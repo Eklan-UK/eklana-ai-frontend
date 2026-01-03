@@ -1,0 +1,17 @@
+Grammar Patterns Practice
+
+Subject + Verb + Object: Basic sentence structure
+Example: I eat an apple
+
+Question: Do/Does + Subject + Verb?: Yes/No question format
+Example: Do you like pizza?
+
+Past tense: Subject + Verb-ed: Regular past tense
+Example: I walked to school
+
+Present continuous: Subject + am/is/are + Verb-ing: Action happening now
+Example: She is reading a book
+
+Future: Subject + will + Verb: Simple future tense
+Example: They will arrive tomorrow
+

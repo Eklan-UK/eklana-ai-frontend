@@ -1,0 +1,50 @@
+{
+  "name": "front-end",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "generate-icons": "node scripts/generate-icons.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/nodemailer": "^7.0.4",
+    "axios": "^1.13.2",
+    "bcrypt": "^6.0.0",
+    "better-auth": "^1.4.9",
+    "cloudinary": "^2.8.0",
+    "lucide-react": "^0.562.0",
+    "mammoth": "^1.11.0",
+    "mongoose": "^9.1.1",
+    "next": "16.1.1",
+    "next-pwa": "^5.6.0",
+    "nodemailer": "^7.0.12",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.7",
+    "winston": "^3.19.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.2",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

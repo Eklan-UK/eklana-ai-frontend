@@ -1,0 +1,13 @@
+Restaurant Vocabulary Practice
+
+hello | hola | Hello, how are you? | Hola, ¿cómo estás?
+goodbye | adiós | Goodbye, see you later! | Adiós, ¡nos vemos!
+please | por favor | Can you help me, please? | ¿Puedes ayudarme, por favor?
+thank you | gracias | Thank you very much! | ¡Muchas gracias!
+water | agua | I need a glass of water | Necesito un vaso de agua
+food | comida | The food is delicious | La comida está deliciosa
+menu | menú | Can I see the menu? | ¿Puedo ver el menú?
+bill | cuenta | Can I have the bill, please? | ¿Puedo tener la cuenta, por favor?
+table | mesa | A table for two, please | Una mesa para dos, por favor
+waiter | camarero | Waiter, can you help us? | Camarero, ¿puede ayudarnos?
+

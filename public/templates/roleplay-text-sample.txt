@@ -1,0 +1,15 @@
+Restaurant Roleplay Scene
+
+Scene 1: Ordering at a Restaurant
+
+ai_0: Good evening! Welcome to our restaurant. How many people?
+student: Hello! A table for two, please.
+ai_0: Of course! Right this way, please.
+student: Thank you. Can I see the menu?
+ai_0: Here you go. Our special today is the paella.
+student: That sounds good. I'll have that.
+ai_0: Excellent choice! Would you like something to drink?
+student: Yes, a glass of water, please.
+ai_0: Perfect. I'll bring that right away.
+student: Thank you very much!
+

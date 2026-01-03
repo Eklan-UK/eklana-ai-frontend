@@ -1,0 +1,13 @@
+Vocabulary Matching Exercise
+
+hello | greeting
+goodbye | farewell
+please | request
+thank you | gratitude
+water | liquid
+food | nourishment
+friend | companion
+house | residence
+book | literature
+time | duration
+

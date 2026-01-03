@@ -1,0 +1,13 @@
+Vocabulary Definitions
+
+hello: A greeting used when meeting someone
+goodbye: A farewell used when leaving
+please: A polite word used when making a request
+thank you: An expression of gratitude
+water: A clear liquid essential for life
+food: Substances consumed for nutrition
+friend: A person with whom one has a bond of mutual affection
+house: A building where people live
+book: A written or printed work consisting of pages
+time: The indefinite continued progress of existence
+
