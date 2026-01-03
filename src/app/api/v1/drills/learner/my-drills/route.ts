@@ -4,7 +4,9 @@ import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import DrillAssignment from "@/models/drill-assignment";
 import Learner from "@/models/leaner";
+import Drill from "@/models/drill";
 import DrillAttempt from "@/models/drill-attempt";
+import User from "@/models/user";
 import { Types } from "mongoose";
 import { logger } from "@/lib/api/logger";
 
@@ -46,8 +48,8 @@ async function getHandler(
       query.status = statusMap[status] || status;
     }
 
-    console.log(learner.id, "Gettig drills for this user",query)
-
+    const _drill = await Drill.find();
+    const _user = await User.find();
     // Get drill assignments
     const assignments = await DrillAssignment.find(query)
       .populate({
