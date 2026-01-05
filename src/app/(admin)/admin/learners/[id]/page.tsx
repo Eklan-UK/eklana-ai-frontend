@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Mail, Calendar, BookOpen, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, Calendar, BookOpen, TrendingUp, CheckCircle, XCircle, Mic, BarChart3 } from 'lucide-react';
 import { adminService } from '@/services/admin.service';
 import { drillAPI } from '@/lib/api';
+import { useLearnerPronunciationAnalytics } from '@/hooks/usePronunciations';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -14,9 +15,13 @@ export default function LearnerProfilePage() {
   const learnerId = params.id as string;
 
   const [learner, setLearner] = useState<any>(null);
+  const [learnerProfile, setLearnerProfile] = useState<any>(null);
   const [drills, setDrills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [drillsLoading, setDrillsLoading] = useState(true);
+
+  // Get pronunciation analytics
+  const { data: pronunciationAnalytics, isLoading: analyticsLoading } = useLearnerPronunciationAnalytics(learnerId);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -24,6 +29,7 @@ export default function LearnerProfilePage() {
         setLoading(true);
         const learnerResponse = await adminService.getLearnerById(learnerId);
         setLearner(learnerResponse.user);
+        setLearnerProfile(learnerResponse.learner || learnerResponse.user);
 
         // Fetch drills assigned to this learner
         setDrillsLoading(true);
@@ -187,14 +193,134 @@ export default function LearnerProfilePage() {
         )}
       </div>
 
-      {/* Analytics Placeholder */}
+      {/* Pronunciation Analytics */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" /> Analytics
+          <Mic className="w-5 h-5" /> Pronunciation Analytics
         </h2>
-        <div className="text-center py-12 text-gray-500">
-          <p>Analytics coming soon</p>
-        </div>
+
+        {analyticsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        ) : !pronunciationAnalytics ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>No pronunciation data available</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Overall Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Total Assignments</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {pronunciationAnalytics.overall?.totalAssignments || 0}
+                </p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Completed</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {pronunciationAnalytics.overall?.completedAssignments || 0}
+                </p>
+              </div>
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Average Score</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {pronunciationAnalytics.overall?.averageScore?.toFixed(1) || 0}%
+                </p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg">
+                <p className="text-xs text-gray-600 mb-1">Pass Rate</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {pronunciationAnalytics.overall?.passRate?.toFixed(1) || 0}%
+                </p>
+              </div>
+            </div>
+
+            {/* Problem Areas */}
+            {pronunciationAnalytics.problemAreas && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3">Top Incorrect Letters</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {pronunciationAnalytics.problemAreas.topIncorrectLetters?.length > 0 ? (
+                      pronunciationAnalytics.problemAreas.topIncorrectLetters.map((item: any, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium"
+                        >
+                          {item.letter} ({item.count})
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">None identified</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3">Top Incorrect Phonemes</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {pronunciationAnalytics.problemAreas.topIncorrectPhonemes?.length > 0 ? (
+                      pronunciationAnalytics.problemAreas.topIncorrectPhonemes.map((item: any, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium"
+                        >
+                          {item.phoneme} ({item.count})
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">None identified</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Word Stats */}
+            {pronunciationAnalytics.wordStats && pronunciationAnalytics.wordStats.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-3">Word-Level Progress</h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {pronunciationAnalytics.wordStats.map((word: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{word.title}</p>
+                        <p className="text-xs text-gray-500">{word.text}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">Attempts</p>
+                          <p className="text-sm font-bold text-gray-900">{word.attempts || 0}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">Best Score</p>
+                          <p
+                            className={`text-sm font-bold ${
+                              word.bestScore >= 70 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {word.bestScore?.toFixed(0) || 0}%
+                          </p>
+                        </div>
+                        <div>
+                          {word.status === "completed" ? (
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

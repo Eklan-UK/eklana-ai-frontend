@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Plus,
   Edit,
@@ -16,9 +16,13 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useAllDrills } from "@/hooks/useAdmin";
+import { useDeleteDrill } from "@/hooks/useDrills";
 import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/react-query";
 
 interface Drill {
   _id: string;
@@ -35,8 +39,6 @@ interface Drill {
 
 const AdminDrillPage: React.FC = () => {
   const router = useRouter();
-  const [drills, setDrills] = useState<Drill[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
@@ -56,32 +58,25 @@ const AdminDrillPage: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchDrills();
-  }, []);
-
-  const fetchDrills = async () => {
-    try {
-      setLoading(true);
-      const response = await drillAPI.getAll({ limit: 100 });
-      const drillsList = response.drills || [];
-      setDrills(drillsList);
-    } catch (error: any) {
-      toast.error("Failed to load drills: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use React Query instead of useEffect + useState
+  const { data: drills = [], isLoading: loading } = useAllDrills({
+    limit: 100,
+  });
+  const deleteMutation = useDeleteDrill();
+  const queryClient = useQueryClient();
 
   const handleDelete = async (drillId: string) => {
-    try {
-      await drillAPI.delete(drillId);
-      toast.success("Drill deleted successfully");
-      setShowDeleteModal(false);
-      setSelectedDrill(null);
-      fetchDrills();
-    } catch (error: any) {
-      toast.error("Failed to delete drill: " + error.message);
+    if (
+      confirm(
+        "Are you sure you want to delete this drill? This action cannot be undone."
+      )
+    ) {
+      deleteMutation.mutate(drillId, {
+        onSuccess: () => {
+          setShowDeleteModal(false);
+          setSelectedDrill(null);
+        },
+      });
     }
   };
 
@@ -116,7 +111,8 @@ const AdminDrillPage: React.FC = () => {
       toast.success("Drill updated successfully");
       setShowEditModal(false);
       setSelectedDrill(null);
-      fetchDrills();
+      // Invalidate queries to refetch data
+      queryClient.invalidateQueries({ queryKey: queryKeys.drills.all });
     } catch (error: any) {
       toast.error("Failed to update drill: " + error.message);
     } finally {
@@ -146,20 +142,26 @@ const AdminDrillPage: React.FC = () => {
     });
   };
 
-  const filteredDrills = drills.filter((drill) => {
-    const matchesSearch =
-      drill.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      drill.context?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === "all" || drill.type === filterType;
-    const matchesDifficulty =
-      filterDifficulty === "all" || drill.difficulty === filterDifficulty;
-    const matchesActive =
-      filterActive === "all" ||
-      (filterActive === "active" && drill.is_active) ||
-      (filterActive === "inactive" && !drill.is_active);
+  const filteredDrills = React.useMemo(
+    () =>
+      drills.filter((drill) => {
+        const matchesSearch =
+          drill.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          drill.context?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesType = filterType === "all" || drill.type === filterType;
+        const matchesDifficulty =
+          filterDifficulty === "all" || drill.difficulty === filterDifficulty;
+        const matchesActive =
+          filterActive === "all" ||
+          (filterActive === "active" && drill.is_active) ||
+          (filterActive === "inactive" && !drill.is_active);
 
-    return matchesSearch && matchesType && matchesDifficulty && matchesActive;
-  });
+        return (
+          matchesSearch && matchesType && matchesDifficulty && matchesActive
+        );
+      }),
+    [drills, searchTerm, filterType, filterDifficulty, filterActive]
+  );
 
   return (
     <div className="space-y-8 pb-12">

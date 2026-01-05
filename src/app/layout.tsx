@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
   title: "eklan AI - English Learning Platform",
@@ -52,14 +53,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`antialiased`}
       >
-        <AuthProvider>
-          <ToastProvider />
-          {children}
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <ToastProvider />
+            {children}
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

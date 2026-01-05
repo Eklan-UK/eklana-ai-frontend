@@ -186,6 +186,235 @@ export const drillAPI = {
   },
 };
 
+// Pronunciation API - All routes now use Next.js API routes
+export const pronunciationAPI = {
+  // Get all pronunciations (admin)
+  getAll: (params?: {
+    limit?: number;
+    offset?: number;
+    difficulty?: string;
+    isActive?: boolean;
+    search?: string;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        pronunciations: any[];
+        pagination: any;
+      };
+    }>('/pronunciations', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  // Create pronunciation (admin)
+  create: (formData: FormData) => {
+    return apiClient.post('/pronunciations', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then((response) => response.data);
+  },
+
+  // Assign pronunciation to learners
+  assign: (pronunciationId: string, data: { learnerIds: string[]; dueDate?: string }) => {
+    return apiRequest<{ message: string; data: any }>(`/pronunciations/${pronunciationId}/assign`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  // Get learner's pronunciations
+  getLearnerPronunciations: (params?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        pronunciations: any[];
+        pagination: any;
+      };
+    }>('/pronunciations/learner/my-pronunciations', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  // Submit pronunciation attempt
+  submitAttempt: (pronunciationId: string, data: {
+    assignmentId?: string;
+    audioBase64: string;
+    passingThreshold?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        attempt: any;
+        assignment: any;
+      };
+    }>(`/pronunciations/${pronunciationId}/attempt`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  // Get pronunciation attempts
+  getAttempts: (pronunciationId: string, learnerId?: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        attempts: any[];
+        assignment: any;
+      };
+    }>(`/pronunciations/${pronunciationId}/attempts`, {
+      method: 'GET',
+      params: learnerId ? { learnerId } : undefined,
+    });
+  },
+
+  // Get learner pronunciation analytics
+  getLearnerAnalytics: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learner: any;
+        overall: any;
+        problemAreas: any;
+        accuracyTrend: any[];
+        wordStats: any[];
+      };
+    }>(`/pronunciations/learner/${learnerId}/analytics`, {
+      method: 'GET',
+    });
+  },
+};
+
+// Pronunciation Problems API (New Global System)
+export const pronunciationProblemAPI = {
+  // Get all pronunciation problems (global, visible to all)
+  getAll: (params?: {
+    difficulty?: string;
+    isActive?: boolean;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        problems: any[];
+      };
+    }>('/pronunciation-problems', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  // Create pronunciation problem (admin)
+  create: (data: {
+    title: string;
+    description?: string;
+    phonemes: string[];
+    difficulty?: string;
+    estimatedTimeMinutes?: number;
+    order?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        problem: any;
+      };
+    }>('/pronunciation-problems', {
+      method: 'POST',
+      data,
+    });
+  },
+
+  // Get problem by slug with words and progress
+  getBySlug: (slug: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        problem: any;
+        words: any[];
+        progress?: any; // Only for learners
+      };
+    }>(`/pronunciation-problems/${slug}`, {
+      method: 'GET',
+    });
+  },
+
+  // Get words in a problem
+  getWords: (slug: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        words: any[];
+      };
+    }>(`/pronunciation-problems/${slug}/words`, {
+      method: 'GET',
+    });
+  },
+
+  // Add word to problem (admin)
+  addWord: (slug: string, formData: FormData) => {
+    return apiClient.post(`/pronunciation-problems/${slug}/words`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then((response) => response.data);
+  },
+};
+
+// Pronunciation Words API
+export const pronunciationWordAPI = {
+  // Submit word attempt
+  submitAttempt: (wordId: string, data: {
+    audioBase64: string;
+    passingThreshold?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        attempt: any;
+        progress: any;
+      };
+    }>(`/pronunciation-words/${wordId}/attempt`, {
+      method: 'POST',
+      data,
+    });
+  },
+};
+
+// Learner Challenges API
+export const learnerChallengesAPI = {
+  // Get challenging words for a learner
+  getChallenges: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learner: any;
+        challenges: any;
+        words: any[];
+        weakPhonemes: string[];
+      };
+    }>(`/learners/${learnerId}/pronunciation-challenges`, {
+      method: 'GET',
+    });
+  },
+};
+
 // Tutor API
 export const tutorAPI = {
   // Get my drills

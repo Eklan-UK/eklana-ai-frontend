@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   Layout,
+  Mic,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -26,6 +27,7 @@ const Sidebar: React.FC = () => {
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
     { name: "Analytics", icon: BarChart2, path: "/admin/analytics" },
     { name: "Settings", icon: Settings, path: "/admin/settings" },
   ];

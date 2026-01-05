@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { ArrowLeft, Calendar, Target, Clock } from "lucide-react";
 import Link from "next/link";
 import { drillAPI } from "@/lib/api";
+import { formatDate } from "@/utils/drill";
 
 interface DrillPracticeInterfaceProps {
   drill: any;
@@ -211,14 +212,5 @@ function getDrillIcon(type: string): string {
     sentence_writing: "✍️",
   };
   return icons[type] || "📚";
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", { 
-    month: "short", 
-    day: "numeric", 
-    year: "numeric" 
-  });
 }
 

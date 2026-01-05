@@ -1,23 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import {
-  BookOpen,
-  Clock,
-  Calendar,
-  CheckCircle,
-  AlertCircle,
-  Target,
-  Loader2,
-} from "lucide-react";
-import Link from "next/link";
-import { drillAPI } from "@/lib/api";
-import { toast } from "sonner";
+import { Loader2, BookOpen } from "lucide-react";
+import { useLearnerDrills } from "@/hooks/useDrills";
+import { DrillCard } from "@/components/drills/DrillCard";
+import { getDrillStatus } from "@/utils/drill";
 
 interface DrillItem {
   assignmentId: string;
@@ -47,123 +38,19 @@ interface DrillItem {
 }
 
 // Helper function to determine drill status based on dates
-function getDrillStatus(
-  item: DrillItem
-): "ongoing" | "upcoming" | "completed" | "missed" {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  // Check if completed
-  if (item.completedAt || (item.status as string) === "completed") {
-    return "completed";
-  }
-
-  // Use assignment dueDate if available, otherwise calculate from drill date + duration
-  const dueDate = item.dueDate
-    ? new Date(item.dueDate)
-    : (() => {
-        const endDate = new Date(item.drill.date);
-        endDate.setDate(
-          endDate.getDate() + (item.drill.duration_days || 1) - 1
-        );
-        return endDate;
-      })();
-  dueDate.setHours(23, 59, 59, 999);
-
-  const startDate = new Date(item.drill.date);
-  startDate.setHours(0, 0, 0, 0);
-
-  // Check if drill is missed (due date has passed and not completed)
-  if (
-    now > dueDate &&
-    !item.completedAt &&
-    (item.status as string) !== "completed"
-  ) {
-    return "missed";
-  }
-
-  // Check if drill is ongoing (today is within the date range)
-  if (now >= startDate && now <= dueDate) {
-    return "ongoing";
-  }
-
-  // Check if drill is upcoming (start date is in the future)
-  if (startDate > now) {
-    return "upcoming";
-  }
-
-  // Default to ongoing if past start date but before due date
-  return "ongoing";
-}
 
 export default function DrillsPage() {
   const router = useRouter();
-  const [drills, setDrills] = useState<DrillItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<
     "ongoing" | "upcoming" | "completed"
   >("ongoing");
 
-  useEffect(() => {
-    loadDrills();
-  }, []);
-
-  const loadDrills = async () => {
-    try {
-      setLoading(true);
-      // Load all drills - we'll filter by status on the client side
-      // Cache is enabled by default in apiRequest
-      const response: any = await drillAPI.getLearnerDrills({ limit: 100 });
-
-      // Handle different response structures
-      let drillsData: DrillItem[] = [];
-
-      if (response.data?.drills) {
-        drillsData = response.data.drills;
-      } else if (response.drills) {
-        drillsData = response.drills;
-      } else if (Array.isArray(response)) {
-        drillsData = response;
-      }
-
-      // Ensure drills have the correct structure
-      drillsData = drillsData.map((item: any) => {
-        // Handle case where drill might be nested differently
-        if (item.drill && typeof item.drill === "object") {
-          return item;
-        }
-        // If drill data is at top level, restructure it
-        if (item._id && item.title) {
-          return {
-            assignmentId: item.assignmentId || item._id,
-            drill: item,
-            assignedBy: item.assignedBy,
-            assignedAt: item.assignedAt || item.created_date,
-            dueDate:
-              item.dueDate ||
-              new Date(
-                new Date(item.date).getTime() +
-                  (item.duration_days || 1) * 24 * 60 * 60 * 1000
-              ).toISOString(),
-            status: item.status || "pending",
-            completedAt: item.completedAt,
-            latestAttempt: item.latestAttempt,
-          };
-        }
-        return item;
-      });
-
-      setDrills(drillsData);
-    } catch (error: any) {
-      console.error("Error loading drills:", error);
-      toast.error(
-        "Failed to load drills: " + (error.message || "Unknown error")
-      );
-      setDrills([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use React Query instead of useEffect + useState
+  const {
+    data: drills = [],
+    isLoading: loading,
+    error,
+  } = useLearnerDrills({ limit: 100 });
 
   const handleDrillClick = async (drillId: string, assignmentId?: string) => {
     // Track recent activity
@@ -189,61 +76,6 @@ export default function DrillsPage() {
       : `/account/drills/${drillId}`;
 
     router.push(url);
-  };
-
-  const getDrillIcon = (type: string): string => {
-    const icons: Record<string, string> = {
-      vocabulary: "📚",
-      roleplay: "💬",
-      matching: "🔗",
-      definition: "📖",
-      summary: "📝",
-      grammar: "✏️",
-      sentence_writing: "✍️",
-    };
-    return icons[type] || "📚";
-  };
-
-  const getStatusBadge = (item: DrillItem) => {
-    const status = getDrillStatus(item);
-
-    switch (status) {
-      case "completed":
-        return (
-          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" />
-            Completed
-          </span>
-        );
-      case "ongoing":
-        return (
-          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            Ongoing
-          </span>
-        );
-      case "upcoming":
-        return (
-          <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            Upcoming
-          </span>
-        );
-      case "missed":
-        return (
-          <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Missed
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Pending
-          </span>
-        );
-    }
   };
 
   // Filter drills based on date-based status
@@ -320,101 +152,20 @@ export default function DrillsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {filteredDrills.map((item) => {
-              const drill = item.drill;
-              const dueDate = item.dueDate
-                ? new Date(item.dueDate)
-                : (() => {
-                    const endDate = new Date(item.drill.date);
-                    endDate.setDate(
-                      endDate.getDate() + (item.drill.duration_days || 1) - 1
-                    );
-                    return endDate;
-                  })();
-              const status = getDrillStatus(item);
-              const isOverdue = status === "missed";
-
-              return (
-                <Card
-                  key={item.assignmentId}
-                  className="p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div
-                      className="flex items-start gap-3 flex-1 cursor-pointer"
-                      onClick={() =>
-                        handleDrillClick(drill._id, item.assignmentId)
-                      }
-                    >
-                      <span className="text-2xl">
-                        {getDrillIcon(drill.type)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 mb-1 truncate">
-                          {drill.title}
-                        </h3>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-gray-500 capitalize">
-                            {drill.type}
-                          </span>
-                          <span className="text-xs text-gray-400">•</span>
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Target className="w-3 h-3" />
-                            <span className="capitalize">
-                              {drill.difficulty}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {getStatusBadge(item)}
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>Due: {dueDate.toLocaleDateString()}</span>
-                    </div>
-                    {item.latestAttempt?.score !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>Score: {item.latestAttempt.score}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {isOverdue && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
-                      <p className="text-xs text-red-700">
-                        This drill is overdue
-                      </p>
-                    </div>
-                  )}
-
-                  {item.assignedBy && (
-                    <p className="text-xs text-gray-400 mb-3">
-                      Assigned by: {item.assignedBy.firstName}{" "}
-                      {item.assignedBy.lastName}
-                    </p>
-                  )}
-
-                  {/* Start Button */}
-                  <div className="flex justify-end mt-3">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDrillClick(drill._id, item.assignmentId);
-                      }}
-                      className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                    >
-                      Start
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
+            {filteredDrills.map((item) => (
+              <DrillCard
+                key={item.assignmentId}
+                drill={item.drill}
+                assignmentId={item.assignmentId}
+                assignedBy={item.assignedBy}
+                dueDate={item.dueDate}
+                completedAt={item.completedAt}
+                latestAttempt={item.latestAttempt}
+                status={item.status}
+                variant="detailed"
+                onStartClick={handleDrillClick}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -1,0 +1,99 @@
+// models/pronunciation-problem.model.ts
+import { Schema, model, models, Document, Types } from 'mongoose';
+
+export interface IPronunciationProblem extends Document {
+	_id: Types.ObjectId;
+	title: string;
+	slug: string; // URL-friendly identifier (unique)
+	description?: string;
+	phonemes: string[]; // Target phonemes for this problem (e.g., ["r", "l"])
+	difficulty: 'beginner' | 'intermediate' | 'advanced';
+	estimatedTimeMinutes?: number;
+	createdBy: Types.ObjectId; // Admin who created it
+	isActive: boolean;
+	order: number; // Display order
+	// Metadata
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const pronunciationProblemSchema = new Schema<IPronunciationProblem>(
+	{
+		title: {
+			type: String,
+			required: [true, 'Title is required'],
+			trim: true,
+			maxlength: [200, 'Title cannot exceed 200 characters'],
+		},
+		slug: {
+			type: String,
+			required: [true, 'Slug is required'],
+			unique: true,
+			trim: true,
+			lowercase: true,
+			match: [/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be URL-friendly'],
+		},
+		description: {
+			type: String,
+			trim: true,
+			maxlength: [1000, 'Description cannot exceed 1000 characters'],
+		},
+		phonemes: {
+			type: [String],
+			required: [true, 'At least one phoneme is required'],
+			validate: {
+				validator: (v: string[]) => v.length > 0,
+				message: 'At least one phoneme is required',
+			},
+		},
+		difficulty: {
+			type: String,
+			enum: ['beginner', 'intermediate', 'advanced'],
+			required: [true, 'Difficulty level is required'],
+			default: 'intermediate',
+		},
+		estimatedTimeMinutes: {
+			type: Number,
+			min: [1, 'Estimated time must be at least 1 minute'],
+		},
+		createdBy: {
+			type: Schema.Types.ObjectId,
+			ref: 'User',
+			required: [true, 'Creator is required'],
+			index: true,
+		},
+		isActive: {
+			type: Boolean,
+			default: true,
+			index: true,
+		},
+		order: {
+			type: Number,
+			default: 0,
+		},
+	},
+	{
+		timestamps: true,
+		collection: 'pronunciation_problems',
+	}
+);
+
+// Indexes for performance
+pronunciationProblemSchema.index({ slug: 1 }, { unique: true });
+pronunciationProblemSchema.index({ createdBy: 1, createdAt: -1 });
+pronunciationProblemSchema.index({ difficulty: 1, isActive: 1 });
+pronunciationProblemSchema.index({ order: 1, isActive: 1 });
+pronunciationProblemSchema.index({ phonemes: 1 });
+
+// Generate slug from title before saving
+pronunciationProblemSchema.pre('save', function (next) {
+	if (this.isModified('title') && !this.slug) {
+		this.slug = this.title
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '');
+	}
+});
+
+export default models?.PronunciationProblem || model<IPronunciationProblem>('PronunciationProblem', pronunciationProblemSchema);
+

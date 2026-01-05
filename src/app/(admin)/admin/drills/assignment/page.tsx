@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   BookOpen,
   Plus,
@@ -12,8 +12,7 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { drillAPI } from "@/lib/api";
-import { toast } from "sonner";
+import { useAllDrills } from "@/hooks/useAdmin";
 
 interface Drill {
   _id: string;
@@ -28,29 +27,14 @@ interface Drill {
 }
 
 export default function DrillAssignmentPage() {
-  const [drills, setDrills] = useState<Drill[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
 
-  useEffect(() => {
-    fetchDrills();
-  }, []);
+  // Use React Query instead of useEffect + useState
+  const { data: drills = [], isLoading: loading } = useAllDrills({ limit: 100 });
 
-  const fetchDrills = async () => {
-    try {
-      setLoading(true);
-      const response = await drillAPI.getAll({ limit: 100 });
-      setDrills(response.drills || []);
-    } catch (error: any) {
-      toast.error("Failed to load drills: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredDrills = drills.filter((drill) => {
+  const filteredDrills = React.useMemo(() => drills.filter((drill) => {
     const matchesSearch =
       drill.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       drill.type.toLowerCase().includes(searchTerm.toLowerCase());
@@ -58,7 +42,7 @@ export default function DrillAssignmentPage() {
     const matchesDifficulty =
       filterDifficulty === "all" || drill.difficulty === filterDifficulty;
     return matchesSearch && matchesType && matchesDifficulty;
-  });
+  }), [drills, searchTerm, filterType, filterDifficulty]);
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {

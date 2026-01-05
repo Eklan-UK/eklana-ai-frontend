@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { drillAPI, tutorAPI } from "@/lib/api";
+import { useTutorStudents } from "@/hooks/useTutor";
+import { useDrill } from "@/hooks/useDrills";
 import { FileUploadZone } from "@/components/drills/FileUploadZone";
 import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
@@ -94,8 +96,11 @@ function CreateDrillPageContent() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [students, setStudents] = useState<any[]>([]);
   const [existingDrill, setExistingDrill] = useState<any>(null);
+  
+  // Use React Query instead of useEffect
+  const { data: studentsData } = useTutorStudents();
+  const students = studentsData?.students || [];
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
@@ -152,28 +157,18 @@ function CreateDrillPageContent() {
     };
   });
 
-  // Load students
-  useEffect(() => {
-    const loadStudents = async () => {
-      try {
-        const response = await tutorAPI.getStudents();
-        setStudents(response.students || []);
-      } catch (error) {
-        console.error("Failed to load students:", error);
-      }
-    };
-    loadStudents();
-  }, []);
+  // Use React Query instead of useEffect
+  const { data: studentsData } = useTutorStudents();
+  const students = studentsData?.students || [];
 
-  // Load existing drill in edit mode
+  // Load existing drill in edit mode using React Query
+  const { data: drillData } = useDrill(drillId || "");
+  
+  // Update existingDrill when drillData is loaded
   useEffect(() => {
-    const loadDrill = async () => {
-      if (isEditMode && drillId && !existingDrill) {
-        setLoading(true);
-        try {
-          const response = await drillAPI.getById(drillId);
-          const drill = response.drill;
-          setExistingDrill(drill);
+    if (isEditMode && drillData && !existingDrill) {
+      const drill = drillData;
+      setExistingDrill(drill);
 
           const aiNames =
             drill.ai_character_names ||
@@ -227,15 +222,15 @@ function CreateDrillPageContent() {
             article_content: drill.article_content || "",
             article_title: drill.article_title || "",
           });
-        } catch (error) {
-          console.error("Failed to load drill:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-    loadDrill();
-  }, [isEditMode, drillId, existingDrill]);
+    }
+  }, [isEditMode, drillData, existingDrill]);
+  
+  // Set loading state based on drill query
+  useEffect(() => {
+    if (isEditMode && drillId) {
+      setLoading(drillLoading);
+    }
+  }, [isEditMode, drillId, drillLoading]);
 
   // Auto-save draft
   useEffect(() => {

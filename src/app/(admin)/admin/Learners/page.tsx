@@ -1,75 +1,25 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Filter, Download, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
-import { adminService } from '@/services/admin.service';
-import { toast } from 'sonner';
+import { useAllLearners } from '@/hooks/useAdmin';
 import Link from 'next/link';
 
 const Learners: React.FC = () => {
-  const [learners, setLearners] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [limit] = useState(20);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchLearners();
-  }, [offset, searchQuery]);
+  // Use React Query instead of useEffect + useState
+  const { data, isLoading: loading } = useAllLearners({
+    limit,
+    offset,
+    role: 'learner',
+    search: searchQuery || undefined,
+  });
 
-  // Fetch drill counts for learners
-  useEffect(() => {
-    const fetchDrillCounts = async () => {
-      if (learners.length === 0) return;
-      
-      try {
-        const learnersWithCounts = await Promise.all(
-          learners.map(async (learner) => {
-            try {
-              const drillsResponse = await adminService.getDrills({
-                limit: 1,
-                // Note: We need to filter by studentEmail, but getDrills might not support it
-                // For now, we'll use a workaround
-              });
-              // This is a simplified version - in production, you'd want a dedicated endpoint
-              return {
-                ...learner,
-                drillCount: 0, // Placeholder - would need proper endpoint
-              };
-            } catch {
-              return { ...learner, drillCount: 0 };
-            }
-          })
-        );
-        setLearners(learnersWithCounts);
-      } catch (error) {
-        console.error('Failed to fetch drill counts:', error);
-      }
-    };
-
-    if (learners.length > 0) {
-      fetchDrillCounts();
-    }
-  }, [learners.length]);
-
-  const fetchLearners = async () => {
-    try {
-      setLoading(true);
-      const response = await adminService.getLearners({
-        limit,
-        offset,
-        role: 'learner',
-        search: searchQuery || undefined,
-      });
-      setLearners(response.users);
-      setTotal(response.total);
-    } catch (error: any) {
-      toast.error('Failed to load learners: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const learners = data?.learners || [];
+  const total = data?.total || 0;
 
   const formatDate = (dateString: string) => {
     try {

@@ -16,109 +16,19 @@ import Link from "next/link";
 import { getUserFirstName } from "@/utils/user";
 import { getCurrentUser } from "./get-user";
 import { getAssignedDrills } from "./get-drills";
+import { getDrillTypeInfo, formatDate, getDrillStatus } from "@/utils/drill";
+import { generateMetadata } from "@/utils/seo";
+import { DrillCard } from "@/components/drills/DrillCard";
 
 // Revalidate every 30 seconds (ISR)
 export const revalidate = 30;
 
-// Helper function to get drill type icon and color
-function getDrillTypeInfo(type: string) {
-  const types: Record<
-    string,
-    { icon: string; color: string; borderColor: string }
-  > = {
-    vocabulary: {
-      icon: "📚",
-      color: "green",
-      borderColor: "border-l-green-500",
-    },
-    roleplay: { icon: "💬", color: "blue", borderColor: "border-l-blue-500" },
-    matching: {
-      icon: "🔗",
-      color: "purple",
-      borderColor: "border-l-purple-500",
-    },
-    definition: {
-      icon: "📖",
-      color: "orange",
-      borderColor: "border-l-orange-500",
-    },
-    summary: {
-      icon: "📝",
-      color: "indigo",
-      borderColor: "border-l-indigo-500",
-    },
-    grammar: { icon: "✏️", color: "pink", borderColor: "border-l-pink-500" },
-    sentence_writing: {
-      icon: "✍️",
-      color: "teal",
-      borderColor: "border-l-teal-500",
-    },
-  };
-  return (
-    types[type] || {
-      icon: "📚",
-      color: "gray",
-      borderColor: "border-l-gray-500",
-    }
-  );
-}
-
-// Helper function to format date
-function formatDate(dateString: string) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// Helper function to determine drill status based on dates
-function getDrillStatus(drill: any) {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); // Reset to start of day for comparison
-
-  // Use assignment dueDate if available, otherwise calculate from drill date + duration
-  const dueDate = drill.dueDate
-    ? new Date(drill.dueDate)
-    : (() => {
-        const endDate = new Date(drill.date);
-        endDate.setDate(endDate.getDate() + (drill.duration_days || 1) - 1);
-        return endDate;
-      })();
-  dueDate.setHours(23, 59, 59, 999);
-
-  const startDate = new Date(drill.date);
-  startDate.setHours(0, 0, 0, 0);
-
-  // Check if drill is completed
-  if (drill.completedAt || drill.assignmentStatus === "completed") {
-    return "completed";
-  }
-
-  // Check if drill is missed (due date has passed and not completed)
-  if (
-    now > dueDate &&
-    !drill.completedAt &&
-    drill.assignmentStatus !== "completed"
-  ) {
-    return "missed";
-  }
-
-  // Check if drill is active (today is within the date range)
-  // Note: is_active check is optional - if not set, assume active
-  if (now >= startDate && now <= dueDate && drill.is_active !== false) {
-    return "active";
-  }
-
-  // Check if drill is upcoming (start date is in the future)
-  if (startDate > now) {
-    return "upcoming";
-  }
-
-  // Default to pending
-  return "pending";
-}
+// SEO Metadata
+export const metadata = generateMetadata({
+  title: "Dashboard",
+  description: "View your assigned drills, progress, and learning activities",
+  path: "/account",
+});
 
 // Helper function to check if drill is active
 function isDrillActive(drill: any) {
@@ -390,9 +300,6 @@ export default async function HomePage() {
 
                 return sortedDrills.slice(0, 3);
               })().map((drill: any) => {
-                const typeInfo = getDrillTypeInfo(drill.type);
-                const status = getDrillStatus(drill);
-                // Use assignment dueDate if available, otherwise calculate from drill date
                 const dueDate = drill.dueDate
                   ? new Date(drill.dueDate)
                   : (() => {
@@ -403,79 +310,17 @@ export default async function HomePage() {
                       return endDate;
                     })();
 
-                // Use assignmentId in the URL if available
-                const drillUrl = drill.assignmentId
-                  ? `/account/drills/${drill._id}?assignmentId=${drill.assignmentId}`
-                  : `/account/drills/${drill._id}`;
-
-                const statusBadges: Record<
-                  string,
-                  { text: string; className: string }
-                > = {
-                  active: {
-                    text: "Active",
-                    className: "bg-green-100 text-green-700",
-                  },
-                  upcoming: {
-                    text: "Upcoming",
-                    className: "bg-blue-100 text-blue-700",
-                  },
-                  missed: {
-                    text: "Missed",
-                    className: "bg-red-100 text-red-700",
-                  },
-                  completed: {
-                    text: "Completed",
-                    className: "bg-gray-100 text-gray-700",
-                  },
-                  pending: {
-                    text: "Pending",
-                    className: "bg-yellow-100 text-yellow-700",
-                  },
-                };
-                const statusBadge = statusBadges[status] || statusBadges.active;
-
                 return (
-                  <Link key={drill._id} href={drillUrl}>
-                    <Card
-                      className={`${typeInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xl">{typeInfo.icon}</span>
-                            <h4 className="font-semibold text-gray-900">
-                              {drill.title}
-                            </h4>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.className}`}
-                            >
-                              {statusBadge.text}
-                            </span>
-                          </div>
-                          {drill.context && (
-                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                              {drill.context}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              Due: {formatDate(dueDate.toISOString())}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1 capitalize">
-                              <Target className="w-3 h-3" />
-                              {drill.difficulty}
-                            </span>
-                          </div>
-                        </div>
-                        <Button variant="primary" size="sm">
-                          Start
-                        </Button>
-                      </div>
-                    </Card>
-                  </Link>
+                  <DrillCard
+                    key={drill._id}
+                    drill={drill}
+                    assignmentId={drill.assignmentId}
+                    dueDate={dueDate.toISOString()}
+                    completedAt={drill.completedAt}
+                    status={getDrillStatus(drill)}
+                    variant="default"
+                    showStartButton={true}
+                  />
                 );
               })}
             </div>
@@ -523,10 +368,6 @@ export default async function HomePage() {
               </h4>
               <div className="space-y-2">
                 {missedDrills.slice(0, 2).map((drill: any) => {
-                  const typeInfo = getDrillTypeInfo(drill.type);
-                  const drillUrl = drill.assignmentId
-                    ? `/account/drills/${drill._id}?assignmentId=${drill.assignmentId}`
-                    : `/account/drills/${drill._id}`;
                   const dueDate = drill.dueDate
                     ? new Date(drill.dueDate)
                     : (() => {
@@ -536,27 +377,18 @@ export default async function HomePage() {
                         );
                         return endDate;
                       })();
+
                   return (
-                    <Link key={drill._id} href={drillUrl}>
-                      <Card
-                        className={`${typeInfo.borderColor} opacity-75 hover:opacity-100 transition-opacity cursor-pointer border-red-200`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span>{typeInfo.icon}</span>
-                            <span className="font-medium text-gray-900">
-                              {drill.title}
-                            </span>
-                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                              Missed
-                            </span>
-                          </div>
-                          <span className="text-xs text-red-500">
-                            Due: {formatDate(dueDate.toISOString())}
-                          </span>
-                        </div>
-                      </Card>
-                    </Link>
+                    <DrillCard
+                      key={drill._id}
+                      drill={drill}
+                      assignmentId={drill.assignmentId}
+                      dueDate={dueDate.toISOString()}
+                      status="missed"
+                      variant="compact"
+                      showStartButton={false}
+                      className="border-red-200 bg-red-50"
+                    />
                   );
                 })}
               </div>

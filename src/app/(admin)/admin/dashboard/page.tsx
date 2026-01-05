@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { adminService } from "@/services/admin.service";
 import { toast } from "sonner";
+import { useDashboardStats, useRecentLearners } from "@/hooks/useAdmin";
 
 interface DashboardStats {
   totalActiveLearners: number;
@@ -25,31 +26,11 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalActiveLearners: 0,
-    totalDrills: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [learners, setLearners] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [statsData, learnersData] = await Promise.all([
-          adminService.getDashboardStats(),
-          adminService.getLearners({ limit: 10 }),
-        ]);
-        setStats(statsData);
-        setLearners(learnersData.users);
-      } catch (error: any) {
-        toast.error("Failed to load dashboard data: " + error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  // Use React Query instead of useEffect + useState
+  const { data: stats = { totalActiveLearners: 0, totalDrills: 0 }, isLoading: statsLoading } = useDashboardStats();
+  const { data: learners = [], isLoading: learnersLoading } = useRecentLearners(10);
+  
+  const loading = statsLoading || learnersLoading;
 
   const displayStats = [
     {

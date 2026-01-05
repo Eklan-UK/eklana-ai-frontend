@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { drillAPI, adminAPI } from "@/lib/api";
+import { useDrillById, useAllLearners, useAssignDrill } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 
 interface Learner {
@@ -45,52 +45,37 @@ export default function DrillAssignmentDetailPage() {
   const router = useRouter();
   const drillId = params.drillId as string;
 
-  const [drill, setDrill] = useState<Drill | null>(null);
-  const [learners, setLearners] = useState<Learner[]>([]);
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<Set<string>>(
     new Set()
   );
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Use React Query instead of useEffect + useState
+  const { data: drill, isLoading: drillLoading } = useDrillById(drillId);
+  const { data: learnersData, isLoading: learnersLoading } = useAllLearners({
+    limit: 200,
+  });
+  const assignMutation = useAssignDrill();
+
+  const learners = learnersData?.learners || [];
+  const loading = drillLoading || learnersLoading;
+
+  // Pre-select learners who are already assigned
   useEffect(() => {
-    if (drillId) {
-      fetchData();
+    if (drill?.assigned_to && learners.length > 0) {
+      const assignedEmails = new Set(drill.assigned_to);
+      const assignedLearnerIds = new Set<string>();
+      learners.forEach((learner: Learner) => {
+        if (
+          learner.userId &&
+          assignedEmails.has((learner.userId as any).email)
+        ) {
+          assignedLearnerIds.add(learner.userId._id.toString());
+        }
+      });
+      setSelectedLearnerIds(assignedLearnerIds);
     }
-  }, [drillId]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [drillResponse, learnersResponse] = await Promise.all([
-        drillAPI.getById(drillId),
-        adminAPI.getAllLearners({ limit: 200 }),
-      ]);
-
-      setDrill(drillResponse.drill);
-      setLearners(learnersResponse.data?.learners || []);
-
-      // Pre-select learners who are already assigned
-      if (drillResponse.drill?.assigned_to) {
-        const assignedEmails = new Set(drillResponse.drill.assigned_to);
-        const assignedLearnerIds = new Set<string>();
-        learnersResponse.data?.learners.forEach((learner: Learner) => {
-          if (
-            learner.userId &&
-            assignedEmails.has((learner.userId as any).email)
-          ) {
-            assignedLearnerIds.add(learner.userId._id.toString());
-          }
-        });
-        setSelectedLearnerIds(assignedLearnerIds);
-      }
-    } catch (error: any) {
-      toast.error("Failed to load data: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [drill?.assigned_to, learners]);
 
   const handleToggleLearner = (learnerId: string) => {
     const newSelected = new Set(selectedLearnerIds);
@@ -118,34 +103,31 @@ export default function DrillAssignmentDetailPage() {
       return;
     }
 
-    try {
-      setSubmitting(true);
+    if (!drill) return;
 
-      // Calculate due date based on drill date and duration
-      const dueDate = drill
-        ? new Date(
-            new Date(drill.date).getTime() +
-              drill.duration_days * 24 * 60 * 60 * 1000
-          ).toISOString()
-        : undefined;
+    // Calculate due date based on drill date and duration
+    const dueDate = new Date(
+      new Date(drill.date).getTime() +
+        drill.duration_days * 24 * 60 * 60 * 1000
+    ).toISOString();
 
-      await drillAPI.assign(drillId, {
-        learnerIds: Array.from(selectedLearnerIds),
-        dueDate,
-      });
-
-      toast.success(
-        `Drill assigned to ${selectedLearnerIds.size} student(s) successfully!`
-      );
-      router.push("/admin/drills/assignment");
-    } catch (error: any) {
-      toast.error("Failed to assign drill: " + error.message);
-    } finally {
-      setSubmitting(false);
-    }
+    assignMutation.mutate(
+      {
+        drillId,
+        data: {
+          learnerIds: Array.from(selectedLearnerIds),
+          dueDate,
+        },
+      },
+      {
+        onSuccess: () => {
+          router.push("/admin/drills/assignment");
+        },
+      }
+    );
   };
 
-  const filteredLearners = learners.filter((learner) => {
+  const filteredLearners = useMemo(() => learners.filter((learner) => {
     if (!learner.userId) return false;
     const email = (learner.userId as any).email?.toLowerCase() || "";
     const firstName =
@@ -157,7 +139,7 @@ export default function DrillAssignmentDetailPage() {
       firstName.includes(search) ||
       lastName.includes(search)
     );
-  });
+  }), [learners, searchTerm]);
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -403,10 +385,10 @@ export default function DrillAssignmentDetailPage() {
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={submitting || selectedLearnerIds.size === 0}
+              disabled={assignMutation.isPending || selectedLearnerIds.size === 0}
               className="w-full py-3 bg-[#418b43] text-white font-medium rounded-xl hover:bg-[#3a7c3b] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {submitting ? (
+              {assignMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Assigning...
