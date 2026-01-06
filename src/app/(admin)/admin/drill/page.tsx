@@ -46,17 +46,6 @@ const AdminDrillPage: React.FC = () => {
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    title: "",
-    type: "",
-    difficulty: "",
-    date: "",
-    duration_days: 1,
-    context: "",
-    is_active: true,
-  });
-  const [saving, setSaving] = useState(false);
 
   // Use React Query instead of useEffect + useState
   const { data: drills = [], isLoading: loading } = useAllDrills({
@@ -80,45 +69,6 @@ const AdminDrillPage: React.FC = () => {
     }
   };
 
-  const handleEditClick = (drill: Drill) => {
-    setSelectedDrill(drill);
-    setEditFormData({
-      title: drill.title,
-      type: drill.type,
-      difficulty: drill.difficulty,
-      date: new Date(drill.date).toISOString().split("T")[0],
-      duration_days: drill.duration_days || 1,
-      context: drill.context || "",
-      is_active: drill.is_active,
-    });
-    setShowEditModal(true);
-  };
-
-  const handleEditSave = async () => {
-    if (!selectedDrill) return;
-
-    try {
-      setSaving(true);
-      await drillAPI.update(selectedDrill._id, {
-        title: editFormData.title,
-        type: editFormData.type,
-        difficulty: editFormData.difficulty,
-        date: new Date(editFormData.date).toISOString(),
-        duration_days: editFormData.duration_days,
-        context: editFormData.context,
-        is_active: editFormData.is_active,
-      });
-      toast.success("Drill updated successfully");
-      setShowEditModal(false);
-      setSelectedDrill(null);
-      // Invalidate queries to refetch data
-      queryClient.invalidateQueries({ queryKey: queryKeys.drills.all });
-    } catch (error: any) {
-      toast.error("Failed to update drill: " + error.message);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const getDrillIcon = (type: string): string => {
     const icons: Record<string, string> = {
@@ -351,13 +301,13 @@ const AdminDrillPage: React.FC = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </Link>
-                        <button
-                          onClick={() => handleEditClick(drill)}
+                        <Link
+                          href={`/admin/drills/create?drillId=${drill._id}`}
                           className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
-                        </button>
+                        </Link>
                         <button
                           onClick={() => {
                             setSelectedDrill(drill);
@@ -455,200 +405,6 @@ const AdminDrillPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
-      {showEditModal && selectedDrill && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 my-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Edit Drill</h3>
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setSelectedDrill(null);
-                }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={editFormData.title}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, title: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {/* Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Type *
-                </label>
-                <select
-                  value={editFormData.type}
-                  onChange={(e) =>
-                    setEditFormData({ ...editFormData, type: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                  required
-                >
-                  <option value="vocabulary">Vocabulary</option>
-                  <option value="roleplay">Roleplay</option>
-                  <option value="matching">Matching</option>
-                  <option value="definition">Definition</option>
-                  <option value="summary">Summary</option>
-                  <option value="grammar">Grammar</option>
-                  <option value="sentence_writing">Sentence Writing</option>
-                </select>
-              </div>
-
-              {/* Difficulty */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Difficulty *
-                </label>
-                <select
-                  value={editFormData.difficulty}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      difficulty: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                  required
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-
-              {/* Date and Duration */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={editFormData.date}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        date: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (days) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={editFormData.duration_days}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        duration_days: parseInt(e.target.value) || 1,
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Context */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Context
-                </label>
-                <textarea
-                  value={editFormData.context}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      context: e.target.value,
-                    })
-                  }
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
-                  placeholder="Optional context or instructions..."
-                />
-              </div>
-
-              {/* Active Status */}
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={editFormData.is_active}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      is_active: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 text-[#418b43] border-gray-300 rounded focus:ring-[#418b43]"
-                />
-                <label
-                  htmlFor="is_active"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Active
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setSelectedDrill(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditSave}
-                disabled={
-                  saving ||
-                  !editFormData.title ||
-                  !editFormData.type ||
-                  !editFormData.difficulty
-                }
-                className="flex-1 px-4 py-2 bg-[#418b43] text-white rounded-lg hover:bg-[#3a7c3b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

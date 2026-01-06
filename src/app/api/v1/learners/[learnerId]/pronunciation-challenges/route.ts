@@ -20,17 +20,17 @@ async function handler(
 
 		const { learnerId } = params;
 
-		// Find learner
-		const learner = await Learner.findById(learnerId)
-			.populate('userId', 'email firstName lastName')
+		// Find user (learnerId is now userId)
+		const user = await User.findById(learnerId)
+			.select('email firstName lastName')
 			.lean()
 			.exec();
 
-		if (!learner) {
+		if (!user) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
-					message: 'Learner not found',
+					message: 'User not found',
 				},
 				{ status: 404 }
 			);
@@ -38,7 +38,7 @@ async function handler(
 
 		// Get all challenging words (not passed, high attempts or low scores)
 		const challengingProgress = await LearnerPronunciationProgress.find({
-			learnerId: learner._id,
+			learnerId: new Types.ObjectId(learnerId), // learnerId now references User
 			isChallenging: true,
 			passed: false,
 		})
@@ -67,8 +67,8 @@ async function handler(
 				message: 'Challenging words retrieved successfully',
 				data: {
 					learner: {
-						_id: learner._id,
-						user: learner.userId,
+						_id: user._id,
+						user: user,
 					},
 					challenges: {
 						total: challengingProgress.length,

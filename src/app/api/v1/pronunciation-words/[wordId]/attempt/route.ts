@@ -31,17 +31,7 @@ async function handler(
 		const body = await req.json();
 		const validated = attemptSchema.parse(body);
 
-		// Find learner profile
-		const learner = await Learner.findOne({ userId: context.userId }).lean().exec();
-		if (!learner) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Learner profile not found',
-				},
-				{ status: 404 }
-			);
-		}
+		// Use userId directly (learnerId now references User)
 
 		// Find word and problem
 		const word = await PronunciationWord.findById(wordId).lean().exec();
@@ -66,15 +56,15 @@ async function handler(
 			);
 		}
 
-		// Find or create progress record
+		// Find or create progress record (learnerId now references User)
 		let progress = await LearnerPronunciationProgress.findOne({
-			learnerId: learner._id,
+			learnerId: context.userId,
 			wordId: word._id,
 		});
 
 		if (!progress) {
 			progress = await LearnerPronunciationProgress.create({
-				learnerId: learner._id,
+				learnerId: context.userId,
 				problemId: problem._id,
 				wordId: word._id,
 				attempts: 0,
@@ -94,7 +84,7 @@ async function handler(
 			const audioBuffer = Buffer.from(cleanAudioBase64, 'base64');
 			const uploadResult = await uploadToCloudinary(audioBuffer, {
 				folder: 'eklan/pronunciations/attempts',
-				publicId: `attempt_${Date.now()}_${learner._id}`,
+				publicId: `attempt_${Date.now()}_${context.userId}`,
 				resourceType: 'raw',
 			});
 			audioUrl = uploadResult.secureUrl;
@@ -187,7 +177,7 @@ async function handler(
 			problemId: problem._id,
 			wordId: word._id,
 			progressId: progress._id,
-			learnerId: learner._id,
+			learnerId: context.userId,
 			textScore: evaluationResult.text_score,
 			fluencyScore: evaluationResult.fluency_score,
 			passed: passed,
@@ -203,7 +193,7 @@ async function handler(
 
 		logger.info('Pronunciation attempt submitted', {
 			wordId: word._id,
-			learnerId: learner._id,
+			learnerId: context.userId,
 			score: evaluationResult.text_score,
 			passed: passed,
 			attemptNumber: attemptNumber,

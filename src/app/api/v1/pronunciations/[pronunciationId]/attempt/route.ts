@@ -33,17 +33,7 @@ async function handler(
 		const body = await req.json();
 		const validated = attemptSchema.parse(body);
 
-		// Find learner profile
-		const learner = await Learner.findOne({ userId: context.userId }).lean().exec();
-		if (!learner) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Learner profile not found',
-				},
-				{ status: 404 }
-			);
-		}
+		// Use userId directly (learnerId now references User)
 
 		// Find pronunciation
 		const pronunciation = await Pronunciation.findById(pronunciationId).lean().exec();
@@ -60,14 +50,14 @@ async function handler(
 		// Find or create assignment
 		let assignment = await PronunciationAssignment.findOne({
 			pronunciationId,
-			learnerId: learner._id,
+			learnerId: context.userId,
 		});
 
 		if (!assignment) {
 			// Create assignment if it doesn't exist
 			assignment = await PronunciationAssignment.create({
 				pronunciationId,
-				learnerId: learner._id,
+				learnerId: context.userId, // learnerId now references User
 				assignedBy: context.userId, // Self-assigned in this case
 				status: 'in-progress',
 			});
@@ -85,7 +75,7 @@ async function handler(
 			const audioBuffer = Buffer.from(cleanAudioBase64, 'base64');
 			const uploadResult = await uploadToCloudinary(audioBuffer, {
 				folder: 'eklan/pronunciations/attempts',
-				publicId: `attempt_${Date.now()}_${learner._id}`,
+				publicId: `attempt_${Date.now()}_${context.userId}`,
 				resourceType: 'raw',
 			});
 			audioUrl = uploadResult.secureUrl;
@@ -156,11 +146,11 @@ async function handler(
 			pronunciationAssignmentId: assignment._id,
 		});
 
-		// Create attempt record
+		// Create attempt record (learnerId now references User)
 		const attempt = await PronunciationAttempt.create({
 			pronunciationAssignmentId: assignment._id,
 			pronunciationId,
-			learnerId: learner._id,
+			learnerId: context.userId,
 			textScore: evaluationResult.text_score,
 			fluencyScore: evaluationResult.fluency_score,
 			passed: passed,
@@ -195,7 +185,7 @@ async function handler(
 
 		logger.info('Pronunciation attempt submitted', {
 			pronunciationId,
-			learnerId: learner._id,
+			userId: context.userId,
 			score: evaluationResult.text_score,
 			passed: passed,
 			attemptNumber: attemptCount + 1,

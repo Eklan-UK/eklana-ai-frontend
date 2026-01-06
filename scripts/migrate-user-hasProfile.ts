@@ -12,7 +12,7 @@
 
 import mongoose from 'mongoose';
 import User from '../src/models/user';
-import Learner from '../src/models/leaner';
+import Profile from '../src/models/profile';
 import Tutor from '../src/models/tutor';
 import config from '../src/lib/api/config';
 
@@ -40,23 +40,24 @@ async function migrate() {
         }
 
         // Check if user has completed onboarding by checking for profile
+        // Note: hasProfile field has been removed from User model
+        // This migration is kept for historical reference but is no longer needed
         let hasProfile = false;
 
-        if (user.role === 'learner') {
-          const learnerProfile = await Learner.findOne({ userId: user._id }).exec();
-          hasProfile = !!learnerProfile;
+        if (user.role === 'user') {
+          const userProfile = await Profile.findOne({ userId: user._id }).exec();
+          hasProfile = !!userProfile;
         } else if (user.role === 'tutor') {
           const tutorProfile = await Tutor.findOne({ userId: user._id }).exec();
           hasProfile = !!tutorProfile;
         } else {
-          // For admin or users without role, set hasProfile to true
-          // (they don't need onboarding)
+          // For admin, they don't need onboarding
           hasProfile = true;
         }
 
-        // Update user
-        user.hasProfile = hasProfile;
-        await user.save();
+        // Note: hasProfile field no longer exists on User model
+        // This migration script is kept for reference but won't update anything
+        console.log(`User ${user._id} (${user.email}): would set hasProfile = ${hasProfile} (field removed)`);
 
         console.log(`Updated user ${user._id} (${user.email}): hasProfile = ${hasProfile}`);
         updated++;

@@ -12,7 +12,6 @@
 
 import mongoose from 'mongoose';
 import User from '../src/models/user';
-import Learner from '../src/models/leaner';
 import Profile from '../src/models/profile';
 import LearnerPronunciationProgress from '../src/models/learner-pronunciation-progress';
 import Progress from '../src/models/progress';
@@ -24,50 +23,63 @@ async function migrate() {
     await mongoose.connect(config.MONGO_URI || process.env.MONGO_URI || process.env.MONGODB_URI || '');
     console.log('Connected to database');
 
-    // Step 1: Migrate Learner to Profile
+    // Step 1: Migrate Learner to Profile (if Learner collection still exists)
     console.log('\n=== Step 1: Migrating Learner to Profile ===');
-    const learners = await Learner.find({}).exec();
-    console.log(`Found ${learners.length} learners to migrate`);
-
+    // Note: Learner model has been removed, but we can still access the collection directly
+    // if it exists in the database for migration purposes
+    const db = mongoose.connection.db;
     let profilesCreated = 0;
     let profilesSkipped = 0;
 
-    for (const learner of learners) {
-      try {
-        // Check if profile already exists
-        const existingProfile = await Profile.findOne({ userId: learner.userId }).exec();
-        if (existingProfile) {
-          console.log(`Profile already exists for user ${learner.userId}, skipping`);
-          profilesSkipped++;
-          continue;
+    try {
+      const learnerCollection = db?.collection('learners');
+      if (learnerCollection) {
+        const learners = await learnerCollection.find({}).toArray();
+        console.log(`Found ${learners.length} learners to migrate`);
+
+        for (const learner of learners) {
+          try {
+            // Check if profile already exists
+            const existingProfile = await Profile.findOne({ userId: learner.userId }).exec();
+            if (existingProfile) {
+              console.log(`Profile already exists for user ${learner.userId}, skipping`);
+              profilesSkipped++;
+              continue;
+            }
+
+            // Create profile from learner data
+            await Profile.create({
+              userId: learner.userId,
+              tutorId: learner.tutorId,
+              gradeLevel: learner.gradeLevel,
+              subjects: learner.subjects || [],
+              learningGoals: learner.learningGoals || [],
+              learningStyle: learner.learningStyle,
+              educationLevel: learner.educationLevel,
+              parentContact: learner.parentContact,
+              preferences: learner.preferences || {
+                sessionDuration: 60,
+                preferredTimeSlots: [],
+                learningPace: 'moderate',
+              },
+              status: learner.status || 'active',
+              notes: learner.notes,
+              createdAt: learner.createdAt,
+              updatedAt: learner.updatedAt,
+            });
+
+            console.log(`Created profile for user ${learner.userId}`);
+            profilesCreated++;
+          } catch (error: any) {
+            console.error(`Error migrating learner ${learner._id}:`, error.message);
+          }
         }
-
-        // Create profile from learner data
-        await Profile.create({
-          userId: learner.userId,
-          tutorId: learner.tutorId,
-          gradeLevel: learner.gradeLevel,
-          subjects: learner.subjects || [],
-          learningGoals: learner.learningGoals || [],
-          learningStyle: learner.learningStyle,
-          educationLevel: learner.educationLevel,
-          parentContact: learner.parentContact,
-          preferences: learner.preferences || {
-            sessionDuration: 60,
-            preferredTimeSlots: [],
-            learningPace: 'moderate',
-          },
-          status: learner.status || 'active',
-          notes: learner.notes,
-          createdAt: learner.createdAt,
-          updatedAt: learner.updatedAt,
-        });
-
-        console.log(`Created profile for user ${learner.userId}`);
-        profilesCreated++;
-      } catch (error: any) {
-        console.error(`Error migrating learner ${learner._id}:`, error.message);
+      } else {
+        console.log('Learner collection not found, skipping learner migration');
       }
+    } catch (error: any) {
+      console.log('Could not access Learner collection:', error.message);
+      console.log('Skipping learner migration (collection may already be deleted)');
     }
 
     console.log(`Profiles created: ${profilesCreated}, Skipped: ${profilesSkipped}`);
@@ -82,30 +94,50 @@ async function migrate() {
 
     for (const prog of pronunciationProgresses) {
       try {
-        // Get user ID from learner
-        const learner = await Learner.findById(prog.learnerId).exec();
-        if (!learner) {
-          console.log(`Learner not found for progress ${prog._id}, skipping`);
+        // Get user ID from learner (learnerId now references User directly)
+        // Since LearnerPronunciationProgress.learnerId was referencing Learner._id,
+        // we need to check if it now references User._id directly
+        // For migration, we'll try to find the user directly
+        let userId: mongoose.Types.ObjectId | null = null;
+
+        // Try to find user by checking if learnerId is actually a userId now
+        const user = await User.findById(prog.learnerId).exec();
+        if (user) {
+          userId = user._id;
+        } else {
+          // If not found, try to find via Learner collection (if it still exists)
+          const db = mongoose.connection.db;
+          const learnerCollection = db?.collection('learners');
+          if (learnerCollection) {
+            const learner = await learnerCollection.findOne({ _id: prog.learnerId });
+            if (learner && learner.userId) {
+              userId = learner.userId;
+            }
+          }
+        }
+
+        if (!userId) {
+          console.log(`Could not find user for progress ${prog._id}, skipping`);
           progressSkipped++;
           continue;
         }
 
         // Check if progress already exists
         const existingProgress = await Progress.findOne({
-          userId: learner.userId,
+          userId: userId,
           type: 'pronunciation',
           'pronunciationData.wordId': prog.wordId,
         }).exec();
 
         if (existingProgress) {
-          console.log(`Progress already exists for user ${learner.userId} word ${prog.wordId}, skipping`);
+          console.log(`Progress already exists for user ${userId} word ${prog.wordId}, skipping`);
           progressSkipped++;
           continue;
         }
 
         // Create progress from pronunciation progress
         await Progress.create({
-          userId: learner.userId,
+          userId: userId,
           type: 'pronunciation',
           pronunciationData: {
             problemId: prog.problemId,
@@ -126,7 +158,7 @@ async function migrate() {
           updatedAt: prog.updatedAt,
         });
 
-        console.log(`Created progress for user ${learner.userId} word ${prog.wordId}`);
+        console.log(`Created progress for user ${userId} word ${prog.wordId}`);
         progressCreated++;
       } catch (error: any) {
         console.error(`Error migrating pronunciation progress ${prog._id}:`, error.message);

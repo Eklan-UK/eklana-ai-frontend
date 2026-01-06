@@ -49,52 +49,49 @@ async function handler(
 		let nextWord = null;
 
 		if (context.userRole === 'user') {
-			const learner = await Learner.findOne({ userId: context.userId }).lean().exec();
-			if (learner) {
-				// Get all progress records for this problem
-				const progressRecords = await LearnerPronunciationProgress.find({
-					learnerId: learner._id,
-					problemId: problem._id,
-				})
-					.populate('wordId', 'word ipa phonemes audioUrl useTTS')
-					.lean()
-					.exec();
+			// Get all progress records for this problem (learnerId now references User)
+			const progressRecords = await LearnerPronunciationProgress.find({
+				learnerId: context.userId,
+				problemId: problem._id,
+			})
+				.populate('wordId', 'word ipa phonemes audioUrl useTTS')
+				.lean()
+				.exec();
 
-				// Find the first uncompleted word
-				const completedWordIds = new Set(
-					progressRecords.filter((p) => p.passed).map((p) => p.wordId.toString())
-				);
+			// Find the first uncompleted word
+			const completedWordIds = new Set(
+				progressRecords.filter((p) => p.passed).map((p) => p.wordId.toString())
+			);
 
-				nextWord = words.find((word) => !completedWordIds.has(word._id.toString()));
+			nextWord = words.find((word) => !completedWordIds.has(word._id.toString()));
 
-				// Create progress object (plain object, not Map, for JSON serialization)
-				const progressObject: Record<string, any> = {};
-				progressRecords.forEach((p) => {
-					progressObject[p.wordId.toString()] = {
-						passed: p.passed,
-						attempts: p.attempts,
-						bestScore: p.bestScore,
-						averageScore: p.averageScore,
-						isChallenging: p.isChallenging,
-						challengeLevel: p.challengeLevel,
-						weakPhonemes: p.weakPhonemes,
-						lastAttemptAt: p.lastAttemptAt,
-					};
-				});
-
-				progress = {
-					totalWords: words.length,
-					completedWords: completedWordIds.size,
-					progressPercentage: words.length > 0 ? (completedWordIds.size / words.length) * 100 : 0,
-					wordProgress: progressObject,
-					nextWord: nextWord ? {
-						_id: nextWord._id,
-						word: nextWord.word,
-						ipa: nextWord.ipa,
-						order: nextWord.order,
-					} : null,
+			// Create progress object (plain object, not Map, for JSON serialization)
+			const progressObject: Record<string, any> = {};
+			progressRecords.forEach((p) => {
+				progressObject[p.wordId.toString()] = {
+					passed: p.passed,
+					attempts: p.attempts,
+					bestScore: p.bestScore,
+					averageScore: p.averageScore,
+					isChallenging: p.isChallenging,
+					challengeLevel: p.challengeLevel,
+					weakPhonemes: p.weakPhonemes,
+					lastAttemptAt: p.lastAttemptAt,
 				};
-			}
+			});
+
+			progress = {
+				totalWords: words.length,
+				completedWords: completedWordIds.size,
+				progressPercentage: words.length > 0 ? (completedWordIds.size / words.length) * 100 : 0,
+				wordProgress: progressObject,
+				nextWord: nextWord ? {
+					_id: nextWord._id,
+					word: nextWord.word,
+					ipa: nextWord.ipa,
+					order: nextWord.order,
+				} : null,
+			};
 		}
 
 		return NextResponse.json(

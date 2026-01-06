@@ -19,32 +19,43 @@ async function handler(
 
 		const { pronunciationId } = params;
 		const { searchParams } = new URL(req.url);
-		const learnerId = searchParams.get('learnerId');
+		const learnerIdParam = searchParams.get('learnerId');
 
-		// Find learner profile
-		let learner;
-		if (learnerId && (context.userRole === 'admin' || context.userRole === 'tutor')) {
-			// Admin/tutor can view any learner's attempts
-			learner = await Learner.findById(learnerId).lean().exec();
+		// Determine which user's attempts to fetch
+		let targetUserId: Types.ObjectId;
+		if (learnerIdParam && (context.userRole === 'admin' || context.userRole === 'tutor')) {
+			// Admin/tutor can view any user's attempts
+			if (!Types.ObjectId.isValid(learnerIdParam)) {
+				return NextResponse.json(
+					{
+						code: 'ValidationError',
+						message: 'Invalid learner ID format',
+					},
+					{ status: 400 }
+				);
+			}
+			targetUserId = new Types.ObjectId(learnerIdParam);
 		} else {
-			// Learner can only view their own attempts
-			learner = await Learner.findOne({ userId: context.userId }).lean().exec();
+			// User can only view their own attempts
+			targetUserId = context.userId;
 		}
 
-		if (!learner) {
+		// Verify user exists
+		const user = await User.findById(targetUserId).lean().exec();
+		if (!user) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
-					message: 'Learner profile not found',
+					message: 'User not found',
 				},
 				{ status: 404 }
 			);
 		}
 
-		// Find assignment
+		// Find assignment (learnerId now references User)
 		const assignment = await PronunciationAssignment.findOne({
 			pronunciationId,
-			learnerId: learner._id,
+			learnerId: targetUserId,
 		}).lean().exec();
 
 		if (!assignment) {

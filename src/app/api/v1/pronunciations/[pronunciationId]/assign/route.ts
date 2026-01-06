@@ -6,13 +6,14 @@ import { connectToDatabase } from '@/lib/api/db';
 import Pronunciation from '@/models/pronunciation';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import User from '@/models/user';
+import Profile from '@/models/profile';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
 const assignSchema = z.object({
 	learnerIds: z.array(z.string().refine((id) => Types.ObjectId.isValid(id), {
-		message: 'Each learner ID must be a valid MongoDB ObjectId',
+		message: 'Each user ID must be a valid MongoDB ObjectId',
 	})).min(1),
 	dueDate: z.string().datetime().optional(),
 });
@@ -41,19 +42,20 @@ async function handler(
 			);
 		}
 
-		// Verify all learners exist
-		const learners = await Learner.find({
+		// Verify all users exist (learnerIds are now userIds)
+		const users = await User.find({
 			_id: { $in: validated.learnerIds.map((id) => new Types.ObjectId(id)) },
+			role: 'user', // Only assign to users
 		})
-			.populate('userId', 'email firstName lastName')
+			.select('email firstName lastName')
 			.lean()
 			.exec();
 
-		if (learners.length !== validated.learnerIds.length) {
+		if (users.length !== validated.learnerIds.length) {
 			return NextResponse.json(
 				{
 					code: 'ValidationError',
-					message: 'One or more learner IDs are invalid',
+					message: 'One or more user IDs are invalid',
 				},
 				{ status: 400 }
 			);
@@ -63,30 +65,30 @@ async function handler(
 		const assignments = [];
 		const skipped = [];
 
-		for (const learner of learners) {
+		for (const user of users) {
 			try {
-				// Check if assignment already exists
+				// Check if assignment already exists (learnerId now references User)
 				const existing = await PronunciationAssignment.findOne({
 					pronunciationId,
-					learnerId: learner._id,
+					learnerId: user._id,
 				});
 
 				if (existing) {
-					skipped.push(learner._id.toString());
+					skipped.push(user._id.toString());
 					continue;
 				}
 
-				// Create new assignment
+				// Create new assignment (learnerId now references User)
 				const assignment = await PronunciationAssignment.create({
 					pronunciationId,
-					learnerId: learner._id,
+					learnerId: user._id,
 					assignedBy: context.userId,
 					dueDate: validated.dueDate ? new Date(validated.dueDate) : undefined,
 					status: 'pending',
 				});
 
 				await assignment.populate([
-					{ path: 'learnerId', select: 'userId', populate: { path: 'userId', select: 'email firstName lastName' } },
+					{ path: 'learnerId', select: 'email firstName lastName' },
 					{ path: 'assignedBy', select: 'email firstName lastName' },
 				]);
 
@@ -94,13 +96,13 @@ async function handler(
 			} catch (error: any) {
 				if (error.code === 11000) {
 					// Duplicate key error
-					skipped.push(learner._id.toString());
+					skipped.push(user._id.toString());
 					continue;
 				}
 				logger.error('Error creating assignment', {
 					error: error.message,
 					pronunciationId,
-					learnerId: learner._id,
+					userId: user._id,
 				});
 			}
 		}

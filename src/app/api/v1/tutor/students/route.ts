@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
+import Profile from '@/models/profile';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -19,21 +20,31 @@ async function handler(
 		const limit = parseInt(searchParams.get('limit') || String(config.defaultResLimit));
 		const offset = parseInt(searchParams.get('offset') || String(config.defaultResOffset));
 
-		// Get total count
-		const total = await Learner.countDocuments({ tutorId: context.userId }).exec();
+		// Find all users with profiles assigned to this tutor
+		const profiles = await Profile.find({ tutorId: context.userId })
+			.select('userId tutorId')
+			.lean()
+			.exec();
 
-		// Find all learners assigned to this tutor
-		const students = await Learner.find({ tutorId: context.userId })
-			.populate({
-				path: 'userId',
-				select: '-password -__v',
-			})
-			.select('-__v')
+		const userIds = profiles.map((p) => p.userId);
+
+		// Get total count
+		const total = userIds.length;
+
+		// Find all users assigned to this tutor
+		const users = await User.find({ _id: { $in: userIds } })
+			.select('-password -__v')
 			.sort({ createdAt: -1 })
 			.limit(limit)
 			.skip(offset)
 			.lean()
 			.exec();
+
+		// Map to students format with profile info
+		const students = users.map((user) => ({
+			...user,
+			userId: user,
+		}));
 
 		logger.info('Students fetched successfully for tutor', {
 			tutorId: context.userId,
