@@ -142,7 +142,7 @@ export default function CreatePronunciationProblemPage() {
               <Plus className="w-4 h-4" />
             </Button>
           </div>
-          {formData.phonemes.length > 0 && (
+          {formData.phonemes.length > 0 ? (
             <div className="flex flex-wrap gap-2 mt-3">
               {formData.phonemes.map((phoneme, idx) => (
                 <span
@@ -160,9 +160,13 @@ export default function CreatePronunciationProblemPage() {
                 </span>
               ))}
             </div>
+          ) : (
+            <p className="text-xs text-amber-600 mt-2 font-medium">
+              ⚠ You must add at least one phoneme before creating the problem
+            </p>
           )}
           <p className="text-xs text-gray-500 mt-2">
-            Add phonemes that learners will practice in this problem (e.g., r, l, th, θ)
+            Type a phoneme and click the + button to add it (e.g., r, l, th, θ)
           </p>
         </div>
 
@@ -218,7 +222,18 @@ export default function CreatePronunciationProblemPage() {
           </Link>
           <Button
             type="submit"
-            disabled={createMutation.isPending || formData.phonemes.length === 0}
+            disabled={
+              createMutation.isPending ||
+              !formData.title.trim() ||
+              formData.phonemes.length === 0
+            }
+            title={
+              !formData.title.trim()
+                ? "Please enter a title"
+                : formData.phonemes.length === 0
+                ? "Please add at least one phoneme"
+                : undefined
+            }
           >
             {createMutation.isPending ? (
               <>

@@ -40,7 +40,7 @@ export function useAllLearners(filters?: {
       const response = await adminAPI.getAllLearners(filters || {});
       return {
         learners: response.data?.learners || [],
-        total: response.data?.total || 0,
+        total: (response.data?.pagination as any)?.total || (response.data as any)?.total || 0,
       };
     },
     staleTime: 1000 * 60 * 2, // 2 minutes

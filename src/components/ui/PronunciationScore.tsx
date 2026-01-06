@@ -2,7 +2,7 @@
 
 import { CheckCircle, XCircle, AlertCircle, TrendingUp, Award, BarChart3 } from "lucide-react";
 import { Card } from "./Card";
-import type { TextScore, WordScore, PhoneScore, SyllableScore } from "@/services/speechace.service";
+import type { TextScore, WordScore, PhoneScore, SyllableScore } from "@/services/speechace-direct.service";
 
 interface PronunciationScoreProps {
 	textScore: TextScore;

@@ -21,13 +21,22 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
   const isOAuthUser = user?.accounts && Array.isArray(user.accounts) && user.accounts.length > 0;
   const shouldVerify = !isVerified && !isOAuthUser;
   
-  // Check onboarding status (only for learners)
+  // Check onboarding status using hasProfile field
+  // hasProfile is set to true after onboarding completion
   let hasOnboarding = false;
   let shouldOnboard = false;
   
-  if (user?.role === 'learner') {
+  // Check hasProfile directly from user object first (faster)
+  if (user?.hasProfile === true) {
+    hasOnboarding = true;
+    shouldOnboard = false;
+  } else if (user?.hasProfile === false) {
+    hasOnboarding = false;
+    shouldOnboard = true;
+  } else {
+    // Fallback: check via API if hasProfile is not set (for older users)
     try {
-      const response = await userAPI.checkLearnerProfile();
+      const response = await userAPI.checkProfile();
       hasOnboarding = response.hasProfile || false;
       shouldOnboard = !hasOnboarding;
     } catch (error) {
@@ -35,8 +44,10 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
       hasOnboarding = false;
       shouldOnboard = true;
     }
-  } else {
-    // Admins and tutors don't need onboarding
+  }
+  
+  // Admins and tutors don't need onboarding (set hasProfile = true for them)
+  if (user?.role === 'admin' || user?.role === 'tutor') {
     hasOnboarding = true;
     shouldOnboard = false;
   }

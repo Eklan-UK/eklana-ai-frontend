@@ -120,7 +120,13 @@ export const adminService = {
   },
 
   // Get dashboard stats (we'll need to create this endpoint or calculate from existing data)
-  getDashboardStats: async () => {
+  getDashboardStats: async (): Promise<{
+    totalActiveLearners: number;
+    totalDrills: number;
+    newSignupsThisWeek: number;
+    discoveryCallsToday: number;
+    videosAwaitingReview: number;
+  }> => {
     // For now, we'll fetch data and calculate stats on the frontend
     // In the future, we can create a dedicated endpoint
     const [learners, drills] = await Promise.all([
@@ -135,7 +141,9 @@ export const adminService = {
     return {
       totalActiveLearners: activeCount,
       totalDrills: drills.total,
-      // Add more stats as needed
+      newSignupsThisWeek: 0, // TODO: Calculate from user creation dates
+      discoveryCallsToday: 0, // TODO: Implement discovery calls tracking
+      videosAwaitingReview: 0, // TODO: Implement video review tracking
     };
   },
 

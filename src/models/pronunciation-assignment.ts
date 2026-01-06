@@ -91,7 +91,7 @@ pronunciationAssignmentSchema.pre('save', function (next) {
 	if (this.dueDate && new Date() > this.dueDate && this.status === 'pending') {
 		this.status = 'overdue';
 	}
-	next();
+	// No need to call next() in async middleware
 });
 
 export default models?.PronunciationAssignment || model<IPronunciationAssignment>('PronunciationAssignment', pronunciationAssignmentSchema);

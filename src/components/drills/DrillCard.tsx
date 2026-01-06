@@ -69,6 +69,7 @@ export function DrillCard({
       e.preventDefault();
       onStartClick(drill._id, assignmentId);
     }
+    // If no onStartClick handler, Link will handle navigation
   };
 
   if (variant === "compact") {
@@ -150,17 +151,23 @@ export function DrillCard({
 
       {showStartButton && (
         <div className="flex justify-end mt-3">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartClick?.(drill._id, assignmentId);
-            }}
-            className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-          >
-            Start
-          </Button>
+          <Link href={drillUrl}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                // If onStartClick is provided, use it; otherwise Link handles navigation
+                if (onStartClick) {
+                  e.preventDefault();
+                  onStartClick(drill._id, assignmentId);
+                }
+              }}
+              className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
+            >
+              Start
+            </Button>
+          </Link>
         </div>
       )}
     </Card>

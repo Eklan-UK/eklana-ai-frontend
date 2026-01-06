@@ -58,7 +58,7 @@ async function handler(
 		// Aggregate weak phonemes across all challenges
 		const allWeakPhonemes = new Set<string>();
 		challengingProgress.forEach((p) => {
-			p.weakPhonemes?.forEach((phoneme) => allWeakPhonemes.add(phoneme));
+			p.weakPhonemes?.forEach((phoneme: string) => allWeakPhonemes.add(phoneme));
 		});
 
 		return NextResponse.json(

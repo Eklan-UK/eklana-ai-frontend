@@ -14,6 +14,7 @@ export interface IUser extends Document {
   isActive?: boolean;
   isEmailVerified?: boolean;
   emailVerified?: boolean; // Better Auth uses this field
+  hasProfile?: boolean; // Set to true after onboarding is completed
   avatar?: string;
   image?: string; // Better Auth uses this field
   phone?: string;
@@ -111,6 +112,10 @@ const userSchema = new Schema<IUser>(
     emailVerified: {
       type: Boolean,
       select: false, // Don't return, we use isEmailVerified
+    },
+    hasProfile: {
+      type: Boolean,
+      default: false,
     },
     avatar: {
       type: String,

@@ -174,9 +174,9 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
             <p className="text-gray-600 mb-6">
               You've completed the vocabulary drill.
             </p>
-            <Link href="/account/drills">
+            <Link href="/account">
               <Button variant="primary" size="lg" fullWidth>
-                Back to Drills
+                Continue Learning
               </Button>
             </Link>
           </Card>

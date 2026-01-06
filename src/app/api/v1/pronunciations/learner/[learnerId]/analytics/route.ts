@@ -76,10 +76,10 @@ async function handler(
 		const incorrectPhonemesCount: Record<string, number> = {};
 
 		allAttempts.forEach((attempt) => {
-			attempt.incorrectLetters?.forEach((letter) => {
+			attempt.incorrectLetters?.forEach((letter: string) => {
 				incorrectLettersCount[letter] = (incorrectLettersCount[letter] || 0) + 1;
 			});
-			attempt.incorrectPhonemes?.forEach((phoneme) => {
+			attempt.incorrectPhonemes?.forEach((phoneme: string) => {
 				incorrectPhonemesCount[phoneme] = (incorrectPhonemesCount[phoneme] || 0) + 1;
 			});
 		});

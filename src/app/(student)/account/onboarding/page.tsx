@@ -25,13 +25,15 @@ import { useAuthStore } from "@/store/auth-store";
 import { userAPI } from "@/lib/api";
 import { toast } from "sonner";
 
+const { useAuthStore: useAuthStoreDirect } = require("@/store/auth-store");
+
 const TOTAL_STEPS = 5;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAuthStore();
+  const { user, checkSession } = useAuthStore();
 
   const {
     name,
@@ -187,6 +189,9 @@ export default function OnboardingPage() {
 
       // Clear onboarding data
       reset();
+
+      // Refresh user data to get updated hasProfile status
+      await checkSession(true); // Force refresh to get updated hasProfile
 
       // Small delay to show success message
       setTimeout(() => {

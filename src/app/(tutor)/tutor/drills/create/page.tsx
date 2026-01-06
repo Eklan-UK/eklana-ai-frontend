@@ -157,9 +157,6 @@ function CreateDrillPageContent() {
     };
   });
 
-  // Use React Query instead of useEffect
-  const { data: studentsData } = useTutorStudents();
-  const students = studentsData?.students || [];
 
   // Load existing drill in edit mode using React Query
   const { data: drillData } = useDrill(drillId || "");
@@ -225,12 +222,6 @@ function CreateDrillPageContent() {
     }
   }, [isEditMode, drillData, existingDrill]);
   
-  // Set loading state based on drill query
-  useEffect(() => {
-    if (isEditMode && drillId) {
-      setLoading(drillLoading);
-    }
-  }, [isEditMode, drillId, drillLoading]);
 
   // Auto-save draft
   useEffect(() => {
@@ -798,9 +789,8 @@ function CreateDrillPageContent() {
                 </>
               )}
 
-              {/* Import Section */}
-              {!isEditMode && (
-                <div className="border-t pt-6 mt-6">
+              {/* Import Section - Available in both create and edit modes */}
+              <div className="border-t pt-6 mt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">Import Data</h3>
@@ -829,7 +819,6 @@ function CreateDrillPageContent() {
                     </div>
                   </div>
                 </div>
-              )}
 
               {/* Context for other types */}
               {!isRoleplay && (
@@ -913,7 +902,7 @@ function CreateDrillPageContent() {
               </div>
               <div className="space-y-6">
                 {(formData.roleplay_scenes || []).map((scene, sceneIndex) => (
-                  <Card key={sceneIndex} className="border-purple-200 bg-purple-50/20">
+                  <Card key={sceneIndex} className="border-green-200 bg-green-50/20">
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-4">
                         <Input
@@ -987,8 +976,8 @@ function CreateDrillPageContent() {
                             key={turnIndex}
                             className={`${
                               turn.speaker === "student"
-                                ? "border-blue-200 bg-blue-50/30"
-                                : "border-purple-200 bg-purple-50/30"
+                                ? "border-green-200 bg-green-50/30"
+                                : "border-emerald-200 bg-emerald-50/30"
                             }`}
                           >
                             <div className="p-4">
@@ -1093,7 +1082,7 @@ function CreateDrillPageContent() {
               </div>
               <div className="space-y-6">
                 {(formData.target_sentences || []).map((item, index) => (
-                  <Card key={index} className="border-blue-100 bg-blue-50/20">
+                  <Card key={index} className="border-green-100 bg-green-50/20">
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-4">
                         <h4 className="font-semibold text-gray-900">
@@ -1202,7 +1191,7 @@ function CreateDrillPageContent() {
               </div>
               <div className="space-y-6">
                 {(formData.matching_pairs || []).map((pair, index) => (
-                  <Card key={index} className="border-purple-100">
+                  <Card key={index} className="border-green-100">
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-4">
                         <h4 className="font-semibold text-gray-900">Pair {index + 1}</h4>

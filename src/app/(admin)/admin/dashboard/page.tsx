@@ -20,40 +20,55 @@ import { useDashboardStats, useRecentLearners } from "@/hooks/useAdmin";
 interface DashboardStats {
   totalActiveLearners: number;
   totalDrills: number;
-  newSignupsThisWeek?: number;
-  discoveryCallsToday?: number;
-  videosAwaitingReview?: number;
+  newSignupsThisWeek: number;
+  discoveryCallsToday: number;
+  videosAwaitingReview: number;
 }
 
 const Dashboard: React.FC = () => {
   // Use React Query instead of useEffect + useState
-  const { data: stats = { totalActiveLearners: 0, totalDrills: 0 }, isLoading: statsLoading } = useDashboardStats();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: learners = [], isLoading: learnersLoading } = useRecentLearners(10);
   
   const loading = statsLoading || learnersLoading;
+  
+  // Default stats with all optional properties
+  const statsWithDefaults: DashboardStats = stats ? {
+    totalActiveLearners: stats.totalActiveLearners || 0,
+    totalDrills: stats.totalDrills || 0,
+    newSignupsThisWeek: stats.newSignupsThisWeek || 0,
+    discoveryCallsToday: stats.discoveryCallsToday || 0,
+    videosAwaitingReview: stats.videosAwaitingReview || 0,
+  } : {
+    totalActiveLearners: 0,
+    totalDrills: 0,
+    newSignupsThisWeek: 0,
+    discoveryCallsToday: 0,
+    videosAwaitingReview: 0,
+  };
 
   const displayStats = [
     {
       title: "Total Active Learners",
-      value: loading ? "..." : stats.totalActiveLearners.toString(),
+      value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
       color: "border-emerald-200 bg-emerald-50/30",
     },
     {
       title: "Total Drills",
-      value: loading ? "..." : stats.totalDrills.toString(),
+      value: loading ? "..." : statsWithDefaults.totalDrills.toString(),
       change: "",
       color: "border-purple-200 bg-purple-50/30",
     },
     {
       title: "Discovery Calls Today",
-      value: loading ? "..." : (stats.discoveryCallsToday || 0).toString(),
+      value: loading ? "..." : statsWithDefaults.discoveryCallsToday.toString(),
       change: "",
       color: "border-blue-200 bg-blue-50/30",
     },
     {
       title: "Videos Awaiting Review",
-      value: loading ? "..." : (stats.videosAwaitingReview || 0).toString(),
+      value: loading ? "..." : statsWithDefaults.videosAwaitingReview.toString(),
       change: "",
       color: "border-amber-200 bg-amber-50/30",
     },

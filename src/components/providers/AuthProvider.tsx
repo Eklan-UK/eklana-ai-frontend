@@ -10,7 +10,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { checkSession, isLoading, isAuthenticated } = useAuthStore();
+  const { checkSession, isLoading, isAuthenticated, hasHydrated } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -19,20 +19,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let mounted = true;
     
     const initializeAuth = async () => {
-      // Check session only on initial mount
+      // Wait for localStorage hydration before checking session
+      // This ensures we use persisted session data first
+      let currentState = useAuthStore.getState();
+      if (!currentState.hasHydrated) {
+        // Wait for Zustand to hydrate from localStorage
+        // The onRehydrateStorage callback will set hasHydrated to true
+        const maxWait = 1000; // Max 1 second wait
+        const startTime = Date.now();
+        while (!currentState.hasHydrated && (Date.now() - startTime) < maxWait && mounted) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+          currentState = useAuthStore.getState();
+        }
+      }
+      
+      // Only check session if we don't have a cached session or it's been a while
+      // This prevents unnecessary API calls on every page load
       if (mounted) {
-        await checkSession();
+        const currentState = useAuthStore.getState();
+        const shouldCheck = !currentState.user || 
+                           !currentState.session || 
+                           !currentState.lastSessionCheck ||
+                           (Date.now() - currentState.lastSessionCheck) > 5 * 60 * 1000; // 5 minutes
+        
+        if (shouldCheck) {
+          await checkSession();
+        } else {
+          // Use cached session, just set loading to false
+          currentState.setLoading(false);
+        }
       }
       
       // Handle OAuth callback - check if we just completed OAuth login
       const searchParams = new URLSearchParams(window.location.search);
       const isOAuthCallback = searchParams.has('code') || pathname?.includes('/callback');
       
-      if (isOAuthCallback && isAuthenticated && mounted) {
-        const { user } = useAuthStore.getState();
-        if (user) {
+      if (isOAuthCallback && mounted) {
+        const state = useAuthStore.getState();
+        if (state.isAuthenticated && state.user) {
           // OAuth users are typically auto-verified
-          const status = await checkAuthFlowStatus(user);
+          const status = await checkAuthFlowStatus(state.user);
           const redirectPath = getAuthRedirectPath(status);
           
           // Clean up URL and redirect
@@ -68,14 +94,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       pathname?.startsWith(route)
     );
 
-    // Don't redirect if still loading or on public route
-    if (isLoading || isPublicRoute) return;
+    // Don't redirect if still loading, not hydrated, or on public route
+    if (isLoading || !hasHydrated || isPublicRoute) return;
 
     // Redirect to login if not authenticated and trying to access protected route
     if (!isAuthenticated && !isPublicRoute) {
       router.push("/auth/login");
     }
-  }, [isLoading, isAuthenticated, pathname, router]);
+  }, [isLoading, isAuthenticated, hasHydrated, pathname, router]);
 
   return <>{children}</>;
 }

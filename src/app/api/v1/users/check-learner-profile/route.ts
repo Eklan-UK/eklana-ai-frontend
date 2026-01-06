@@ -1,9 +1,8 @@
-// GET /api/v1/users/check-learner-profile
-// Check if the authenticated user has a learner profile
+// GET /api/v1/users/check-profile
+// Check if the authenticated user has completed onboarding (hasProfile)
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
-import Learner from '@/models/leaner';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -15,8 +14,8 @@ async function handler(
 	try {
 		await connectToDatabase();
 
-		// Check if user exists and is a learner
-		const user = await User.findById(context.userId).select('role').lean().exec();
+		// Check if user exists
+		const user = await User.findById(context.userId).select('role hasProfile').lean().exec();
 		if (!user) {
 			return NextResponse.json(
 				{
@@ -28,39 +27,26 @@ async function handler(
 			);
 		}
 
-		// If user is not a learner, they don't need a learner profile
-		if (user.role !== 'learner') {
-			return NextResponse.json(
-				{
-					code: 'Success',
-					message: 'User is not a learner',
-					hasProfile: true, // Not required for non-learners
-					role: user.role,
-				},
-				{ status: 200 }
-			);
-		}
+		// Check hasProfile field (set to true after onboarding completion)
+		const hasProfile = user.hasProfile === true;
 
-		// Check if learner profile exists
-		const learnerProfile = await Learner.findOne({ userId: context.userId }).lean().exec();
-
-		logger.info('Learner profile check completed', {
+		logger.info('Profile check completed', {
 			userId: context.userId,
-			hasProfile: !!learnerProfile,
+			hasProfile,
 			role: user.role,
 		});
 
 		return NextResponse.json(
 			{
 				code: 'Success',
-				message: learnerProfile ? 'Learner profile exists' : 'Learner profile not found',
-				hasProfile: !!learnerProfile,
+				message: hasProfile ? 'User has completed onboarding' : 'User has not completed onboarding',
+				hasProfile,
 				role: user.role,
 			},
 			{ status: 200 }
 		);
 	} catch (error: any) {
-		logger.error('Error checking learner profile', {
+		logger.error('Error checking user profile', {
 			error: error.message,
 			stack: error.stack,
 			userId: context.userId,
@@ -68,7 +54,7 @@ async function handler(
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message || 'Failed to check learner profile',
+				message: error.message || 'Failed to check user profile',
 				hasProfile: false,
 			},
 			{ status: 500 }

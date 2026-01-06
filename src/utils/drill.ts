@@ -68,7 +68,8 @@ export function getDrillStatus(drill: any): DrillStatus {
   }
 
   // Check if drill is active/ongoing (today is within the date range)
-  if (now >= startDate && now <= dueDate && (drill.is_active !== false || drill.drill?.is_active !== false)) {
+  // Removed is_active check - drills are always available
+  if (now >= startDate && now <= dueDate) {
     return drill.drill ? "ongoing" : "active";
   }
 

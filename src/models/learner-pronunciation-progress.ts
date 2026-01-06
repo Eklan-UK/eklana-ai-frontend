@@ -115,10 +115,10 @@ learnerPronunciationProgressSchema.index({ problemId: 1, passed: 1 });
 learnerPronunciationProgressSchema.index({ wordId: 1, passed: 1 });
 
 // Pre-save middleware to calculate challenge indicators
-learnerPronunciationProgressSchema.pre('save', function (next) {
-	if (this.accuracyScores.length > 0) {
+learnerPronunciationProgressSchema.pre('save', async function () {
+	if (this.accuracyScores && this.accuracyScores.length > 0) {
 		// Calculate average score
-		this.averageScore = this.accuracyScores.reduce((sum, score) => sum + score, 0) / this.accuracyScores.length;
+		this.averageScore = this.accuracyScores.reduce((sum: number, score: number) => sum + score, 0) / this.accuracyScores.length;
 		
 		// Find best score
 		this.bestScore = Math.max(...this.accuracyScores);
@@ -131,13 +131,12 @@ learnerPronunciationProgressSchema.pre('save', function (next) {
 			this.challengeLevel = 'high';
 		} else if (this.attempts > 3 || (this.averageScore || 0) < 70) {
 			this.challengeLevel = 'medium';
-		} else if (this.weakPhonemes.length > 0) {
+		} else if (this.weakPhonemes && this.weakPhonemes.length > 0) {
 			this.challengeLevel = 'low';
 		} else {
 			this.challengeLevel = undefined;
 		}
 	}
-	next();
 });
 
 export default models?.LearnerPronunciationProgress || model<ILearnerPronunciationProgress>('LearnerPronunciationProgress', learnerPronunciationProgressSchema);

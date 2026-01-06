@@ -6,7 +6,6 @@ import type { NextRequest } from 'next/server';
 
 // Public routes that don't require authentication
 const publicRoutes = [
-  '/',
   '/welcome',
   '/splash',
   '/auth/login',
@@ -18,11 +17,15 @@ const publicRoutes = [
   '/terms',
   '/privacy',
   '/contact',
-  '/landing',
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Redirect root path to /account
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/account', request.url));
+  }
 
   // Allow public routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {

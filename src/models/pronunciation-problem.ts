@@ -79,14 +79,14 @@ const pronunciationProblemSchema = new Schema<IPronunciationProblem>(
 );
 
 // Indexes for performance
-pronunciationProblemSchema.index({ slug: 1 }, { unique: true });
+// Note: slug index is automatically created by unique: true on the field
 pronunciationProblemSchema.index({ createdBy: 1, createdAt: -1 });
 pronunciationProblemSchema.index({ difficulty: 1, isActive: 1 });
 pronunciationProblemSchema.index({ order: 1, isActive: 1 });
 pronunciationProblemSchema.index({ phonemes: 1 });
 
 // Generate slug from title before saving
-pronunciationProblemSchema.pre('save', function (next) {
+pronunciationProblemSchema.pre('save', async function () {
 	if (this.isModified('title') && !this.slug) {
 		this.slug = this.title
 			.toLowerCase()

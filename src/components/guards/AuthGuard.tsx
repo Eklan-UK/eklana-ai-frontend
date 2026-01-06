@@ -22,7 +22,7 @@ export function AuthGuard({
 }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading: authLoading, checkSession } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, hasHydrated, checkSession } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
 
   // Public routes that don't require authentication
@@ -50,8 +50,8 @@ export function AuthGuard({
         return;
       }
 
-      // Wait for auth to load (only on initial load)
-      if (authLoading && !isAuthenticated && !user) {
+      // Wait for localStorage hydration before checking authentication
+      if (!hasHydrated || (authLoading && !isAuthenticated && !user)) {
         return;
       }
 
@@ -82,10 +82,10 @@ export function AuthGuard({
     };
 
     checkAuth();
-  }, [isAuthenticated, user, authLoading, pathname, router, allowedRoles, requireAuth]);
+  }, [isAuthenticated, user, authLoading, hasHydrated, pathname, router, allowedRoles, requireAuth]);
 
-  // Show loading state only on initial check, not on every route change
-  if (isChecking && authLoading && !isAuthenticated && !user) {
+  // Show loading state while hydrating or checking
+  if (!hasHydrated || (isChecking && authLoading && !isAuthenticated && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">

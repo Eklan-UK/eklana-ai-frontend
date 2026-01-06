@@ -45,12 +45,10 @@ export default async function HomePage() {
   const firstName = getUserFirstName(userData?.user);
   const { drills } = await getAssignedDrills();
 
-  // Filter drills by status
-  const activeDrills = drills.filter(isDrillActive);
-  const upcomingDrills = drills.filter(isDrillUpcoming);
-  const missedDrills = drills.filter(
-    (drill: any) => getDrillStatus(drill) === "missed"
-  );
+  // Show all drills regardless of status - no filtering
+  const activeDrills = drills; // Show all drills as active
+  const upcomingDrills: any[] = []; // No separate upcoming section
+  const missedDrills: any[] = []; // No separate missed section
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
@@ -277,28 +275,19 @@ export default async function HomePage() {
             </Card>
           ) : (
             <div className="space-y-3 mb-4">
-              {/* Show active drills first, then other non-completed drills */}
+              {/* Show all drills - no status filtering */}
               {(() => {
-                // Prioritize active drills, then show other non-completed drills
-                const nonCompletedDrills = drills.filter((d: any) => {
-                  const status = getDrillStatus(d);
-                  return status !== "completed";
-                });
-
-                // Sort: active first, then by date
-                const sortedDrills = nonCompletedDrills.sort(
+                // Show all drills, sorted by date
+                const sortedDrills = [...drills].sort(
                   (a: any, b: any) => {
-                    const aStatus = getDrillStatus(a);
-                    const bStatus = getDrillStatus(b);
-                    if (aStatus === "active" && bStatus !== "active") return -1;
-                    if (bStatus === "active" && aStatus !== "active") return 1;
                     return (
-                      new Date(a.date).getTime() - new Date(b.date).getTime()
+                      new Date(a.drill?.date || a.date).getTime() - 
+                      new Date(b.drill?.date || b.date).getTime()
                     );
                   }
                 );
 
-                return sortedDrills.slice(0, 3);
+                return sortedDrills.slice(0, 5); // Show up to 5 drills
               })().map((drill: any) => {
                 const dueDate = drill.dueDate
                   ? new Date(drill.dueDate)
@@ -310,10 +299,12 @@ export default async function HomePage() {
                       return endDate;
                     })();
 
+                // DrillCard will handle navigation via Link component
+                // The start button will navigate to the drill page
                 return (
                   <DrillCard
-                    key={drill._id}
-                    drill={drill}
+                    key={drill._id || drill.drill?._id}
+                    drill={drill.drill || drill}
                     assignmentId={drill.assignmentId}
                     dueDate={dueDate.toISOString()}
                     completedAt={drill.completedAt}
@@ -326,74 +317,7 @@ export default async function HomePage() {
             </div>
           )}
 
-          {upcomingDrills.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                Upcoming
-              </h4>
-              <div className="space-y-2">
-                {upcomingDrills.slice(0, 2).map((drill: any) => {
-                  const typeInfo = getDrillTypeInfo(drill.type);
-                  const drillUrl = drill.assignmentId
-                    ? `/account/drills/${drill._id}?assignmentId=${drill.assignmentId}`
-                    : `/account/drills/${drill._id}`;
-                  return (
-                    <Link key={drill._id} href={drillUrl}>
-                      <Card
-                        className={`${typeInfo.borderColor} opacity-75 hover:opacity-100 transition-opacity cursor-pointer`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span>{typeInfo.icon}</span>
-                            <span className="font-medium text-gray-900">
-                              {drill.title}
-                            </span>
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            Starts {formatDate(drill.date)}
-                          </span>
-                        </div>
-                      </Card>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {missedDrills.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-red-700 mb-2">
-                Missed
-              </h4>
-              <div className="space-y-2">
-                {missedDrills.slice(0, 2).map((drill: any) => {
-                  const dueDate = drill.dueDate
-                    ? new Date(drill.dueDate)
-                    : (() => {
-                        const endDate = new Date(drill.date);
-                        endDate.setDate(
-                          endDate.getDate() + (drill.duration_days || 1) - 1
-                        );
-                        return endDate;
-                      })();
-
-                  return (
-                    <DrillCard
-                      key={drill._id}
-                      drill={drill}
-                      assignmentId={drill.assignmentId}
-                      dueDate={dueDate.toISOString()}
-                      status="missed"
-                      variant="compact"
-                      showStartButton={false}
-                      className="border-red-200 bg-red-50"
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Removed separate upcoming and missed sections - all drills shown above */}
         </div>
 
         {/* Recent Activity Section */}

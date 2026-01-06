@@ -20,7 +20,7 @@ export function useAuth() {
   // Redirect to home if authenticated
   const requireGuest = () => {
     if (store.isAuthenticated && !store.isLoading) {
-      router.push("/");
+      router.push("/account");
     }
   };
 

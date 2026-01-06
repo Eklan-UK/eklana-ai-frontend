@@ -63,6 +63,10 @@ async function handler(
 			logger.info('User onboarded as tutor', { userId: context.userId });
 		}
 
+		// Set hasProfile to true after successful onboarding
+		user.hasProfile = true;
+		await user.save();
+
 		return NextResponse.json(
 			{
 				code: 'Success',
@@ -70,6 +74,7 @@ async function handler(
 				data: {
 					userId: context.userId.toString(),
 					role,
+					hasProfile: true,
 				},
 			},
 			{ status: 200 }

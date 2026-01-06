@@ -7,10 +7,13 @@ interface AuthState {
   session: any | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  hasHydrated: boolean;
+  lastSessionCheck: number | null; // Track when we last checked session
   // Actions
   setUser: (user: any | null) => void;
   setSession: (session: any | null) => void;
   setLoading: (loading: boolean) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
     email: string;
@@ -25,13 +28,18 @@ interface AuthState {
   signInWithApple: () => Promise<void>;
 }
 
+// Session check throttle: only check once per 5 minutes unless forced
+const SESSION_CHECK_THROTTLE = 5 * 60 * 1000; // 5 minutes
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       session: null,
-      isLoading: false, // Start as false, will be set by checkSession if needed
+      isLoading: true,
       isAuthenticated: false,
+      hasHydrated: false,
+      lastSessionCheck: null,
 
       setUser: (user) =>
         set({
@@ -48,71 +56,41 @@ export const useAuthStore = create<AuthState>()(
 
       setLoading: (loading) => set({ isLoading: loading }),
 
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
       login: async (email: string, password: string) => {
         try {
           set({ isLoading: true });
+
           const result = await authClient.signIn.email({
             email,
             password,
           });
 
+          // Handle successful login
           if (result.data?.user) {
             set({
               user: result.data.user,
-              session: result.data, // Store the full response data as session
+              session: result.data,
               isAuthenticated: true,
               isLoading: false,
+              lastSessionCheck: Date.now(),
             });
-          } else {
-            // Check if error is about email verification
-            if (
-              result.error?.code === "EMAIL_NOT_VERIFIED" ||
-              (result.error?.message?.includes("email") &&
-                result.error?.message?.includes("verify"))
-            ) {
-              // Still allow login, but user will be redirected to verification
-              // Try to get user data from error or make a session call
-              try {
-                const sessionResult = await authClient.getSession();
-                if (sessionResult?.data?.user) {
-                  set({
-                    user: sessionResult.data.user,
-                    session: sessionResult.data,
-                    isAuthenticated: true,
-                    isLoading: false,
-                  });
-                  return; // Don't throw error, allow login to proceed
-                }
-              } catch (sessionError) {
-                // If we can't get session, throw original error
-              }
-            }
-            throw new Error(result.error?.message || "Login failed");
+            return;
           }
+
+          // Handle errors
+          if (result.error) {
+            set({ isLoading: false });
+            throw new Error(result.error.message || "Login failed");
+          }
+
+          // Unexpected case - no data and no error
+          set({ isLoading: false });
+          throw new Error("Login failed - no response data");
         } catch (error: any) {
           set({ isLoading: false });
-          // If error is EMAIL_NOT_VERIFIED, still try to get session
-          if (
-            error.code === "EMAIL_NOT_VERIFIED" ||
-            (error.message?.includes("email") &&
-              error.message?.includes("verify"))
-          ) {
-            try {
-              // Try to get session anyway - Better Auth might still create a session
-              const sessionResult = await authClient.getSession();
-              if (sessionResult?.data?.user) {
-                set({
-                  user: sessionResult.data.user,
-                  session: sessionResult.data,
-                  isAuthenticated: true,
-                  isLoading: false,
-                });
-                return; // Success - user is logged in but not verified
-              }
-            } catch (sessionError) {
-              // Continue to throw original error
-            }
-          }
+          // Re-throw to let UI handle the error
           throw error;
         }
       },
@@ -120,11 +98,11 @@ export const useAuthStore = create<AuthState>()(
       register: async (data) => {
         try {
           set({ isLoading: true });
+
           const result = await authClient.signUp.email({
             email: data.email,
             password: data.password,
             name: data.name,
-            // Additional fields for Better Auth
             ...(data.firstName && { firstName: data.firstName }),
             ...(data.lastName && { lastName: data.lastName }),
           });
@@ -132,13 +110,21 @@ export const useAuthStore = create<AuthState>()(
           if (result.data?.user) {
             set({
               user: result.data.user,
-              session: result.data, // Store the full response data as session
+              session: result.data,
               isAuthenticated: true,
               isLoading: false,
+              lastSessionCheck: Date.now(),
             });
-          } else {
-            throw new Error(result.error?.message || "Registration failed");
+            return;
           }
+
+          if (result.error) {
+            set({ isLoading: false });
+            throw new Error(result.error.message || "Registration failed");
+          }
+
+          set({ isLoading: false });
+          throw new Error("Registration failed - no response data");
         } catch (error: any) {
           set({ isLoading: false });
           throw error;
@@ -147,94 +133,121 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
+          // Clear local state immediately for better UX
+          set({
+            user: null,
+            session: null,
+            isAuthenticated: false,
+            isLoading: false,
+            lastSessionCheck: null,
+          });
+
+          // Then call server logout
           await authClient.signOut();
-          set({
-            user: null,
-            session: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
         } catch (error) {
-          // Even if logout fails, clear local state
-          set({
-            user: null,
-            session: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          // State already cleared, so logout is "successful" locally
+          console.error("Logout error:", error);
         }
       },
 
       checkSession: async (forceRefresh = false) => {
         const state = get();
-        
-        // If we have cached session and not forcing refresh, use it first
-        if (!forceRefresh && state.user && state.session && state.isAuthenticated) {
-          // Set loading to false immediately if we have cached data
+
+        // If we have a valid cached session and not forcing refresh, check throttle
+        if (
+          !forceRefresh &&
+          state.user &&
+          state.session &&
+          state.isAuthenticated &&
+          state.lastSessionCheck !== null
+        ) {
+          const timeSinceLastCheck = Date.now() - state.lastSessionCheck;
+
+          // If we checked recently (within throttle period), skip the check
+          if (timeSinceLastCheck < SESSION_CHECK_THROTTLE) {
+            set({ isLoading: false });
+            return;
+          }
+        }
+
+        // Use cached session if available and not forcing refresh
+        if (
+          !forceRefresh &&
+          state.user &&
+          state.session &&
+          state.isAuthenticated
+        ) {
           set({ isLoading: false });
-          
-          // Check network session in background (non-blocking)
-          authClient.getSession()
+
+          // Verify session in background without blocking UI
+          authClient
+            .getSession()
             .then((sessionResult) => {
               if (sessionResult?.data?.user) {
+                // Update with fresh data
                 set({
                   user: sessionResult.data.user,
                   session: sessionResult.data,
                   isAuthenticated: true,
+                  lastSessionCheck: Date.now(),
                 });
-              } else {
-                // Network says no session, but keep cached for offline
-                // Only clear if we're sure (not just network error)
-                if (sessionResult?.data === null) {
-                  set({
-                    session: null,
-                    user: null,
-                    isAuthenticated: false,
-                  });
-                }
+              } else if (sessionResult?.data === null) {
+                // Server says no valid session - clear local state
+                set({
+                  session: null,
+                  user: null,
+                  isAuthenticated: false,
+                  lastSessionCheck: null,
+                });
               }
+              // On network error, keep cached session
             })
-            .catch(() => {
-              // Network error - keep cached session for offline support
-              // Don't log out user if network fails
+            .catch((error) => {
+              console.error("Background session check failed:", error);
+              // Keep cached session on network error
             });
-          
+
           return;
         }
 
-        // No cached session or forcing refresh - check network
+        // No cached session or forcing refresh
         try {
           set({ isLoading: true });
+
           const sessionResult = await authClient.getSession();
-          // Better Auth returns { data: { user, session } } or { data: null }
+
           if (sessionResult?.data?.user) {
             set({
               user: sessionResult.data.user,
-              session: sessionResult.data, // Store full response
+              session: sessionResult.data,
               isAuthenticated: true,
               isLoading: false,
+              lastSessionCheck: Date.now(),
             });
           } else {
+            // No valid session
             set({
               session: null,
               user: null,
               isAuthenticated: false,
               isLoading: false,
+              lastSessionCheck: null,
             });
           }
         } catch (error) {
-          // Network error - if we have cached session, keep it
+          console.error("Session check failed:", error);
+
+          // On network error, keep cached session if available
           const currentState = get();
           if (currentState.user && currentState.session) {
-            // Keep cached session for offline support
             set({ isLoading: false });
           } else {
-            // No cached session and network failed
             set({
               session: null,
               user: null,
               isAuthenticated: false,
               isLoading: false,
+              lastSessionCheck: null,
             });
           }
         }
@@ -243,10 +256,14 @@ export const useAuthStore = create<AuthState>()(
       signInWithGoogle: async () => {
         try {
           set({ isLoading: true });
+
+          // Better Auth will redirect, so we don't need to handle response
           await authClient.signIn.social({
             provider: "google",
             callbackURL: `${window.location.origin}/auth/callback`,
           });
+
+          // Browser will redirect before this is reached
         } catch (error: any) {
           set({ isLoading: false });
           throw error;
@@ -256,10 +273,14 @@ export const useAuthStore = create<AuthState>()(
       signInWithApple: async () => {
         try {
           set({ isLoading: true });
+
+          // Better Auth will redirect, so we don't need to handle response
           await authClient.signIn.social({
             provider: "apple",
             callbackURL: `${window.location.origin}/auth/callback`,
           });
+
+          // Browser will redirect before this is reached
         } catch (error: any) {
           set({ isLoading: false });
           throw error;
@@ -273,7 +294,23 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         session: state.session,
         isAuthenticated: state.isAuthenticated,
+        lastSessionCheck: state.lastSessionCheck,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHasHydrated(true);
+
+          // If we have persisted session, use it initially without checking
+          if (state.user && state.session && state.isAuthenticated) {
+            state.setLoading(false);
+            // Don't check session immediately - let components request it if needed
+            // This prevents unnecessary API calls on every page load
+          } else {
+            // No persisted session - will need to check
+            state.setLoading(true);
+          }
+        }
+      },
     }
   )
 );

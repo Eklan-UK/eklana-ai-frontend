@@ -71,13 +71,14 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
     fetchAssignment();
   }, [drill._id, drill.title, drill.type, drill.difficulty]);
 
-  // Check if drill is active
+  // Check if drill is active - drills are always available regardless of date
   const now = new Date();
   const startDate = new Date(drill.date);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + (drill.duration_days || 1) - 1);
   endDate.setHours(23, 59, 59, 999);
-  const isActive = now >= startDate && now <= endDate && drill.is_active;
+  // Remove is_active check - drills are always available
+  const isActive = true; // Always allow access to drills
   const isUpcoming = startDate > now;
 
   if (!isStarted) {
@@ -120,13 +121,7 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
                 </div>
               </div>
               
-              {!isActive && !isUpcoming && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-yellow-800">
-                    This drill is no longer active.
-                  </p>
-                </div>
-              )}
+              {/* Removed inactive drill warning - drills are always available */}
               
               {isUpcoming && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
@@ -144,16 +139,14 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
                   Back
                 </Button>
               </Link>
-              {isActive && (
-                <Button 
-                  variant="primary" 
-                  size="md" 
-                  fullWidth
-                  onClick={() => setIsStarted(true)}
-                >
-                  Start Drill
-                </Button>
-              )}
+              <Button 
+                variant="primary" 
+                size="md" 
+                fullWidth
+                onClick={() => setIsStarted(true)}
+              >
+                Start Drill
+              </Button>
             </div>
           </Card>
         </div>

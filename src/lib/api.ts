@@ -507,13 +507,13 @@ export const userAPI = {
   },
 
   // Check if learner profile exists
-  checkLearnerProfile: () => {
+  checkProfile: () => {
     return apiRequest<{
       code: string;
       message: string;
       hasProfile: boolean;
       role?: string;
-    }>('/users/check-learner-profile');
+    }>('/users/check-profile');
   },
 };
 

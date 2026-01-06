@@ -57,7 +57,7 @@ export default function LessonCompletedPage() {
             variant="primary"
             size="lg"
             fullWidth
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/account")}
           >
             Continue Learning
           </Button>

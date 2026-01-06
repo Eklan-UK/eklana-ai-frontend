@@ -29,7 +29,7 @@ export default function LearnerProfilePage() {
         setLoading(true);
         const learnerResponse = await adminService.getLearnerById(learnerId);
         setLearner(learnerResponse.user);
-        setLearnerProfile(learnerResponse.learner || learnerResponse.user);
+        setLearnerProfile(learnerResponse.user);
 
         // Fetch drills assigned to this learner
         setDrillsLoading(true);

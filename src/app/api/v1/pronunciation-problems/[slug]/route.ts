@@ -67,10 +67,10 @@ async function handler(
 
 				nextWord = words.find((word) => !completedWordIds.has(word._id.toString()));
 
-				// Create progress map
-				const progressMap = new Map();
+				// Create progress object (plain object, not Map, for JSON serialization)
+				const progressObject: Record<string, any> = {};
 				progressRecords.forEach((p) => {
-					progressMap.set(p.wordId.toString(), {
+					progressObject[p.wordId.toString()] = {
 						passed: p.passed,
 						attempts: p.attempts,
 						bestScore: p.bestScore,
@@ -79,14 +79,14 @@ async function handler(
 						challengeLevel: p.challengeLevel,
 						weakPhonemes: p.weakPhonemes,
 						lastAttemptAt: p.lastAttemptAt,
-					});
+					};
 				});
 
 				progress = {
 					totalWords: words.length,
 					completedWords: completedWordIds.size,
 					progressPercentage: words.length > 0 ? (completedWordIds.size / words.length) * 100 : 0,
-					wordProgress: progressMap,
+					wordProgress: progressObject,
 					nextWord: nextWord ? {
 						_id: nextWord._id,
 						word: nextWord.word,

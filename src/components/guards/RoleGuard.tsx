@@ -17,10 +17,11 @@ interface RoleGuardProps {
  */
 export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
 
   useEffect(() => {
-    if (isLoading) return;
+    // Wait for localStorage hydration before checking authentication
+    if (!hasHydrated || isLoading) return;
 
     if (!isAuthenticated || !user) {
       router.push("/auth/login");
@@ -39,9 +40,10 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
         router.push("/account");
       }
     }
-  }, [user, isAuthenticated, isLoading, allowedRoles, router]);
+  }, [user, isAuthenticated, isLoading, hasHydrated, allowedRoles, router]);
 
-  if (isLoading) {
+  // Show loading while hydrating from localStorage or checking session
+  if (!hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">

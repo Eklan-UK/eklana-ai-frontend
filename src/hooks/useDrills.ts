@@ -8,7 +8,7 @@ import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 
 // Get learner drills
-export function useLearnerDrills(filters?: { limit?: number; status?: string }) {
+export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {
   return useQuery({
     queryKey: queryKeys.drills.learner.list(filters),
     queryFn: async () => {
@@ -108,7 +108,7 @@ export function useCompleteDrill() {
       drillId: string;
       data: any;
     }) => {
-      return await drillAPI.completeDrill(drillId, data);
+      return await drillAPI.complete(drillId, data);
     },
     onSuccess: () => {
       // Invalidate learner drills to show updated status

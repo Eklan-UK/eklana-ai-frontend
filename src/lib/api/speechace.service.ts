@@ -13,10 +13,37 @@ interface SpeechaceScoreRequest {
 	user_audio_sample_format?: string;
 }
 
+interface WordScore {
+	word: string;
+	quality_score: number;
+	phone_score_list: Array<{
+		phone: string;
+		quality_score: number;
+		sound_most_like: string;
+	}>;
+	syllable_score_list: Array<{
+		letters: string;
+		quality_score: number;
+	}>;
+}
+
+interface TextScore {
+	text: string;
+	word_score_list: WordScore[];
+	speechace_score: { pronunciation: number };
+	ielts_score: { pronunciation: number };
+	pte_score: { pronunciation: number };
+	toeic_score: { pronunciation: number };
+	cefr_score: { pronunciation: string };
+}
+
 interface SpeechaceScoreResponse {
-	status: number;
-	text_score: number;
-	word_scores: Array<{
+	text: string;
+	textScore: TextScore;
+	// Legacy fields for backward compatibility
+	status?: number;
+	text_score?: number;
+	word_scores?: Array<{
 		word: string;
 		score: number;
 		phonemes?: Array<{
@@ -58,7 +85,7 @@ class SpeechaceService {
 		audioBase64: string,
 		userId: string,
 		questionInfo?: string
-	): Promise<SpeechaceScoreResponse> {
+	): Promise<SpeechaceScoreResponse & { text_score: number; word_scores: Array<{ word: string; score: number; phonemes?: Array<{ phoneme: string; score: number }> }> }> {
 		try {
 			// Convert base64 to buffer for form data
 			const audioBuffer = Buffer.from(audioBase64, 'base64');
@@ -74,7 +101,7 @@ class SpeechaceService {
 				formData.append('question_info', questionInfo);
 			}
 
-			const response = await axios.post<SpeechaceScoreResponse>(
+			const response = await axios.post<any>(
 				`${this.apiEndpoint}/api/scoring/text/v9/json?key=${encodeURIComponent(this.apiKey)}&dialect=en-us&user_id=${encodeURIComponent(userId)}`,
 				formData,
 				{
@@ -85,13 +112,36 @@ class SpeechaceService {
 				}
 			);
 
+			// Extract the score from the response
+			// The API returns textScore object with speechace_score.pronunciation
+			const rawData = response.data;
+			const textScore = rawData.textScore || rawData.text_score;
+			const pronunciationScore = textScore?.speechace_score?.pronunciation || textScore || rawData.text_score || 0;
+
+			// Convert word_score_list to word_scores format for backward compatibility
+			const word_scores = textScore?.word_score_list?.map((ws: WordScore) => ({
+				word: ws.word,
+				score: ws.quality_score,
+				phonemes: ws.phone_score_list?.map((ps) => ({
+					phoneme: ps.phone,
+					score: ps.quality_score,
+				})),
+			})) || [];
+
+			// Create normalized response
+			const normalizedResponse: SpeechaceScoreResponse & { text_score: number; word_scores: Array<{ word: string; score: number; phonemes?: Array<{ phoneme: string; score: number }> }> } = {
+				...rawData,
+				text_score: pronunciationScore,
+				word_scores: word_scores,
+			};
+
 			logger.info('Speechace pronunciation score generated', {
 				userId,
 				text,
-				textScore: response.data.text_score,
+				textScore: JSON.stringify(rawData),
 			});
 
-			return response.data;
+			return normalizedResponse;
 		} catch (error: any) {
 			logger.error('Speechace API error', {
 				error: error.message,

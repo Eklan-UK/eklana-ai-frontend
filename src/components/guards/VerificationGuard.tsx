@@ -17,7 +17,7 @@ interface VerificationGuardProps {
 export function VerificationGuard({ children }: VerificationGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, hasHydrated } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
   const [isAllowed, setIsAllowed] = useState(false);
 
@@ -40,8 +40,8 @@ export function VerificationGuard({ children }: VerificationGuardProps) {
         return;
       }
 
-      // Wait for auth to load
-      if (authLoading) {
+      // Wait for localStorage hydration and auth to load
+      if (!hasHydrated || authLoading) {
         return;
       }
 
@@ -76,10 +76,10 @@ export function VerificationGuard({ children }: VerificationGuardProps) {
     };
 
     checkVerification();
-  }, [isAuthenticated, user, authLoading, pathname, router]);
+  }, [isAuthenticated, user, authLoading, hasHydrated, pathname, router]);
 
-  // Show loading state while checking
-  if (isChecking || authLoading) {
+  // Show loading state while hydrating or checking
+  if (!hasHydrated || isChecking || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">

@@ -366,8 +366,8 @@ export default function PronunciationPracticePage() {
                   <Button
                     onClick={stopRecording}
                     size="lg"
-                    className="w-full"
-                    variant="destructive"
+                    className="w-full bg-red-600 text-white hover:bg-red-700 border-red-600"
+                    variant="outline"
                   >
                     <Pause className="w-5 h-5 mr-2" />
                     Stop Recording

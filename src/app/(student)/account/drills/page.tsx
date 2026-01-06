@@ -78,13 +78,14 @@ export default function DrillsPage() {
     router.push(url);
   };
 
-  // Filter drills based on date-based status
+  // Show all drills regardless of status - filter only by completion for completed tab
   const filteredDrills = drills.filter((item) => {
     const status = getDrillStatus(item);
-    if (activeTab === "ongoing") {
-      return status === "ongoing" || status === "missed";
+    if (activeTab === "completed") {
+      return status === "completed";
     }
-    return status === activeTab;
+    // For ongoing and upcoming tabs, show all non-completed drills
+    return status !== "completed";
   });
 
   // Calculate stats based on date-based status
