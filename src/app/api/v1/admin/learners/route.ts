@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -17,16 +17,12 @@ async function getHandler(
 		const limit = parseInt(searchParams.get('limit') || '100');
 		const offset = parseInt(searchParams.get('offset') || '0');
 
-		// Get total count
-		const total = await Learner.countDocuments().exec();
+		// Get total count of users with role 'user'
+		const total = await User.countDocuments({ role: 'user' }).exec();
 
-		// Find all learners and populate user details
-		const learners = await Learner.find()
-			.populate({
-				path: 'userId',
-				select: 'email firstName lastName role',
-			})
-			.select('-__v')
+		// Find all users with role 'user'
+		const users = await User.find({ role: 'user' })
+			.select('-password -__v')
 			.sort({ createdAt: -1 })
 			.limit(limit)
 			.skip(offset)
@@ -36,14 +32,14 @@ async function getHandler(
 		return NextResponse.json(
 			{
 				code: 'Success',
-				message: 'Learners retrieved successfully',
+				message: 'Users retrieved successfully',
 				data: {
-					learners,
+					learners: users, // Keep 'learners' key for backward compatibility
 					pagination: {
 						total,
 						limit,
 						offset,
-						hasMore: offset + learners.length < total,
+						hasMore: offset + users.length < total,
 					},
 				},
 			},

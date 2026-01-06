@@ -110,10 +110,10 @@ const DrillBuilder: React.FC = () => {
   const [durationDays, setDurationDays] = useState(7);
   const [context, setContext] = useState('');
   const [audioExampleUrl, setAudioExampleUrl] = useState('');
-  const [selectedLearners, setSelectedLearners] = useState<Set<string>>(new Set());
-  const [learners, setLearners] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingLearners, setLoadingLearners] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
@@ -124,19 +124,19 @@ const DrillBuilder: React.FC = () => {
     defaultDate.setDate(defaultDate.getDate() + 7);
     setCompletionDate(defaultDate.toISOString().split('T')[0]);
 
-    // Fetch learners
-    const fetchLearners = async () => {
+    // Fetch users with role 'user'
+    const fetchUsers = async () => {
       try {
-        setLoadingLearners(true);
-        const response = await adminService.getLearners({ limit: 100, role: 'learner' });
-        setLearners(response.users);
+        setLoadingUsers(true);
+        const response = await adminService.getLearners({ limit: 100, role: 'user' });
+        setUsers(response.users);
       } catch (error: any) {
-        toast.error('Failed to load learners: ' + error.message);
+        toast.error('Failed to load users: ' + error.message);
       } finally {
-        setLoadingLearners(false);
+        setLoadingUsers(false);
       }
     };
-    fetchLearners();
+    fetchUsers();
   }, []);
 
   // Vocabulary helpers
@@ -265,21 +265,21 @@ const DrillBuilder: React.FC = () => {
     setSentenceWritingItems(updated);
   };
 
-  const toggleLearner = (learnerId: string) => {
-    const updated = new Set(selectedLearners);
-    if (updated.has(learnerId)) {
-      updated.delete(learnerId);
+  const toggleUser = (userId: string) => {
+    const updated = new Set(selectedUsers);
+    if (updated.has(userId)) {
+      updated.delete(userId);
     } else {
-      updated.add(learnerId);
+      updated.add(userId);
     }
-    setSelectedLearners(updated);
+    setSelectedUsers(updated);
   };
 
-  const toggleAllLearners = () => {
-    if (selectedLearners.size === learners.length) {
-      setSelectedLearners(new Set());
+  const toggleAllUsers = () => {
+    if (selectedUsers.size === users.length) {
+      setSelectedUsers(new Set());
     } else {
-      setSelectedLearners(new Set(learners.map(l => l._id)));
+      setSelectedUsers(new Set(users.map(u => u._id)));
     }
   };
 
@@ -445,18 +445,18 @@ const DrillBuilder: React.FC = () => {
       }
     }
 
-    if (selectedLearners.size === 0) {
-      toast.error('Please select at least one learner');
+    if (selectedUsers.size === 0) {
+      toast.error('Please select at least one user');
       return;
     }
 
     try {
       setLoading(true);
 
-      // Get learner emails for assignment
-      const assignedTo = Array.from(selectedLearners).map(id => {
-        const learner = learners.find(l => l._id === id);
-        return learner?.email;
+      // Get user emails for assignment
+      const assignedTo = Array.from(selectedUsers).map(id => {
+        const user = users.find(u => u._id === id);
+        return user?.email;
       }).filter(Boolean) as string[];
 
       // Build drill data based on type
@@ -1202,51 +1202,51 @@ const DrillBuilder: React.FC = () => {
             </div>
           </div>
 
-          {/* Learner Assignment */}
+          {/* User Assignment */}
           <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-lg font-bold text-gray-900">Learner(s) Assignment<span className="text-red-500">*</span></h2>
+              <h2 className="text-lg font-bold text-gray-900">User(s) Assignment<span className="text-red-500">*</span></h2>
               <button
-                onClick={toggleAllLearners}
+                onClick={toggleAllUsers}
                 className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-600 text-xs font-bold rounded-lg border border-gray-100 hover:bg-gray-100"
               >
-                <Plus className="w-3 h-3" /> {selectedLearners.size === learners.length ? 'Deselect all' : 'Select all'}
+                <Plus className="w-3 h-3" /> {selectedUsers.size === users.length ? 'Deselect all' : 'Select all'}
               </button>
             </div>
 
-            {loadingLearners ? (
+            {loadingUsers ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
               </div>
-            ) : learners.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-8">No learners found</p>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">No users found</p>
             ) : (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 <div className="flex items-center gap-3 p-2">
                   <input
                     type="checkbox"
-                    checked={selectedLearners.size === learners.length && learners.length > 0}
-                    onChange={toggleAllLearners}
+                    checked={selectedUsers.size === users.length && users.length > 0}
+                    onChange={toggleAllUsers}
                     className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
                   />
-                  <span className="text-sm font-medium text-gray-700">Select all Learners</span>
+                  <span className="text-sm font-medium text-gray-700">Select all Users</span>
                 </div>
                 
                 <div className="p-4 bg-gray-50 rounded-2xl space-y-4">
-                  {learners.map((learner) => {
-                    const name = `${learner.firstName || ""} ${learner.lastName || ""}`.trim() || "Unknown";
-                    const isSelected = selectedLearners.has(learner._id);
+                  {users.map((user) => {
+                    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Unknown";
+                    const isSelected = selectedUsers.has(user._id);
                     return (
-                      <div key={learner._id} className={`flex items-center gap-3 ${!isSelected ? 'opacity-50' : ''}`}>
+                      <div key={user._id} className={`flex items-center gap-3 ${!isSelected ? 'opacity-50' : ''}`}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleLearner(learner._id)}
+                          onChange={() => toggleUser(user._id)}
                           className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
                         />
                         <div>
                           <p className="text-sm font-bold text-gray-900">{name}</p>
-                          <p className="text-xs text-gray-400">{learner.email}</p>
+                          <p className="text-xs text-gray-400">{user.email}</p>
                         </div>
                       </div>
                     );
@@ -1270,7 +1270,7 @@ const DrillBuilder: React.FC = () => {
                Creating...
              </>
            ) : (
-             `Create Drill for ${selectedLearners.size} learner${selectedLearners.size !== 1 ? 's' : ''}`
+             `Create Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? 's' : ''}`
            )}
          </button>
          <button

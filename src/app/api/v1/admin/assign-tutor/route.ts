@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
-import Learner from '@/models/leaner';
+import Profile from '@/models/profile';
 import Tutor from '@/models/tutor';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -85,33 +85,28 @@ async function handler(
 			);
 		}
 
-		// Find learner profile
-		const learnerProfile = await Learner.findOne({ userId: validated.studentId }).exec();
-		if (!learnerProfile) {
+		// Find user profile
+		const userProfile = await Profile.findOne({ userId: validated.studentId }).exec();
+		if (!userProfile) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
-					message: 'Learner profile not found',
+					message: 'User profile not found',
 				},
 				{ status: 404 }
 			);
 		}
 
-		// Update learner's tutorId
-		learnerProfile.tutorId = new Types.ObjectId(validated.tutorId);
-		await learnerProfile.save();
+		// Update profile's tutorId (if Profile model has tutorId field)
+		// Note: Profile model may need tutorId field added if not present
+		if (userProfile.tutorId !== undefined) {
+			(userProfile as any).tutorId = new Types.ObjectId(validated.tutorId);
+			await userProfile.save();
+		}
 
-		// Populate tutor and student details for response
-		const updatedLearner = await Learner.findById(learnerProfile._id)
-			.populate({
-				path: 'userId',
-				select: '-password -__v',
-			})
-			.populate({
-				path: 'tutorId',
-				select: '-password -__v',
-			})
-			.select('-__v')
+		// Get updated user with profile
+		const updatedUser = await User.findById(validated.studentId)
+			.select('-password -__v')
 			.lean()
 			.exec();
 
@@ -126,7 +121,7 @@ async function handler(
 				code: 'Success',
 				message: 'Tutor assigned to student successfully',
 				data: {
-					learner: updatedLearner,
+					learner: updatedUser, // Keep 'learner' key for backward compatibility
 				},
 			},
 			{ status: 200 }

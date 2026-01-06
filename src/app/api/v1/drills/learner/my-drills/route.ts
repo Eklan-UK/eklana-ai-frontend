@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import DrillAssignment from "@/models/drill-assignment";
-import Learner from "@/models/leaner";
 import Drill from "@/models/drill";
 import DrillAttempt from "@/models/drill-attempt";
 import User from "@/models/user";
@@ -22,20 +21,8 @@ async function getHandler(
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    // Get learner profile
-    const learner = await Learner.findOne({ userId: context.userId }).exec();
-    if (!learner) {
-      return NextResponse.json(
-        {
-          code: "NotFoundError",
-          message: "Learner profile not found",
-        },
-        { status: 404 }
-      );
-    }
-
-    // Build query
-    const query: any = { learnerId: learner._id };
+    // Build query - use userId directly since learnerId now references User
+    const query: any = { learnerId: context.userId };
     if (status) {
       // Map frontend status to backend status format
       const statusMap: Record<string, string> = {
@@ -90,7 +77,7 @@ async function getHandler(
     return NextResponse.json(
       {
         code: "Success",
-        message: "Learner drills retrieved successfully",
+        message: "User drills retrieved successfully",
         data: {
           drills: assignmentsWithAttempts.map((a) => ({
             assignmentId: a._id,
@@ -119,7 +106,7 @@ async function getHandler(
       { status: 200 }
     );
   } catch (error: any) {
-    logger.error("Error getting learner drills", {
+    logger.error("Error getting user drills", {
       error: error.message,
       stack: error.stack,
     });

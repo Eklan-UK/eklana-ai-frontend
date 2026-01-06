@@ -4,7 +4,7 @@ import { Schema, model, models, Document, Types } from 'mongoose';
 export interface IDrillAssignment extends Document {
 	_id: Types.ObjectId;
 	drillId: Types.ObjectId; // Reference to Drill
-	learnerId: Types.ObjectId; // Reference to Learner (not email!)
+	learnerId: Types.ObjectId; // Reference to User (kept as learnerId for backward compatibility)
 	assignedBy: Types.ObjectId; // Admin/Tutor who assigned
 	assignedAt: Date;
 	dueDate?: Date;
@@ -25,8 +25,8 @@ const drillAssignmentSchema = new Schema<IDrillAssignment>(
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,
-			ref: 'Learner',
-			required: [true, 'Learner ID is required'],
+			ref: 'User',
+			required: [true, 'User ID is required'],
 			index: true,
 		},
 		assignedBy: {

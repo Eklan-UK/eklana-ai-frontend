@@ -5,7 +5,7 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -19,34 +19,34 @@ async function handler(
 
 		const { learnerId } = params;
 
-		// Find learner
-		const learner = await Learner.findById(learnerId)
-			.populate('userId', 'email firstName lastName')
+		// Find user (learnerId is now userId)
+		const user = await User.findById(learnerId)
+			.select('email firstName lastName')
 			.lean()
 			.exec();
 
-		if (!learner) {
+		if (!user) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
-					message: 'Learner not found',
+					message: 'User not found',
 				},
 				{ status: 404 }
 			);
 		}
 
-		// Get all assignments for this learner
+		// Get all assignments for this user
 		const assignments = await PronunciationAssignment.find({
-			learnerId: learner._id,
+			learnerId: new Types.ObjectId(learnerId), // learnerId now references User
 		})
 			.populate('pronunciationId', 'title text difficulty')
 			.sort({ assignedAt: -1 })
 			.lean()
 			.exec();
 
-		// Get all attempts for this learner
+		// Get all attempts for this user
 		const allAttempts = await PronunciationAttempt.find({
-			learnerId: learner._id,
+			learnerId: new Types.ObjectId(learnerId), // learnerId now references User
 		})
 			.populate('pronunciationId', 'title text')
 			.sort({ createdAt: -1 })
@@ -146,8 +146,8 @@ async function handler(
 				message: 'Analytics retrieved successfully',
 				data: {
 					learner: {
-						_id: learner._id,
-						user: learner.userId,
+						_id: user._id,
+						user: user,
 					},
 					overall: {
 						totalAssignments,

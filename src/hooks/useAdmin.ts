@@ -70,7 +70,7 @@ export function useAssignDrill() {
       data,
     }: {
       drillId: string;
-      data: { learnerIds: string[]; dueDate?: string };
+      data: { userIds: string[]; dueDate?: string };
     }) => {
       return await drillAPI.assign(drillId, data);
     },

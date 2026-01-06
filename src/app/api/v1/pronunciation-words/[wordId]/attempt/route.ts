@@ -7,7 +7,7 @@ import PronunciationWord from '@/models/pronunciation-word';
 import PronunciationProblem from '@/models/pronunciation-problem';
 import LearnerPronunciationProgress from '@/models/learner-pronunciation-progress';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';

@@ -5,7 +5,6 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Drill from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
-import Learner from '@/models/leaner';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -222,7 +221,7 @@ async function postHandler(
 
 		const drill = await Drill.create(drillData);
 
-		// Create DrillAssignment records for assigned learners
+		// Create DrillAssignment records for assigned users
 		let assignmentCount = 0;
 		if (validated.assigned_to && validated.assigned_to.length > 0) {
 			// Get user IDs for the assigned emails
@@ -234,24 +233,19 @@ async function postHandler(
 				.lean()
 				.exec();
 
-			// Get learner profiles for these users
-			const learnerProfiles = await Learner.find({
-				userId: { $in: assignedUsers.map((u) => u._id) },
-			}).exec();
-
 			// Create drill assignments
-			const assignmentPromises = learnerProfiles.map(async (learner) => {
+			const assignmentPromises = assignedUsers.map(async (user) => {
 				try {
 					// Check if assignment already exists (shouldn't happen on create, but just in case)
 					const existingAssignment = await DrillAssignment.findOne({
 						drillId: drill._id,
-						learnerId: learner._id,
+						learnerId: user._id, // learnerId field stores User ID
 					}).exec();
 
 					if (existingAssignment) {
 						logger.warn('Drill assignment already exists', {
 							drillId: drill._id,
-							learnerId: learner._id,
+							userId: user._id,
 						});
 						return null;
 					}
@@ -262,7 +256,7 @@ async function postHandler(
 
 					const assignment = await DrillAssignment.create({
 						drillId: drill._id,
-						learnerId: learner._id,
+						learnerId: user._id, // learnerId field stores User ID
 						assignedBy: context.userId,
 						assignedAt: new Date(),
 						dueDate: dueDate,
@@ -275,7 +269,7 @@ async function postHandler(
 					if (error.code === 11000) {
 						logger.warn('Duplicate drill assignment skipped', {
 							drillId: drill._id,
-							learnerId: learner._id,
+							userId: user._id,
 						});
 						return null;
 					}

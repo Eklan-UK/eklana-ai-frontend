@@ -5,7 +5,7 @@ import { withAuth } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
 import Tutor from "@/models/tutor";
-import Learner from "@/models/leaner";
+import Profile from "@/models/profile";
 import { logger } from "@/lib/api/logger";
 
 async function handler(
@@ -52,14 +52,14 @@ async function handler(
       }
     }
 
-    // Include learner profile if user is a learner
+    // Include user profile if user is a regular user
     if (user.role === "user") {
-      const learnerProfile = await Learner.findOne({ userId: context.userId })
+      const userProfile = await Profile.findOne({ userId: context.userId })
         .select("-__v")
         .lean()
         .exec();
-      if (learnerProfile) {
-        response.learnerProfile = learnerProfile;
+      if (userProfile) {
+        response.profile = userProfile;
       }
     }
 

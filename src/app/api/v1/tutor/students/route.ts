@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -20,20 +20,8 @@ async function handler(
 		const offset = parseInt(searchParams.get('offset') || '0');
 		const status = searchParams.get('status');
 
-		// Find learner profile
-		const learner = await Learner.findOne({ userId: context.userId }).lean().exec();
-		if (!learner) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Learner profile not found',
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Build query
-		const query: any = { learnerId: learner._id };
+		// Build query - use userId directly since learnerId now references User
+		const query: any = { learnerId: context.userId };
 		if (status) {
 			query.status = status;
 		}

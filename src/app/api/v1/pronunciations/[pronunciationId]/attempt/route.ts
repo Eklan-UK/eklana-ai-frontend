@@ -6,7 +6,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
 import Pronunciation from '@/models/pronunciation';
-import Learner from '@/models/leaner';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';

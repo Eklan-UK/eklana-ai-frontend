@@ -4,7 +4,6 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Drill from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
-import Learner from '@/models/leaner';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -205,7 +204,7 @@ async function putHandler(
 
 		await drill.save();
 
-		// Create DrillAssignment records for newly assigned learners
+		// Create DrillAssignment records for newly assigned users
 		let newAssignmentsCount = 0;
 		if (validated.assigned_to !== undefined) {
 			// Get user IDs for the assigned emails
@@ -217,11 +216,6 @@ async function putHandler(
 				.lean()
 				.exec();
 
-			// Get learner profiles for these users
-			const learnerProfiles = await Learner.find({
-				userId: { $in: assignedUsers.map((u) => u._id) },
-			}).exec();
-
 			// Get existing assignments to avoid duplicates
 			const existingAssignments = await DrillAssignment.find({
 				drillId: drill._id,
@@ -230,14 +224,14 @@ async function putHandler(
 				.lean()
 				.exec();
 
-			const existingLearnerIds = new Set(
+			const existingUserIds = new Set(
 				existingAssignments.map((a) => a.learnerId.toString())
 			);
 
-			// Create drill assignments for learners that don't have one yet
-			const assignmentPromises = learnerProfiles
-				.filter((learner) => !existingLearnerIds.has(learner._id.toString()))
-				.map(async (learner) => {
+			// Create drill assignments for users that don't have one yet
+			const assignmentPromises = assignedUsers
+				.filter((user) => !existingUserIds.has(user._id.toString()))
+				.map(async (user) => {
 					try {
 						// Calculate due date based on drill date and duration
 						const dueDate = new Date(drill.date);
@@ -245,7 +239,7 @@ async function putHandler(
 
 						const assignment = await DrillAssignment.create({
 							drillId: drill._id,
-							learnerId: learner._id,
+							learnerId: user._id, // learnerId field stores User ID
 							assignedBy: context.userId,
 							assignedAt: new Date(),
 							dueDate: dueDate,
@@ -258,7 +252,7 @@ async function putHandler(
 						if (error.code === 11000) {
 							logger.warn('Duplicate drill assignment skipped', {
 								drillId: drill._id,
-								learnerId: learner._id,
+								userId: user._id,
 							});
 							return null;
 						}

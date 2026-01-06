@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
-import Learner from '@/models/leaner';
+import Profile from '@/models/profile';
 import Tutor from '@/models/tutor';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -45,12 +45,12 @@ async function handler(
 
 		// Include profile if exists
 		if (user.role === 'user') {
-			const learnerProfile = await Learner.findOne({ userId: new Types.ObjectId(userId) })
+			const userProfile = await Profile.findOne({ userId: new Types.ObjectId(userId) })
 				.select('-__v')
 				.lean()
 				.exec();
-			if (learnerProfile) {
-				response.learnerProfile = learnerProfile;
+			if (userProfile) {
+				response.profile = userProfile;
 			}
 		} else if (user.role === 'tutor') {
 			const tutorProfile = await Tutor.findOne({ userId: new Types.ObjectId(userId) })

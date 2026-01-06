@@ -45,7 +45,7 @@ export default function DrillAssignmentDetailPage() {
   const router = useRouter();
   const drillId = params.drillId as string;
 
-  const [selectedLearnerIds, setSelectedLearnerIds] = useState<Set<string>>(
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
     new Set()
   );
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,46 +60,46 @@ export default function DrillAssignmentDetailPage() {
   const learners = learnersData?.learners || [];
   const loading = drillLoading || learnersLoading;
 
-  // Pre-select learners who are already assigned
+  // Pre-select users who are already assigned
   useEffect(() => {
     if (drill?.assigned_to && learners.length > 0) {
       const assignedEmails = new Set(drill.assigned_to);
-      const assignedLearnerIds = new Set<string>();
+      const assignedUserIds = new Set<string>();
       learners.forEach((learner: Learner) => {
         if (
           learner.userId &&
           assignedEmails.has((learner.userId as any).email)
         ) {
-          assignedLearnerIds.add(learner.userId._id.toString());
+          assignedUserIds.add(learner.userId._id.toString());
         }
       });
-      setSelectedLearnerIds(assignedLearnerIds);
+      setSelectedUserIds(assignedUserIds);
     }
   }, [drill?.assigned_to, learners]);
 
-  const handleToggleLearner = (learnerId: string) => {
-    const newSelected = new Set(selectedLearnerIds);
-    if (newSelected.has(learnerId)) {
-      newSelected.delete(learnerId);
+  const handleToggleUser = (userId: string) => {
+    const newSelected = new Set(selectedUserIds);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
     } else {
-      newSelected.add(learnerId);
+      newSelected.add(userId);
     }
-    setSelectedLearnerIds(newSelected);
+    setSelectedUserIds(newSelected);
   };
 
   const handleSelectAll = () => {
-    if (selectedLearnerIds.size === filteredLearners.length) {
-      setSelectedLearnerIds(new Set());
+    if (selectedUserIds.size === filteredLearners.length) {
+      setSelectedUserIds(new Set());
     } else {
-      setSelectedLearnerIds(
+      setSelectedUserIds(
         new Set(filteredLearners.map((l) => l.userId._id.toString()))
       );
     }
   };
 
   const handleSubmit = async () => {
-    if (selectedLearnerIds.size === 0) {
-      toast.error("Please select at least one student");
+    if (selectedUserIds.size === 0) {
+      toast.error("Please select at least one user");
       return;
     }
 
@@ -115,7 +115,7 @@ export default function DrillAssignmentDetailPage() {
       {
         drillId,
         data: {
-          learnerIds: Array.from(selectedLearnerIds),
+          userIds: Array.from(selectedUserIds),
           dueDate,
         },
       },
@@ -308,14 +308,14 @@ export default function DrillAssignmentDetailPage() {
                   Select Students
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {selectedLearnerIds.size} of {filteredLearners.length} selected
+                  {selectedUserIds.size} of {filteredLearners.length} selected
                 </p>
               </div>
               <button
                 onClick={handleSelectAll}
                 className="text-sm text-[#418b43] hover:underline font-medium"
               >
-                {selectedLearnerIds.size === filteredLearners.length
+                {selectedUserIds.size === filteredLearners.length
                   ? "Deselect All"
                   : "Select All"}
               </button>
@@ -343,7 +343,7 @@ export default function DrillAssignmentDetailPage() {
               ) : (
                 filteredLearners.map((learner) => {
                   const learnerId = learner.userId._id.toString();
-                  const isSelected = selectedLearnerIds.has(learnerId);
+                  const isSelected = selectedUserIds.has(learnerId);
                   const firstName = (learner.userId as any).firstName || "";
                   const lastName = (learner.userId as any).lastName || "";
                   const email = (learner.userId as any).email || "";
@@ -352,7 +352,7 @@ export default function DrillAssignmentDetailPage() {
                   return (
                     <div
                       key={learner._id}
-                      onClick={() => handleToggleLearner(learnerId)}
+                      onClick={() => handleToggleUser(learnerId)}
                       className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                         isSelected
                           ? "border-[#418b43] bg-green-50"
@@ -385,7 +385,7 @@ export default function DrillAssignmentDetailPage() {
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              disabled={assignMutation.isPending || selectedLearnerIds.size === 0}
+              disabled={assignMutation.isPending || selectedUserIds.size === 0}
               className="w-full py-3 bg-[#418b43] text-white font-medium rounded-xl hover:bg-[#3a7c3b] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {assignMutation.isPending ? (
@@ -395,8 +395,8 @@ export default function DrillAssignmentDetailPage() {
                 </>
               ) : (
                 <>
-                  Assign to {selectedLearnerIds.size} Student
-                  {selectedLearnerIds.size !== 1 ? "s" : ""}
+                  Assign to {selectedUserIds.size} User
+                  {selectedUserIds.size !== 1 ? "s" : ""}
                 </>
               )}
             </button>

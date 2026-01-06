@@ -163,9 +163,9 @@ export const drillAPI = {
     });
   },
 
-  // Assign drill to learners
+  // Assign drill to users
   assign: (drillId: string, data: {
-    learnerIds: string[];
+    userIds: string[];
     dueDate?: string;
   }) => {
     return apiRequest<{
