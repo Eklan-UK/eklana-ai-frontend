@@ -99,12 +99,12 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			required: [true, 'Drill assignment ID is required'],
 			index: true,
 		},
-		learnerId: {
-			type: Schema.Types.ObjectId,
-			ref: 'Learner',
-			required: [true, 'Learner ID is required'],
-			index: true,
-		},
+	learnerId: {
+		type: Schema.Types.ObjectId,
+		ref: 'User', // learnerId now references User (kept name for backward compatibility)
+		required: [true, 'User ID is required'],
+		index: true,
+	},
 		drillId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Drill',
