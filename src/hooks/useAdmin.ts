@@ -108,3 +108,22 @@ export function useRecentLearners(limit: number = 10) {
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
+
+// Get drill assignments for a specific drill
+export function useDrillAssignments(drillId: string) {
+  return useQuery({
+    queryKey: ["admin", "drills", drillId, "assignments"],
+    queryFn: async () => {
+      const response = await fetch(`/api/v1/drills/${drillId}/assignments`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch drill assignments');
+      }
+      const data = await response.json();
+      return data;
+    },
+    enabled: !!drillId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}

@@ -138,7 +138,7 @@ export interface IDrill extends Document {
 	difficulty: 'beginner' | 'intermediate' | 'advanced';
 	date: Date;
 	duration_days: number;
-	assigned_to: string[]; // Array of student emails
+	assigned_to: string[]; // Array of user IDs (for counting purposes only, use DrillAssignment for analytics)
 	context?: string;
 	audio_example_url?: string;
 	

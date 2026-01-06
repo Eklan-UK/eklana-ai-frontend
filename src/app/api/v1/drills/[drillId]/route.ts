@@ -99,6 +99,53 @@ const updateDrillSchema = z.object({
 	duration_days: z.number().int().min(1).optional(),
 	assigned_to: z.array(z.string().email()).optional(),
 	is_active: z.boolean().optional(),
+	context: z.string().optional(),
+	audio_example_url: z.string().url().optional(),
+	// Vocabulary fields
+	target_sentences: z.array(z.object({
+		word: z.string().optional(),
+		wordTranslation: z.string().optional(),
+		text: z.string(),
+		translation: z.string().optional(),
+	})).optional(),
+	// Roleplay fields
+	student_character_name: z.string().optional(),
+	ai_character_names: z.array(z.string()).optional(),
+	roleplay_scenes: z.array(z.object({
+		scene_name: z.string(),
+		context: z.string().optional(),
+		dialogue: z.array(z.object({
+			speaker: z.string(),
+			text: z.string(),
+			translation: z.string().optional(),
+		})),
+	})).optional(),
+	// Matching fields
+	matching_pairs: z.array(z.object({
+		left: z.string(),
+		right: z.string(),
+		leftTranslation: z.string().optional(),
+		rightTranslation: z.string().optional(),
+	})).optional(),
+	// Definition fields
+	definition_items: z.array(z.object({
+		word: z.string(),
+		hint: z.string().optional(),
+	})).optional(),
+	// Grammar fields
+	grammar_items: z.array(z.object({
+		pattern: z.string(),
+		hint: z.string().optional(),
+		example: z.string(),
+	})).optional(),
+	// Sentence Writing fields
+	sentence_writing_items: z.array(z.object({
+		word: z.string(),
+		hint: z.string().optional(),
+	})).optional(),
+	// Summary fields
+	article_title: z.string().optional(),
+	article_content: z.string().optional(),
 });
 
 async function putHandler(
@@ -157,62 +204,80 @@ async function putHandler(
 			);
 		}
 
-		// Validate assigned_to emails if provided
+		// Validate assigned_to user IDs if provided
+		let assignedUserIds: Types.ObjectId[] = [];
 		if (validated.assigned_to !== undefined) {
 			if (validated.assigned_to.length === 0) {
 				return NextResponse.json(
 					{
 						code: 'ValidationError',
-						message: 'At least one student email must be assigned',
+						message: 'At least one user ID must be assigned',
 					},
 					{ status: 400 }
 				);
 			}
 
+			const userIds = validated.assigned_to.map((id) => new Types.ObjectId(id));
 			const studentUsers = await User.find({
-				email: { $in: validated.assigned_to },
+				_id: { $in: userIds },
 				role: 'user',
 			})
-				.select('email')
+				.select('_id email')
 				.lean()
 				.exec();
 
 			if (studentUsers.length !== validated.assigned_to.length) {
-				const foundEmails = studentUsers.map((u) => u.email);
-				const missingEmails = validated.assigned_to.filter((email) => !foundEmails.includes(email));
+				const foundIds = studentUsers.map((u) => u._id.toString());
+				const missingIds = validated.assigned_to.filter((id) => !foundIds.includes(id));
 
 				return NextResponse.json(
 					{
 						code: 'ValidationError',
-						message: 'One or more assigned student emails are invalid or do not belong to learners',
-						invalidEmails: missingEmails,
+						message: 'One or more assigned user IDs are invalid or do not belong to users',
+						invalidUserIds: missingIds,
 					},
 					{ status: 400 }
 				);
 			}
+			assignedUserIds = studentUsers.map((u) => u._id);
 		}
 
-		// Update drill
+		// Update drill basic fields
 		if (validated.title !== undefined) drill.title = validated.title;
 		if (validated.type !== undefined) drill.type = validated.type;
 		if (validated.difficulty !== undefined) drill.difficulty = validated.difficulty;
 		if (validated.date !== undefined) drill.date = new Date(validated.date);
 		if (validated.duration_days !== undefined) drill.duration_days = validated.duration_days;
-		if (validated.assigned_to !== undefined) drill.assigned_to = validated.assigned_to;
+		if (validated.assigned_to !== undefined) drill.assigned_to = assignedUserIds.map((id) => id.toString());
 		if (validated.is_active !== undefined) drill.is_active = validated.is_active;
+		if (validated.context !== undefined) drill.context = validated.context;
+		if (validated.audio_example_url !== undefined) drill.audio_example_url = validated.audio_example_url;
+
+		// Update type-specific fields
+		if (validated.target_sentences !== undefined) drill.target_sentences = validated.target_sentences;
+		if (validated.student_character_name !== undefined) drill.student_character_name = validated.student_character_name;
+		if (validated.ai_character_names !== undefined) drill.ai_character_names = validated.ai_character_names;
+		if (validated.roleplay_scenes !== undefined) drill.roleplay_scenes = validated.roleplay_scenes;
+		if (validated.matching_pairs !== undefined) drill.matching_pairs = validated.matching_pairs;
+		if (validated.definition_items !== undefined) drill.definition_items = validated.definition_items;
+		if (validated.grammar_items !== undefined) drill.grammar_items = validated.grammar_items;
+		if (validated.sentence_writing_items !== undefined) drill.sentence_writing_items = validated.sentence_writing_items;
+		if (validated.article_title !== undefined) drill.article_title = validated.article_title;
+		if (validated.article_content !== undefined) drill.article_content = validated.article_content;
+
 		drill.updated_date = new Date();
 
 		await drill.save();
 
 		// Create DrillAssignment records for newly assigned users
 		let newAssignmentsCount = 0;
-		if (validated.assigned_to !== undefined) {
-			// Get user IDs for the assigned emails
+		if (assignedUserIds.length > 0) {
+			// Get user details for the assigned user IDs
 			const assignedUsers = await User.find({
-				email: { $in: validated.assigned_to },
+				_id: { $in: assignedUserIds },
 				role: 'user',
 			})
-				.select('_id email')
+				.select('_id email firstName lastName')
 				.lean()
 				.exec();
 

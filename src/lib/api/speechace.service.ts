@@ -113,13 +113,16 @@ class SpeechaceService {
 			);
 
 			// Extract the score from the response
-			// The API returns textScore object with speechace_score.pronunciation
+			// The API returns text_score (snake_case) object with speechace_score.pronunciation
 			const rawData = response.data;
-			const textScore = rawData.textScore || rawData.text_score;
-			const pronunciationScore = textScore?.speechace_score?.pronunciation || textScore || rawData.text_score || 0;
+			// The API response has text_score (snake_case), not textScore (camelCase)
+			const textScoreObj = rawData.text_score || rawData.textScore;
+			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation || 
+			                          (typeof textScoreObj === 'number' ? textScoreObj : 0) ||
+			                          rawData.text_score || 0;
 
 			// Convert word_score_list to word_scores format for backward compatibility
-			const word_scores = textScore?.word_score_list?.map((ws: WordScore) => ({
+			const word_scores = textScoreObj?.word_score_list?.map((ws: WordScore) => ({
 				word: ws.word,
 				score: ws.quality_score,
 				phonemes: ws.phone_score_list?.map((ps) => ({
@@ -129,9 +132,11 @@ class SpeechaceService {
 			})) || [];
 
 			// Create normalized response
+			// Include textScore (camelCase) for frontend compatibility, and text_score (number) for backward compatibility
 			const normalizedResponse: SpeechaceScoreResponse & { text_score: number; word_scores: Array<{ word: string; score: number; phonemes?: Array<{ phoneme: string; score: number }> }> } = {
 				...rawData,
-				text_score: pronunciationScore,
+				textScore: textScoreObj, // TextScore object (camelCase for frontend)
+				text_score: pronunciationScore, // Number score (for backward compatibility)
 				word_scores: word_scores,
 			};
 

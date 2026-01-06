@@ -29,6 +29,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
+      // Note: rememberMe is handled by Better Auth session duration settings
       await login(email, password);
       
       // Small delay to ensure user is set in store

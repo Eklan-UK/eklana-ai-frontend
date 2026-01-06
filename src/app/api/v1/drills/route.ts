@@ -59,7 +59,9 @@ const createDrillSchema = z.object({
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
 	duration_days: z.number().int().min(1).optional(),
-	assigned_to: z.array(z.string().email()).min(1),
+	assigned_to: z.array(z.string().refine((id) => Types.ObjectId.isValid(id), {
+		message: 'Each user ID must be a valid MongoDB ObjectId',
+	})).min(1),
 	context: z.string().optional(),
 	audio_example_url: z.string().url().optional(),
 	target_sentences: z.array(targetSentenceSchema).optional(),
@@ -157,29 +159,32 @@ async function postHandler(
 			);
 		}
 
-		// Validate assigned students
+		// Validate assigned students - assigned_to now contains user IDs
+		let assignedUserIds: Types.ObjectId[] = [];
 		if (validated.assigned_to && validated.assigned_to.length > 0) {
+			const userIds = validated.assigned_to.map((id) => new Types.ObjectId(id));
 			const studentUsers = await User.find({
-				email: { $in: validated.assigned_to },
+				_id: { $in: userIds },
 				role: 'user',
 			})
-				.select('email')
+				.select('_id email')
 				.lean()
 				.exec();
 
 			if (studentUsers.length !== validated.assigned_to.length) {
-				const foundEmails = studentUsers.map((u) => u.email);
-				const missingEmails = validated.assigned_to.filter((email) => !foundEmails.includes(email));
+				const foundIds = studentUsers.map((u) => u._id.toString());
+				const missingIds = validated.assigned_to.filter((id) => !foundIds.includes(id));
 
 				return NextResponse.json(
 					{
 						code: 'ValidationError',
-						message: 'One or more assigned student emails are invalid or do not belong to learners',
-						invalidEmails: missingEmails,
+						message: 'One or more assigned user IDs are invalid or do not belong to users',
+						invalidUserIds: missingIds,
 					},
 					{ status: 400 }
 				);
 			}
+			assignedUserIds = studentUsers.map((u) => u._id);
 		}
 
 		// Create drill
@@ -189,7 +194,7 @@ async function postHandler(
 			difficulty: validated.difficulty || 'intermediate',
 			date: new Date(validated.date),
 			duration_days: validated.duration_days || 1,
-			assigned_to: validated.assigned_to,
+			assigned_to: assignedUserIds.map((id) => id.toString()), // Store user IDs as strings for counting
 			created_by: creator.email,
 			createdById: context.userId,
 			created_date: new Date(),

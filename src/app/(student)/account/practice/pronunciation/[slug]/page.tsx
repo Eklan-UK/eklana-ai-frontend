@@ -134,17 +134,21 @@ export default function PronunciationWordPracticePage() {
 
       // Display results immediately
       // The backend API returns: { code, message, data: result }
-      // where result contains text_score (TextScore object) from the backend service
-      const result = speechAceResponse.data;
+      // where result contains textScore (TextScore object) from the backend service normalization
+      const result = speechAceResponse.data as any;
       let textScore: TextScore | null = null;
 
-      // The backend service normalizes the response and returns text_score as the TextScore object
-      if (result?.text_score && typeof result.text_score === 'object') {
-        // text_score is the TextScore object from backend normalization
+      // The backend service normalizes the response and returns textScore (camelCase) as the TextScore object
+      // It also spreads rawData which may contain text_score (snake_case) from the raw API response
+      if (result?.textScore && typeof result.textScore === 'object') {
+        // textScore is the TextScore object from backend normalization
+        textScore = result.textScore as TextScore;
+      } else if (result?.text_score && typeof result.text_score === 'object') {
+        // Fallback: check for text_score (snake_case) from raw API response
         textScore = result.text_score as TextScore;
-      } else if ((result as any)?.textScore) {
-        // Fallback: check for textScore (camelCase) from raw API response
-        textScore = (result as any).textScore;
+      } else if (result?.data?.text_score) {
+        // Another fallback: check nested data structure
+        textScore = result.data.text_score as TextScore;
       }
 
       if (textScore) {
@@ -153,7 +157,8 @@ export default function PronunciationWordPracticePage() {
         setIsAnalyzing(false);
       } else {
         console.error("SpeechAce response structure:", speechAceResponse);
-        throw new Error("Invalid response from SpeechAce - missing textScore");
+        console.error("Result data:", result);
+        throw new Error("Invalid response from SpeechAce - missing textScore. Check console for response structure.");
       }
 
       // Save analytics in background (non-blocking)

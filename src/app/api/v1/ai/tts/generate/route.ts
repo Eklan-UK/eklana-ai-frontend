@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
+import config from '@/lib/api/config';
 
 const generateTTSSchema = z.object({
 	text: z.string().min(1).max(5000),
@@ -23,17 +24,31 @@ async function handler(
 		const body = await req.json();
 		const validated = generateTTSSchema.parse(body);
 
+		// Check if API key is configured
+		const apiKey = config.ELEVEN_LABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
+		if (!apiKey) {
+			logger.error('Eleven Labs API key not configured');
+			return NextResponse.json(
+				{
+					code: 'ConfigurationError',
+					message: 'Eleven Labs API key is not configured. Please set ELEVEN_LABS_API_KEY environment variable.',
+				},
+				{ status: 500 }
+			);
+		}
+
 		// Create a streaming response
 		const stream = new ReadableStream({
 			async start(controller) {
 				try {
-					// We need to adapt the TTS service to work with Next.js streaming
-					// For now, we'll use a simpler approach
-					const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + (validated.voiceId || '21m00Tcm4TlvDq8ikWAM'), {
+					const voiceId = validated.voiceId || '21m00Tcm4TlvDq8ikWAM';
+					const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+					
+					const response = await fetch(url, {
 						method: 'POST',
 						headers: {
 							'Content-Type': 'application/json',
-							'xi-api-key': process.env.ELEVEN_LABS_API_KEY || '',
+							'xi-api-key': apiKey,
 						},
 						body: JSON.stringify({
 							text: validated.text,
@@ -48,7 +63,18 @@ async function handler(
 					});
 
 					if (!response.ok) {
-						throw new Error(`Eleven Labs API error: ${response.statusText}`);
+						const errorText = await response.text().catch(() => response.statusText);
+						logger.error('Eleven Labs API error', {
+							status: response.status,
+							statusText: response.statusText,
+							error: errorText,
+						});
+						
+						if (response.status === 401) {
+							throw new Error('Eleven Labs API key is invalid or expired. Please check your ELEVEN_LABS_API_KEY environment variable.');
+						}
+						
+						throw new Error(`Eleven Labs API error (${response.status}): ${errorText || response.statusText}`);
 					}
 
 					// Stream the audio

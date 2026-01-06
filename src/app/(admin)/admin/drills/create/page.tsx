@@ -677,12 +677,9 @@ const DrillBuilder: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get user emails for assignment
+      // Get user IDs for assignment (not emails)
       const assignedTo = Array.from(selectedUsers)
-        .map((id) => {
-          const user = users.find((u) => u._id === id);
-          return user?.email;
-        })
+        .map((id) => id.toString())
         .filter(Boolean) as string[];
 
       // Build drill data based on type
@@ -692,21 +689,12 @@ const DrillBuilder: React.FC = () => {
         difficulty: difficulty.toLowerCase(),
         date: new Date(completionDate).toISOString(),
         duration_days: durationDays,
-        assigned_to: assignedTo,
+        assigned_to: assignedTo, // Now contains user IDs, not emails
         context: context || undefined,
         audio_example_url: audioExampleUrl || undefined,
-        is_active: true,
       };
 
-      // If editing, use update API
-      if (isEditMode && drillId) {
-        await drillAPI.update(drillId, drillData);
-        toast.success("Drill updated successfully");
-        router.push("/admin/drill");
-        return;
-      }
-
-      // Add type-specific data
+      // Add type-specific data BEFORE updating
       if (drillType === "vocabulary") {
         drillData.target_sentences = vocabularyItems
           .filter((v) => v.text.trim())
