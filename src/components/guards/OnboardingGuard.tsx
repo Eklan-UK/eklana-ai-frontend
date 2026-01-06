@@ -54,7 +54,13 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
 
       // Check verification and onboarding status
       try {
-        const status = await checkAuthFlowStatus(user);
+        // Normalize user role for checking
+        const normalizedUser = {
+          ...user,
+          role: user.role === 'learner' ? 'user' : user.role,
+        };
+        
+        const status = await checkAuthFlowStatus(normalizedUser);
         
         // If verification is needed, that should be handled by VerificationGuard
         // Here we only check onboarding
@@ -65,13 +71,23 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
           }
           setIsAllowed(false);
         } else {
-          // Onboarding complete (or not needed for non-learners), allow access
+          // Onboarding complete (or not needed for non-users), allow access
           setIsAllowed(true);
         }
-      } catch (error) {
-        // On error, allow access (don't block user)
-        console.error("Error checking onboarding status:", error);
-        setIsAllowed(true);
+      } catch (error: any) {
+        // On error, check if it's a Forbidden error
+        if (error?.message?.includes('Forbidden') || error?.code === 'Forbidden') {
+          // If forbidden, redirect to onboarding (user might need to complete it)
+          console.warn("Forbidden error checking onboarding, redirecting to onboarding:", error);
+          if (pathname !== "/account/onboarding") {
+            router.push("/account/onboarding");
+          }
+          setIsAllowed(false);
+        } else {
+          // On other errors, allow access (don't block user)
+          console.error("Error checking onboarding status:", error);
+          setIsAllowed(true);
+        }
       } finally {
         setIsChecking(false);
       }

@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  allowedRoles: ('admin' | 'learner' | 'tutor')[];
+  allowedRoles: ('admin' | 'user' | 'tutor')[];
   fallback?: React.ReactNode;
 }
 
@@ -28,7 +28,7 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
       return;
     }
 
-    const userRole = (user.role as 'admin' | 'learner' | 'tutor') || 'learner';
+    const userRole = (user.role as 'admin' | 'user' | 'tutor') || 'user';
     
     if (!allowedRoles.includes(userRole)) {
       // Redirect based on user's role
@@ -58,7 +58,7 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
     return null;
   }
 
-  const userRole = (user.role as 'admin' | 'learner' | 'tutor') || 'learner';
+  const userRole = (user.role as 'admin' | 'user' | 'tutor') || 'user';
   
   if (!allowedRoles.includes(userRole)) {
     return fallback || null;

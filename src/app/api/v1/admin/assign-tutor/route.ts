@@ -41,7 +41,7 @@ async function handler(
 			);
 		}
 
-		if (studentUser.role !== 'learner') {
+		if (studentUser.role !== 'user') {
 			return NextResponse.json(
 				{
 					code: 'ValidationError',

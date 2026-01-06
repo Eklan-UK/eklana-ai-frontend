@@ -135,4 +135,4 @@ async function getHandler(
   }
 }
 
-export const GET = withRole(["learner"], getHandler);
+export const GET = withRole(["user"], getHandler);

@@ -99,5 +99,5 @@ async function handler(
 	}
 }
 
-export const GET = withRole(['learner'], handler);
+export const GET = withRole(['user'], handler);
 

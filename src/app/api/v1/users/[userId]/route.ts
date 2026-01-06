@@ -44,7 +44,7 @@ async function handler(
 		const response: any = { user };
 
 		// Include profile if exists
-		if (user.role === 'learner') {
+		if (user.role === 'user') {
 			const learnerProfile = await Learner.findOne({ userId: new Types.ObjectId(userId) })
 				.select('-__v')
 				.lean()

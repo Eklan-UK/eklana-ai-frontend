@@ -1,13 +1,17 @@
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import Learner from '@/models/leaner';
+import Profile from '@/models/profile';
 import Tutor from '@/models/tutor';
 
 /**
- * Create a Learner profile for a user
+ * Create a Profile for a user (replaces Learner profile)
  */
-export const createLearnerProfile = async (userId: Types.ObjectId, learnerData?: {
+export const createUserProfile = async (userId: Types.ObjectId, profileData?: {
+	userType?: 'professional' | 'student' | 'browsing' | 'ancestor';
+	learningGoal?: string;
+	nationality?: string;
+	language?: string;
 	gradeLevel?: string;
 	subjects?: string[];
 	learningGoals?: string[];
@@ -26,45 +30,43 @@ export const createLearnerProfile = async (userId: Types.ObjectId, learnerData?:
 	};
 }): Promise<void> => {
 	try {
-		// Check if learner profile already exists
-		const existingLearner = await Learner.findOne({ userId }).exec();
-		if (existingLearner) {
-			logger.warn('Learner profile already exists', { userId });
+		// Check if profile already exists
+		const existingProfile = await Profile.findOne({ userId }).exec();
+		if (existingProfile) {
+			logger.warn('Profile already exists', { userId });
 			return;
 		}
 
-		// Verify user exists and has learner role
+		// Verify user exists
 		const user = await User.findById(userId).exec();
 		if (!user) {
 			throw new Error('User not found');
 		}
 
-		if (user.role !== 'learner') {
-			throw new Error(`User role is ${user.role}, expected learner`);
-		}
-
-		// Create learner profile
-		await Learner.create({
+		// Create profile
+		await Profile.create({
 			userId,
-			gradeLevel: learnerData?.gradeLevel,
-			subjects: learnerData?.subjects || [],
-			learningGoals: learnerData?.learningGoals || [],
-			learningStyle: learnerData?.learningStyle,
-			educationLevel: learnerData?.educationLevel,
-			parentContact: learnerData?.parentContact,
-			preferences: learnerData?.preferences || {
+			userType: profileData?.userType,
+			learningGoal: profileData?.learningGoal,
+			nationality: profileData?.nationality,
+			language: profileData?.language,
+			gradeLevel: profileData?.gradeLevel,
+			subjects: profileData?.subjects || [],
+			learningGoals: profileData?.learningGoals || [],
+			learningStyle: profileData?.learningStyle,
+			educationLevel: profileData?.educationLevel,
+			parentContact: profileData?.parentContact,
+			preferences: profileData?.preferences || {
 				sessionDuration: 60,
 				preferredTimeSlots: [],
 				learningPace: 'moderate',
 			},
-			enrollmentDate: new Date(),
-			totalSessionsAttended: 0,
 			status: 'active',
 		});
 
-		logger.info('Learner profile created successfully', { userId });
+		logger.info('Profile created successfully', { userId });
 	} catch (error: any) {
-		logger.error('Error creating learner profile', {
+		logger.error('Error creating profile', {
 			error: error.message,
 			userId,
 		});
@@ -153,7 +155,7 @@ export const createTutorProfile = async (
 				schedule: [],
 			},
 			bankDetails: tutorData?.bankDetails,
-			status: approvedBy ? 'active' : 'pending', // Auto-approve if approvedBy is provided
+			status: approvedBy ? 'active' : 'pending',
 			approvedBy: approvedBy,
 			approvedAt: approvedBy ? new Date() : undefined,
 		});
@@ -168,12 +170,16 @@ export const createTutorProfile = async (
 	}
 };
 
+// Legacy function names for backward compatibility during migration
+export const createLearnerProfile = createUserProfile;
+
 /**
  * Update user role and create corresponding profile
+ * @deprecated Use createUserProfile or createTutorProfile directly
  */
 export const updateUserRole = async (
 	userId: Types.ObjectId,
-	newRole: 'learner' | 'tutor' | 'admin',
+	newRole: 'user' | 'tutor' | 'admin',
 	profileData?: any,
 	approvedBy?: Types.ObjectId
 ): Promise<void> => {
@@ -188,19 +194,19 @@ export const updateUserRole = async (
 		await user.save();
 
 		// Create corresponding profile
-		if (newRole === 'learner') {
+		if (newRole === 'user') {
 			// Remove tutor profile if exists
 			await Tutor.deleteOne({ userId }).exec();
-			// Create learner profile
-			await createLearnerProfile(userId, profileData);
+			// Create user profile
+			await createUserProfile(userId, profileData);
 		} else if (newRole === 'tutor') {
-			// Remove learner profile if exists
-			await Learner.deleteOne({ userId }).exec();
+			// Remove user profile if exists
+			await Profile.deleteOne({ userId }).exec();
 			// Create tutor profile
 			await createTutorProfile(userId, profileData, approvedBy);
 		} else if (newRole === 'admin') {
-			// Remove both learner and tutor profiles
-			await Learner.deleteOne({ userId }).exec();
+			// Remove both user and tutor profiles
+			await Profile.deleteOne({ userId }).exec();
 			await Tutor.deleteOne({ userId }).exec();
 		}
 
@@ -218,4 +224,3 @@ export const updateUserRole = async (
 		throw error;
 	}
 };
-

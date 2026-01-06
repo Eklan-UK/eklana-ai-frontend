@@ -183,7 +183,7 @@ export default function OnboardingPage() {
     try {
       const formattedData = getFormattedData();
 
-      await userAPI.onboard("learner", formattedData);
+      await userAPI.onboard("user", formattedData);
 
       toast.success("Onboarding completed successfully!");
 

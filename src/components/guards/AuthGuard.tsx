@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  allowedRoles?: ('admin' | 'learner' | 'tutor')[];
+  allowedRoles?: ('admin' | 'user' | 'tutor')[];
   requireAuth?: boolean;
 }
 
@@ -63,9 +63,9 @@ export function AuthGuard({
 
       // If auth is required and user is authenticated, check role
       if (requireAuth && isAuthenticated && user && allowedRoles) {
-        const userRole = user.role || 'learner';
+        const userRole = user.role || 'user';
         
-        if (!allowedRoles.includes(userRole as 'admin' | 'learner' | 'tutor')) {
+        if (!allowedRoles.includes(userRole as 'admin' | 'user' | 'tutor')) {
           // Redirect based on role
           if (userRole === 'admin') {
             router.push("/admin/dashboard");
@@ -103,8 +103,8 @@ export function AuthGuard({
 
   // If role is required but user doesn't have it, don't render (will redirect)
   if (requireAuth && isAuthenticated && user && allowedRoles) {
-    const userRole = user.role || 'learner';
-    if (!allowedRoles.includes(userRole as 'admin' | 'learner' | 'tutor')) {
+    const userRole = user.role || 'user';
+    if (!allowedRoles.includes(userRole as 'admin' | 'user' | 'tutor')) {
       return null;
     }
   }

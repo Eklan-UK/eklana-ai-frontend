@@ -14,7 +14,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register, signInWithGoogle, signInWithApple, isLoading } = useAuthStore();
   const [formData, setFormData] = useState({
-    name: "",
     firstName: "",
     lastName: "",
     email: "",
@@ -35,7 +34,7 @@ export default function RegisterPage() {
     e.preventDefault();
 
     // Validation
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -57,16 +56,12 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      // Split name into first and last if not provided separately
-      const firstName = formData.firstName || formData.name.split(" ")[0] || formData.name;
-      const lastName = formData.lastName || formData.name.split(" ").slice(1).join(" ") || "";
-
       await register({
         email: formData.email,
         password: formData.password,
-        name: formData.name,
-        firstName,
-        lastName,
+        name: `${formData.firstName} ${formData.lastName}`, // Better Auth uses name field
+        firstName: formData.firstName,
+        lastName: formData.lastName,
       });
 
       toast.success("Account created successfully! Please verify your email.");
@@ -115,17 +110,30 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Input
-            type="text"
-            name="name"
-            label="Full Name *"
-            placeholder="Enter your full name"
-            value={formData.name}
-            onChange={handleChange}
-            disabled={isSubmitting || isLoading}
-            required
-            icon={<User className="w-5 h-5 text-gray-400" />}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              type="text"
+              name="firstName"
+              label="First Name *"
+              placeholder="Enter your first name"
+              value={formData.firstName}
+              onChange={handleChange}
+              disabled={isSubmitting || isLoading}
+              required
+              icon={<User className="w-5 h-5 text-gray-400" />}
+            />
+            <Input
+              type="text"
+              name="lastName"
+              label="Last Name *"
+              placeholder="Enter your last name"
+              value={formData.lastName}
+              onChange={handleChange}
+              disabled={isSubmitting || isLoading}
+              required
+              icon={<User className="w-5 h-5 text-gray-400" />}
+            />
+          </div>
 
           <Input
             type="email"

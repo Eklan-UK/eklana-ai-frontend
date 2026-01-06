@@ -4,17 +4,16 @@ import bcrypt from "bcryptjs";
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
-  firstName?: string; // Optional to allow Better Auth users
-  lastName?: string; // Optional to allow Better Auth users
-  name?: string; // Better Auth uses this field
-  username?: string; // Optional to allow Better Auth users
+  firstName: string; // Required for registration
+  lastName: string; // Required for registration
+  name?: string; // Better Auth uses this field (synced from firstName/lastName)
+  username?: string; // Optional
   email: string;
   password?: string; // Optional for OAuth users
-  role?: "admin" | "learner" | "tutor";
+  role: "user" | "admin" | "tutor"; // Updated roles
   isActive?: boolean;
   isEmailVerified?: boolean;
   emailVerified?: boolean; // Better Auth uses this field
-  hasProfile?: boolean; // Set to true after onboarding is completed
   avatar?: string;
   image?: string; // Better Auth uses this field
   phone?: string;
@@ -43,23 +42,17 @@ const userSchema = new Schema<IUser>(
   {
     firstName: {
       type: String,
-      required: function () {
-        // Make required only if not created by Better Auth (which uses 'name' field)
-        return !this.name;
-      },
+      required: [true, "First name is required"],
       maxlength: [50, "First name cannot exceed 50 characters"],
       trim: true,
     },
     lastName: {
       type: String,
-      required: function () {
-        // Make required only if not created by Better Auth
-        return !this.name;
-      },
+      required: [true, "Last name is required"],
       maxlength: [50, "Last name cannot exceed 50 characters"],
       trim: true,
     },
-    // Better Auth uses 'name' field - we'll handle this in a pre-save hook
+    // Better Auth uses 'name' field - we'll sync this from firstName/lastName
     name: {
       type: String,
       required: false,
@@ -67,10 +60,6 @@ const userSchema = new Schema<IUser>(
     },
     username: {
       type: String,
-      required: function () {
-        // Make required only if not created by Better Auth
-        return !this.email;
-      },
       unique: true,
       sparse: true, // Allow null values for unique index
       maxlength: [50, "Username cannot exceed 50 characters"],
@@ -93,12 +82,12 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      required: false, // Make optional to allow Better Auth to create users first
+      required: false,
       enum: {
-        values: ["admin", "learner", "tutor"],
+        values: ["user", "admin", "tutor"],
         message: "{VALUE} is not a valid role",
       },
-      default: "learner",
+      default: "user", // Changed default from "learner" to "user"
     },
     isActive: {
       type: Boolean,
@@ -112,10 +101,6 @@ const userSchema = new Schema<IUser>(
     emailVerified: {
       type: Boolean,
       select: false, // Don't return, we use isEmailVerified
-    },
-    hasProfile: {
-      type: Boolean,
-      default: false,
     },
     avatar: {
       type: String,
@@ -211,12 +196,17 @@ userSchema.post(["findOne", "find", "findOneAndUpdate"], function (docs: any) {
 
 // Transform Better Auth fields to User model fields before saving
 userSchema.pre("save", async function () {
-  // Ensure role is set - default to 'learner' if not provided
+  // Ensure role is set - default to 'user' if not provided
   if (!this.role) {
-    this.role = "learner";
+    this.role = "user";
   }
 
-  // Sync Better Auth's 'name' field to firstName/lastName
+  // Sync firstName/lastName to Better Auth's 'name' field
+  if (this.firstName && this.lastName && !this.name) {
+    this.name = `${this.firstName} ${this.lastName}`;
+  }
+
+  // Sync Better Auth's 'name' field to firstName/lastName if needed (for OAuth users)
   if (this.name && (!this.firstName || !this.lastName)) {
     const nameParts = this.name.trim().split(/\s+/);
     if (nameParts.length > 0) {

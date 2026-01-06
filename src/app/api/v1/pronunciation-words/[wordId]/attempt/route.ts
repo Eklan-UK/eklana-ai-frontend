@@ -272,7 +272,7 @@ export async function POST(
 	{ params }: { params: Promise<{ wordId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['learner'], (req, context) =>
+	return withRole(['user'], (req, context) =>
 		handler(req, context, resolvedParams)
 	)(req);
 }

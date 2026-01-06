@@ -162,7 +162,7 @@ async function postHandler(
 		if (validated.assigned_to && validated.assigned_to.length > 0) {
 			const studentUsers = await User.find({
 				email: { $in: validated.assigned_to },
-				role: 'learner',
+				role: 'user',
 			})
 				.select('email')
 				.lean()
@@ -228,7 +228,7 @@ async function postHandler(
 			// Get user IDs for the assigned emails
 			const assignedUsers = await User.find({
 				email: { $in: validated.assigned_to },
-				role: 'learner',
+				role: 'user',
 			})
 				.select('_id email')
 				.lean()
@@ -329,6 +329,6 @@ async function postHandler(
 	}
 }
 
-export const GET = withRole(['admin', 'learner', 'tutor'], getHandler);
+export const GET = withRole(['admin', 'user', 'tutor'], getHandler);
 export const POST = withRole(['tutor', 'admin'], postHandler);
 

@@ -8,7 +8,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 // Extend NextRequest to include user info
 export interface AuthenticatedRequest extends NextRequest {
 	userId?: Types.ObjectId;
-	userRole?: 'admin' | 'learner' | 'tutor';
+	userRole?: 'admin' | 'user' | 'tutor';
 }
 
 /**
@@ -16,7 +16,7 @@ export interface AuthenticatedRequest extends NextRequest {
  */
 export const requireAuth = async (
 	req: NextRequest
-): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'learner' | 'tutor' } | NextResponse> => {
+): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | NextResponse> => {
 	try {
 		const auth = await getAuth();
 		if (!auth) {
@@ -44,10 +44,16 @@ export const requireAuth = async (
 			);
 		}
 
+		// Normalize role (handle legacy "learner" role)
+		let userRole = (session.user.role as 'admin' | 'user' | 'tutor' | 'learner') || 'user';
+		if (userRole === 'learner') {
+			userRole = 'user';
+		}
+
 		// Return userId and userRole
 		return {
 			userId: new Types.ObjectId(session.user.id),
-			userRole: (session.user.role as 'admin' | 'learner' | 'tutor') || 'learner',
+			userRole: userRole as 'admin' | 'user' | 'tutor',
 		};
 	} catch (error: any) {
 		logger.error('Error in requireAuth middleware', {

@@ -489,7 +489,7 @@ export const userAPI = {
   },
 
   // Onboard user (create Learner or Tutor profile)
-  onboard: (role?: 'learner' | 'tutor', profileData?: any) => {
+  onboard: (role?: 'user' | 'tutor', profileData?: any) => {
     return apiRequest<{
       code: string;
       message: string;
@@ -543,7 +543,7 @@ export const adminAPI = {
   },
 
   // Assign role
-  assignRole: (userId: string, role: 'learner' | 'tutor' | 'admin', profileData?: any) => {
+  assignRole: (userId: string, role: 'user' | 'tutor' | 'admin', profileData?: any) => {
     return apiRequest<{
       code: string;
       message: string;

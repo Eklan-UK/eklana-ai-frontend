@@ -1,9 +1,10 @@
 // GET /api/v1/users/check-profile
-// Check if the authenticated user has completed onboarding (hasProfile)
+// Check if the authenticated user has completed onboarding (has Profile)
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
+import Profile from '@/models/profile';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -15,7 +16,7 @@ async function handler(
 		await connectToDatabase();
 
 		// Check if user exists
-		const user = await User.findById(context.userId).select('role hasProfile').lean().exec();
+		const user = await User.findById(context.userId).select('role').lean().exec();
 		if (!user) {
 			return NextResponse.json(
 				{
@@ -27,13 +28,31 @@ async function handler(
 			);
 		}
 
-		// Check hasProfile field (set to true after onboarding completion)
-		const hasProfile = user.hasProfile === true;
+		// Normalize role (handle legacy "learner" role)
+		const userRole = user.role === 'learner' ? 'user' : user.role;
+
+		// Check if Profile exists (onboarding completed)
+		// Admins and tutors don't need profiles, so they're considered as having completed onboarding
+		if (userRole === 'admin' || userRole === 'tutor') {
+			return NextResponse.json(
+				{
+					code: 'Success',
+					message: 'User is admin or tutor, no profile required',
+					hasProfile: true,
+					role: user.role,
+				},
+				{ status: 200 }
+			);
+		}
+
+		// For users, check if Profile exists
+		const profile = await Profile.findOne({ userId: context.userId }).lean().exec();
+		const hasProfile = !!profile;
 
 		logger.info('Profile check completed', {
 			userId: context.userId,
 			hasProfile,
-			role: user.role,
+			role: userRole,
 		});
 
 		return NextResponse.json(
@@ -41,7 +60,7 @@ async function handler(
 				code: 'Success',
 				message: hasProfile ? 'User has completed onboarding' : 'User has not completed onboarding',
 				hasProfile,
-				role: user.role,
+				role: userRole,
 			},
 			{ status: 200 }
 		);

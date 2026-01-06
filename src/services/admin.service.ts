@@ -12,7 +12,7 @@ export const adminService = {
     const response = await adminAPI.getAllUsers({
       limit: params?.limit,
       offset: params?.offset,
-      role: params?.role || 'learner',
+      role: params?.role || 'user',
       search: params?.search,
     });
     
@@ -149,7 +149,7 @@ export const adminService = {
 
   // Get learners with their drill counts
   getLearnersWithDrillCounts: async () => {
-    const learners = await adminService.getLearners({ limit: 1000, role: 'learner' });
+    const learners = await adminService.getLearners({ limit: 1000, role: 'user' });
     
     // For each learner, get their drill assignments count
     // This is a simplified version - in production, you'd want a dedicated endpoint
@@ -183,7 +183,7 @@ export const adminService = {
   },
 
   // Assign role to a user
-  assignRole: async (userId: string, role: 'learner' | 'tutor' | 'admin', profileData?: any) => {
+  assignRole: async (userId: string, role: 'user' | 'tutor' | 'admin', profileData?: any) => {
     return adminAPI.assignRole(userId, role, profileData);
   },
 };

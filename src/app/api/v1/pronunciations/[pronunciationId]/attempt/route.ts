@@ -261,7 +261,7 @@ export async function POST(
 	{ params }: { params: Promise<{ pronunciationId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['learner'], (req, context) =>
+	return withRole(['user'], (req, context) =>
 		handler(req, context, resolvedParams)
 	)(req);
 }

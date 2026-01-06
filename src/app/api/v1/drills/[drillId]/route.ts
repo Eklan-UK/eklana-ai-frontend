@@ -56,7 +56,7 @@ async function getHandler(
 		}
 
 		// Learners can only view drills assigned to them
-		if (user.role === 'learner' && !drill.assigned_to.includes(user.email)) {
+		if (user.role === 'user' && !drill.assigned_to.includes(user.email)) {
 			return NextResponse.json(
 				{
 					code: 'AuthorizationError',
@@ -172,7 +172,7 @@ async function putHandler(
 
 			const studentUsers = await User.find({
 				email: { $in: validated.assigned_to },
-				role: 'learner',
+				role: 'user',
 			})
 				.select('email')
 				.lean()
@@ -211,7 +211,7 @@ async function putHandler(
 			// Get user IDs for the assigned emails
 			const assignedUsers = await User.find({
 				email: { $in: validated.assigned_to },
-				role: 'learner',
+				role: 'user',
 			})
 				.select('_id email')
 				.lean()
@@ -400,7 +400,7 @@ export async function GET(
 	{ params }: { params: Promise<{ drillId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['admin', 'learner', 'tutor'], (req, context) =>
+	return withRole(['admin', 'user', 'tutor'], (req, context) =>
 		getHandler(req, context, resolvedParams)
 	)(req);
 }

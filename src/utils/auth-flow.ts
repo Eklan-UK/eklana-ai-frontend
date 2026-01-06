@@ -21,35 +21,42 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
   const isOAuthUser = user?.accounts && Array.isArray(user.accounts) && user.accounts.length > 0;
   const shouldVerify = !isVerified && !isOAuthUser;
   
-  // Check onboarding status using hasProfile field
-  // hasProfile is set to true after onboarding completion
+  // Check onboarding status by checking if Profile exists
+  // Profile is created during onboarding completion
   let hasOnboarding = false;
   let shouldOnboard = false;
   
-  // Check hasProfile directly from user object first (faster)
-  if (user?.hasProfile === true) {
+  // Normalize role (handle legacy "learner" role)
+  const userRole = user?.role === 'learner' ? 'user' : user?.role;
+
+  // Admins and tutors don't need profiles/onboarding
+  if (userRole === 'admin' || userRole === 'tutor') {
     hasOnboarding = true;
     shouldOnboard = false;
-  } else if (user?.hasProfile === false) {
-    hasOnboarding = false;
-    shouldOnboard = true;
-  } else {
-    // Fallback: check via API if hasProfile is not set (for older users)
+  } else if (userRole === 'user' || !userRole) {
+    // For users (or users without role set), check if Profile exists via API
     try {
       const response = await userAPI.checkProfile();
       hasOnboarding = response.hasProfile || false;
       shouldOnboard = !hasOnboarding;
-    } catch (error) {
-      // On error, assume no onboarding
-      hasOnboarding = false;
-      shouldOnboard = true;
+    } catch (error: any) {
+      // On error, check if it's a 403 Forbidden (might be role issue)
+      if (error?.message?.includes('Forbidden') || error?.code === 'Forbidden') {
+        // If forbidden, user might not have proper role set - assume needs onboarding
+        console.warn('Forbidden error checking profile, assuming onboarding needed:', error);
+        hasOnboarding = false;
+        shouldOnboard = true;
+      } else {
+        // On other errors, assume no onboarding
+        console.error('Error checking profile:', error);
+        hasOnboarding = false;
+        shouldOnboard = true;
+      }
     }
-  }
-  
-  // Admins and tutors don't need onboarding (set hasProfile = true for them)
-  if (user?.role === 'admin' || user?.role === 'tutor') {
-    hasOnboarding = true;
-    shouldOnboard = false;
+  } else {
+    // Unknown role - assume needs onboarding
+    hasOnboarding = false;
+    shouldOnboard = true;
   }
   
   return {

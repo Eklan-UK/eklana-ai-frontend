@@ -1,16 +1,21 @@
 // POST /api/v1/users/onboard
-// Onboard a user by creating their Learner or Tutor profile
+// Onboard a user by creating their Profile (for users) or Tutor profile (for tutors)
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
-import { createLearnerProfile, createTutorProfile } from '@/utils/onboarding';
+import { createUserProfile, createTutorProfile } from '@/utils/onboarding';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
 const onboardSchema = z.object({
-	role: z.enum(['learner', 'tutor']).optional(),
+	role: z.enum(['user', 'tutor']).optional(),
+	// Profile data
+	userType: z.enum(['professional', 'student', 'browsing', 'ancestor']).optional(),
+	learningGoal: z.string().optional(),
+	nationality: z.string().optional(),
+	language: z.string().optional(),
 });
 
 async function handler(
@@ -35,14 +40,14 @@ async function handler(
 		}
 
 		// Get role from user or request body
-		const role = user.role || validated.role || 'learner';
+		const role = user.role || validated.role || 'user';
 
 		// Validate role
-		if (!['learner', 'tutor'].includes(role)) {
+		if (!['user', 'tutor'].includes(role)) {
 			return NextResponse.json(
 				{
 					code: 'ValidationError',
-					message: 'Invalid role. Must be "learner" or "tutor"',
+					message: 'Invalid role. Must be "user" or "tutor"',
 				},
 				{ status: 400 }
 			);
@@ -55,17 +60,19 @@ async function handler(
 		}
 
 		// Create appropriate profile
-		if (role === 'learner') {
-			await createLearnerProfile(context.userId, body);
-			logger.info('User onboarded as learner', { userId: context.userId });
+		if (role === 'user') {
+			await createUserProfile(context.userId, {
+				userType: validated.userType,
+				learningGoal: validated.learningGoal,
+				nationality: validated.nationality,
+				language: validated.language,
+				...body, // Include any other profile fields
+			});
+			logger.info('User onboarded with profile', { userId: context.userId });
 		} else if (role === 'tutor') {
 			await createTutorProfile(context.userId, body);
 			logger.info('User onboarded as tutor', { userId: context.userId });
 		}
-
-		// Set hasProfile to true after successful onboarding
-		user.hasProfile = true;
-		await user.save();
 
 		return NextResponse.json(
 			{
@@ -74,7 +81,6 @@ async function handler(
 				data: {
 					userId: context.userId.toString(),
 					role,
-					hasProfile: true,
 				},
 			},
 			{ status: 200 }
@@ -106,4 +112,3 @@ async function handler(
 }
 
 export const POST = withAuth(handler);
-

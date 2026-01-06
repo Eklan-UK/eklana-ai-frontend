@@ -103,7 +103,7 @@ export async function GET(
 	{ params }: { params: Promise<{ pronunciationId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['learner', 'admin', 'tutor'], (req, context) =>
+	return withRole(['user', 'admin', 'tutor'], (req, context) =>
 		handler(req, context, resolvedParams)
 	)(req);
 }

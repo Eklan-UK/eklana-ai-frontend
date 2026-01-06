@@ -109,13 +109,12 @@ export const getAuth = async () => {
 
       user: {
         additionalFields: {
-          firstName: { type: "string", required: false },
-          lastName: { type: "string", required: false },
+          firstName: { type: "string", required: true },
+          lastName: { type: "string", required: true },
           username: { type: "string", required: false, unique: true },
           role: { type: "string", required: false },
           isActive: { type: "boolean", required: false, default: true },
           isEmailVerified: { type: "boolean", required: false, default: false },
-          hasProfile: { type: "boolean", required: false, default: false },
           avatar: { type: "string", required: false },
           phone: { type: "string", required: false },
           dateOfBirth: { type: "date", required: false },

@@ -14,7 +14,7 @@ const Learners: React.FC = () => {
   const { data, isLoading: loading } = useAllLearners({
     limit,
     offset,
-    role: 'learner',
+    role: 'user',
     search: searchQuery || undefined,
   });
 

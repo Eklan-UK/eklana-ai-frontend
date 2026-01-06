@@ -15,7 +15,7 @@ export default function StudentLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <RoleGuard allowedRoles={['learner']}>
+    <RoleGuard allowedRoles={['user']}>
       <VerificationGuard>
         <OnboardingGuard>{children}</OnboardingGuard>
       </VerificationGuard>

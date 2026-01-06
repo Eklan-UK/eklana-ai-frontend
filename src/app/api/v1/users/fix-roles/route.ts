@@ -36,7 +36,7 @@ async function handler(
 				],
 			},
 			{
-				$set: { role: 'learner' },
+				$set: { role: 'user' },
 			}
 		);
 
@@ -47,7 +47,7 @@ async function handler(
 		return NextResponse.json(
 			{
 				code: 'Success',
-				message: `Updated ${result.modifiedCount} users with default role 'learner'`,
+				message: `Updated ${result.modifiedCount} users with default role 'user'`,
 				data: {
 					updatedCount: result.modifiedCount,
 					matchedCount: result.matchedCount,

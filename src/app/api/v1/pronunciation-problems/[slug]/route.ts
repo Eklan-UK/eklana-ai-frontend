@@ -48,7 +48,7 @@ async function handler(
 		let progress = null;
 		let nextWord = null;
 
-		if (context.userRole === 'learner') {
+		if (context.userRole === 'user') {
 			const learner = await Learner.findOne({ userId: context.userId }).lean().exec();
 			if (learner) {
 				// Get all progress records for this problem

@@ -34,9 +34,9 @@ async function handler(
     if (!user.role) {
       await User.updateOne(
         { _id: context.userId },
-        { $set: { role: 'learner' } }
+        { $set: { role: 'user' } }
       );
-      user.role = 'learner';
+      user.role = 'user';
     }
 
     const response: any = { user };
@@ -53,7 +53,7 @@ async function handler(
     }
 
     // Include learner profile if user is a learner
-    if (user.role === "learner") {
+    if (user.role === "user") {
       const learnerProfile = await Learner.findOne({ userId: context.userId })
         .select("-__v")
         .lean()

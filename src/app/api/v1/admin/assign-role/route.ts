@@ -13,7 +13,7 @@ const assignRoleSchema = z.object({
 	userId: z.string().refine((id) => Types.ObjectId.isValid(id), {
 		message: 'Invalid user ID format',
 	}),
-	role: z.enum(['learner', 'tutor', 'admin']),
+	role: z.enum(['user', 'tutor', 'admin']),
 	profileData: z.any().optional(),
 });
 
