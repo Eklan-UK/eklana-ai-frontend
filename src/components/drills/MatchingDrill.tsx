@@ -235,22 +235,20 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       const score = 100;
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      // Prepare matching results
-      const matchingResults = pairs.map((pair: MatchPair, idx: number) => {
-        const pairKey = `${idx}-${idx}`;
-        return {
-          left: pair.left,
-          right: pair.right,
-          matched: matchedPairs.has(pairKey),
-        };
-      });
+      // Prepare matching results according to API schema
+      const pairsMatched = matchedPairs.size;
+      const totalPairs = pairs.length;
+      const accuracy = totalPairs > 0 ? (pairsMatched / totalPairs) * 100 : 0;
 
       await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,
         matchingResults: {
-          pairs: matchingResults,
+          pairsMatched,
+          totalPairs,
+          accuracy,
+          incorrectPairs: [], // All pairs are correct since we only allow correct matches
         },
         platform: "web",
       });
