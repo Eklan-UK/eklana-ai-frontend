@@ -36,15 +36,19 @@ async function handler(
 			);
 		}
 
-		// Get all challenging words (not passed, high attempts or low scores)
+		// Get challenging words with limit to prevent memory issues
+		const { searchParams } = new URL(req.url);
+		const limit = parseInt(searchParams.get('limit') || '100');
+
 		const challengingProgress = await LearnerPronunciationProgress.find({
-			learnerId: new Types.ObjectId(learnerId), // learnerId now references User
+			learnerId: new Types.ObjectId(learnerId),
 			isChallenging: true,
 			passed: false,
 		})
 			.populate('wordId', 'word ipa phonemes')
 			.populate('problemId', 'title slug')
 			.sort({ attempts: -1, averageScore: 1 })
+			.limit(limit)
 			.lean()
 			.exec();
 

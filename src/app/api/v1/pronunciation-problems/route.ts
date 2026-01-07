@@ -34,26 +34,48 @@ async function getHandler(
 			query.difficulty = difficulty;
 		}
 
-		// Get problems with word counts
+		// Add pagination to prevent loading all problems
+		const limit = parseInt(searchParams.get('limit') || '100');
+		const offset = parseInt(searchParams.get('offset') || '0');
+
+		// Get problems with pagination
 		const problems = await PronunciationProblem.find(query)
 			.populate('createdBy', 'email firstName lastName')
 			.sort({ order: 1, createdAt: -1 })
+			.limit(limit)
+			.skip(offset)
 			.lean()
 			.exec();
 
-		// Get word counts for each problem
-		const problemsWithWordCounts = await Promise.all(
-			problems.map(async (problem) => {
-				const wordCount = await PronunciationWord.countDocuments({
-					problemId: problem._id,
+		// Get word counts efficiently using aggregation (single query instead of N queries)
+		const problemIds = problems.map((p) => p._id);
+		const wordCounts = await PronunciationWord.aggregate([
+			{
+				$match: {
+					problemId: { $in: problemIds },
 					isActive: true,
-				});
-				return {
-					...problem,
-					wordCount,
-				};
-			})
+				},
+			},
+			{
+				$group: {
+					_id: '$problemId',
+					count: { $sum: 1 },
+				},
+			},
+		]);
+
+		// Create a map for quick lookup
+		const wordCountMap = new Map(
+			wordCounts.map((item) => [item._id.toString(), item.count])
 		);
+
+		// Combine problems with word counts
+		const problemsWithWordCounts = problems.map((problem) => ({
+			...problem,
+			wordCount: wordCountMap.get(problem._id.toString()) || 0,
+		}));
+
+		const total = await PronunciationProblem.countDocuments(query);
 
 		return NextResponse.json(
 			{
@@ -61,6 +83,12 @@ async function getHandler(
 				message: 'Pronunciation problems retrieved successfully',
 				data: {
 					problems: problemsWithWordCounts,
+					pagination: {
+						total,
+						limit,
+						offset,
+						hasMore: offset + problems.length < total,
+					},
 				},
 			},
 			{ status: 200 }

@@ -68,13 +68,22 @@ async function handler(
 			);
 		}
 
-		// Get all attempts for this assignment
+		// Get attempts with pagination to prevent memory issues
+		const limit = parseInt(searchParams.get('limit') || '50');
+		const offset = parseInt(searchParams.get('offset') || '0');
+
 		const attempts = await PronunciationAttempt.find({
 			pronunciationAssignmentId: assignment._id,
 		})
 			.sort({ attemptNumber: 1 })
+			.limit(limit)
+			.skip(offset)
 			.lean()
 			.exec();
+
+		const totalAttempts = await PronunciationAttempt.countDocuments({
+			pronunciationAssignmentId: assignment._id,
+		});
 
 		return NextResponse.json(
 			{
@@ -89,6 +98,12 @@ async function handler(
 						completedAt: assignment.completedAt,
 					},
 					attempts,
+					pagination: {
+						total: totalAttempts,
+						limit,
+						offset,
+						hasMore: offset + attempts.length < totalAttempts,
+					},
 				},
 			},
 			{ status: 200 }

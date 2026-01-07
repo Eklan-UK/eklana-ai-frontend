@@ -35,12 +35,18 @@ async function handler(
 			);
 		}
 
-		// Get all words for this problem (ordered)
+		// Get words with pagination if needed (but for a single problem, reasonable to load all)
+		// Add limit as safety measure
+		const { searchParams } = new URL(req.url);
+		const wordLimit = parseInt(searchParams.get('wordLimit') || '500');
+		
 		const words = await PronunciationWord.find({
 			problemId: problem._id,
 			isActive: true,
 		})
+			.select('word ipa phonemes order audioUrl useTTS')
 			.sort({ order: 1 })
+			.limit(wordLimit)
 			.lean()
 			.exec();
 
@@ -49,12 +55,12 @@ async function handler(
 		let nextWord = null;
 
 		if (context.userRole === 'user') {
-			// Get all progress records for this problem (learnerId now references User)
+			// Get progress records efficiently (only needed fields)
 			const progressRecords = await LearnerPronunciationProgress.find({
 				learnerId: context.userId,
 				problemId: problem._id,
 			})
-				.populate('wordId', 'word ipa phonemes audioUrl useTTS')
+				.select('wordId passed attempts bestScore averageScore isChallenging challengeLevel weakPhonemes lastAttemptAt')
 				.lean()
 				.exec();
 

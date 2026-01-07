@@ -104,7 +104,9 @@ async function getHandler(
 		if (createdBy) query.created_by = createdBy;
 		if (studentEmail) query.assigned_to = studentEmail;
 
+		// Only select metadata fields for listing, not large content arrays
 		const drills = await Drill.find(query)
+			.select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to createdById created_by')
 			.limit(limit)
 			.skip(offset)
 			.sort({ created_date: -1 })

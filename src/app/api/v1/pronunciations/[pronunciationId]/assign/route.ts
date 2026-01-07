@@ -61,56 +61,54 @@ async function handler(
 			);
 		}
 
-		// Create assignments (skip duplicates)
-		const assignments = [];
-		const skipped = [];
+		// Check existing assignments in bulk (single query instead of N queries)
+		const userIds = users.map((u) => u._id);
+		const existingAssignments = await PronunciationAssignment.find({
+			pronunciationId,
+			learnerId: { $in: userIds },
+		})
+			.select('learnerId')
+			.lean()
+			.exec();
 
-		for (const user of users) {
-			try {
-				// Check if assignment already exists (learnerId now references User)
-				const existing = await PronunciationAssignment.findOne({
-					pronunciationId,
-					learnerId: user._id,
-				});
+		const existingUserIds = new Set(
+			existingAssignments.map((a) => a.learnerId.toString())
+		);
 
-				if (existing) {
-					skipped.push(user._id.toString());
-					continue;
-				}
+		// Filter out users who already have assignments
+		const usersToAssign = users.filter(
+			(u) => !existingUserIds.has(u._id.toString())
+		);
 
-				// Create new assignment (learnerId now references User)
-				const assignment = await PronunciationAssignment.create({
-					pronunciationId,
-					learnerId: user._id,
-					assignedBy: context.userId,
-					dueDate: validated.dueDate ? new Date(validated.dueDate) : undefined,
-					status: 'pending',
-				});
+		// Create assignments in bulk (single insertMany instead of N creates)
+		const assignmentsToCreate = usersToAssign.map((user) => ({
+			pronunciationId,
+			learnerId: user._id,
+			assignedBy: context.userId,
+			dueDate: validated.dueDate ? new Date(validated.dueDate) : undefined,
+			status: 'pending',
+		}));
 
-				await assignment.populate([
-					{ path: 'learnerId', select: 'email firstName lastName' },
-					{ path: 'assignedBy', select: 'email firstName lastName' },
-				]);
+		const createdAssignments = await PronunciationAssignment.insertMany(
+			assignmentsToCreate,
+			{ ordered: false } // Continue on duplicate errors
+		);
 
-				assignments.push(assignment);
-			} catch (error: any) {
-				if (error.code === 11000) {
-					// Duplicate key error
-					skipped.push(user._id.toString());
-					continue;
-				}
-				logger.error('Error creating assignment', {
-					error: error.message,
-					pronunciationId,
-					userId: user._id,
-				});
-			}
-		}
+		// Populate assignments
+		const assignments = await PronunciationAssignment.find({
+			_id: { $in: createdAssignments.map((a) => a._id) },
+		})
+			.populate('learnerId', 'email firstName lastName')
+			.populate('assignedBy', 'email firstName lastName')
+			.lean()
+			.exec();
+
+		const skipped = userIds.length - assignments.length;
 
 		logger.info('Pronunciation assignments created', {
 			pronunciationId,
 			assignedCount: assignments.length,
-			skippedCount: skipped.length,
+			skippedCount: skipped,
 			assignedBy: context.userId,
 		});
 
@@ -120,8 +118,8 @@ async function handler(
 				message: 'Pronunciation assigned successfully',
 				data: {
 					assigned: assignments.length,
-					skipped: skipped.length,
-					assignments: assignments.map((a) => ({
+					skipped,
+					assignments: assignments.map((a: any) => ({
 						_id: a._id,
 						learnerId: a.learnerId,
 						assignedBy: a.assignedBy,

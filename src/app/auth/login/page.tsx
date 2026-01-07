@@ -13,7 +13,8 @@ import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, signInWithGoogle, signInWithApple, isLoading } = useAuthStore();
+  const { login, signInWithGoogle, signInWithApple, isLoading } =
+    useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -21,7 +22,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
@@ -29,26 +30,28 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      // Note: rememberMe is handled by Better Auth session duration settings
-      await login(email, password);
-      
+      // Pass rememberMe option to login function
+      await login(email, password, rememberMe);
+
       // Small delay to ensure user is set in store
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
       // Refresh session to get latest user data
       await useAuthStore.getState().checkSession();
-      
+
       // Get updated user from store
       const { user } = useAuthStore.getState();
-      
+
       if (!user) {
-        throw new Error("Login successful but user data not available. Please try again.");
+        throw new Error(
+          "Login successful but user data not available. Please try again."
+        );
       }
-      
+
       // Check verification and onboarding status
       const status = await checkAuthFlowStatus(user);
       const redirectPath = getAuthRedirectPath(status);
-      
+
       if (status.shouldVerify) {
         toast.info("Please verify your email to continue");
         router.push("/auth/verify-email");
@@ -61,7 +64,10 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       // Handle EMAIL_NOT_VERIFIED error - still allow login but redirect to verification
-      if (error.code === "EMAIL_NOT_VERIFIED" || error.message?.includes("email") && error.message?.includes("verify")) {
+      if (
+        error.code === "EMAIL_NOT_VERIFIED" ||
+        (error.message?.includes("email") && error.message?.includes("verify"))
+      ) {
         // Try to get session anyway - user might still be logged in
         try {
           await useAuthStore.getState().checkSession();
@@ -75,7 +81,9 @@ export default function LoginPage() {
           // If we can't get session, show error
         }
       }
-      toast.error(error?.message || "Invalid email or password. Please try again.");
+      toast.error(
+        error?.message || "Invalid email or password. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }

@@ -14,7 +14,11 @@ interface AuthState {
   setSession: (session: any | null) => void;
   setLoading: (loading: boolean) => void;
   setHasHydrated: (hasHydrated: boolean) => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ) => Promise<void>;
   register: (data: {
     email: string;
     password: string;
@@ -58,13 +62,21 @@ export const useAuthStore = create<AuthState>()(
 
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
-      login: async (email: string, password: string) => {
+      login: async (
+        email: string,
+        password: string,
+        rememberMe: boolean = false
+      ) => {
         try {
           set({ isLoading: true });
 
+          // Pass rememberMe option to Better Auth
+          // When true, session will use the configured expiresIn (30 days)
+          // When false, session will use default browser session duration
           const result = await authClient.signIn.email({
             email,
             password,
+            rememberMe,
           });
 
           // Handle successful login

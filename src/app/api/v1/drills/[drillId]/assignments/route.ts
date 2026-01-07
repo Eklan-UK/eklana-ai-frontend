@@ -27,7 +27,11 @@ async function handler(
 			);
 		}
 
-		// Get all assignments for this drill
+		// Get assignments with pagination to prevent memory issues
+		const { searchParams } = new URL(req.url);
+		const limit = parseInt(searchParams.get('limit') || '100');
+		const offset = parseInt(searchParams.get('offset') || '0');
+
 		const assignments = await DrillAssignment.find({ drillId: new Types.ObjectId(drillId) })
 			.populate({
 				path: 'learnerId',
@@ -38,8 +42,12 @@ async function handler(
 				select: 'firstName lastName email',
 			})
 			.sort({ assignedAt: -1 })
+			.limit(limit)
+			.skip(offset)
 			.lean()
 			.exec();
+
+		const total = await DrillAssignment.countDocuments({ drillId: new Types.ObjectId(drillId) });
 
 		return NextResponse.json(
 			{
@@ -60,6 +68,12 @@ async function handler(
 						score: a.score,
 						timeSpent: a.timeSpent,
 					})),
+					pagination: {
+						total,
+						limit,
+						offset,
+						hasMore: offset + assignments.length < total,
+					},
 				},
 			},
 			{ status: 200 }

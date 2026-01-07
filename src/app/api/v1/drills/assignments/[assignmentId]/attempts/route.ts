@@ -60,13 +60,23 @@ async function getHandler(
 			);
 		}
 
-		// Get all attempts for this assignment, sorted by completion date (most recent first)
+		// Get attempts with pagination to prevent memory issues
+		const { searchParams } = new URL(req.url);
+		const limit = parseInt(searchParams.get('limit') || '50');
+		const offset = parseInt(searchParams.get('offset') || '0');
+
 		const attempts = await DrillAttempt.find({
 			drillAssignmentId: new Types.ObjectId(assignmentId),
 		})
 			.sort({ completedAt: -1, createdAt: -1 })
+			.limit(limit)
+			.skip(offset)
 			.lean()
 			.exec();
+
+		const totalAttempts = await DrillAttempt.countDocuments({
+			drillAssignmentId: new Types.ObjectId(assignmentId),
+		});
 
 		// Get the latest completed attempt
 		const latestAttempt = attempts.find((a) => a.completedAt) || attempts[0] || null;
@@ -79,7 +89,13 @@ async function getHandler(
 					assignment,
 					attempts,
 					latestAttempt,
-					totalAttempts: attempts.length,
+					totalAttempts,
+					pagination: {
+						total: totalAttempts,
+						limit,
+						offset,
+						hasMore: offset + attempts.length < totalAttempts,
+					},
 				},
 			},
 			{ status: 200 }

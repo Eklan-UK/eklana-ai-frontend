@@ -1,97 +1,240 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { ArrowLeft, CheckCircle, XCircle, Volume2, Loader2 } from "lucide-react";
+import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
+import { ArrowLeft, CheckCircle, Mic, Loader2, Volume2, Lock } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
+import type { TextScore } from "@/services/speechace.service";
+import { speechaceService } from "@/services/speechace.service";
 
 interface VocabularyDrillProps {
   drill: any;
   assignmentId?: string;
 }
 
+type Screen = "word" | "sentence";
+
+interface WordProgress {
+  wordPassed: boolean;
+  wordScore: number | null;
+  sentencePassed: boolean;
+  sentenceScore: number | null;
+}
+
 export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrillProps) {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [attempts, setAttempts] = useState<Record<number, number>>({});
-  const [showResults, setShowResults] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<Screen>("word");
+  const [wordProgress, setWordProgress] = useState<Record<number, WordProgress>>({});
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
 
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const targetSentences = drill.target_sentences || [];
   const currentSentence = targetSentences[currentIndex];
-  const currentAnswer = answers[currentIndex] || "";
-  const hasAnswer = currentAnswer.trim().length > 0;
-
-  // Initialize attempts tracking
-  useEffect(() => {
-    const initialAttempts: Record<number, number> = {};
-    targetSentences.forEach((_: any, index: number) => {
-      initialAttempts[index] = 0;
-    });
-    setAttempts(initialAttempts);
-  }, [targetSentences.length]);
-
-  const handleAnswerChange = (value: string) => {
-    setAnswers({
-      ...answers,
-      [currentIndex]: value,
-    });
+  const currentProgress = wordProgress[currentIndex] || {
+    wordPassed: false,
+    wordScore: null,
+    sentencePassed: false,
+    sentenceScore: null,
   };
 
+  // Initialize progress tracking
+  useEffect(() => {
+    const initialProgress: Record<number, WordProgress> = {};
+    targetSentences.forEach((_: any, index: number) => {
+      initialProgress[index] = {
+        wordPassed: false,
+        wordScore: null,
+        sentencePassed: false,
+        sentenceScore: null,
+      };
+    });
+    setWordProgress(initialProgress);
+  }, [targetSentences.length]);
+
+  // Start recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        setAudioBlob(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+        // Auto-analyze after recording stops
+        await analyzePronunciation(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setPronunciationScore(null);
+    } catch (error: any) {
+      toast.error("Failed to access microphone: " + error.message);
+      console.error("Error accessing microphone:", error);
+    }
+  };
+
+  // Stop recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // Analyze pronunciation with SpeechAce
+  const analyzePronunciation = async (audioBlob: Blob) => {
+    if (!currentSentence) return;
+
+    setIsAnalyzing(true);
+    setPronunciationScore(null);
+
+    try {
+      // Determine text to analyze based on current screen
+      const textToAnalyze =
+        currentScreen === "word"
+          ? currentSentence.word || currentSentence.text.split(" ")[0]
+          : currentSentence.text;
+
+      // Call SpeechAce API
+      const speechAceResponse = await speechaceService.scorePronunciation(
+        textToAnalyze,
+        audioBlob
+      );
+
+      const result = speechAceResponse.data as any;
+      let textScore: TextScore | null = null;
+
+      // Parse response (same logic as pronunciation practice page)
+      if (result?.textScore && typeof result.textScore === "object") {
+        textScore = result.textScore as TextScore;
+      } else if (result?.text_score && typeof result.text_score === "object") {
+        textScore = result.text_score as TextScore;
+      } else if (result?.data?.text_score) {
+        textScore = result.data.text_score as TextScore;
+      }
+
+      if (textScore) {
+        setPronunciationScore(textScore);
+        const score = textScore.speechace_score.pronunciation;
+        const passed = score >= 65;
+
+        // Update progress based on current screen
+        setWordProgress((prev) => {
+          const current = prev[currentIndex] || {
+            wordPassed: false,
+            wordScore: null,
+            sentencePassed: false,
+            sentenceScore: null,
+          };
+
+          if (currentScreen === "word") {
+            return {
+              ...prev,
+              [currentIndex]: {
+                ...current,
+                wordPassed: passed,
+                wordScore: score,
+              },
+            };
+          } else {
+            return {
+              ...prev,
+              [currentIndex]: {
+                ...current,
+                sentencePassed: passed,
+                sentenceScore: score,
+              },
+            };
+          }
+        });
+
+        if (passed) {
+          toast.success(
+            `Great! You scored ${score.toFixed(0)}% - ${currentScreen === "word" ? "Word" : "Sentence"} passed!`
+          );
+        } else {
+          toast.warning(
+            `Score: ${score.toFixed(0)}%. You need at least 65% to pass. Try again!`
+          );
+        }
+      } else {
+        throw new Error("Invalid response from SpeechAce - missing textScore");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to analyze pronunciation");
+      console.error("Error analyzing pronunciation:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Try again - reset current attempt
+  const handleTryAgain = () => {
+    setPronunciationScore(null);
+    setAudioBlob(null);
+  };
+
+  // Continue to sentence screen (only if word passed)
+  const handleContinueToSentence = () => {
+    if (currentProgress.wordPassed) {
+      setCurrentScreen("sentence");
+      setPronunciationScore(null);
+      setAudioBlob(null);
+    } else {
+      toast.error("You must pass the word pronunciation (65%+) before proceeding to the sentence");
+    }
+  };
+
+  // Move to next vocabulary item (only if both passed)
   const handleNext = () => {
-    // Validate answer before proceeding
-    if (!hasAnswer) {
-      toast.error("Please provide an answer before proceeding");
+    if (!currentProgress.wordPassed || !currentProgress.sentencePassed) {
+      toast.error("You must pass both word and sentence pronunciation before proceeding");
       return;
     }
 
-    // Increment attempt for current question
-    setAttempts({
-      ...attempts,
-      [currentIndex]: (attempts[currentIndex] || 0) + 1,
-    });
-
     if (currentIndex < targetSentences.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setCurrentScreen("word");
+      setPronunciationScore(null);
+      setAudioBlob(null);
     } else {
-      // All questions answered - check if all have answers
-      const allAnswered = targetSentences.every((_: any, idx: number) => {
-        const answer = answers[idx];
-        return answer && answer.trim().length > 0;
-      });
-
-      if (allAnswered) {
-        setShowResults(true);
-      } else {
-        toast.error("Please answer all questions before reviewing");
-        // Go to first unanswered question
-        const firstUnanswered = targetSentences.findIndex((_: any, idx: number) => {
-          const answer = answers[idx];
-          return !answer || answer.trim().length === 0;
-        });
-        if (firstUnanswered !== -1) {
-          setCurrentIndex(firstUnanswered);
-        }
-      }
+      // All items completed - submit
+      handleSubmit();
     }
   };
 
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
+  // Submit drill completion
   const handleSubmit = async () => {
     if (!assignmentId) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
@@ -100,21 +243,33 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
 
     setIsSubmitting(true);
     try {
-      // Calculate score (simple: all answered = 100%, can be improved with actual scoring)
-      const totalQuestions = targetSentences.length;
-      const answeredCount = targetSentences.filter((_: any, idx: number) => {
-        const answer = answers[idx];
-        return answer && answer.trim().length > 0;
-      }).length;
-      const score = Math.round((answeredCount / totalQuestions) * 100);
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      // Prepare vocabulary results with attempts
-      const wordScores = targetSentences.map((sentence: any, index: number) => ({
-        word: sentence.word || sentence.text,
-        score: answers[index] && answers[index].trim().length > 0 ? 100 : 0,
-        attempts: attempts[index] || 0,
-      }));
+      // Calculate overall score based on passed items
+      const totalItems = targetSentences.length;
+      const passedItems = Object.values(wordProgress).filter(
+        (p) => p.wordPassed && p.sentencePassed
+      ).length;
+      const score = Math.round((passedItems / totalItems) * 100);
+
+      // Prepare vocabulary results with pronunciation scores
+      const wordScores = targetSentences.map((sentence: any, index: number) => {
+        const progress = wordProgress[index] || {
+          wordPassed: false,
+          wordScore: null,
+          sentencePassed: false,
+          sentenceScore: null,
+        };
+        return {
+          word: sentence.word || sentence.text.split(" ")[0],
+          sentence: sentence.text,
+          wordScore: progress.wordScore || 0,
+          sentenceScore: progress.sentenceScore || 0,
+          wordPassed: progress.wordPassed,
+          sentencePassed: progress.sentencePassed,
+          attempts: 1, // Could track actual attempts if needed
+        };
+      });
 
       // Submit to API
       await drillAPI.complete(drill._id, {
@@ -124,7 +279,7 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
         vocabularyResults: {
           wordScores,
         },
-        platform: 'web',
+        platform: "web",
       });
 
       setIsCompleted(true);
@@ -132,14 +287,14 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
 
       // Track completion in recent activities
       try {
-        await fetch('/api/v1/activities/recent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+        await fetch("/api/v1/activities/recent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
-            type: 'drill',
+            type: "drill",
             resourceId: drill._id,
-            action: 'completed',
+            action: "completed",
             metadata: {
               title: drill.title,
               type: drill.type,
@@ -148,8 +303,7 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
           }),
         });
       } catch (error) {
-        // Silently fail
-        console.error('Failed to track activity:', error);
+        console.error("Failed to track activity:", error);
       }
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
@@ -164,16 +318,12 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
         <Header title="Drill Completed" />
-        
+
         <div className="max-w-md mx-auto px-4 py-6">
           <Card className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Great Job!
-            </h2>
-            <p className="text-gray-600 mb-6">
-              You've completed the vocabulary drill.
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
+            <p className="text-gray-600 mb-6">You've completed the vocabulary drill.</p>
             <Link href="/account">
               <Button variant="primary" size="lg" fullWidth>
                 Continue Learning
@@ -181,106 +331,47 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
             </Link>
           </Card>
         </div>
-        
+
         <BottomNav />
       </div>
     );
   }
 
-  if (showResults) {
+  if (!currentSentence) {
     return (
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
-        <Header title="Review Your Answers" />
-        
+        <Header title={drill.title} />
         <div className="max-w-md mx-auto px-4 py-6">
-          <Card className="mb-4">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              Your Answers
-            </h2>
-            <div className="space-y-4">
-              {targetSentences.map((sentence: any, index: number) => (
-                <div key={index} className="border-b pb-4 last:border-0">
-                  <div className="flex items-start gap-2 mb-2">
-                    {sentence.word && (
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700">
-                          Word: {sentence.word}
-                        </p>
-                        {sentence.wordTranslation && (
-                          <p className="text-xs text-gray-500">
-                            Translation: {sentence.wordTranslation}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Sentence: {sentence.text}
-                  </p>
-                  {sentence.translation && (
-                    <p className="text-xs text-gray-500 mb-2">
-                      Translation: {sentence.translation}
-                    </p>
-                  )}
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Your answer:</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {answers[index] || "No answer provided"}
-                    </p>
-                    {attempts[index] > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Attempts: {attempts[index]}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <Card className="text-center py-8">
+            <p className="text-gray-600">No vocabulary items found in this drill.</p>
           </Card>
-          
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setShowResults(false)}
-            >
-              Review Again
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              fullWidth
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit"
-              )}
-            </Button>
-          </div>
         </div>
-        
         <BottomNav />
       </div>
     );
   }
+
+  const currentWord = currentSentence.word || currentSentence.text.split(" ")[0];
+  const currentText =
+    currentScreen === "word" ? currentWord : currentSentence.text;
+  const isWordPassed = currentProgress.wordPassed;
+  const isSentencePassed = currentProgress.sentencePassed;
+  const canContinueToSentence = isWordPassed;
+  const canProceedToNext = isWordPassed && isSentencePassed;
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
       <div className="h-6"></div>
       <Header title={drill.title} />
-      
+
       <div className="max-w-md mx-auto px-4 py-6">
         {/* Progress */}
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-            <span>Question {currentIndex + 1} of {targetSentences.length}</span>
+            <span>
+              Item {currentIndex + 1} of {targetSentences.length}
+            </span>
             <span>{Math.round(((currentIndex + 1) / targetSentences.length) * 100)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
@@ -291,89 +382,418 @@ export default function VocabularyDrill({ drill, assignmentId }: VocabularyDrill
           </div>
         </div>
 
-        <Card className="mb-4">
-          {currentSentence && (
-            <div>
-              {currentSentence.word && (
-                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    Vocabulary Word
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-bold text-gray-900">
-                      {currentSentence.word}
-                    </p>
-                    <TTSButton text={currentSentence.word} />
-                  </div>
-                  {currentSentence.wordTranslation && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {currentSentence.wordTranslation}
-                    </p>
-                  )}
-                </div>
+        {/* Screen Indicator */}
+        <div className="mb-4 flex gap-2">
+          <div
+            className={`flex-1 p-3 rounded-lg text-center ${
+              currentScreen === "word"
+                ? "bg-blue-100 border-2 border-blue-500"
+                : isWordPassed
+                  ? "bg-green-50 border border-green-300"
+                  : "bg-gray-100 border border-gray-300"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {isWordPassed && currentScreen !== "word" && (
+                <CheckCircle className="w-4 h-4 text-green-600" />
               )}
-              
-              <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  Sentence to Practice
-                </p>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <p className="text-base text-gray-900 flex-1">
-                    {currentSentence.text}
-                  </p>
-                  <TTSButton text={currentSentence.text} />
-                </div>
-                {currentSentence.translation && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Translation: {currentSentence.translation}
-                  </p>
-                )}
-              </div>
+              <span
+                className={`text-sm font-medium ${
+                  currentScreen === "word" ? "text-blue-700" : isWordPassed ? "text-green-700" : "text-gray-600"
+                }`}
+              >
+                Word
+              </span>
+            </div>
+          </div>
+          <div
+            className={`flex-1 p-3 rounded-lg text-center ${
+              currentScreen === "sentence"
+                ? "bg-blue-100 border-2 border-blue-500"
+                : isSentencePassed
+                  ? "bg-green-50 border border-green-300"
+                  : !isWordPassed
+                    ? "bg-gray-100 border border-gray-300 opacity-50"
+                    : "bg-gray-100 border border-gray-300"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {!isWordPassed && currentScreen !== "sentence" && (
+                <Lock className="w-4 h-4 text-gray-400" />
+              )}
+              {isSentencePassed && currentScreen !== "sentence" && (
+                <CheckCircle className="w-4 h-4 text-green-600" />
+              )}
+              <span
+                className={`text-sm font-medium ${
+                  currentScreen === "sentence"
+                    ? "text-blue-700"
+                    : isSentencePassed
+                      ? "text-green-700"
+                      : !isWordPassed
+                        ? "text-gray-400"
+                        : "text-gray-600"
+                }`}
+              >
+                Sentence
+              </span>
+            </div>
+          </div>
+        </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Practice saying this sentence:
-                </label>
-                <textarea
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Type or speak your answer here..."
-                  value={answers[currentIndex] || ""}
-                  onChange={(e) => handleAnswerChange(e.target.value)}
+        <Card className="mb-4">
+          <div className="text-center py-6">
+            {/* Word/Sentence Display */}
+            <div className="mb-6">
+              <h2 className="text-sm font-medium text-gray-700 mb-2">
+                {currentScreen === "word" ? "Pronounce the Word" : "Pronounce the Sentence"}
+              </h2>
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                  {currentText}
+                </h1>
+                <TTSButton
+                  text={currentText}
+                  size="lg"
+                  autoPlay={autoPlayAudio && !pronunciationScore}
                 />
               </div>
+              {currentScreen === "word" && currentSentence.wordTranslation && (
+                <p className="text-sm text-gray-500 mt-2">{currentSentence.wordTranslation}</p>
+              )}
+              {currentScreen === "sentence" && currentSentence.translation && (
+                <p className="text-sm text-gray-500 mt-2">{currentSentence.translation}</p>
+              )}
             </div>
-          )}
+
+            {/* Lock message for sentence screen */}
+            {currentScreen === "sentence" && !isWordPassed && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-yellow-800">
+                  <Lock className="w-4 h-4" />
+                  <p className="text-sm font-medium">
+                    Complete word pronunciation first (65%+ required)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Listen Section */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">
+                Listen to the correct pronunciation
+              </h3>
+              <TTSButton
+                text={currentText}
+                size="lg"
+                variant="button"
+                autoPlay={autoPlayAudio && !pronunciationScore}
+              />
+            </div>
+
+            {/* Record Section */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-4">
+                Record your pronunciation
+              </h3>
+              <div className="relative">
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isAnalyzing || (currentScreen === "sentence" && !isWordPassed)}
+                  className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                    isRecording
+                      ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                      : "bg-blue-500 hover:bg-blue-600"
+                  }`}
+                >
+                  <Mic className="w-12 h-12 text-white" />
+                </button>
+                {isRecording && (
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+                    Recording... Tap to stop
+                  </div>
+                )}
+              </div>
+              {!isRecording && !isAnalyzing && !pronunciationScore && (
+                <p className="text-sm text-gray-500 mt-4">
+                  Tap the microphone to start recording
+                </p>
+              )}
+              {isAnalyzing && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <p className="text-sm text-gray-600">Analyzing your pronunciation...</p>
+                </div>
+              )}
+              {pronunciationScore && !isAnalyzing && (
+                <p className="text-sm text-green-600 mt-4 font-medium">
+                  ✓ Analysis complete! Scroll down to see your score.
+                </p>
+              )}
+            </div>
+
+            {/* Auto-play toggle */}
+            <label className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-4">
+              <input
+                type="checkbox"
+                checked={autoPlayAudio}
+                onChange={(e) => setAutoPlayAudio(e.target.checked)}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <span>Auto-play pronunciation</span>
+            </label>
+          </div>
         </Card>
 
-        <div className="flex gap-3">
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            fullWidth
-            onClick={handleNext}
-            disabled={!hasAnswer}
-          >
-            {currentIndex === targetSentences.length - 1 ? "Review" : "Next"}
-          </Button>
-          {!hasAnswer && (
-            <p className="text-xs text-red-500 mt-1 text-center">
-              Please provide an answer before proceeding
-            </p>
+        {/* Word Quality Analytics Section */}
+        {pronunciationScore && (
+          <div className="mb-4 space-y-4">
+            {/* Overall Score Indicator (simple) */}
+            <Card className="bg-gradient-to-br from-green-50 to-blue-50 border-green-200">
+              <div className="text-center py-4">
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <div
+                    className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                      pronunciationScore.speechace_score.pronunciation >= 65
+                        ? "bg-green-100"
+                        : "bg-yellow-100"
+                    }`}
+                  >
+                    <span
+                      className={`text-2xl font-bold ${
+                        pronunciationScore.speechace_score.pronunciation >= 65
+                          ? "text-green-600"
+                          : "text-yellow-600"
+                      }`}
+                    >
+                      {Math.round(pronunciationScore.speechace_score.pronunciation)}
+                    </span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-600">Pronunciation Score</p>
+                    <p className="text-xs text-gray-500">
+                      {pronunciationScore.speechace_score.pronunciation >= 65
+                        ? "✓ Passed"
+                        : "Need 65% to pass"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Word Quality Analytics */}
+            {pronunciationScore.word_score_list.map((wordScore, wordIndex) => (
+              <Card key={wordIndex}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">
+                      {wordScore.word}
+                    </h3>
+                    <p className="text-xs text-gray-500">Word Quality Score</p>
+                  </div>
+                  <div
+                    className={`w-14 h-14 rounded-full ${
+                      wordScore.quality_score >= 80
+                        ? "bg-green-100"
+                        : wordScore.quality_score >= 70
+                          ? "bg-yellow-100"
+                          : "bg-red-100"
+                    } flex items-center justify-center`}
+                  >
+                    <span
+                      className={`text-lg font-bold ${
+                        wordScore.quality_score >= 80
+                          ? "text-green-600"
+                          : wordScore.quality_score >= 70
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {Math.round(wordScore.quality_score)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Syllable Breakdown */}
+                {wordScore.syllable_score_list.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                      Syllables
+                    </h4>
+                    <div className="flex gap-2 flex-wrap">
+                      {wordScore.syllable_score_list.map((syllable, sylIndex) => (
+                        <div
+                          key={sylIndex}
+                          className="flex-1 min-w-[80px] p-2 bg-gray-50 rounded-lg"
+                        >
+                          <p className="text-xs font-medium text-gray-900 mb-1">
+                            {syllable.letters}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-xs font-bold ${
+                                syllable.quality_score >= 80
+                                  ? "text-green-600"
+                                  : syllable.quality_score >= 70
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                              }`}
+                            >
+                              {Math.round(syllable.quality_score)}
+                            </span>
+                            {syllable.stress_level !== null && (
+                              <span className="text-xs text-gray-500">
+                                Stress: {syllable.stress_level}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Phone (Phoneme) Breakdown */}
+                {wordScore.phone_score_list.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2">Phonemes</h4>
+                    <div className="flex gap-1 flex-wrap">
+                      {wordScore.phone_score_list.map((phone, phoneIndex) => (
+                        <div
+                          key={phoneIndex}
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            phone.quality_score >= 80
+                              ? "bg-green-100 text-green-600"
+                              : phone.quality_score >= 70
+                                ? "bg-yellow-100 text-yellow-600"
+                                : "bg-red-100 text-red-600"
+                          }`}
+                          title={`${phone.phone}: ${Math.round(phone.quality_score)}%`}
+                        >
+                          {phone.phone}
+                          <span className="ml-1 text-[10px]">
+                            {Math.round(phone.quality_score)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ))}
+
+            {/* Letter-level Feedback for word screen */}
+            {currentScreen === "word" &&
+              pronunciationScore.word_score_list.length > 0 && (
+                <LetterLevelFeedback
+                  word={currentWord}
+                  wordScore={pronunciationScore.word_score_list[0]}
+                />
+              )}
+
+            {/* Pass/Fail Message */}
+            {pronunciationScore.speechace_score.pronunciation < 65 && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800 text-center">
+                  You need at least 65% to pass. Try again!
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {currentScreen === "word" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={handleContinueToSentence}
+              disabled={!canContinueToSentence || isRecording || isAnalyzing}
+            >
+              {canContinueToSentence ? (
+                "Continue to Sentence"
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Pass Word First (65%+)
+                </>
+              )}
+            </Button>
+          )}
+
+          {currentScreen === "sentence" && (
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={handleNext}
+              disabled={!canProceedToNext || isRecording || isAnalyzing}
+            >
+              {canProceedToNext ? (
+                currentIndex === targetSentences.length - 1 ? (
+                  "Complete Drill"
+                ) : (
+                  "Next Item"
+                )
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 mr-2" />
+                  Pass Sentence First (65%+)
+                </>
+              )}
+            </Button>
+          )}
+
+          {pronunciationScore && (
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              onClick={handleTryAgain}
+              disabled={isRecording || isAnalyzing}
+            >
+              Try Again
+            </Button>
+          )}
+
+          {currentScreen === "sentence" && (
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
+              onClick={() => {
+                setCurrentScreen("word");
+                setPronunciationScore(null);
+                setAudioBlob(null);
+              }}
+              disabled={isRecording || isAnalyzing}
+            >
+              Back to Word
+            </Button>
+          )}
+
+          {currentIndex > 0 && currentScreen === "word" && (
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
+              onClick={() => {
+                setCurrentIndex(currentIndex - 1);
+                setCurrentScreen("word");
+                setPronunciationScore(null);
+                setAudioBlob(null);
+              }}
+              disabled={isRecording || isAnalyzing}
+            >
+              Previous Item
+            </Button>
           )}
         </div>
       </div>
-      
+
       <BottomNav />
     </div>
   );
 }
-

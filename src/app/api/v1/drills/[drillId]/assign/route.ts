@@ -27,7 +27,38 @@ async function handler(
 		await connectToDatabase();
 
 		const { drillId } = params;
-		const body = await req.json();
+		
+		// Parse request body with proper error handling
+		let body;
+		try {
+			body = await req.json();
+		} catch (parseError: any) {
+			logger.error('Error parsing request body', {
+				error: parseError.message,
+				drillId,
+				contentType: req.headers.get('content-type'),
+			});
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Invalid or empty request body. Please ensure the request includes valid JSON data.',
+					error: parseError.message,
+				},
+				{ status: 400 }
+			);
+		}
+
+		// Validate body exists
+		if (!body || (typeof body === 'object' && Object.keys(body).length === 0)) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Request body is required and must contain userIds array',
+				},
+				{ status: 400 }
+			);
+		}
+
 		const validated = assignSchema.parse(body);
 
 		// Verify drill exists

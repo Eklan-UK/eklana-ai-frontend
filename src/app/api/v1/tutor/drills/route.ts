@@ -44,7 +44,9 @@ async function handler(
 		if (studentEmail) query.assigned_to = studentEmail;
 
 		const total = await Drill.countDocuments(query).exec();
+		// Only select metadata fields, not large content arrays
 		const drills = await Drill.find(query)
+			.select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to createdById')
 			.limit(limit)
 			.skip(offset)
 			.sort({ created_date: -1 })

@@ -35,20 +35,14 @@ async function getHandler(
       query.status = statusMap[status] || status;
     }
 
-    // Get drill assignments with optimized populate
+    // Get drill assignments with minimal populate (only metadata, not content)
+    // Content fields are loaded separately when drill is opened
     const assignments = await DrillAssignment.find(query)
-      .populate({
-        path: "drillId",
-        select:
-          "title type difficulty date duration_days context audio_example_url target_sentences roleplay_scenes matching_pairs definition_items grammar_items sentence_writing_items article_title article_content",
-        // Limit array sizes to prevent memory issues
-        options: { lean: true },
-      })
-      .populate({
-        path: "assignedBy",
-        select: "firstName lastName email",
-        options: { lean: true },
-      })
+      .populate(
+        "drillId",
+        "title type difficulty date duration_days context audio_example_url"
+      )
+      .populate("assignedBy", "firstName lastName email")
       .sort({ assignedAt: -1 })
       .limit(limit)
       .skip(offset)
