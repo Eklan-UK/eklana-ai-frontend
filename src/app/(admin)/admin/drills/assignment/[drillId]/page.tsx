@@ -17,14 +17,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useDrillById, useAllLearners, useAssignDrill } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 
-interface Learner {
+interface User {
   _id: string;
-  userId: {
-    _id: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-  };
+  email: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 interface Drill {
@@ -57,25 +54,16 @@ export default function DrillAssignmentDetailPage() {
   });
   const assignMutation = useAssignDrill();
 
-  const learners = learnersData?.learners || [];
+  const users = learnersData?.learners || [];
   const loading = drillLoading || learnersLoading;
 
-  // Pre-select users who are already assigned
+  // Pre-select users who are already assigned (assigned_to now contains user IDs)
   useEffect(() => {
-    if (drill?.assigned_to && learners.length > 0) {
-      const assignedEmails = new Set(drill.assigned_to);
-      const assignedUserIds = new Set<string>();
-      learners.forEach((learner: Learner) => {
-        if (
-          learner.userId &&
-          assignedEmails.has((learner.userId as any).email)
-        ) {
-          assignedUserIds.add(learner.userId._id.toString());
-        }
-      });
+    if (drill?.assigned_to && Array.isArray(drill.assigned_to) && users.length > 0) {
+      const assignedUserIds = new Set<string>(drill.assigned_to.map((id: string) => id.toString()));
       setSelectedUserIds(assignedUserIds);
     }
-  }, [drill?.assigned_to, learners]);
+  }, [drill?.assigned_to, users]);
 
   const handleToggleUser = (userId: string) => {
     const newSelected = new Set(selectedUserIds);
@@ -88,11 +76,11 @@ export default function DrillAssignmentDetailPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedUserIds.size === filteredLearners.length) {
+    if (selectedUserIds.size === filteredUsers.length) {
       setSelectedUserIds(new Set());
     } else {
       setSelectedUserIds(
-        new Set(filteredLearners.map((l) => l.userId._id.toString()))
+        new Set(filteredUsers.map((u) => u._id.toString()))
       );
     }
   };
@@ -127,19 +115,17 @@ export default function DrillAssignmentDetailPage() {
     );
   };
 
-  const filteredLearners = useMemo(() => learners.filter((learner) => {
-    if (!learner.userId) return false;
-    const email = (learner.userId as any).email?.toLowerCase() || "";
-    const firstName =
-      (learner.userId as any).firstName?.toLowerCase() || "";
-    const lastName = (learner.userId as any).lastName?.toLowerCase() || "";
+  const filteredUsers = useMemo(() => users.filter((user: User) => {
+    const email = user.email?.toLowerCase() || "";
+    const firstName = user.firstName?.toLowerCase() || "";
+    const lastName = user.lastName?.toLowerCase() || "";
     const search = searchTerm.toLowerCase();
     return (
       email.includes(search) ||
       firstName.includes(search) ||
       lastName.includes(search)
     );
-  }), [learners, searchTerm]);
+  }), [users, searchTerm]);
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -308,14 +294,14 @@ export default function DrillAssignmentDetailPage() {
                   Select Students
                 </h2>
                 <p className="text-sm text-gray-500">
-                  {selectedUserIds.size} of {filteredLearners.length} selected
+                  {selectedUserIds.size} of {filteredUsers.length} selected
                 </p>
               </div>
               <button
                 onClick={handleSelectAll}
                 className="text-sm text-[#418b43] hover:underline font-medium"
               >
-                {selectedUserIds.size === filteredLearners.length
+                {selectedUserIds.size === filteredUsers.length
                   ? "Deselect All"
                   : "Select All"}
               </button>
@@ -335,24 +321,24 @@ export default function DrillAssignmentDetailPage() {
 
             {/* Students List */}
             <div className="max-h-[500px] overflow-y-auto space-y-2 mb-6">
-              {filteredLearners.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <User className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                   <p>No students found</p>
                 </div>
               ) : (
-                filteredLearners.map((learner) => {
-                  const learnerId = learner.userId._id.toString();
-                  const isSelected = selectedUserIds.has(learnerId);
-                  const firstName = (learner.userId as any).firstName || "";
-                  const lastName = (learner.userId as any).lastName || "";
-                  const email = (learner.userId as any).email || "";
+                filteredUsers.map((user: User) => {
+                  const userId = user._id.toString();
+                  const isSelected = selectedUserIds.has(userId);
+                  const firstName = user.firstName || "";
+                  const lastName = user.lastName || "";
+                  const email = user.email || "";
                   const name = `${firstName} ${lastName}`.trim() || email;
 
                   return (
                     <div
-                      key={learner._id}
-                      onClick={() => handleToggleUser(learnerId)}
+                      key={user._id}
+                      onClick={() => handleToggleUser(userId)}
                       className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
                         isSelected
                           ? "border-[#418b43] bg-green-50"

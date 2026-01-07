@@ -161,9 +161,10 @@ async function postHandler(
 
 		// Validate assigned students - assigned_to now contains user IDs
 		let assignedUserIds: Types.ObjectId[] = [];
+		let studentUsers: Array<{ _id: Types.ObjectId; email: string }> = [];
 		if (validated.assigned_to && validated.assigned_to.length > 0) {
 			const userIds = validated.assigned_to.map((id) => new Types.ObjectId(id));
-			const studentUsers = await User.find({
+			studentUsers = await User.find({
 				_id: { $in: userIds },
 				role: 'user',
 			})
@@ -228,62 +229,63 @@ async function postHandler(
 
 		// Create DrillAssignment records for assigned users
 		let assignmentCount = 0;
-		if (validated.assigned_to && validated.assigned_to.length > 0) {
-			// Get user IDs for the assigned emails
-			const assignedUsers = await User.find({
-				email: { $in: validated.assigned_to },
-				role: 'user',
+		if (assignedUserIds.length > 0) {
+			// Use the already validated user IDs (from lines 166-172)
+			// No need to fetch again - we already have studentUsers from validation
+			const assignedUsers = assignedUserIds.map((id) => {
+				const user = studentUsers.find((u) => u._id.toString() === id.toString());
+				return {
+					_id: id,
+					email: user?.email || '',
+				};
+			});
+
+			// Check for existing assignments in bulk (avoid N+1 queries)
+			const existingAssignments = await DrillAssignment.find({
+				drillId: drill._id,
+				learnerId: { $in: assignedUserIds },
 			})
-				.select('_id email')
+				.select('learnerId')
 				.lean()
 				.exec();
 
-			// Create drill assignments
-			const assignmentPromises = assignedUsers.map(async (user) => {
-				try {
-					// Check if assignment already exists (shouldn't happen on create, but just in case)
-					const existingAssignment = await DrillAssignment.findOne({
-						drillId: drill._id,
-						learnerId: user._id, // learnerId field stores User ID
-					}).exec();
+			const existingUserIds = new Set(
+				existingAssignments.map((a) => a.learnerId.toString())
+			);
 
-					if (existingAssignment) {
-						logger.warn('Drill assignment already exists', {
-							drillId: drill._id,
-							userId: user._id,
+			// Calculate due date once (drill.date is now completion date)
+			const dueDate = new Date(validated.date);
+
+			// Create drill assignments for users that don't have one yet
+			const newAssignments = assignedUsers
+				.filter((user) => !existingUserIds.has(user._id.toString()))
+				.map((user) => ({
+					drillId: drill._id,
+					learnerId: user._id,
+					assignedBy: context.userId,
+					assignedAt: new Date(),
+					dueDate: dueDate,
+					status: 'pending' as const,
+				}));
+
+			if (newAssignments.length > 0) {
+				// Bulk insert assignments (much faster than individual creates)
+				const createdAssignments = await DrillAssignment.insertMany(newAssignments, {
+					ordered: false, // Continue even if some fail (duplicates)
+				}).catch((error: any) => {
+					// Handle partial failures (e.g., duplicates)
+					if (error.writeErrors) {
+						const successful = newAssignments.length - error.writeErrors.length;
+						logger.warn('Some drill assignments failed', {
+							successful,
+							failed: error.writeErrors.length,
 						});
-						return null;
-					}
-
-					// Calculate due date based on drill date and duration
-					const dueDate = new Date(validated.date);
-					dueDate.setDate(dueDate.getDate() + (validated.duration_days || 1));
-
-					const assignment = await DrillAssignment.create({
-						drillId: drill._id,
-						learnerId: user._id, // learnerId field stores User ID
-						assignedBy: context.userId,
-						assignedAt: new Date(),
-						dueDate: dueDate,
-						status: 'pending',
-					});
-
-					return assignment;
-				} catch (error: any) {
-					// Handle duplicate assignment error
-					if (error.code === 11000) {
-						logger.warn('Duplicate drill assignment skipped', {
-							drillId: drill._id,
-							userId: user._id,
-						});
-						return null;
+						return error.insertedDocs || [];
 					}
 					throw error;
-				}
-			});
-
-			const assignments = await Promise.all(assignmentPromises);
-			assignmentCount = assignments.filter((a) => a !== null).length;
+				});
+				assignmentCount = Array.isArray(createdAssignments) ? createdAssignments.length : 0;
+			}
 
 			// Update drill's totalAssignments count
 			drill.totalAssignments = assignmentCount;

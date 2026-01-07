@@ -295,7 +295,7 @@ const AdminDrillPage: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/tutor/drills/${drill._id}`}
+                          href={`/admin/drills/${drill._id}`}
                           className="p-2 text-gray-600 hover:text-[#418b43] hover:bg-emerald-50 rounded-lg transition-colors"
                           title="View"
                         >

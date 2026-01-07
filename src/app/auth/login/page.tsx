@@ -165,6 +165,7 @@ export default function LoginPage() {
             variant="primary"
             size="lg"
             fullWidth
+            className="items-center justify-center flex"
             disabled={isSubmitting || isLoading}
           >
             {isSubmitting ? (

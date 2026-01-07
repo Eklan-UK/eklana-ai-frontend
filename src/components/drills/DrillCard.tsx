@@ -9,7 +9,12 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Calendar, Target, CheckCircle } from "lucide-react";
-import { getDrillIcon, getDrillTypeInfo, formatDate, getDrillStatus } from "@/utils/drill";
+import {
+  getDrillIcon,
+  getDrillTypeInfo,
+  formatDate,
+  getDrillStatus,
+} from "@/utils/drill";
 import { getStatusBadge } from "@/utils/drill-ui";
 
 export interface DrillCardProps {
@@ -48,24 +53,30 @@ export function DrillCard({
   className = "",
 }: DrillCardProps) {
   const typeInfo = getDrillTypeInfo(drill.type);
-  const drillStatus = getDrillStatus({ drill, dueDate, completedAt, assignmentStatus: status });
-  
-  // Calculate due date
-  const calculatedDueDate = dueDate
-    ? new Date(dueDate)
-    : (() => {
-        const endDate = new Date(drill.date);
-        endDate.setDate(endDate.getDate() + (drill.duration_days || 1) - 1);
-        return endDate;
-      })();
+  const drillStatus = getDrillStatus({
+    drill,
+    dueDate,
+    completedAt,
+    assignmentStatus: status,
+  });
+
+  // Calculate due date (drill.date is now the completion/due date)
+  const calculatedDueDate = dueDate ? new Date(dueDate) : new Date(drill.date);
 
   const isOverdue = drillStatus === "missed";
-  const drillUrl = assignmentId
-    ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
-    : `/account/drills/${drill._id}`;
+  const isUpcoming = drillStatus === "upcoming";
+  const isCompleted = drillStatus === "completed";
+
+  // Determine drill URL based on status
+  const drillUrl =
+    isCompleted && assignmentId
+      ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
+      : assignmentId
+      ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
+      : `/account/drills/${drill._id}`;
 
   const handleClick = (e: React.MouseEvent) => {
-    if (onStartClick) {
+    if (onStartClick && !isUpcoming && !isCompleted) {
       e.preventDefault();
       onStartClick(drill._id, assignmentId);
     }
@@ -84,8 +95,12 @@ export function DrillCard({
               <span className="font-medium text-gray-900">{drill.title}</span>
             </div>
             {showStartButton && (
-              <Button variant="primary" size="sm">
-                Start
+              <Button variant="primary" size="sm" disabled={isUpcoming}>
+                {isUpcoming
+                  ? "View"
+                  : isCompleted
+                  ? "Review Submission"
+                  : "Start"}
               </Button>
             )}
           </div>
@@ -121,7 +136,12 @@ export function DrillCard({
             </div>
           </div>
         </div>
-        {getStatusBadge({ drill, dueDate, completedAt, assignmentStatus: status })}
+        {getStatusBadge({
+          drill,
+          dueDate,
+          completedAt,
+          assignmentStatus: status,
+        })}
       </div>
 
       <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
@@ -143,35 +163,52 @@ export function DrillCard({
         </div>
       )}
 
-      {assignedBy && variant === "detailed" && (
-        <p className="text-xs text-gray-400 mb-3">
-          Assigned by: {assignedBy.firstName} {assignedBy.lastName}
-        </p>
-      )}
-
-      {showStartButton && (
-        <div className="flex justify-end mt-3">
-          <Link href={drillUrl}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                // If onStartClick is provided, use it; otherwise Link handles navigation
-                if (onStartClick) {
-                  e.preventDefault();
-                  onStartClick(drill._id, assignmentId);
-                }
-              }}
-              className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-            >
-              Start
-            </Button>
-          </Link>
+      <div className="flex w-full items-center justify-between">
+        <div>
+          {assignedBy && variant === "detailed" && (
+            <p className="text-xs text-gray-400 ">
+              Assigned by: {assignedBy.firstName} {assignedBy.lastName}
+            </p>
+          )}
         </div>
-      )}
+
+        <div>
+          {showStartButton && (
+            <div className="flex justify-end">
+              {isUpcoming ? (
+                <Link href={`/account/drills/${drill._id}`}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={true}
+                    className="bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed"
+                  >
+                    View
+                  </Button>
+                </Link>
+              ) : (
+                <Link href={drillUrl}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // If onStartClick is provided and drill is not completed, use it
+                      if (onStartClick && !isCompleted) {
+                        e.preventDefault();
+                        onStartClick(drill._id, assignmentId);
+                      }
+                    }}
+                    className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                  >
+                    {isCompleted ? "Review Submission" : "Start"}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
-
-

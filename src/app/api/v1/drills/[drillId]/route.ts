@@ -9,7 +9,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
-// GET handler
+// GET handler - Simple, direct drill fetch by ID
 async function getHandler(
 	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string },
@@ -19,7 +19,10 @@ async function getHandler(
 		await connectToDatabase();
 
 		const { drillId } = params;
+		const { searchParams } = new URL(req.url);
+		const assignmentId = searchParams.get('assignmentId');
 
+		// Validate drill ID
 		if (!Types.ObjectId.isValid(drillId)) {
 			return NextResponse.json(
 				{
@@ -30,6 +33,7 @@ async function getHandler(
 			);
 		}
 
+		// Fetch drill directly
 		const drill = await Drill.findById(drillId).select('-__v').lean().exec();
 
 		if (!drill) {
@@ -42,20 +46,77 @@ async function getHandler(
 			);
 		}
 
-		// Check permissions
-		const user = await User.findById(context.userId).select('email role').lean().exec();
-		if (!user) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'User not found',
+		// Permission check: Use DrillAssignment if assignmentId provided, otherwise check role-based access
+		if (assignmentId) {
+			// Validate assignmentId format
+			if (!Types.ObjectId.isValid(assignmentId)) {
+				return NextResponse.json(
+					{
+						code: 'ValidationError',
+						message: 'Invalid assignment ID format',
+					},
+					{ status: 400 }
+				);
+			}
+
+			// Verify assignment exists and belongs to the user
+			const assignment = await DrillAssignment.findOne({
+				_id: new Types.ObjectId(assignmentId),
+				drillId: new Types.ObjectId(drillId),
+				learnerId: context.userId,
+			}).lean().exec();
+
+			if (!assignment) {
+				return NextResponse.json(
+					{
+						code: 'NotFoundError',
+						message: 'Assignment not found or you do not have access',
+					},
+					{ status: 404 }
+				);
+			}
+
+			// Return drill with assignment info
+			return NextResponse.json({
+				drill,
+				assignment: {
+					assignmentId: assignment._id,
+					status: assignment.status,
+					dueDate: assignment.dueDate,
+					completedAt: assignment.completedAt,
 				},
-				{ status: 404 }
-			);
+			}, { status: 200 });
 		}
 
-		// Learners can only view drills assigned to them
-		if (user.role === 'user' && !drill.assigned_to.includes(user.email)) {
+		// No assignmentId provided - check role-based permissions
+		// Use userRole from context to avoid extra query
+		const userRole = context.userRole;
+
+		// Admin: can view any drill
+		if (userRole === 'admin') {
+			return NextResponse.json({ drill }, { status: 200 });
+		}
+
+		// Tutor: can view drills they created
+		if (userRole === 'tutor') {
+			// Check createdById first (preferred method)
+			const isCreatorById = drill.createdById?.toString() === context.userId.toString();
+			
+			// If createdById matches, allow access
+			if (isCreatorById) {
+				return NextResponse.json({ drill }, { status: 200 });
+			}
+			
+			// Fallback: check created_by email (legacy support)
+			// Only fetch user if created_by looks like an email
+			if (typeof drill.created_by === 'string' && drill.created_by.includes('@')) {
+				const user = await User.findById(context.userId).select('email').lean().exec();
+				if (user && drill.created_by === user.email) {
+					return NextResponse.json({ drill }, { status: 200 });
+				}
+			}
+			
+			// Not the creator
 			return NextResponse.json(
 				{
 					code: 'AuthorizationError',
@@ -65,18 +126,38 @@ async function getHandler(
 			);
 		}
 
-		// Tutors can only view drills they created
-		if (user.role === 'tutor' && drill.created_by !== user.email) {
-			return NextResponse.json(
-				{
-					code: 'AuthorizationError',
-					message: 'You do not have permission to view this drill',
-				},
-				{ status: 403 }
-			);
+		// User: must have an assignment to view the drill
+		// Use indexed query for performance
+		if (userRole === 'user') {
+			const assignment = await DrillAssignment.findOne({
+				drillId: new Types.ObjectId(drillId),
+				learnerId: context.userId,
+			})
+				.select('_id status dueDate completedAt')
+				.lean()
+				.exec();
+
+			if (!assignment) {
+				return NextResponse.json(
+					{
+						code: 'AuthorizationError',
+						message: 'You do not have access to this drill',
+					},
+					{ status: 403 }
+				);
+			}
+
+			return NextResponse.json({ drill }, { status: 200 });
 		}
 
-		return NextResponse.json({ drill }, { status: 200 });
+		// Fallback: deny access
+		return NextResponse.json(
+			{
+				code: 'AuthorizationError',
+				message: 'You do not have permission to view this drill',
+			},
+			{ status: 403 }
+		);
 	} catch (error: any) {
 		logger.error('Error fetching drill', error);
 		return NextResponse.json(
@@ -294,39 +375,42 @@ async function putHandler(
 			);
 
 			// Create drill assignments for users that don't have one yet
-			const assignmentPromises = assignedUsers
-				.filter((user) => !existingUserIds.has(user._id.toString()))
-				.map(async (user) => {
-					try {
-						// Calculate due date based on drill date and duration
-						const dueDate = new Date(drill.date);
-						dueDate.setDate(dueDate.getDate() + drill.duration_days);
+			const newUsers = assignedUsers.filter(
+				(user) => !existingUserIds.has(user._id.toString())
+			);
 
-						const assignment = await DrillAssignment.create({
-							drillId: drill._id,
-							learnerId: user._id, // learnerId field stores User ID
-							assignedBy: context.userId,
-							assignedAt: new Date(),
-							dueDate: dueDate,
-							status: 'pending',
+			if (newUsers.length > 0) {
+				// drill.date is now the completion/due date
+				const dueDate = new Date(drill.date);
+
+				// Bulk insert assignments (much faster than individual creates)
+				const newAssignments = newUsers.map((user) => ({
+					drillId: drill._id,
+					learnerId: user._id,
+					assignedBy: context.userId,
+					assignedAt: new Date(),
+					dueDate: dueDate,
+					status: 'pending' as const,
+				}));
+
+				try {
+					const createdAssignments = await DrillAssignment.insertMany(newAssignments, {
+						ordered: false, // Continue even if some fail
+					});
+					newAssignmentsCount = Array.isArray(createdAssignments) ? createdAssignments.length : 0;
+				} catch (error: any) {
+					// Handle partial failures
+					if (error.writeErrors) {
+						newAssignmentsCount = error.insertedDocs?.length || 0;
+						logger.warn('Some drill assignments failed', {
+							successful: newAssignmentsCount,
+							failed: error.writeErrors.length,
 						});
-
-						return assignment;
-					} catch (error: any) {
-						// Handle duplicate assignment error
-						if (error.code === 11000) {
-							logger.warn('Duplicate drill assignment skipped', {
-								drillId: drill._id,
-								userId: user._id,
-							});
-							return null;
-						}
+					} else {
 						throw error;
 					}
-				});
-
-			const assignments = await Promise.all(assignmentPromises);
-			newAssignmentsCount = assignments.filter((a) => a !== null).length;
+				}
+			}
 
 			// Update drill's totalAssignments count
 			if (newAssignmentsCount > 0) {
@@ -483,4 +567,5 @@ export async function DELETE(
 		deleteHandler(req, context, resolvedParams)
 	)(req);
 }
+
 

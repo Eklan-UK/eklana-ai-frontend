@@ -35,18 +35,19 @@ async function getHandler(
       query.status = statusMap[status] || status;
     }
 
-    const _drill = await Drill.find();
-    const _user = await User.find();
-    // Get drill assignments
+    // Get drill assignments with optimized populate
     const assignments = await DrillAssignment.find(query)
       .populate({
         path: "drillId",
         select:
           "title type difficulty date duration_days context audio_example_url target_sentences roleplay_scenes matching_pairs definition_items grammar_items sentence_writing_items article_title article_content",
+        // Limit array sizes to prevent memory issues
+        options: { lean: true },
       })
       .populate({
         path: "assignedBy",
         select: "firstName lastName email",
+        options: { lean: true },
       })
       .sort({ assignedAt: -1 })
       .limit(limit)
@@ -56,23 +57,45 @@ async function getHandler(
 
     const total = await DrillAssignment.countDocuments(query);
 
-    // Get drill attempts for each assignment
-    const assignmentsWithAttempts = await Promise.all(
-      assignments.map(async (assignment) => {
-        const attempts = await DrillAttempt.find({
-          drillAssignmentId: assignment._id,
-        })
-          .sort({ completedAt: -1 })
-          .limit(1)
-          .lean()
-          .exec();
+    // Get drill attempts efficiently using aggregation or batch query
+    // Instead of N queries, we'll fetch attempts for all assignments at once
+    const assignmentIds = assignments.map((a) => a._id);
 
-        return {
-          ...assignment,
-          latestAttempt: attempts[0] || null,
-        };
-      })
+    // Get latest attempt for each assignment using aggregation
+    const latestAttempts = await DrillAttempt.aggregate([
+      {
+        $match: {
+          drillAssignmentId: { $in: assignmentIds },
+        },
+      },
+      {
+        $sort: { completedAt: -1, createdAt: -1 },
+      },
+      {
+        $group: {
+          _id: "$drillAssignmentId",
+          latestAttempt: { $first: "$$ROOT" },
+        },
+      },
+    ]);
+
+    // Create a map for quick lookup
+    const attemptMap = new Map(
+      latestAttempts.map((item) => [
+        item._id.toString(),
+        {
+          score: item.latestAttempt.score,
+          timeSpent: item.latestAttempt.timeSpent,
+          completedAt: item.latestAttempt.completedAt,
+        },
+      ])
     );
+
+    // Combine assignments with their latest attempts
+    const assignmentsWithAttempts = assignments.map((assignment) => ({
+      ...assignment,
+      latestAttempt: attemptMap.get(assignment._id.toString()) || null,
+    }));
 
     return NextResponse.json(
       {

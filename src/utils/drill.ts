@@ -34,32 +34,27 @@ export function formatDate(dateString: string): string {
 
 /**
  * Get drill status based on dates and completion
+ * Note: drill.date is now the completion/due date, not start date
+ * Drills become active immediately upon assignment
  */
 export function getDrillStatus(drill: any): DrillStatus {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  // Use assignment dueDate if available, otherwise calculate from drill date + duration
-  const dueDate = drill.dueDate
+  // Use assignment dueDate if available, otherwise use drill.date as completion date
+  const completionDate = drill.dueDate
     ? new Date(drill.dueDate)
-    : (() => {
-        const endDate = new Date(drill.date || drill.drill?.date);
-        endDate.setDate(endDate.getDate() + (drill.duration_days || drill.drill?.duration_days || 1) - 1);
-        return endDate;
-      })();
-  dueDate.setHours(23, 59, 59, 999);
-
-  const startDate = new Date(drill.date || drill.drill?.date);
-  startDate.setHours(0, 0, 0, 0);
+    : new Date(drill.date || drill.drill?.date);
+  completionDate.setHours(23, 59, 59, 999);
 
   // Check if drill is completed
   if (drill.completedAt || drill.assignmentStatus === "completed" || drill.status === "completed") {
     return "completed";
   }
 
-  // Check if drill is missed (due date has passed and not completed)
+  // Check if drill is missed (completion date has passed and not completed)
   if (
-    now > dueDate &&
+    now > completionDate &&
     !drill.completedAt &&
     drill.assignmentStatus !== "completed" &&
     drill.status !== "completed"
@@ -67,19 +62,14 @@ export function getDrillStatus(drill: any): DrillStatus {
     return "missed";
   }
 
-  // Check if drill is active/ongoing (today is within the date range)
-  // Removed is_active check - drills are always available
-  if (now >= startDate && now <= dueDate) {
-    return drill.drill ? "ongoing" : "active";
+  // If drill has an assignment, it's active/ongoing (drills are active immediately upon assignment)
+  // Status is "ongoing" if it's part of an assignment, "active" otherwise
+  if (drill.assignmentId || drill.drill) {
+    return "ongoing";
   }
 
-  // Check if drill is upcoming (start date is in the future)
-  if (startDate > now) {
-    return "upcoming";
-  }
-
-  // Default to ongoing/active if past start date but before due date
-  return drill.drill ? "ongoing" : "active";
+  // Default to active (drill is available)
+  return "active";
 }
 
 /**

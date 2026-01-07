@@ -72,10 +72,8 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     ? 1
     : 0;
 
-  const startDate = drill.date ? new Date(drill.date) : null;
-  const endDate = startDate
-    ? new Date(new Date(startDate).setDate(startDate.getDate() + (drill.duration_days || 1) - 1))
-    : null;
+  // drill.date is now the completion/due date
+  const completionDate = drill.date ? new Date(drill.date) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,13 +149,13 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 </p>
               </div>
             </div>
-            {startDate && endDate && (
+            {completionDate && (
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-gray-400" />
                 <div>
-                  <p className="text-sm text-gray-500">Duration</p>
+                  <p className="text-sm text-gray-500">Completion Date</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+                    {completionDate.toLocaleDateString()}
                   </p>
                 </div>
               </div>

@@ -252,7 +252,7 @@ const drillSchema = new Schema<IDrill>(
 		date: {
 			type: Date,
 			required: [true, 'Date is required'],
-			description: 'Start date when the drill becomes available',
+			description: 'Completion date (due date) - the latest date by which the drill should be completed. The drill becomes active immediately upon assignment.',
 		},
 		
 		duration_days: {
@@ -260,7 +260,7 @@ const drillSchema = new Schema<IDrill>(
 			required: [true, 'Duration is required'],
 			default: 1,
 			min: [1, 'Duration must be at least 1 day'],
-			description: 'Number of days the drill remains active/available',
+			description: 'Number of days from assignment date until completion date. Used for calculating due dates when assigning drills.',
 		},
 		
 		// Assignment - Array of student emails
@@ -443,14 +443,15 @@ drillSchema.pre('save', function() {
 });
 
 // Virtual for checking if drill is currently active based on date
+// Note: date is now the completion/due date, not start date
+// Drills are active immediately upon assignment
 drillSchema.virtual('isCurrentlyActive').get(function() {
 	const now = new Date();
-	const startDate = new Date(this.date);
-	const endDate = new Date(startDate);
-	endDate.setDate(endDate.getDate() + this.duration_days - 1);
-	endDate.setHours(23, 59, 59, 999);
+	const completionDate = new Date(this.date);
+	completionDate.setHours(23, 59, 59, 999);
 	
-	return now >= startDate && now <= endDate && this.is_active;
+	// Drill is active if current date is before or equal to completion date
+	return now <= completionDate && this.is_active;
 });
 
 // Method to validate drill type-specific required fields

@@ -289,15 +289,10 @@ export default async function HomePage() {
 
                 return sortedDrills.slice(0, 5); // Show up to 5 drills
               })().map((drill: any) => {
+                // drill.date is now the completion/due date
                 const dueDate = drill.dueDate
                   ? new Date(drill.dueDate)
-                  : (() => {
-                      const endDate = new Date(drill.date);
-                      endDate.setDate(
-                        endDate.getDate() + (drill.duration_days || 1) - 1
-                      );
-                      return endDate;
-                    })();
+                  : new Date(drill.date || drill.drill?.date);
 
                 // DrillCard will handle navigation via Link component
                 // The start button will navigate to the drill page

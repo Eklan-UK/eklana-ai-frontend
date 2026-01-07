@@ -20,23 +20,25 @@ async function handler(
 		const limit = parseInt(searchParams.get('limit') || String(config.defaultResLimit));
 		const offset = parseInt(searchParams.get('offset') || String(config.defaultResOffset));
 
-		// Find all users with profiles assigned to this tutor
+		// Optimize: Use aggregation to get users and count in a single query
+		// First get total count efficiently
+		const total = await Profile.countDocuments({ tutorId: context.userId }).exec();
+
+		// Get user IDs with pagination
 		const profiles = await Profile.find({ tutorId: context.userId })
-			.select('userId tutorId')
+			.select('userId')
+			.sort({ createdAt: -1 })
+			.limit(limit)
+			.skip(offset)
 			.lean()
 			.exec();
 
 		const userIds = profiles.map((p) => p.userId);
 
-		// Get total count
-		const total = userIds.length;
-
 		// Find all users assigned to this tutor
 		const users = await User.find({ _id: { $in: userIds } })
 			.select('-password -__v')
 			.sort({ createdAt: -1 })
-			.limit(limit)
-			.skip(offset)
 			.lean()
 			.exec();
 

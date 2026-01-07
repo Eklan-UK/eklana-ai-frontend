@@ -26,6 +26,7 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
   const router = useRouter();
   const [isStarted, setIsStarted] = useState(false);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<any>(null);
 
   // Fetch assignment ID and track recent activity
   useEffect(() => {
@@ -34,11 +35,12 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
         // Get learner drills to find the assignment
         const response = await drillAPI.getLearnerDrills();
         if (response.data?.drills) {
-          const assignment = response.data.drills.find(
+          const foundAssignment = response.data.drills.find(
             (item: any) => item.drill?._id === drill._id
           );
-          if (assignment?.assignmentId) {
-            setAssignmentId(assignment.assignmentId);
+          if (foundAssignment?.assignmentId) {
+            setAssignmentId(foundAssignment.assignmentId);
+            setAssignment(foundAssignment);
           }
         }
 
@@ -71,15 +73,15 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
     fetchAssignment();
   }, [drill._id, drill.title, drill.type, drill.difficulty]);
 
-  // Check if drill is active - drills are always available regardless of date
+  // Check if drill is active - drills are always available once assigned
+  // drill.date is now the completion/due date, not start date
   const now = new Date();
-  const startDate = new Date(drill.date);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + (drill.duration_days || 1) - 1);
-  endDate.setHours(23, 59, 59, 999);
-  // Remove is_active check - drills are always available
-  const isActive = true; // Always allow access to drills
-  const isUpcoming = startDate > now;
+  const completionDate = new Date(drill.date);
+  completionDate.setHours(23, 59, 59, 999);
+  // Drills are active immediately upon assignment
+  const isActive = true; // Always allow access to drills once assigned
+  const isCompleted = assignment?.completedAt || assignment?.status === "completed" || assignment?.assignmentStatus === "completed";
+  const isOverdue = now > completionDate && !isCompleted;
 
   if (!isStarted) {
     return (
@@ -109,24 +111,25 @@ export default function DrillPracticeInterface({ drill }: DrillPracticeInterface
                 <div className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   <span>
-                    {isUpcoming 
-                      ? `Starts ${formatDate(drill.date)}`
-                      : `Due ${formatDate(endDate.toISOString())}`
+                    {isOverdue 
+                      ? `Overdue - Due ${formatDate(drill.date)}`
+                      : `Due ${formatDate(drill.date)}`
                     }
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  <span>{drill.duration_days || 1} day{drill.duration_days !== 1 ? 's' : ''}</span>
-                </div>
+                {assignment?.dueDate && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>Due {formatDate(assignment.dueDate)}</span>
+                  </div>
+                )}
               </div>
               
-              {/* Removed inactive drill warning - drills are always available */}
-              
-              {isUpcoming && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-blue-800">
-                    This drill will be available starting {formatDate(drill.date)}.
+              {/* Show overdue warning if applicable */}
+              {isOverdue && !isCompleted && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-red-800">
+                    This drill is overdue. Please complete it as soon as possible.
                   </p>
                 </div>
               )}

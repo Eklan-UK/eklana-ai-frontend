@@ -40,9 +40,8 @@ export function TutorDrillCard({
     ? 1
     : 0;
 
-  const startDate = new Date(drill.date);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + (drill.duration_days || 1) - 1);
+  // drill.date is now the completion/due date
+  const completionDate = new Date(drill.date);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -95,7 +94,7 @@ export function TutorDrillCard({
             <div className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
               <span>
-                {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+                Due {completionDate.toLocaleDateString()}
               </span>
             </div>
             <span
