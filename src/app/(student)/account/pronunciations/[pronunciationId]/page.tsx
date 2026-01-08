@@ -18,9 +18,13 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
-import { pronunciationAPI } from "@/lib/api";
 import { toast } from "sonner";
 import Link from "next/link";
+import {
+  useLearnerPronunciationById,
+  usePronunciationAttempts,
+  useSubmitPronunciationAttempt,
+} from "@/hooks/usePronunciations";
 
 interface PronunciationAttempt {
   textScore: number;
@@ -39,15 +43,27 @@ export default function PronunciationPracticePage() {
   const pronunciationId = params.pronunciationId as string;
   const assignmentId = searchParams.get("assignmentId") || "";
 
-  const [pronunciation, setPronunciation] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // React Query hooks
+  const {
+    data: pronunciationData,
+    isLoading: pronunciationLoading,
+    error: pronunciationError,
+  } = useLearnerPronunciationById(pronunciationId);
+
+  const {
+    data: attemptsData,
+    isLoading: attemptsLoading,
+  } = usePronunciationAttempts(pronunciationId);
+
+  const submitAttemptMutation = useSubmitPronunciationAttempt();
+
+  // Local state for UI
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [attemptResult, setAttemptResult] = useState<PronunciationAttempt | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [attempts, setAttempts] = useState<any[]>([]);
-  const [assignment, setAssignment] = useState<any>(null);
+  const [localAssignment, setLocalAssignment] = useState<any>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -58,48 +74,19 @@ export default function PronunciationPracticePage() {
     autoPlay: false,
   });
 
-  // Load pronunciation data
+  // Derived state from React Query
+  const pronunciation = pronunciationData?.pronunciation;
+  const assignment = localAssignment || pronunciationData?.assignment || attemptsData?.assignment;
+  const attempts = attemptsData?.attempts || [];
+  const loading = pronunciationLoading || attemptsLoading;
+
+  // Handle error
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        // Load pronunciation
-        const pronunciationResponse = await pronunciationAPI.getLearnerPronunciations();
-        const pronunciations = pronunciationResponse.data?.pronunciations || [];
-        const found = pronunciations.find(
-          (p: any) => p.pronunciation?._id === pronunciationId || p.pronunciation?._id?.toString() === pronunciationId
-        );
-        
-        if (found) {
-          setPronunciation(found.pronunciation);
-          setAssignment(found);
-        } else {
+    if (pronunciationError) {
           toast.error("Pronunciation not found");
           router.push("/account/pronunciations");
-          return;
-        }
-
-        // Load attempts if assignmentId is provided
-        if (assignmentId) {
-          try {
-            const attemptsData = await pronunciationAPI.getAttempts(pronunciationId);
-            setAttempts(attemptsData.data?.attempts || []);
-            setAssignment(attemptsData.data?.assignment || found);
-          } catch (error) {
-            console.error("Failed to load attempts:", error);
-          }
-        }
-      } catch (error: any) {
-        toast.error("Failed to load pronunciation: " + error.message);
-        router.push("/account/pronunciations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [pronunciationId, assignmentId, router]);
+    }
+  }, [pronunciationError, router]);
 
   // Start recording
   const startRecording = async () => {
@@ -192,11 +179,14 @@ export default function PronunciationPracticePage() {
         try {
           const base64Audio = (reader.result as string).split(",")[1];
 
-          // Submit attempt
-          const result = await pronunciationAPI.submitAttempt(pronunciationId, {
+          // Submit attempt using React Query mutation
+          const result = await submitAttemptMutation.mutateAsync({
+            pronunciationId,
+            data: {
             assignmentId: assignmentId || undefined,
             audioBase64: base64Audio,
             passingThreshold: 70,
+            },
           });
           const attemptData = result.data?.attempt;
 
@@ -210,19 +200,9 @@ export default function PronunciationPracticePage() {
             wordFeedback: attemptData.wordFeedback || [],
           });
 
-          // Update assignment status
+          // Update local assignment status
           if (result.data?.assignment) {
-            setAssignment(result.data.assignment);
-          }
-
-          // Reload attempts
-          if (assignmentId) {
-            try {
-              const attemptsData = await pronunciationAPI.getAttempts(pronunciationId);
-              setAttempts(attemptsData.data?.attempts || []);
-            } catch (error) {
-              console.error("Failed to reload attempts:", error);
-            }
+            setLocalAssignment(result.data.assignment);
           }
 
           if (attemptData.passed) {

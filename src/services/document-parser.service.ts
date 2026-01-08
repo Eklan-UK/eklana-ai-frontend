@@ -61,6 +61,8 @@ export interface ParsedContent {
     | "grammar"
     | "sentence_writing"
     | "summary"
+    | "listening"
+    | "sentence"
     | "unknown";
   confidence: number;
   extractedData: {

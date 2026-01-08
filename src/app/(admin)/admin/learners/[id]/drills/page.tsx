@@ -1,46 +1,35 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, BookOpen, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
-import { adminService } from '@/services/admin.service';
+import { useLearnerById } from '@/hooks/useAdmin';
+import { useQuery } from '@tanstack/react-query';
 import { drillAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { useEffect } from 'react';
 
-export default function StudentDrillsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const studentId = params.id as string;
-
-  const [student, setStudent] = useState<any>(null);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch student info
-        const studentResponse = await adminService.getLearnerById(studentId);
-        setStudent(studentResponse.user);
-
-        // Fetch drill assignments for this student
-        const assignmentsResponse = await fetch(`/api/v1/drills/learner/${studentId}/assignments`, {
+// Hook for student drill assignments
+function useStudentDrillAssignments(studentId: string) {
+  return useQuery({
+    queryKey: ['students', studentId, 'assignments'],
+    queryFn: async () => {
+      const response = await fetch(`/api/v1/drills/learner/${studentId}/assignments`, {
           credentials: 'include',
         });
         
-        if (assignmentsResponse.ok) {
-          const data = await assignmentsResponse.json();
-          setAssignments(data.data?.assignments || data.assignments || []);
-        } else {
+      if (response.ok) {
+        const data = await response.json();
+        return data.data?.assignments || data.assignments || [];
+      }
+      
           // Fallback: fetch from learner drills endpoint
           const drillsResponse = await drillAPI.getLearnerDrills();
           if (drillsResponse.data?.drills) {
-            const studentAssignments = drillsResponse.data.drills
+        return drillsResponse.data.drills
               .filter((item: any) => {
                 const userId = item.drill?.created_by || item.userId;
                 return userId === studentId || item.userId?._id === studentId;
@@ -50,21 +39,31 @@ export default function StudentDrillsPage() {
                 drill: item.drill || item,
                 assignmentId: item.assignmentId || item._id,
               }));
-            setAssignments(studentAssignments);
-          }
-        }
-      } catch (error: any) {
-        console.error('Failed to load student drills:', error);
-        toast.error('Failed to load student drills: ' + error.message);
-      } finally {
-        setLoading(false);
       }
-    };
+      return [];
+    },
+    enabled: !!studentId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+          }
 
-    if (studentId) {
-      fetchData();
+export default function StudentDrillsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const studentId = params.id as string;
+
+  // Use React Query hooks
+  const { data: student, isLoading: studentLoading, error: studentError } = useLearnerById(studentId);
+  const { data: assignments = [], isLoading: assignmentsLoading } = useStudentDrillAssignments(studentId);
+
+  const loading = studentLoading || assignmentsLoading;
+
+  // Handle error
+  useEffect(() => {
+    if (studentError) {
+      toast.error('Failed to load student');
     }
-  }, [studentId]);
+  }, [studentError]);
 
   const formatDate = (dateString: string | Date): string => {
     try {

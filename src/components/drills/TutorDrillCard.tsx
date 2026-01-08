@@ -1,10 +1,11 @@
 /**
  * Reusable Tutor Drill Card Component
  * DRY: Eliminates duplicate tutor drill card rendering logic
+ * Optimized: Memoized to prevent unnecessary re-renders
  */
 "use client";
 
-import React from "react";
+import React, { memo, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Users, Clock, Edit, Trash2, ChevronRight, Loader2 } from "lucide-react";
@@ -27,23 +28,29 @@ export interface TutorDrillCardProps {
   className?: string;
 }
 
-export function TutorDrillCard({
+function TutorDrillCardComponent({
   drill,
   onDelete,
   isDeleting = false,
   className = "",
 }: TutorDrillCardProps) {
   const drillId = drill._id || drill.id || "";
-  const assignedCount = Array.isArray(drill.assigned_to)
+  
+  // Memoize computed values
+  const assignedCount = useMemo(
+    () =>
+      Array.isArray(drill.assigned_to)
     ? drill.assigned_to.length
     : drill.assigned_to
     ? 1
-    : 0;
+        : 0,
+    [drill.assigned_to]
+  );
 
   // drill.date is now the completion/due date
-  const completionDate = new Date(drill.date);
+  const completionDate = useMemo(() => new Date(drill.date), [drill.date]);
 
-  const getDifficultyColor = (difficulty: string) => {
+  const getDifficultyColor = useCallback((difficulty: string) => {
     switch (difficulty) {
       case "beginner":
         return "bg-green-100 text-green-700";
@@ -54,7 +61,13 @@ export function TutorDrillCard({
       default:
         return "bg-gray-100 text-gray-700";
     }
-  };
+  }, []);
+  
+  const handleDelete = useCallback(() => {
+    if (onDelete) {
+      onDelete(drillId);
+    }
+  }, [onDelete, drillId]);
 
   return (
     <Card
@@ -117,7 +130,7 @@ export function TutorDrillCard({
           </Link>
           {onDelete && (
             <button
-              onClick={() => onDelete(drillId)}
+              onClick={handleDelete}
               disabled={isDeleting}
               className="p-2 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
             >
@@ -136,4 +149,7 @@ export function TutorDrillCard({
     </Card>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders in lists
+export const TutorDrillCard = memo(TutorDrillCardComponent);
 

@@ -30,6 +30,7 @@ import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
 import { ParsedContent } from "@/services/document-parser.service";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { toast } from "sonner";
 
 const DRAFT_KEY = "drill_draft";
@@ -86,6 +87,9 @@ interface DrillFormData {
   }>;
   article_content?: string;
   article_title?: string;
+  listening_drill_title?: string;
+  listening_drill_content?: string;
+  sentence_drill_word?: string;
 }
 
 function CreateDrillPageContent() {
@@ -154,6 +158,8 @@ function CreateDrillPageContent() {
       sentence_writing_items: [{ word: "", hint: "" }],
       article_content: "",
       article_title: "",
+      listening_drill_title: "",
+      listening_drill_content: "",
     };
   });
 
@@ -218,6 +224,9 @@ function CreateDrillPageContent() {
             ],
             article_content: drill.article_content || "",
             article_title: drill.article_title || "",
+            listening_drill_title: drill.listening_drill_title || "",
+            listening_drill_content: drill.listening_drill_content || "",
+            sentence_drill_word: drill.sentence_drill_word || "",
           });
     }
   }, [isEditMode, drillData, existingDrill]);
@@ -329,6 +338,19 @@ function CreateDrillPageContent() {
           updatedFormData.article_title = title;
         }
         break;
+      case 'listening':
+        if (items.length > 0 && items[0].content) {
+          updatedFormData.listening_drill_content = items[0].content;
+        }
+        if (title) {
+          updatedFormData.listening_drill_title = title;
+        }
+        break;
+      case 'sentence':
+        if (items.length > 0 && items[0].word) {
+          updatedFormData.sentence_drill_word = items[0].word;
+        }
+        break;
     }
 
     setFormData(updatedFormData);
@@ -357,6 +379,8 @@ function CreateDrillPageContent() {
         delete submitData.sentence_writing_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
         if (submitData.ai_character_name) {
           delete submitData.ai_character_name;
         }
@@ -371,6 +395,8 @@ function CreateDrillPageContent() {
         delete submitData.sentence_writing_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       } else if (formData.type === "definition") {
         delete submitData.target_sentences;
         delete submitData.roleplay_dialogue;
@@ -382,6 +408,8 @@ function CreateDrillPageContent() {
         delete submitData.sentence_writing_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       } else if (formData.type === "summary") {
         delete submitData.target_sentences;
         delete submitData.roleplay_dialogue;
@@ -392,6 +420,8 @@ function CreateDrillPageContent() {
         delete submitData.definition_items;
         delete submitData.grammar_items;
         delete submitData.sentence_writing_items;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       } else if (formData.type === "grammar") {
         delete submitData.target_sentences;
         delete submitData.roleplay_dialogue;
@@ -403,6 +433,8 @@ function CreateDrillPageContent() {
         delete submitData.sentence_writing_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       } else if (formData.type === "sentence_writing") {
         delete submitData.target_sentences;
         delete submitData.roleplay_dialogue;
@@ -414,6 +446,8 @@ function CreateDrillPageContent() {
         delete submitData.grammar_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       } else {
         // vocabulary
         delete submitData.roleplay_dialogue;
@@ -426,6 +460,8 @@ function CreateDrillPageContent() {
         delete submitData.sentence_writing_items;
         delete submitData.article_content;
         delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
       }
 
       // Convert date to ISO string
@@ -468,6 +504,8 @@ function CreateDrillPageContent() {
   const isSummary = formData.type === "summary";
   const isGrammar = formData.type === "grammar";
   const isSentenceWriting = formData.type === "sentence_writing";
+  const isSentence = formData.type === "sentence";
+  const isListening = formData.type === "listening";
   const isVocabulary = formData.type === "vocabulary";
 
   return (
@@ -665,6 +703,8 @@ function CreateDrillPageContent() {
                     <option value="summary">Summary</option>
                     <option value="grammar">Grammar</option>
                     <option value="sentence_writing">Sentence Writing</option>
+                    <option value="sentence">Sentence (Review)</option>
+                    <option value="listening">Listening</option>
                   </Select>
                 </div>
 
@@ -1570,6 +1610,42 @@ function CreateDrillPageContent() {
                   <p className="text-sm text-gray-500 mt-2">
                     Copy and paste the news article text for students to read and
                     summarize.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {isListening && (
+            <Card className="p-6 mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Listening Content *
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="listening_drill_title">Content Title *</Label>
+                  <Input
+                    id="listening_drill_title"
+                    value={formData.listening_drill_title || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, listening_drill_title: e.target.value })
+                    }
+                    placeholder="e.g., Daily News Update"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="listening_drill_content">Content *</Label>
+                  <RichTextEditor
+                    value={formData.listening_drill_content || ""}
+                    onChange={(value) =>
+                      setFormData({ ...formData, listening_drill_content: value })
+                    }
+                    placeholder="Enter or paste content here. Markdown formatting is supported and will be auto-formatted on paste..."
+                    rows={15}
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    Students will listen to this content using text-to-speech. You can use markdown formatting (headers, bold, lists, etc.).
                   </p>
                 </div>
               </div>

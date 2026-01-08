@@ -14,6 +14,7 @@ import {
   Target,
   BookOpen,
   X,
+  FileCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useAllDrills } from "@/hooks/useAdmin";
@@ -79,6 +80,8 @@ const AdminDrillPage: React.FC = () => {
       summary: "📝",
       grammar: "✏️",
       sentence_writing: "✍️",
+      sentence: "✍️",
+      listening: "🎧",
     };
     return icons[type] || "📚";
   };
@@ -123,6 +126,14 @@ const AdminDrillPage: React.FC = () => {
             Manage all drills, assign to students, edit, and delete
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/drills/sentence-reviews"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-sm"
+          >
+            <FileCheck className="w-4 h-4" />
+            Review Sentences
+          </Link>
         <Link
           href="/admin/drills/create"
           className="flex items-center gap-2 px-5 py-2.5 bg-[#418b43] text-white font-medium rounded-xl hover:bg-[#3a7c3b] transition-all shadow-sm"
@@ -130,6 +141,7 @@ const AdminDrillPage: React.FC = () => {
           <Plus className="w-4 h-4" />
           Create New Drill
         </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -161,6 +173,8 @@ const AdminDrillPage: React.FC = () => {
             <option value="summary">Summary</option>
             <option value="grammar">Grammar</option>
             <option value="sentence_writing">Sentence Writing</option>
+            <option value="sentence">Sentence</option>
+            <option value="listening">Listening</option>
           </select>
 
           {/* Difficulty Filter */}

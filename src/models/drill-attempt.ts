@@ -77,11 +77,33 @@ export interface IDrillAttempt extends Document {
 		}>;
 	};
 
+	sentenceResults?: {
+		word: string; // Target word
+		definition: string; // User's definition (not reviewed)
+		sentences: Array<{
+			text: string; // User's sentence
+			index: number; // 0 or 1
+		}>;
+		reviewStatus: 'pending' | 'reviewed';
+		sentenceReviews?: Array<{
+			sentenceIndex: number; // 0 or 1
+			isCorrect: boolean;
+			correctedText?: string; // Only if isCorrect is false
+			reviewedAt?: Date;
+			reviewedBy?: Types.ObjectId; // Tutor/admin who reviewed
+		}>;
+	};
+
 	summaryResults?: {
 		summaryProvided: boolean;
 		score?: number;
 		wordCount?: number;
 		qualityScore?: number;
+	};
+
+	listeningResults?: {
+		completed: boolean;
+		timeSpent: number;
 	};
 
 	// Metadata
@@ -203,11 +225,42 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 				},
 			],
 		},
+		sentenceResults: {
+			word: String,
+			definition: String,
+			sentences: [
+				{
+					text: String,
+					index: Number,
+				},
+			],
+			reviewStatus: {
+				type: String,
+				enum: ['pending', 'reviewed'],
+				default: 'pending',
+			},
+			sentenceReviews: [
+				{
+					sentenceIndex: Number,
+					isCorrect: Boolean,
+					correctedText: String,
+					reviewedAt: Date,
+					reviewedBy: {
+						type: Schema.Types.ObjectId,
+						ref: 'User',
+					},
+				},
+			],
+		},
 		summaryResults: {
 			summaryProvided: Boolean,
 			score: Number,
 			wordCount: Number,
 			qualityScore: Number,
+		},
+		listeningResults: {
+			completed: Boolean,
+			timeSpent: Number,
 		},
 		deviceInfo: {
 			type: String,

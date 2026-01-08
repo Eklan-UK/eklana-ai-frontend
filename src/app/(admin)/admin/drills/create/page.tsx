@@ -20,6 +20,7 @@ import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
 import { ParsedContent } from "@/services/document-parser.service";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 
 interface Sentence {
   english: string;
@@ -114,6 +115,10 @@ const DrillBuilder: React.FC = () => {
   // Summary
   const [articleTitle, setArticleTitle] = useState("");
   const [articleContent, setArticleContent] = useState("");
+
+  // Listening
+  const [listeningTitle, setListeningTitle] = useState("");
+  const [listeningContent, setListeningContent] = useState("");
 
   // Common fields
   const [drillTitle, setDrillTitle] = useState("");
@@ -281,6 +286,9 @@ const DrillBuilder: React.FC = () => {
       } else if (drill.type === "summary") {
         setArticleTitle(drill.article_title || "");
         setArticleContent(drill.article_content || "");
+      } else if (drill.type === "listening") {
+        setListeningTitle(drill.listening_drill_title || "");
+        setListeningContent(drill.listening_drill_content || "");
       }
     }
   }, [isEditMode, drillData, users]);
@@ -578,6 +586,14 @@ const DrillBuilder: React.FC = () => {
           setArticleTitle(title);
         }
         break;
+      case "listening":
+        if (items.length > 0 && items[0].content) {
+          setListeningContent(items[0].content);
+        }
+        if (title) {
+          setListeningTitle(title);
+        }
+        break;
     }
 
     setShowPreview(false);
@@ -667,6 +683,11 @@ const DrillBuilder: React.FC = () => {
         toast.error("Please provide both article title and content");
         return;
       }
+    } else if (drillType === "listening") {
+      if (!listeningTitle.trim() || !listeningContent.trim()) {
+        toast.error("Please provide both listening title and content");
+        return;
+      }
     }
 
     if (selectedUsers.size === 0) {
@@ -754,6 +775,9 @@ const DrillBuilder: React.FC = () => {
       } else if (drillType === "summary") {
         drillData.article_title = articleTitle.trim();
         drillData.article_content = articleContent.trim();
+      } else if (drillType === "listening") {
+        drillData.listening_drill_title = listeningTitle.trim();
+        drillData.listening_drill_content = listeningContent.trim();
       }
 
       // If editing, use update API
@@ -1519,6 +1543,46 @@ const DrillBuilder: React.FC = () => {
               </div>
             </div>
           )}
+
+          {drillType === "listening" && (
+            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900 mb-6">
+                Listening Content<span className="text-red-500">*</span>
+              </h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Add content that students will listen to using text-to-speech (ElevenLabs).
+                Markdown formatting is supported for better readability.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                    Content Title<span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={listeningTitle}
+                    onChange={(e) => setListeningTitle(e.target.value)}
+                    placeholder="e.g. Daily News Update, Story Time, etc."
+                    className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                    Content<span className="text-red-500">*</span>
+                  </label>
+                  <RichTextEditor
+                    value={listeningContent}
+                    onChange={setListeningContent}
+                    placeholder="Enter or paste content here. Markdown formatting is supported and will be auto-formatted on paste..."
+                    rows={15}
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    Students will be able to read along while listening to the content via text-to-speech.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-8">
@@ -1590,6 +1654,7 @@ const DrillBuilder: React.FC = () => {
                       <option value="grammar">Grammar</option>
                       <option value="sentence_writing">Sentence Writing</option>
                       <option value="summary">Summary</option>
+                      <option value="listening">Listening</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>

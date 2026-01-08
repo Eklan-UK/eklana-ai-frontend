@@ -127,3 +127,33 @@ export function useDrillAssignments(drillId: string) {
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
+
+// Get learner by ID
+export function useLearnerById(learnerId: string) {
+  return useQuery({
+    queryKey: ["learners", "detail", learnerId],
+    queryFn: async () => {
+      const response = await adminService.getLearnerById(learnerId);
+      return response.user;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+// Get drills assigned to a specific learner
+export function useLearnerDrills(learnerId: string, learnerEmail?: string) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "drills"],
+    queryFn: async () => {
+      if (!learnerEmail) return [];
+      const response = await drillAPI.getAll({
+        studentEmail: learnerEmail,
+        limit: 100,
+      });
+      return response.drills || [];
+    },
+    enabled: !!learnerId && !!learnerEmail,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}

@@ -32,8 +32,8 @@ interface AuthState {
   signInWithApple: () => Promise<void>;
 }
 
-// Session check throttle: only check once per 5 minutes unless forced
-const SESSION_CHECK_THROTTLE = 5 * 60 * 1000; // 5 minutes
+// Session check throttle: only check once per 30 minutes unless forced
+const SESSION_CHECK_THROTTLE = 30 * 60 * 1000; // 30 minutes
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -203,20 +203,18 @@ export const useAuthStore = create<AuthState>()(
                   isAuthenticated: true,
                   lastSessionCheck: Date.now(),
                 });
-              } else if (sessionResult?.data === null) {
-                // Server says no valid session - clear local state
-                set({
-                  session: null,
-                  user: null,
-                  isAuthenticated: false,
-                  lastSessionCheck: null,
-                });
+              } else if (sessionResult?.error) {
+                // Network error or server error - keep cached session
+                console.warn("Background session check error:", sessionResult.error);
+                // Don't clear session on errors - user might be offline
               }
-              // On network error, keep cached session
+              // sessionResult.data === null means explicit logout/invalid session
+              // But only clear if we explicitly got a "session not found" response
+              // NOT on network errors
             })
             .catch((error) => {
-              console.error("Background session check failed:", error);
-              // Keep cached session on network error
+              console.warn("Background session check failed:", error);
+              // Keep cached session on network error - user might be offline
             });
 
           return;
@@ -236,8 +234,26 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               lastSessionCheck: Date.now(),
             });
+          } else if (sessionResult?.error) {
+            // API returned an error (network issue, server error, etc.)
+            console.warn("Session check returned error:", sessionResult.error);
+            
+            // On API error, preserve cached session if available
+            const currentState = get();
+            if (currentState.user && currentState.session) {
+              set({ isLoading: false });
+            } else {
+              // No cached session and error - user needs to login
+              set({
+                session: null,
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+                lastSessionCheck: null,
+              });
+            }
           } else {
-            // No valid session
+            // Explicit null/no session response (user is logged out)
             set({
               session: null,
               user: null,
@@ -247,13 +263,15 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error) {
-          console.error("Session check failed:", error);
+          console.warn("Session check failed with exception:", error);
 
-          // On network error, keep cached session if available
+          // On network error (catch block), preserve cached session
           const currentState = get();
           if (currentState.user && currentState.session) {
+            // Keep using cached session - user might be offline
             set({ isLoading: false });
           } else {
+            // No cached session available
             set({
               session: null,
               user: null,

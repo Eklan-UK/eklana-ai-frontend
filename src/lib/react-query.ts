@@ -51,6 +51,27 @@ export const queryKeys = {
         [...queryKeys.students.tutor.all(), "list", filters] as const,
     },
   },
+  learners: {
+    all: ["learners"] as const,
+    detail: (id: string) => [...queryKeys.learners.all, "detail", id] as const,
+    drills: (id: string) => [...queryKeys.learners.all, id, "drills"] as const,
+  },
+  pronunciations: {
+    all: ["pronunciations"] as const,
+    lists: () => [...queryKeys.pronunciations.all, "list"] as const,
+    list: (filters?: Record<string, any>) =>
+      [...queryKeys.pronunciations.lists(), filters] as const,
+    detail: (id: string) => [...queryKeys.pronunciations.all, "detail", id] as const,
+    learner: {
+      all: () => [...queryKeys.pronunciations.all, "learner"] as const,
+      list: (filters?: Record<string, any>) =>
+        [...queryKeys.pronunciations.learner.all(), "list", filters] as const,
+      detail: (id: string) =>
+        [...queryKeys.pronunciations.learner.all(), "detail", id] as const,
+    },
+    attempts: (pronunciationId: string) =>
+      [...queryKeys.pronunciations.all, pronunciationId, "attempts"] as const,
+  },
   activities: {
     all: ["activities"] as const,
     recent: (filters?: Record<string, any>) =>

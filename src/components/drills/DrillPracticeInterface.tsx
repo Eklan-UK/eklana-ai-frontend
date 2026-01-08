@@ -10,7 +10,8 @@ import MatchingDrill from "./MatchingDrill";
 import DefinitionDrill from "./DefinitionDrill";
 import SummaryDrill from "./SummaryDrill";
 import GrammarDrill from "./GrammarDrill";
-import SentenceWritingDrill from "./SentenceWritingDrill";
+import SentenceDrill from "./SentenceDrill";
+import ListeningDrill from "./ListeningDrill";
 import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
 
@@ -19,9 +20,14 @@ interface DrillPracticeInterfaceProps {
   assignmentId?: string;
 }
 
-export default function DrillPracticeInterface({ drill, assignmentId: propAssignmentId }: DrillPracticeInterfaceProps) {
+export default function DrillPracticeInterface({
+  drill,
+  assignmentId: propAssignmentId,
+}: DrillPracticeInterfaceProps) {
   const router = useRouter();
-  const [assignmentId, setAssignmentId] = useState<string | null>(propAssignmentId || null);
+  const [assignmentId, setAssignmentId] = useState<string | null>(
+    propAssignmentId || null
+  );
   const [assignment, setAssignment] = useState<any>(null);
 
   // Fetch assignment ID and track recent activity
@@ -49,14 +55,14 @@ export default function DrillPracticeInterface({ drill, assignmentId: propAssign
 
         // Track recent activity (viewed)
         try {
-          await fetch('/api/v1/activities/recent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
+          await fetch("/api/v1/activities/recent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({
-              type: 'drill',
+              type: "drill",
               resourceId: drill._id,
-              action: 'viewed',
+              action: "viewed",
               metadata: {
                 title: drill.title,
                 type: drill.type,
@@ -66,10 +72,10 @@ export default function DrillPracticeInterface({ drill, assignmentId: propAssign
           });
         } catch (error) {
           // Silently fail
-          console.error('Failed to track activity:', error);
+          console.error("Failed to track activity:", error);
         }
       } catch (error) {
-        console.error('Failed to fetch assignment:', error);
+        console.error("Failed to fetch assignment:", error);
       }
     };
 
@@ -79,22 +85,25 @@ export default function DrillPracticeInterface({ drill, assignmentId: propAssign
   // Render the appropriate drill interface based on type
   const renderDrill = () => {
     const commonProps = { drill, assignmentId: assignmentId || undefined };
-    
+
     switch (drill.type) {
-      case 'vocabulary':
+      case "vocabulary":
         return <VocabularyDrill {...commonProps} />;
-      case 'roleplay':
+      case "roleplay":
         return <RoleplayDrill {...commonProps} />;
-      case 'matching':
+      case "matching":
         return <MatchingDrill {...commonProps} />;
-      case 'definition':
+      case "definition":
         return <DefinitionDrill {...commonProps} />;
-      case 'summary':
+      case "summary":
         return <SummaryDrill {...commonProps} />;
-      case 'grammar':
+      case "grammar":
         return <GrammarDrill {...commonProps} />;
-      case 'sentence_writing':
-        return <SentenceWritingDrill {...commonProps} />;
+      case "sentence_writing":
+      case "sentence":
+        return <SentenceDrill {...commonProps} />;
+      case "listening":
+        return <ListeningDrill {...commonProps} />;
       default:
         return (
           <div className="min-h-screen bg-white pb-20 md:pb-0">
@@ -102,7 +111,9 @@ export default function DrillPracticeInterface({ drill, assignmentId: propAssign
             <Header title="Unknown Drill Type" />
             <div className="max-w-md mx-auto px-4 py-6">
               <Card>
-                <p className="text-gray-600">This drill type is not yet supported.</p>
+                <p className="text-gray-600">
+                  This drill type is not yet supported.
+                </p>
               </Card>
             </div>
             <BottomNav />
@@ -113,5 +124,3 @@ export default function DrillPracticeInterface({ drill, assignmentId: propAssign
 
   return renderDrill();
 }
-
-

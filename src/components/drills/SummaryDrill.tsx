@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, Loader2, FileText, BookOpen } from "lucide-react";
-import Link from "next/link";
+import { Loader2, FileText, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
+import { DrillCompletionScreen, DrillLayout } from "./shared";
 
 interface SummaryDrillProps {
   drill: any;
@@ -92,31 +90,15 @@ export default function SummaryDrill({ drill, assignmentId }: SummaryDrillProps)
   };
 
   if (isCompleted) {
-    return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
-        <div className="h-6"></div>
-        <Header title="Drill Completed" />
-        <div className="max-w-md mx-auto px-4 py-6">
-          <Card className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
-            <p className="text-gray-600 mb-6">You've completed the summary drill.</p>
-            <Link href="/account">
-              <Button variant="primary" size="lg" fullWidth>Continue Learning</Button>
-            </Link>
-          </Card>
-        </div>
-        <BottomNav />
-      </div>
-    );
+    return <DrillCompletionScreen drillType="summary" />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 pb-20 md:pb-0">
-      <div className="h-6"></div>
-      <Header title={drill.title} />
-      
-      <div className="max-w-3xl mx-auto px-4 py-6">
+    <DrillLayout
+      title={drill.title}
+      backgroundGradient="bg-gradient-to-br from-green-50 to-emerald-50"
+      maxWidth="3xl"
+    >
         {/* Instructions */}
         <Card className="mb-6 bg-green-50 border-green-200">
           <div className="flex items-start gap-3">
@@ -200,9 +182,6 @@ export default function SummaryDrill({ drill, assignmentId }: SummaryDrillProps)
             "Submit Summary"
           )}
         </Button>
-      </div>
-      
-      <BottomNav />
-    </div>
+    </DrillLayout>
   );
 }

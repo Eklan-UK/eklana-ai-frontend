@@ -46,6 +46,32 @@ export function useLearnerPronunciations(filters?: {
   });
 }
 
+// Get single pronunciation for learner (by ID)
+export function useLearnerPronunciationById(pronunciationId: string) {
+  return useQuery({
+    queryKey: ["pronunciations", "learner", "detail", pronunciationId],
+    queryFn: async () => {
+      // Fetch all learner pronunciations and find the one by ID
+      const response = await pronunciationAPI.getLearnerPronunciations();
+      const pronunciations = response.data?.pronunciations || [];
+      const found = pronunciations.find(
+        (p: any) =>
+          p.pronunciation?._id === pronunciationId ||
+          p.pronunciation?._id?.toString() === pronunciationId
+      );
+      if (!found) {
+        throw new Error("Pronunciation not found");
+      }
+      return {
+        pronunciation: found.pronunciation,
+        assignment: found,
+      };
+    },
+    enabled: !!pronunciationId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
 // Create pronunciation mutation
 export function useCreatePronunciation() {
   const queryClient = useQueryClient();

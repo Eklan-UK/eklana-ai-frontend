@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,7 +16,7 @@ import {
 import Link from "next/link";
 import { apiRequest } from "@/lib/api";
 import { formatDate, getDrillTypeInfo } from "@/utils/drill";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 interface DrillAttempt {
   _id: string;
@@ -85,6 +85,26 @@ interface DrillAttempt {
     wordCount?: number;
     qualityScore?: number;
   };
+  sentenceResults?: {
+    word: string;
+    definition: string;
+    sentences: Array<{
+      text: string;
+      index: number;
+    }>;
+    reviewStatus: 'pending' | 'reviewed';
+    sentenceReviews?: Array<{
+      sentenceIndex: number;
+      isCorrect: boolean;
+      correctedText?: string;
+      reviewedAt?: string;
+      reviewedBy?: any;
+    }>;
+  };
+  listeningResults?: {
+    completed: boolean;
+    timeSpent: number;
+  };
 }
 
 interface DrillAssignment {
@@ -107,21 +127,17 @@ export default function DrillCompletedPage() {
   const drillId = params.id as string;
   const assignmentId = searchParams.get("assignmentId");
 
-  const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState<DrillAttempt | null>(null);
-  const [assignment, setAssignment] = useState<DrillAssignment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
+  // React Query hook to fetch drill attempt data
+  const {
+    data: attemptData,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["drills", "assignments", assignmentId, "attempts"],
+    queryFn: async () => {
     if (!assignmentId) {
-      setError("Assignment ID is required");
-      setLoading(false);
-      return;
+        throw new Error("Assignment ID is required");
     }
-
-    const fetchAttempt = async () => {
-      try {
-        setLoading(true);
         const response = await apiRequest<{
           code: string;
           message: string;
@@ -136,22 +152,17 @@ export default function DrillCompletedPage() {
         });
 
         if (response.code === "Success" && response.data) {
-          setAssignment(response.data.assignment);
-          setAttempt(response.data.latestAttempt);
-        } else {
-          setError("Failed to load submission");
-        }
-      } catch (err: any) {
-        console.error("Error fetching drill attempt:", err);
-        setError(err.message || "Failed to load submission");
-        toast.error("Failed to load submission");
-      } finally {
-        setLoading(false);
+        return response.data;
       }
-    };
+      throw new Error("Failed to load submission");
+    },
+    enabled: !!assignmentId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-    fetchAttempt();
-  }, [assignmentId]);
+  const assignment = attemptData?.assignment || null;
+  const attempt = attemptData?.latestAttempt || null;
+  const error = queryError?.message || (!assignmentId ? "Assignment ID is required" : null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -401,6 +412,7 @@ export default function DrillCompletedPage() {
         break;
 
       case "sentence_writing":
+        // Legacy format - old sentence_writing drills with sentenceWritingResults
         if (attempt.sentenceWritingResults) {
           return (
             <div className="space-y-4">
@@ -425,6 +437,84 @@ export default function DrillCompletedPage() {
                     <p className="text-sm text-gray-500">Accuracy</p>
                   </div>
                 </div>
+              </Card>
+            </div>
+          );
+        }
+        // New format uses sentenceResults - fall through to sentence case
+        // eslint-disable-next-line no-fallthrough
+
+      case "sentence":
+        if (attempt.sentenceResults) {
+          const { word, definition, sentences, reviewStatus, sentenceReviews } = attempt.sentenceResults;
+          const isReviewed = reviewStatus === 'reviewed' && sentenceReviews && sentenceReviews.length === 2;
+          
+          return (
+            <div className="space-y-4">
+              {/* Word and Definition */}
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Target Word</h3>
+                <div className="mb-4">
+                  <p className="text-2xl font-bold text-gray-900 mb-2">{word}</p>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">Your Definition:</p>
+                    <p className="text-gray-900">{definition}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Sentences */}
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Sentences</h3>
+                <div className="space-y-4">
+                  {sentences.map((sentence, idx) => {
+                    const review = isReviewed 
+                      ? sentenceReviews.find((r: any) => r.sentenceIndex === sentence.index)
+                      : null;
+                    const isCorrect = review?.isCorrect ?? false;
+                    
+                    return (
+                      <div key={idx} className="border-b border-gray-200 pb-4 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
+                            {sentence.index + 1}
+                          </span>
+                          <h4 className="font-semibold text-gray-900">Sentence {sentence.index + 1}</h4>
+                          {isReviewed && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              isCorrect 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {isCorrect ? 'Correct' : 'Needs Correction'}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="bg-gray-50 p-4 rounded-lg mb-2">
+                          <p className="text-sm text-gray-600 mb-1">Your Sentence:</p>
+                          <p className="text-gray-900">{sentence.text}</p>
+                        </div>
+
+                        {isReviewed && !isCorrect && review?.correctedText && (
+                          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                            <p className="text-sm text-green-700 mb-1 font-semibold">Corrected Version:</p>
+                            <p className="text-green-900">{review.correctedText}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {!isReviewed && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <AlertCircle className="w-4 h-4 inline mr-2" />
+                      Your submission is pending review. You'll be notified when it's been reviewed.
+                    </p>
+                  </div>
+                )}
               </Card>
             </div>
           );
@@ -461,6 +551,26 @@ export default function DrillCompletedPage() {
                       <p className="text-sm text-gray-500">Quality Score</p>
                     </div>
                   )}
+                </div>
+              </Card>
+            </div>
+          );
+        }
+        break;
+
+      case "listening":
+        if (attempt.listeningResults) {
+          return (
+            <div className="space-y-4">
+              <Card className="p-6">
+                <div className="text-center">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Listening Completed
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    You successfully completed the listening drill.
+                  </p>
                 </div>
               </Card>
             </div>

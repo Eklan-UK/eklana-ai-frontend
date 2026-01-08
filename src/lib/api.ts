@@ -143,6 +143,8 @@ export const drillAPI = {
     grammarResults?: any;
     sentenceWritingResults?: any;
     summaryResults?: any;
+    listeningResults?: any;
+    sentenceResults?: any;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';
   }) => {

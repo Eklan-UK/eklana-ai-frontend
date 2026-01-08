@@ -5,6 +5,8 @@ interface CardProps {
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -12,6 +14,8 @@ export const Card: React.FC<CardProps> = ({
   className = '',
   padding = 'md',
   onClick,
+  onMouseEnter,
+  onMouseLeave,
 }) => {
   const paddingClasses = {
     none: '',
@@ -24,6 +28,8 @@ export const Card: React.FC<CardProps> = ({
     <div 
       className={`bg-white rounded-2xl shadow-sm ${paddingClasses[padding]} ${className} ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {children}
     </div>

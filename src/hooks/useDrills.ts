@@ -121,4 +121,64 @@ export function useCompleteDrill() {
   });
 }
 
+// Prefetch drill data (for use on hover/focus for faster navigation)
+export function usePrefetchDrill() {
+  const queryClient = useQueryClient();
 
+  return (drillId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.drills.detail(drillId),
+      queryFn: async () => {
+        const response = await drillAPI.getById(drillId);
+        return response.drill;
+      },
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+  };
+}
+
+// Prefetch learner drills (for use when navigating to drills page)
+export function usePrefetchLearnerDrills() {
+  const queryClient = useQueryClient();
+
+  return (filters?: { limit?: number }) => {
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.drills.learner.list(filters),
+      queryFn: async () => {
+        const response: any = await drillAPI.getLearnerDrills(filters || { limit: 100 });
+        let drillsData: any[] = [];
+        if (response.data?.drills) {
+          drillsData = response.data.drills;
+        } else if (response.drills) {
+          drillsData = response.drills;
+        } else if (Array.isArray(response)) {
+          drillsData = response;
+        }
+        return drillsData.map((item: any) => {
+          if (item.drill && typeof item.drill === "object") {
+            return item;
+          }
+          if (item._id && item.title) {
+            return {
+              assignmentId: item.assignmentId || item._id,
+              drill: item,
+              assignedBy: item.assignedBy,
+              assignedAt: item.assignedAt || item.created_date,
+              dueDate:
+                item.dueDate ||
+                new Date(
+                  new Date(item.date).getTime() +
+                    (item.duration_days || 1) * 24 * 60 * 60 * 1000
+                ).toISOString(),
+              status: item.status || "pending",
+              completedAt: item.completedAt,
+              latestAttempt: item.latestAttempt,
+            };
+          }
+          return item;
+        });
+      },
+      staleTime: 1000 * 60 * 2, // 2 minutes
+    });
+  };
+}

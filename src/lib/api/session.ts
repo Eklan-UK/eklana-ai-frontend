@@ -1,8 +1,8 @@
 // Server-side session utilities for Next.js server components
-import { cookies } from 'next/headers';
-import { getAuth } from './better-auth';
-import { fromNodeHeaders } from 'better-auth/node';
-import { headers } from 'next/headers';
+import { cookies } from "next/headers";
+import { getAuth } from "./better-auth";
+import { fromNodeHeaders } from "better-auth/node";
+import { headers } from "next/headers";
 
 export interface SessionUser {
   id: string;
@@ -10,7 +10,7 @@ export interface SessionUser {
   name?: string;
   firstName?: string;
   lastName?: string;
-  role?: 'admin' | 'learner' | 'tutor';
+  role?: "admin" | "learner" | "tutor";
   emailVerified?: boolean;
   isEmailVerified?: boolean;
   avatar?: string;
@@ -52,43 +52,29 @@ export async function getServerSession(): Promise<ServerSession> {
       return { user: null, session: null };
     }
 
-    // Ensure role is set - update in database if missing
-    let userRole = (session.user.role as 'admin' | 'learner' | 'tutor') || 'learner';
-    if (!session.user.role) {
-      // Update user in database to set default role
-      try {
-        const User = (await import('@/models/user')).default;
-        const { connectToDatabase } = await import('./db');
-        await connectToDatabase();
-        
-        await User.updateOne(
-          { _id: session.user.id },
-          { $set: { role: 'learner' } },
-          { upsert: false }
-        );
-      } catch (error) {
-        console.error('Error updating user role:', error);
-        // Continue with default role
-      }
-    }
+    // Default role if not set (don't update DB here - that's too expensive per request)
+    // Role should be set during user creation or via a migration
+    const userRole =
+      (session.user.role as "admin" | "learner" | "tutor") || "learner";
 
     return {
       user: {
         id: session.user.id,
-        email: session.user.email || '',
+        email: session.user.email || "",
         name: session.user.name,
         firstName: session.user.firstName,
         lastName: session.user.lastName,
         role: userRole,
         emailVerified: session.user.emailVerified,
-        isEmailVerified: session.user.isEmailVerified || session.user.emailVerified,
+        isEmailVerified:
+          session.user.isEmailVerified || session.user.emailVerified,
         avatar: session.user.avatar || session.user.image,
         image: session.user.image || session.user.avatar,
       },
       session,
     };
   } catch (error) {
-    console.error('Error getting server session:', error);
+    console.error("Error getting server session:", error);
     return { user: null, session: null };
   }
 }
@@ -96,7 +82,9 @@ export async function getServerSession(): Promise<ServerSession> {
 /**
  * Get session from request headers (for use in middleware or API routes)
  */
-export async function getSessionFromHeaders(headers: Headers): Promise<ServerSession> {
+export async function getSessionFromHeaders(
+  headers: Headers
+): Promise<ServerSession> {
   try {
     const auth = await getAuth();
     if (!auth) {
@@ -121,20 +109,21 @@ export async function getSessionFromHeaders(headers: Headers): Promise<ServerSes
     return {
       user: {
         id: session.user.id,
-        email: session.user.email || '',
+        email: session.user.email || "",
         name: session.user.name,
         firstName: session.user.firstName,
         lastName: session.user.lastName,
-        role: (session.user.role as 'admin' | 'learner' | 'tutor') || 'learner',
+        role: (session.user.role as "admin" | "learner" | "tutor") || "learner",
         emailVerified: session.user.emailVerified,
-        isEmailVerified: session.user.isEmailVerified || session.user.emailVerified,
+        isEmailVerified:
+          session.user.isEmailVerified || session.user.emailVerified,
         avatar: session.user.avatar || session.user.image,
         image: session.user.image || session.user.avatar,
       },
       session,
     };
   } catch (error) {
-    console.error('Error getting session from headers:', error);
+    console.error("Error getting session from headers:", error);
     return { user: null, session: null };
   }
 }
@@ -145,27 +134,27 @@ export async function getSessionFromHeaders(headers: Headers): Promise<ServerSes
  */
 export async function requireServerAuth(): Promise<SessionUser> {
   const { user } = await getServerSession();
-  
+
   if (!user) {
     // In server components, we can't redirect directly
     // Return a special error that can be handled by the component
-    throw new Error('UNAUTHORIZED');
+    throw new Error("UNAUTHORIZED");
   }
-  
+
   return user;
 }
 
 /**
  * Require specific role in server components
  */
-export async function requireServerRole(allowedRoles: ('admin' | 'learner' | 'tutor')[]): Promise<SessionUser> {
+export async function requireServerRole(
+  allowedRoles: ("admin" | "learner" | "tutor")[]
+): Promise<SessionUser> {
   const user = await requireServerAuth();
-  
-  if (!allowedRoles.includes(user.role || 'learner')) {
-    throw new Error('FORBIDDEN');
+
+  if (!allowedRoles.includes(user.role || "learner")) {
+    throw new Error("FORBIDDEN");
   }
-  
+
   return user;
 }
-
-

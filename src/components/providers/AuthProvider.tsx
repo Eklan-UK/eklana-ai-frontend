@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/auth-store";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
@@ -13,6 +13,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { checkSession, isLoading, isAuthenticated, hasHydrated } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
+
+  // Handle coming back online - revalidate session
+  const handleOnline = useCallback(() => {
+    const state = useAuthStore.getState();
+    // If user has cached session, verify it's still valid when back online
+    if (state.user && state.session && state.isAuthenticated) {
+      // Don't force refresh - just do a background check
+      checkSession(false);
+    }
+  }, [checkSession]);
+
+  // Handle visibility change - refresh session when tab becomes visible after being hidden
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === 'visible') {
+      const state = useAuthStore.getState();
+      const timeSinceLastCheck = state.lastSessionCheck 
+        ? Date.now() - state.lastSessionCheck 
+        : Infinity;
+      
+      // Only check if it's been more than 30 minutes
+      if (timeSinceLastCheck > 30 * 60 * 1000 && state.isAuthenticated) {
+        checkSession(false);
+      }
+    }
+  }, [checkSession]);
+
+  useEffect(() => {
+    // Add online/offline listeners for better network resilience
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [handleOnline, handleVisibilityChange]);
 
   useEffect(() => {
     // Only check session on mount, not on every route change
@@ -40,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const shouldCheck = !currentState.user || 
                            !currentState.session || 
                            !currentState.lastSessionCheck ||
-                           (Date.now() - currentState.lastSessionCheck) > 5 * 60 * 1000; // 5 minutes
+                           (Date.now() - currentState.lastSessionCheck) > 30 * 60 * 1000; // 30 minutes
         
         if (shouldCheck) {
           await checkSession();

@@ -1,10 +1,11 @@
 /**
  * Reusable Drill Card Component
  * DRY: Eliminates duplicate drill card rendering logic
+ * Optimized: Memoized to prevent unnecessary re-renders
  */
 "use client";
 
-import React from "react";
+import React, { memo, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ import {
   getDrillStatus,
 } from "@/utils/drill";
 import { getStatusBadge } from "@/utils/drill-ui";
+import { usePrefetchDrill } from "@/hooks/useDrills";
 
 export interface DrillCardProps {
   drill: any;
@@ -39,7 +41,7 @@ export interface DrillCardProps {
   className?: string;
 }
 
-export function DrillCard({
+function DrillCardComponent({
   drill,
   assignmentId,
   assignedBy,
@@ -52,40 +54,56 @@ export function DrillCard({
   onStartClick,
   className = "",
 }: DrillCardProps) {
-  const typeInfo = getDrillTypeInfo(drill.type);
-  const drillStatus = getDrillStatus({
-    drill,
-    dueDate,
-    completedAt,
-    assignmentStatus: status,
-  });
+  // Memoize computed values to prevent recalculation on every render
+  const typeInfo = useMemo(() => getDrillTypeInfo(drill.type), [drill.type]);
+  
+  const drillStatus = useMemo(
+    () => getDrillStatus({ drill, dueDate, completedAt, assignmentStatus: status }),
+    [drill, dueDate, completedAt, status]
+  );
 
   // Calculate due date (drill.date is now the completion/due date)
-  const calculatedDueDate = dueDate ? new Date(dueDate) : new Date(drill.date);
+  const calculatedDueDate = useMemo(
+    () => (dueDate ? new Date(dueDate) : new Date(drill.date)),
+    [dueDate, drill.date]
+  );
 
   const isOverdue = drillStatus === "missed";
   const isUpcoming = drillStatus === "upcoming";
   const isCompleted = drillStatus === "completed";
 
   // Determine drill URL based on status
-  const drillUrl =
+  const drillUrl = useMemo(
+    () =>
     isCompleted && assignmentId
       ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
       : assignmentId
       ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
-      : `/account/drills/${drill._id}`;
+        : `/account/drills/${drill._id}`,
+    [isCompleted, assignmentId, drill._id]
+  );
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
     if (onStartClick && !isUpcoming && !isCompleted) {
       e.preventDefault();
       onStartClick(drill._id, assignmentId);
     }
-    // If no onStartClick handler, Link will handle navigation
-  };
+    },
+    [onStartClick, isUpcoming, isCompleted, drill._id, assignmentId]
+  );
+
+  // Prefetch drill data on hover for faster navigation
+  const prefetchDrill = usePrefetchDrill();
+  const handleMouseEnter = useCallback(() => {
+    if (drill._id) {
+      prefetchDrill(drill._id);
+    }
+  }, [drill._id, prefetchDrill]);
 
   if (variant === "compact") {
     return (
-      <Link href={drillUrl} onClick={handleClick}>
+      <Link href={drillUrl} onClick={handleClick} onMouseEnter={handleMouseEnter}>
         <Card
           className={`${typeInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer ${className}`}
         >
@@ -113,6 +131,7 @@ export function DrillCard({
     <Card
       key={assignmentId || drill._id}
       className={`p-4 hover:shadow-md transition-shadow ${className}`}
+      onMouseEnter={handleMouseEnter}
     >
       <div className="flex items-start justify-between mb-3">
         <div
@@ -212,3 +231,6 @@ export function DrillCard({
     </Card>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders in lists
+export const DrillCard = memo(DrillCardComponent);

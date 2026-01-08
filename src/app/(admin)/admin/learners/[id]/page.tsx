@@ -1,61 +1,44 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, Mail, Calendar, BookOpen, TrendingUp, CheckCircle, XCircle, Mic, BarChart3 } from 'lucide-react';
-import { adminService } from '@/services/admin.service';
-import { drillAPI } from '@/lib/api';
+import { useLearnerById, useLearnerDrills } from '@/hooks/useAdmin';
 import { useLearnerPronunciationAnalytics } from '@/hooks/usePronunciations';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 export default function LearnerProfilePage() {
   const params = useParams();
   const router = useRouter();
   const learnerId = params.id as string;
 
-  const [learner, setLearner] = useState<any>(null);
-  const [learnerProfile, setLearnerProfile] = useState<any>(null);
-  const [drills, setDrills] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [drillsLoading, setDrillsLoading] = useState(true);
+  // React Query hooks for learner data
+  const { 
+    data: learner, 
+    isLoading: learnerLoading, 
+    error: learnerError 
+  } = useLearnerById(learnerId);
+
+  // Fetch drills assigned to this learner
+  const {
+    data: drills = [],
+    isLoading: drillsLoading,
+  } = useLearnerDrills(learnerId, learner?.email);
 
   // Get pronunciation analytics
   const { data: pronunciationAnalytics, isLoading: analyticsLoading } = useLearnerPronunciationAnalytics(learnerId);
 
+  const loading = learnerLoading;
+
+  // Handle error
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const learnerResponse = await adminService.getLearnerById(learnerId);
-        setLearner(learnerResponse.user);
-        setLearnerProfile(learnerResponse.user);
-
-        // Fetch drills assigned to this learner
-        setDrillsLoading(true);
-        try {
-          const drillsResponse = await drillAPI.getAll({
-            studentEmail: learnerResponse.user.email,
-            limit: 100,
-          });
-          setDrills(drillsResponse.drills || []);
-        } catch (error) {
-          console.error('Failed to load drills:', error);
-        } finally {
-          setDrillsLoading(false);
-        }
-      } catch (error: any) {
-        toast.error('Failed to load learner: ' + error.message);
+    if (learnerError) {
+      toast.error('Failed to load learner');
         router.push('/admin/Learners');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (learnerId) {
-      fetchData();
     }
-  }, [learnerId, router]);
+  }, [learnerError, router]);
 
   const formatDate = (dateString: string) => {
     try {

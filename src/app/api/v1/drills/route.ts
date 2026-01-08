@@ -55,7 +55,7 @@ const sentenceWritingItemSchema = z.object({
 
 const createDrillSchema = z.object({
 	title: z.string().min(1).max(200),
-	type: z.enum(['vocabulary', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing']),
+	type: z.enum(['vocabulary', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening']),
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
 	duration_days: z.number().int().min(1).optional(),
@@ -74,6 +74,9 @@ const createDrillSchema = z.object({
 	definition_items: z.array(definitionItemSchema).optional(),
 	grammar_items: z.array(grammarItemSchema).optional(),
 	sentence_writing_items: z.array(sentenceWritingItemSchema).optional(),
+	sentence_drill_word: z.string().optional(), // For sentence drill
+	listening_drill_title: z.string().optional(), // For listening drill
+	listening_drill_content: z.string().optional(), // For listening drill
 	article_title: z.string().optional(),
 	article_content: z.string().optional(),
 	is_active: z.boolean().optional(),
@@ -224,6 +227,9 @@ async function postHandler(
 		if (validated.grammar_items !== undefined) drillData.grammar_items = validated.grammar_items;
 		if (validated.sentence_writing_items !== undefined)
 			drillData.sentence_writing_items = validated.sentence_writing_items;
+		if (validated.sentence_drill_word !== undefined) drillData.sentence_drill_word = validated.sentence_drill_word;
+		if (validated.listening_drill_title !== undefined) drillData.listening_drill_title = validated.listening_drill_title;
+		if (validated.listening_drill_content !== undefined) drillData.listening_drill_content = validated.listening_drill_content;
 		if (validated.article_title !== undefined) drillData.article_title = validated.article_title;
 		if (validated.article_content !== undefined) drillData.article_content = validated.article_content;
 

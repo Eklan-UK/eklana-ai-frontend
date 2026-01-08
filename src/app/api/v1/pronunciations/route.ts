@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Pronunciation from '@/models/pronunciation';
-import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { uploadToCloudinary } from '@/services/cloudinary.service';
@@ -114,28 +113,7 @@ async function postHandler(
 			);
 		}
 
-		// Get creator
-		const creator = await User.findById(context.userId).select('email role').lean().exec();
-		if (!creator) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'User not found',
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Only admins can create pronunciations
-		if (creator.role !== 'admin') {
-			return NextResponse.json(
-				{
-					code: 'AuthorizationError',
-					message: 'Only admins can create pronunciations',
-				},
-				{ status: 403 }
-			);
-		}
+		// Role already checked by withRole middleware - no need to verify again
 
 		// Audio file is optional - if not provided, use TTS
 		let audioUrl: string | undefined;

@@ -15,7 +15,7 @@ async function handler(
   try {
     await connectToDatabase();
 
-    let user = await User.findById(context.userId)
+    const user = await User.findById(context.userId)
       .select("-password -__v")
       .lean()
       .exec();
@@ -30,19 +30,12 @@ async function handler(
       );
     }
 
-    // Ensure role is set - update if missing
-    if (!user.role) {
-      await User.updateOne(
-        { _id: context.userId },
-        { $set: { role: 'user' } }
-      );
-      user.role = 'user';
-    }
-
-    const response: any = { user };
+    // Use role from context (already validated) or fallback to DB value
+    const effectiveRole = user.role || context.userRole || "user";
+    const response: any = { user: { ...user, role: effectiveRole } };
 
     // Include tutor profile if user is a tutor
-    if (user.role === "tutor") {
+    if (effectiveRole === "tutor") {
       const tutorProfile = await Tutor.findOne({ userId: context.userId })
         .select("-__v")
         .lean()
@@ -53,7 +46,7 @@ async function handler(
     }
 
     // Include user profile if user is a regular user
-    if (user.role === "user") {
+    if (effectiveRole === "user") {
       const userProfile = await Profile.findOne({ userId: context.userId })
         .select("-__v")
         .lean()
@@ -65,7 +58,7 @@ async function handler(
 
     logger.info("Current user fetched successfully", {
       userId: context.userId,
-      role: user.role,
+      role: effectiveRole,
     });
 
     return NextResponse.json(response, { status: 200 });

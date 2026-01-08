@@ -73,11 +73,24 @@ const completeSchema = z.object({
 			attempts: z.number(),
 		})),
 	}).optional(),
+	sentenceResults: z.object({
+		word: z.string(),
+		definition: z.string(),
+		sentences: z.array(z.object({
+			text: z.string(),
+			index: z.number(),
+		})),
+		reviewStatus: z.enum(['pending', 'reviewed']).default('pending'),
+	}).optional(),
 	summaryResults: z.object({
 		summaryProvided: z.boolean(),
 		score: z.number().optional(),
 		wordCount: z.number().optional(),
 		qualityScore: z.number().optional(),
+	}).optional(),
+	listeningResults: z.object({
+		completed: z.boolean(),
+		timeSpent: z.number(),
 	}).optional(),
 	deviceInfo: z.string().optional(),
 	platform: z.enum(['web', 'ios', 'android']).optional(),
@@ -168,7 +181,9 @@ async function handler(
 			definitionResults: validated.definitionResults,
 			grammarResults: validated.grammarResults,
 			sentenceWritingResults: validated.sentenceWritingResults,
+			sentenceResults: validated.sentenceResults,
 			summaryResults: validated.summaryResults,
+			listeningResults: validated.listeningResults,
 			deviceInfo: validated.deviceInfo,
 			platform: validated.platform || 'web',
 		});

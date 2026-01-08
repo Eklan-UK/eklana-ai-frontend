@@ -1,66 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { withRole } from '@/lib/api/middleware';
-import { logger } from '@/lib/api/logger';
-import { documentParserService } from '@/services/document-parser.service';
+import { NextRequest, NextResponse } from "next/server";
+import { withRole } from "@/lib/api/middleware";
+import { logger } from "@/lib/api/logger";
+import { documentParserService } from "@/services/document-parser.service";
 
 async function handler(
-	req: NextRequest,
-	context: { userId: any; userRole: string }
+  req: NextRequest,
+  context: { userId: any; userRole: string }
 ): Promise<NextResponse> {
-	try {
-		// Only tutors and admins can parse clipboard data
-		if (context.userRole !== 'tutor' && context.userRole !== 'admin') {
-			return NextResponse.json(
-				{
-					code: 'AuthorizationError',
-					message: 'Only tutors and admins can parse clipboard data',
-				},
-				{ status: 403 }
-			);
-		}
+  try {
+    // Role already checked by withRole middleware
+    const body = await req.json();
+    const { text } = body;
 
-		const body = await req.json();
-		const { text } = body;
+    if (!text || typeof text !== "string") {
+      return NextResponse.json(
+        {
+          code: "ValidationError",
+          message: "No text provided",
+        },
+        { status: 400 }
+      );
+    }
 
-		if (!text || typeof text !== 'string') {
-			return NextResponse.json(
-				{
-					code: 'ValidationError',
-					message: 'No text provided',
-				},
-				{ status: 400 }
-			);
-		}
+    // Parse clipboard text
+    const parsed = await documentParserService.parseClipboard(text);
 
-		// Parse clipboard text
-		const parsed = await documentParserService.parseClipboard(text);
+    logger.info("Clipboard data parsed successfully", {
+      detectedType: parsed.type,
+      confidence: parsed.confidence,
+    });
 
-		logger.info('Clipboard data parsed successfully', {
-			detectedType: parsed.type,
-			confidence: parsed.confidence,
-		});
-
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Clipboard data parsed successfully',
-				data: parsed,
-			},
-			{ status: 200 }
-		);
-	} catch (error: any) {
-		logger.error('Error parsing clipboard data', error);
-		return NextResponse.json(
-			{
-				code: 'ServerError',
-				message: 'Failed to parse clipboard data',
-				error: error.message,
-			},
-			{ status: 500 }
-		);
-	}
+    return NextResponse.json(
+      {
+        code: "Success",
+        message: "Clipboard data parsed successfully",
+        data: parsed,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    logger.error("Error parsing clipboard data", error);
+    return NextResponse.json(
+      {
+        code: "ServerError",
+        message: "Failed to parse clipboard data",
+        error: error.message,
+      },
+      { status: 500 }
+    );
+  }
 }
 
-export const POST = withRole(['tutor', 'admin'], handler);
-
-
+export const POST = withRole(["tutor", "admin"], handler);
