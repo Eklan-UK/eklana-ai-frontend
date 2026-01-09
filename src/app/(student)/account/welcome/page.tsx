@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function WelcomePage() {
   return (
@@ -11,12 +12,15 @@ export default function WelcomePage() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        {/* Decorative Elements */}
-        <div className="relative w-full max-w-xs mb-8">
-          <div className="absolute top-0 left-0 w-16 h-16 bg-orange-200 rounded-full opacity-60"></div>
-          <div className="absolute top-4 left-8 w-20 h-20 bg-red-200 rounded-full opacity-60"></div>
-          <div className="absolute top-2 right-4 w-16 h-16 bg-blue-200 rounded-full opacity-60"></div>
-          <div className="absolute top-12 right-0 w-12 h-12 bg-purple-200 rounded-full opacity-60"></div>
+        {/* Logo */}
+        <div className="mb-8">
+          <Image
+            src="/logo2.png"
+            alt="eklan Logo"
+            width={80}
+            height={80}
+            className="rounded-2xl shadow-lg"
+          />
         </div>
 
         {/* Welcome Text */}

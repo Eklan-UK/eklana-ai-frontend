@@ -69,20 +69,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
       
-      // Only check session if we don't have a cached session or it's been a while
-      // This prevents unnecessary API calls on every page load
+      // CRITICAL: If we have a cached session from localStorage, TRUST IT completely
+      // Only check server if we have NO cached session at all
       if (mounted) {
         const currentState = useAuthStore.getState();
-        const shouldCheck = !currentState.user || 
-                           !currentState.session || 
-                           !currentState.lastSessionCheck ||
-                           (Date.now() - currentState.lastSessionCheck) > 30 * 60 * 1000; // 30 minutes
         
-        if (shouldCheck) {
-          await checkSession();
-        } else {
-          // Use cached session, just set loading to false
+        // If we have a cached session, just use it - no server check needed
+        if (currentState.user && currentState.session && currentState.isAuthenticated) {
           currentState.setLoading(false);
+          // Optional: do a background refresh if it's been a while
+          const timeSinceLastCheck = currentState.lastSessionCheck 
+            ? Date.now() - currentState.lastSessionCheck 
+            : Infinity;
+          if (timeSinceLastCheck > 60 * 60 * 1000) { // 1 hour
+            // Background check - won't clear state even on failure
+            checkSession(false);
+          }
+        } else {
+          // No cached session - need to check server
+          await checkSession();
         }
       }
       
@@ -130,11 +135,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       pathname?.startsWith(route)
     );
 
-    // Don't redirect if still loading, not hydrated, or on public route
-    if (isLoading || !hasHydrated || isPublicRoute) return;
+    // Don't redirect if not hydrated yet or on public route
+    if (!hasHydrated || isPublicRoute) return;
 
-    // Redirect to login if not authenticated and trying to access protected route
-    if (!isAuthenticated && !isPublicRoute) {
+    // Get current state to check for cached auth
+    const currentState = useAuthStore.getState();
+    const hasCachedAuth = !!(currentState.user && currentState.session);
+
+    // Don't redirect if still loading AND we have cached auth
+    if (isLoading && hasCachedAuth) return;
+
+    // Don't redirect if still loading (waiting for session check)
+    if (isLoading) return;
+
+    // Only redirect to login if definitely not authenticated AND no cached session
+    if (!isAuthenticated && !hasCachedAuth && !isPublicRoute) {
       router.push("/auth/login");
     }
   }, [isLoading, isAuthenticated, hasHydrated, pathname, router]);

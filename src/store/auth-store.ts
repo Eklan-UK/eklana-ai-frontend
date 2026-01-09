@@ -182,8 +182,8 @@ export const useAuthStore = create<AuthState>()(
       checkSession: async (forceRefresh = false) => {
         const state = get();
 
-        // ALWAYS use cached session if available
-        // Only clear session on explicit logout
+        // ALWAYS use cached session if available - NEVER clear it here
+        // Only clear session on EXPLICIT logout via logout() function
         if (state.user && state.session && state.isAuthenticated) {
           set({ isLoading: false });
 
@@ -208,18 +208,19 @@ export const useAuthStore = create<AuthState>()(
                   lastSessionCheck: Date.now(),
                 });
               }
-              // On any error or null response - DO NOT clear session
-              // User explicitly logged in, keep them logged in
+              // On null response - DO NOT clear session
+              // User explicitly logged in, keep them logged in until they logout
+              // This prevents logout on session expiry - user must explicitly logout
             })
             .catch((error) => {
-              // Network error - keep cached session
-              console.warn("Background session check failed:", error);
+              // Network error - keep cached session, don't clear anything
+              console.warn("Background session check failed (keeping cached session):", error);
             });
 
           return;
         }
 
-        // No cached session - need to check server
+        // No cached session - try to recover from server (initial load or after browser cleared storage)
         try {
           set({ isLoading: true });
 
@@ -234,24 +235,21 @@ export const useAuthStore = create<AuthState>()(
               lastSessionCheck: Date.now(),
             });
           } else {
-            // No session from server AND no cached session
+            // No session from server AND no cached session - user is not logged in
+            // This is OK - just means they need to login
             set({
-              session: null,
-              user: null,
-              isAuthenticated: false,
               isLoading: false,
-              lastSessionCheck: null,
+              // Don't set isAuthenticated to false explicitly if already false
+              // Just ensure loading is done
             });
           }
         } catch (error) {
           console.warn("Session check failed:", error);
-          // No cached session and error - can't authenticate
+          // Network error with no cached session
+          // Don't set any auth state - just stop loading
+          // User can retry or will see login page
           set({
-            session: null,
-            user: null,
-            isAuthenticated: false,
             isLoading: false,
-            lastSessionCheck: null,
           });
         }
       },
@@ -299,11 +297,17 @@ export const useAuthStore = create<AuthState>()(
         if (state) {
           state.setHasHydrated(true);
 
-          // If we have persisted session, use it - NEVER check session on load
-          if (state.user && state.session && state.isAuthenticated) {
+          // If we have persisted session data, use it - NEVER check session on load
+          // Trust localStorage completely - only logout() clears this
+          if (state.user && state.session) {
+            // Ensure isAuthenticated is set correctly from persisted data
+            if (!state.isAuthenticated) {
+              state.setUser(state.user); // This also sets isAuthenticated to true
+            }
             state.setLoading(false);
-            // Trust the cached session completely
+            // Trust the cached session completely - no server verification needed
           } else {
+            // No cached session - need to check with server
             state.setLoading(true);
           }
         }

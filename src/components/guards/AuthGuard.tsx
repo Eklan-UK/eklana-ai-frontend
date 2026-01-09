@@ -22,8 +22,11 @@ export function AuthGuard({
 }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading: authLoading, hasHydrated, checkSession } = useAuthStore();
+  const { user, session, isAuthenticated, isLoading: authLoading, hasHydrated } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
+
+  // Check if we have cached auth data (from localStorage)
+  const hasCachedAuth = !!(user && session);
 
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -51,18 +54,30 @@ export function AuthGuard({
       }
 
       // Wait for localStorage hydration before checking authentication
-      if (!hasHydrated || (authLoading && !isAuthenticated && !user)) {
+      if (!hasHydrated) {
+        return;
+      }
+
+      // If still loading AND we have cached auth, trust the cache
+      if (authLoading && hasCachedAuth) {
+        setIsChecking(false);
+        return;
+      }
+
+      // If still loading with no cached auth, wait
+      if (authLoading) {
         return;
       }
 
       // Check if authentication is required
-      if (requireAuth && !isAuthenticated) {
+      // Only redirect to login if we're definitely not authenticated AND no cached session
+      if (requireAuth && !isAuthenticated && !hasCachedAuth) {
         router.push("/auth/login");
         return;
       }
 
-      // If auth is required and user is authenticated, check role
-      if (requireAuth && isAuthenticated && user && allowedRoles) {
+      // If auth is required and user exists, check role
+      if (requireAuth && user && allowedRoles) {
         const userRole = user.role || 'user';
         
         if (!allowedRoles.includes(userRole as 'admin' | 'user' | 'tutor')) {
@@ -82,10 +97,10 @@ export function AuthGuard({
     };
 
     checkAuth();
-  }, [isAuthenticated, user, authLoading, hasHydrated, pathname, router, allowedRoles, requireAuth]);
+  }, [isAuthenticated, user, session, authLoading, hasHydrated, pathname, router, allowedRoles, requireAuth, hasCachedAuth]);
 
-  // Show loading state while hydrating or checking
-  if (!hasHydrated || (isChecking && authLoading && !isAuthenticated && !user)) {
+  // Show loading state while hydrating
+  if (!hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -96,17 +111,33 @@ export function AuthGuard({
     );
   }
 
-  // If auth is required but not authenticated, don't render (will redirect)
-  if (requireAuth && !isAuthenticated) {
-    return null;
+  // Show loading only if still loading AND no cached auth
+  if (isChecking && authLoading && !hasCachedAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  // If role is required but user doesn't have it, don't render (will redirect)
-  if (requireAuth && isAuthenticated && user && allowedRoles) {
-    const userRole = user.role || 'user';
-    if (!allowedRoles.includes(userRole as 'admin' | 'user' | 'tutor')) {
-      return null;
+  // If we have cached auth, trust it
+  if (hasCachedAuth || isAuthenticated) {
+    // Check role if required
+    if (requireAuth && user && allowedRoles) {
+      const userRole = user.role || 'user';
+      if (!allowedRoles.includes(userRole as 'admin' | 'user' | 'tutor')) {
+        return null;
+      }
     }
+    return <>{children}</>;
+  }
+
+  // If auth is required but not authenticated (and no cache), don't render
+  if (requireAuth) {
+    return null;
   }
 
   return <>{children}</>;

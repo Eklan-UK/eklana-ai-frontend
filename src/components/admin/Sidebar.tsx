@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -50,11 +51,13 @@ const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
       <div className="p-6 flex items-center gap-2">
-        <div className="text-[#3d8c40]">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L9.5 7.5L4 10L9.5 12.5L12 18L14.5 12.5L20 10L14.5 7.5L12 2Z" />
-          </svg>
-        </div>
+        <Image
+          src="/logo2.png"
+          alt="eklan Logo"
+          width={32}
+          height={32}
+          className="rounded-lg"
+        />
         <span className="text-xl font-bold text-gray-800">eklan</span>
         <Layout className="ml-auto w-4 h-4 text-gray-400" />
       </div>

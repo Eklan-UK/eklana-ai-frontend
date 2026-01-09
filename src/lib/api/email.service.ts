@@ -78,9 +78,8 @@ export const emailTemplates = {
 				<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
 					<!-- Logo/Brand Header -->
 					<div style="text-align: center; margin-bottom: 30px;">
-						<div style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); padding: 12px 24px; border-radius: 12px;">
-							<span style="color: white; font-size: 24px; font-weight: bold;">eklan</span>
-						</div>
+						<img src="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+						<div style="font-size: 24px; font-weight: bold; color: #22c55e;">eklan</div>
 					</div>
 					
 					<!-- Main Card -->

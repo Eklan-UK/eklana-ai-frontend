@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { authClient } from '@/lib/auth-client';
 import { toast } from 'sonner';
 
@@ -58,11 +59,13 @@ const Login: React.FC = () => {
         <div className="text-center mb-8">
           <p className="text-gray-500 text-sm mb-2 font-medium">Admin</p>
           <div className="flex items-center justify-center gap-2 mb-12">
-             <div className="text-[#3d8c40]">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L9.5 7.5L4 10L9.5 12.5L12 18L14.5 12.5L20 10L14.5 7.5L12 2Z" />
-              </svg>
-            </div>
+            <Image
+              src="/logo2.png"
+              alt="eklan Logo"
+              width={40}
+              height={40}
+              className="rounded-lg"
+            />
             <h1 className="text-3xl font-bold text-gray-800">eklan</h1>
           </div>
         </div>

@@ -296,38 +296,15 @@ function LogoutButton() {
 function VersionInfo() {
   return (
     <div className="pt-8 pb-4 text-center">
-      <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M8 12L4 8L8 4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <span>eklan version 1.0</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 8L8 12L12 8L8 4L12 8Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+      <div className="flex flex-col items-center justify-center gap-2">
+        <Image
+          src="/logo2.png"
+          alt="eklan Logo"
+          width={32}
+          height={32}
+          className="rounded-lg opacity-50"
+        />
+        <span className="text-sm text-gray-400">eklan version 1.0</span>
       </div>
     </div>
   );

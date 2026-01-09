@@ -17,33 +17,47 @@ interface RoleGuardProps {
  */
 export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
+  const { user, session, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
+
+  // Check if we have cached auth data (from localStorage)
+  const hasCachedAuth = !!(user && session);
 
   useEffect(() => {
     // Wait for localStorage hydration before checking authentication
-    if (!hasHydrated || isLoading) return;
+    if (!hasHydrated) return;
+    
+    // If still loading AND we have cached auth, wait - don't redirect
+    if (isLoading && hasCachedAuth) return;
+    
+    // If still loading and no cached auth, wait for loading to complete
+    if (isLoading) return;
 
-    if (!isAuthenticated || !user) {
+    // Only redirect to login if we're definitely not authenticated
+    // AND we don't have any cached session data
+    if (!isAuthenticated && !hasCachedAuth) {
       router.push("/auth/login");
       return;
     }
 
-    const userRole = (user.role as 'admin' | 'user' | 'tutor') || 'user';
-    
-    if (!allowedRoles.includes(userRole)) {
-      // Redirect based on user's role
-      if (userRole === 'admin') {
-        router.push("/admin/dashboard");
-      } else if (userRole === 'tutor') {
-        router.push("/tutor/dashboard");
-      } else {
-        router.push("/account");
+    // Check role if user exists
+    if (user) {
+      const userRole = (user.role as 'admin' | 'user' | 'tutor') || 'user';
+      
+      if (!allowedRoles.includes(userRole)) {
+        // Redirect based on user's role
+        if (userRole === 'admin') {
+          router.push("/admin/dashboard");
+        } else if (userRole === 'tutor') {
+          router.push("/tutor/dashboard");
+        } else {
+          router.push("/account");
+        }
       }
     }
-  }, [user, isAuthenticated, isLoading, hasHydrated, allowedRoles, router]);
+  }, [user, session, isAuthenticated, isLoading, hasHydrated, allowedRoles, router, hasCachedAuth]);
 
-  // Show loading while hydrating from localStorage or checking session
-  if (!hasHydrated || isLoading) {
+  // Show loading while hydrating from localStorage
+  if (!hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -54,17 +68,31 @@ export function RoleGuard({ children, allowedRoles, fallback }: RoleGuardProps) 
     );
   }
 
-  if (!isAuthenticated || !user) {
-    return null;
+  // Show loading only if still loading AND no cached auth
+  if (isLoading && !hasCachedAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  const userRole = (user.role as 'admin' | 'user' | 'tutor') || 'user';
-  
-  if (!allowedRoles.includes(userRole)) {
-    return fallback || null;
+  // If we have cached auth data, trust it and render
+  if (hasCachedAuth || (isAuthenticated && user)) {
+    const userRole = (user?.role as 'admin' | 'user' | 'tutor') || 'user';
+    
+    if (!allowedRoles.includes(userRole)) {
+      return fallback || null;
+    }
+    
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // No auth - will redirect via useEffect
+  return null;
 }
 
 
