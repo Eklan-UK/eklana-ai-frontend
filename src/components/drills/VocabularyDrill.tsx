@@ -404,7 +404,7 @@ export default function VocabularyDrill({
         title: drill.title,
         type: drill.type,
         score,
-      });
+        });
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")

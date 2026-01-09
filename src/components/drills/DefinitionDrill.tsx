@@ -112,7 +112,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         title: drill.title,
         type: drill.type,
         score,
-      });
+        });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {

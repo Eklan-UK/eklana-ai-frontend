@@ -259,10 +259,10 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
 
       // Track activity locally (no API call)
       trackActivity("drill", drill._id, "completed", {
-        title: drill.title,
-        type: drill.type,
-        score,
-      });
+              title: drill.title,
+              type: drill.type,
+              score,
+        });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
       setIsSubmitting(false);

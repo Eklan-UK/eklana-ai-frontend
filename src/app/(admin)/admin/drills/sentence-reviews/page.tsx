@@ -102,20 +102,20 @@ function ReviewModal({
     const initialReviews: Record<number, Array<{ isCorrect: boolean | null; correctedText: string }>> = {};
     allWords.forEach((word, wordIdx) => {
       const wordSentences = word.sentences || [];
-      if (isAlreadyReviewed && existingReviews.length > 0) {
+    if (isAlreadyReviewed && existingReviews.length > 0) {
         initialReviews[wordIdx] = wordSentences.map((_, idx) => {
           // Calculate global sentence index for backwards compatibility
           const globalIdx = allWords.slice(0, wordIdx).reduce((acc, w) => acc + (w.sentences?.length || 0), 0) + idx;
           const existing = existingReviews.find((r) => r.sentenceIndex === globalIdx || r.sentenceIndex === idx);
-          return {
-            isCorrect: existing?.isCorrect ?? null,
-            correctedText: existing?.correctedText || "",
-          };
-        });
+        return {
+          isCorrect: existing?.isCorrect ?? null,
+          correctedText: existing?.correctedText || "",
+        };
+      });
       } else {
         initialReviews[wordIdx] = wordSentences.map(() => ({ isCorrect: null, correctedText: "" }));
       }
-    });
+  });
     return initialReviews;
   });
 
@@ -162,8 +162,8 @@ function ReviewModal({
     
     Object.entries(allWordReviews).forEach(([wordIdx, wordReviews]) => {
       const hasIssue = wordReviews.some(
-        (r) => r.isCorrect === false && !r.correctedText.trim()
-      );
+      (r) => r.isCorrect === false && !r.correctedText.trim()
+    );
       if (hasIssue && incompleteWordIndex === -1) {
         hasIncorrectWithoutCorrection = true;
         incompleteWordIndex = parseInt(wordIdx);
@@ -192,8 +192,8 @@ function ReviewModal({
         wordReviews.forEach((r) => {
           sentenceReviews.push({
             sentenceIndex: globalIdx,
-            isCorrect: r.isCorrect!,
-            correctedText: r.isCorrect ? undefined : r.correctedText || undefined,
+        isCorrect: r.isCorrect!,
+        correctedText: r.isCorrect ? undefined : r.correctedText || undefined,
           });
           globalIdx++;
         });

@@ -119,7 +119,7 @@ function DrillCardComponent({
 }: DrillCardProps) {
   // Memoize computed values to prevent recalculation on every render
   const typeInfo = useMemo(() => getDrillTypeInfo(drill.type), [drill.type]);
-
+  
   const drillStatus = useMemo(
     () =>
       getDrillStatus({ drill, dueDate, completedAt, assignmentStatus: status }),
@@ -144,20 +144,20 @@ function DrillCardComponent({
   // Determine drill URL based on status
   const drillUrl = useMemo(
     () =>
-      isCompleted && assignmentId
-        ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
-        : assignmentId
-        ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
+    isCompleted && assignmentId
+      ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
+      : assignmentId
+      ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
         : `/account/drills/${drill._id}`,
     [isCompleted, assignmentId, drill._id]
   );
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (onStartClick && !isUpcoming && !isCompleted) {
-        e.preventDefault();
-        onStartClick(drill._id, assignmentId);
-      }
+    if (onStartClick && !isUpcoming && !isCompleted) {
+      e.preventDefault();
+      onStartClick(drill._id, assignmentId);
+    }
     },
     [onStartClick, isUpcoming, isCompleted, drill._id, assignmentId]
   );
@@ -193,15 +193,15 @@ function DrillCardComponent({
                   totalCount={latestAttempt?.totalCount}
                 />
               )}
-              {showStartButton && (
-                <Button variant="primary" size="sm" disabled={isUpcoming}>
-                  {isUpcoming
-                    ? "View"
-                    : isCompleted
+            {showStartButton && (
+              <Button variant="primary" size="sm" disabled={isUpcoming}>
+                {isUpcoming
+                  ? "View"
+                  : isCompleted
                     ? "Review"
-                    : "Start"}
-                </Button>
-              )}
+                  : "Start"}
+              </Button>
+            )}
             </div>
           </div>
         </Card>

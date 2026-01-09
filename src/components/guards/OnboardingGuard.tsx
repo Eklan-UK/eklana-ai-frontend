@@ -96,9 +96,9 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
           ...user,
           role: userRole,
         };
-
+        
         const status = await checkAuthFlowStatus(normalizedUser);
-
+        
         if (status.shouldOnboard) {
           if (pathname !== "/account/onboarding") {
             router.push("/account/onboarding");

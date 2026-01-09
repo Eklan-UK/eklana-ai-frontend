@@ -124,7 +124,7 @@ export default function SummaryDrill({
       trackActivity("drill", drill._id, "completed", {
         title: drill.title,
         type: drill.type,
-      });
+        });
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -196,31 +196,31 @@ export default function SummaryDrill({
       {/* Read Mode */}
       {currentMode === "read" && (
         <>
-          {/* Instructions */}
-          <Card className="mb-6 bg-green-50 border-green-200">
-            <div className="flex items-start gap-3">
+        {/* Instructions */}
+        <Card className="mb-6 bg-green-50 border-green-200">
+          <div className="flex items-start gap-3">
               <BookOpen className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div>
+            <div>
                 <p className="text-sm font-semibold text-green-900 mb-1">
                   Read the Passage
                 </p>
-                <p className="text-sm text-green-800">
+              <p className="text-sm text-green-800">
                   Read the passage carefully. Pay attention to the main ideas
                   and key details. Estimated reading time: {readingTimeMinutes}{" "}
                   min ({passageWordCount} words)
-                </p>
-              </div>
+              </p>
             </div>
-          </Card>
+          </div>
+        </Card>
 
           {/* Passage Card */}
           <Card className="mb-6 bg-white shadow-lg">
-            <div className="mb-4 pb-4 border-b border-gray-200">
+          <div className="mb-4 pb-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-green-500" />
-                  {articleTitle}
-                </h2>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-green-500" />
+                {articleTitle}
+              </h2>
                 <TTSButton text={articleContent} size="md" />
               </div>
             </div>
@@ -311,11 +311,11 @@ export default function SummaryDrill({
               >
                 {showPassage ? "Hide" : "Show"}
               </button>
-            </div>
-
+          </div>
+          
             {showPassage && (
-              <div className="prose prose-sm max-w-none">
-                <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+          <div className="prose prose-sm max-w-none">
+            <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                   {articleContent || "No passage content provided."}
                 </div>
               </div>
@@ -380,25 +380,25 @@ export default function SummaryDrill({
                   <div className="text-gray-600 leading-relaxed whitespace-pre-wrap text-sm max-h-48 overflow-y-auto">
                     {articleContent}
                   </div>
-                </div>
-              </div>
+            </div>
+          </div>
             )}
-          </Card>
+        </Card>
 
-          {/* Summary Input */}
+        {/* Summary Input */}
           <Card className="mb-6 bg-white shadow-lg">
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-green-500" />
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-green-500" />
                 Your Summary
-              </label>
-              <div className="relative">
-                <textarea
+            </label>
+            <div className="relative">
+              <textarea
                   className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[200px] resize-none text-base"
                   placeholder="Write your summary here...&#10;&#10;Include the main points and key ideas from the passage. Try to use your own words."
-                  value={summary}
-                  onChange={(e) => handleSummaryChange(e.target.value)}
-                />
+                value={summary}
+                onChange={(e) => handleSummaryChange(e.target.value)}
+              />
 
                 {/* Word count and status */}
                 <div className="flex items-center justify-between mt-3 px-1">
@@ -444,27 +444,27 @@ export default function SummaryDrill({
             )}
           </div>
 
-          {/* Submit Button */}
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleSubmit}
+        {/* Submit Button */}
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          onClick={handleSubmit}
             disabled={isSubmitting || wordCount < 30}
             className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Submitting...
+            </>
+          ) : (
               <>
                 <CheckCircle className="w-5 h-5 mr-2" />
                 Submit Summary for Review
               </>
-            )}
-          </Button>
+          )}
+        </Button>
         </>
       )}
     </DrillLayout>

@@ -99,7 +99,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       trackActivity("drill", drill._id, "completed", {
         title: drill.title,
         type: drill.type,
-      });
+        });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {

@@ -152,13 +152,13 @@ async function getHandler(
         }
         
         return [
-          item._id.toString(),
-          {
+        item._id.toString(),
+        {
             score: attempt.score,
             timeSpent: attempt.timeSpent,
             completedAt: attempt.completedAt,
             ...reviewInfo,
-          },
+        },
         ];
       })
     );
@@ -177,23 +177,23 @@ async function getHandler(
           drills: assignmentsWithAttempts.map((a) => {
             const attemptData = a.latestAttempt as any;
             return {
-              assignmentId: a._id,
-              drill: a.drillId,
-              assignedBy: a.assignedBy,
-              assignedAt: a.assignedAt,
-              dueDate: a.dueDate,
-              status: a.status,
-              completedAt: a.completedAt,
+            assignmentId: a._id,
+            drill: a.drillId,
+            assignedBy: a.assignedBy,
+            assignedAt: a.assignedAt,
+            dueDate: a.dueDate,
+            status: a.status,
+            completedAt: a.completedAt,
               latestAttempt: attemptData
-                ? {
+              ? {
                     score: attemptData.score,
                     timeSpent: attemptData.timeSpent,
                     completedAt: attemptData.completedAt,
                     reviewStatus: attemptData.reviewStatus,
                     correctCount: attemptData.correctCount,
                     totalCount: attemptData.totalCount,
-                  }
-                : null,
+                }
+              : null,
             };
           }),
           pagination: {

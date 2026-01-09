@@ -243,23 +243,23 @@ export default function DrillCompletedPage() {
   } = useQuery({
     queryKey: ["drills", "assignments", assignmentId, "attempts"],
     queryFn: async () => {
-      if (!assignmentId) {
+    if (!assignmentId) {
         throw new Error("Assignment ID is required");
-      }
-      const response = await apiRequest<{
-        code: string;
-        message: string;
-        data: {
-          assignment: DrillAssignment;
-          attempts: DrillAttempt[];
-          latestAttempt: DrillAttempt | null;
-          totalAttempts: number;
-        };
-      }>(`/drills/assignments/${assignmentId}/attempts`, {
-        method: "GET",
-      });
+    }
+        const response = await apiRequest<{
+          code: string;
+          message: string;
+          data: {
+            assignment: DrillAssignment;
+            attempts: DrillAttempt[];
+            latestAttempt: DrillAttempt | null;
+            totalAttempts: number;
+          };
+        }>(`/drills/assignments/${assignmentId}/attempts`, {
+          method: "GET",
+        });
 
-      if (response.code === "Success" && response.data) {
+        if (response.code === "Success" && response.data) {
         return response.data;
       }
       throw new Error("Failed to load submission");
@@ -680,28 +680,28 @@ export default function DrillCompletedPage() {
                 </div>
               </Card>
               {attempt.grammarResults.patternScores.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Pattern Scores
-                  </h4>
-                  <div className="space-y-2">
-                    {attempt.grammarResults.patternScores.map(
-                      (patternScore, idx) => (
-                        <Card key={idx} className="p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">
-                              {patternScore.pattern}
-                            </span>
-                            <span className="text-sm font-semibold text-[#22c55e]">
-                              {patternScore.score}%
-                            </span>
-                          </div>
-                        </Card>
-                      )
-                    )}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Pattern Scores
+                    </h4>
+                    <div className="space-y-2">
+                      {attempt.grammarResults.patternScores.map(
+                        (patternScore, idx) => (
+                          <Card key={idx} className="p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-700">
+                                {patternScore.pattern}
+                              </span>
+                              <span className="text-sm font-semibold text-[#22c55e]">
+                                {patternScore.score}%
+                              </span>
+                            </div>
+                          </Card>
+                        )
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           );
         }
@@ -737,7 +737,7 @@ export default function DrillCompletedPage() {
             </div>
           );
         }
-      // eslint-disable-next-line no-fallthrough
+        // eslint-disable-next-line no-fallthrough
 
       case "sentence":
         if (attempt.sentenceResults) {
@@ -762,7 +762,7 @@ export default function DrillCompletedPage() {
             }
             return globalIdx + sentenceIdx;
           };
-
+          
           return (
             <div className="space-y-6">
               {allWords.map((wordItem, wordIdx) => (
@@ -779,24 +779,24 @@ export default function DrillCompletedPage() {
                         Your Definition:
                       </p>
                       <p className="text-gray-900">{wordItem.definition}</p>
-                    </div>
                   </div>
+                </div>
 
-                  {/* Sentences */}
-                  <div className="space-y-4">
+              {/* Sentences */}
+                <div className="space-y-4">
                     <h4 className="font-medium text-gray-700">Your Sentences:</h4>
                     {wordItem.sentences?.map((sentence, sentenceIdx) => {
                       const globalIdx = getGlobalIndex(wordIdx, sentenceIdx);
-                      const review = isReviewed
+                    const review = isReviewed 
                         ? sentenceReviews?.find(
                             (r: any) =>
                               r.sentenceIndex === globalIdx ||
                               r.sentenceIndex === sentence.index
                           )
-                        : null;
+                      : null;
                       const isCorrect = review?.isCorrect ?? null;
-
-                      return (
+                    
+                    return (
                         <div
                           key={sentenceIdx}
                           className={`rounded-lg border-2 ${
@@ -820,25 +820,25 @@ export default function DrillCompletedPage() {
                                   }`}
                                 >
                                   {sentenceIdx + 1}
-                                </span>
+                          </span>
                                 <p className="text-gray-900 pt-0.5">
                                   {sentence.text}
                                 </p>
                               </div>
-                              {isReviewed && (
+                          {isReviewed && (
                                 <div className="flex-shrink-0">
                                   {isCorrect ? (
                                     <CheckCircle className="w-6 h-6 text-green-600" />
                                   ) : (
                                     <XCircle className="w-6 h-6 text-red-500" />
-                                  )}
-                                </div>
+                          )}
+                        </div>
                               )}
                             </div>
-                          </div>
+                        </div>
 
                           {/* Correction */}
-                          {isReviewed && !isCorrect && review?.correctedText && (
+                        {isReviewed && !isCorrect && review?.correctedText && (
                             <div className="border-t border-green-200 bg-green-100 p-4 rounded-b-lg">
                               <div className="flex items-start gap-2">
                                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -851,16 +851,16 @@ export default function DrillCompletedPage() {
                                   </p>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
                 </Card>
               ))}
 
-              {!isReviewed && (
+                {!isReviewed && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Clock3 className="w-5 h-5 text-amber-600" />
@@ -869,11 +869,11 @@ export default function DrillCompletedPage() {
                       <p className="text-sm text-amber-700">
                         Your submission is waiting to be reviewed. You'll be
                         notified when feedback is available.
-                      </p>
+                    </p>
                     </div>
                   </div>
-                </div>
-              )}
+                  </div>
+                )}
             </div>
           );
         }
@@ -904,12 +904,12 @@ export default function DrillCompletedPage() {
                       Passage: {articleTitle}
                     </p>
                   )}
-                </div>
+                    </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {summary || "No summary provided"}
                   </p>
-                </div>
+                    </div>
               </Card>
 
               {/* Review Feedback */}
@@ -977,10 +977,10 @@ export default function DrillCompletedPage() {
                         <p className="text-green-900 leading-relaxed whitespace-pre-wrap">
                           {review.correctedVersion}
                         </p>
-                      </div>
+                </div>
                     </div>
                   )}
-                </Card>
+              </Card>
               ) : (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-3">
@@ -1088,16 +1088,16 @@ export default function DrillCompletedPage() {
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{typeInfo.icon}</span>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {assignment.drillId.title}
-                </h1>
-                <p className="text-sm text-gray-500 capitalize">
-                  {assignment.drillId.type.replace("_", " ")} •{" "}
-                  {assignment.drillId.difficulty}
-                </p>
-              </div>
+            <span className="text-3xl">{typeInfo.icon}</span>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {assignment.drillId.title}
+              </h1>
+              <p className="text-sm text-gray-500 capitalize">
+                {assignment.drillId.type.replace("_", " ")} •{" "}
+                {assignment.drillId.difficulty}
+              </p>
+            </div>
             </div>
             {/* Review Status Badge */}
             {reviewStats && (

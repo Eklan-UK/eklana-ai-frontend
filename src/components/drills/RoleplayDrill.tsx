@@ -144,7 +144,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     await playAudio(currentTurn.text);
     
     // Move to next turn after AI finishes
-    setTimeout(() => {
+      setTimeout(() => {
       setCurrentTurnIndex(prev => prev + 1);
       setWaitingForAI(false);
     }, 500);
@@ -229,7 +229,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
         if (passed) {
           toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
-        } else {
+    } else {
           toast.warning(
             `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to continue. Try again!`
           );
@@ -330,35 +330,35 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         label="Your lines"
       />
 
-      {/* Context */}
-      {drill.context && (
+        {/* Context */}
+        {drill.context && (
         <Card className="mb-4 bg-emerald-50 border-emerald-200">
-          <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2">
             <MessageCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-            <div>
+              <div>
               <p className="text-sm font-semibold text-emerald-900 mb-1">Scenario</p>
               <p className="text-sm text-emerald-800">{drill.context}</p>
+              </div>
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
 
-      {/* Scene Info */}
-      {currentScene?.scene_name && (
+        {/* Scene Info */}
+        {currentScene?.scene_name && (
         <Card className="mb-4 bg-white/80">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Current Scene</p>
-              <p className="text-sm font-semibold text-gray-900">{currentScene.scene_name}</p>
-            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Current Scene</p>
+                <p className="text-sm font-semibold text-gray-900">{currentScene.scene_name}</p>
+              </div>
             {scenes.length > 1 && (
               <div className="text-xs text-gray-500">
                 Scene {currentSceneIndex + 1} of {scenes.length}
               </div>
             )}
-          </div>
-        </Card>
-      )}
+            </div>
+          </Card>
+        )}
 
       {/* Conversation History */}
       <Card className="mb-4 max-h-64 overflow-y-auto">
@@ -367,51 +367,51 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
             <div className="text-center py-4 text-gray-500 text-sm">
               <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
               <p>Conversation will appear here</p>
-            </div>
-          ) : (
+              </div>
+            ) : (
             completedMessages.map((message) => {
-              const isUser = message.speaker === "student";
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                >
+                const isUser = message.speaker === "student";
+                return (
                   <div
-                    className={`max-w-[85%] rounded-2xl p-3 ${
-                      isUser
-                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
-                        : "bg-gray-100 text-gray-900"
-                    }`}
+                    key={message.id}
+                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      {isUser ? (
+                    <div
+                    className={`max-w-[85%] rounded-2xl p-3 ${
+                        isUser
+                          ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                          : "bg-gray-100 text-gray-900"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        {isUser ? (
                         <User className="w-3 h-3" />
-                      ) : (
+                        ) : (
                         <Bot className="w-3 h-3" />
-                      )}
-                      <span className="text-xs font-semibold opacity-90">
-                        {getSpeakerName(message.speaker)}
+                        )}
+                        <span className="text-xs font-semibold opacity-90">
+                          {getSpeakerName(message.speaker)}
                       </span>
                       {isUser && message.score !== undefined && (
                         <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                           {message.score}%
                         </span>
                       )}
-                    </div>
-                    <p className="text-sm">{message.text}</p>
-                    {message.translation && (
+                      </div>
+                      <p className="text-sm">{message.text}</p>
+                      {message.translation && (
                       <p className={`text-xs mt-1 opacity-75`}>
-                        {message.translation}
-                      </p>
-                    )}
+                          {message.translation}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </Card>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </Card>
 
       {/* Current Turn Interface */}
       {!isConversationComplete && currentTurn && (
@@ -586,7 +586,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
             ) : null}
           </>
         )}
-
+          
         {/* Conversation complete - Submit */}
         {isConversationComplete && (
           <Card className="mb-4 bg-green-50 border-green-200">
@@ -616,7 +616,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               </Button>
             </div>
           </Card>
-        )}
+          )}
       </div>
     </DrillLayout>
   );

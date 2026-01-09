@@ -45,14 +45,14 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
       shouldOnboard = !hasOnboarding;
     } else {
       // Need to check via API
-      try {
-        const response = await userAPI.checkProfile();
-        hasOnboarding = response.hasProfile || false;
-        shouldOnboard = !hasOnboarding;
+    try {
+      const response = await userAPI.checkProfile();
+      hasOnboarding = response.hasProfile || false;
+      shouldOnboard = !hasOnboarding;
         
         // Cache the result in auth store
         authState.setHasProfile(hasOnboarding);
-      } catch (error: any) {
+    } catch (error: any) {
         // On error, check if we have cached value
         if (authState.hasProfile !== null) {
           // Use cached value even if expired
@@ -60,13 +60,13 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
           shouldOnboard = !hasOnboarding;
         } else if (error?.message?.includes('Forbidden') || error?.code === 'Forbidden') {
           // If forbidden, assume needs onboarding
-          hasOnboarding = false;
-          shouldOnboard = true;
-        } else {
-          // On other errors, assume no onboarding
-          console.error('Error checking profile:', error);
-          hasOnboarding = false;
-          shouldOnboard = true;
+        hasOnboarding = false;
+        shouldOnboard = true;
+      } else {
+        // On other errors, assume no onboarding
+        console.error('Error checking profile:', error);
+        hasOnboarding = false;
+        shouldOnboard = true;
         }
       }
     }

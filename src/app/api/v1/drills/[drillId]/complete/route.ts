@@ -56,14 +56,14 @@ const completeSchema = z.object({
 	grammarResults: z.union([
 		// Old format (auto-scored)
 		z.object({
-			patternsPracticed: z.number(),
-			totalPatterns: z.number(),
-			accuracy: z.number(),
-			patternScores: z.array(z.object({
-				pattern: z.string(),
-				score: z.number(),
-				attempts: z.number(),
-			})),
+		patternsPracticed: z.number(),
+		totalPatterns: z.number(),
+		accuracy: z.number(),
+		patternScores: z.array(z.object({
+			pattern: z.string(),
+			score: z.number(),
+			attempts: z.number(),
+		})),
 		}),
 		// New format (pending review)
 		z.object({
