@@ -9,7 +9,14 @@ import React, { memo, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Calendar, Target, CheckCircle } from "lucide-react";
+import {
+  Calendar,
+  Target,
+  CheckCircle,
+  Clock3,
+  AlertCircle,
+  XCircle,
+} from "lucide-react";
 import {
   getDrillIcon,
   getDrillTypeInfo,
@@ -33,12 +40,68 @@ export interface DrillCardProps {
     score?: number;
     timeSpent?: number;
     completedAt?: string;
+    reviewStatus?: "pending" | "reviewed";
+    correctCount?: number;
+    totalCount?: number;
   };
   status?: string;
   variant?: "default" | "compact" | "detailed";
   showStartButton?: boolean;
   onStartClick?: (drillId: string, assignmentId?: string) => void;
   className?: string;
+}
+
+// Review Status Badge Component
+function ReviewBadge({
+  reviewStatus,
+  correctCount,
+  totalCount,
+}: {
+  reviewStatus?: "pending" | "reviewed";
+  correctCount?: number;
+  totalCount?: number;
+}) {
+  if (!reviewStatus) return null;
+
+  if (reviewStatus === "pending") {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-medium">
+        <Clock3 className="w-3 h-3" />
+        <span>Pending Review</span>
+      </div>
+    );
+  }
+
+  // Reviewed status
+  const allCorrect = correctCount === totalCount && totalCount && totalCount > 0;
+  const hasIncorrect = correctCount !== undefined && totalCount !== undefined && correctCount < totalCount;
+
+  if (allCorrect) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+        <CheckCircle className="w-3 h-3" />
+        <span>All Correct</span>
+      </div>
+    );
+  }
+
+  if (hasIncorrect) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+        <AlertCircle className="w-3 h-3" />
+        <span>
+          {correctCount}/{totalCount} Correct
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+      <CheckCircle className="w-3 h-3" />
+      <span>Reviewed</span>
+    </div>
+  );
 }
 
 function DrillCardComponent({
@@ -56,9 +119,10 @@ function DrillCardComponent({
 }: DrillCardProps) {
   // Memoize computed values to prevent recalculation on every render
   const typeInfo = useMemo(() => getDrillTypeInfo(drill.type), [drill.type]);
-  
+
   const drillStatus = useMemo(
-    () => getDrillStatus({ drill, dueDate, completedAt, assignmentStatus: status }),
+    () =>
+      getDrillStatus({ drill, dueDate, completedAt, assignmentStatus: status }),
     [drill, dueDate, completedAt, status]
   );
 
@@ -72,23 +136,28 @@ function DrillCardComponent({
   const isUpcoming = drillStatus === "upcoming";
   const isCompleted = drillStatus === "completed";
 
+  // Check if this drill type has reviews (sentence, grammar, or summary)
+  const hasReviews = drill.type === "sentence" || drill.type === "grammar" || drill.type === "summary";
+  const showReviewBadge =
+    isCompleted && hasReviews && latestAttempt?.reviewStatus;
+
   // Determine drill URL based on status
   const drillUrl = useMemo(
     () =>
-    isCompleted && assignmentId
-      ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
-      : assignmentId
-      ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
+      isCompleted && assignmentId
+        ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
+        : assignmentId
+        ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
         : `/account/drills/${drill._id}`,
     [isCompleted, assignmentId, drill._id]
   );
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-    if (onStartClick && !isUpcoming && !isCompleted) {
-      e.preventDefault();
-      onStartClick(drill._id, assignmentId);
-    }
+      if (onStartClick && !isUpcoming && !isCompleted) {
+        e.preventDefault();
+        onStartClick(drill._id, assignmentId);
+      }
     },
     [onStartClick, isUpcoming, isCompleted, drill._id, assignmentId]
   );
@@ -103,7 +172,11 @@ function DrillCardComponent({
 
   if (variant === "compact") {
     return (
-      <Link href={drillUrl} onClick={handleClick} onMouseEnter={handleMouseEnter}>
+      <Link
+        href={drillUrl}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+      >
         <Card
           className={`${typeInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer ${className}`}
         >
@@ -112,15 +185,24 @@ function DrillCardComponent({
               <span className="text-xl">{typeInfo.icon}</span>
               <span className="font-medium text-gray-900">{drill.title}</span>
             </div>
-            {showStartButton && (
-              <Button variant="primary" size="sm" disabled={isUpcoming}>
-                {isUpcoming
-                  ? "View"
-                  : isCompleted
-                  ? "Review Submission"
-                  : "Start"}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {showReviewBadge && (
+                <ReviewBadge
+                  reviewStatus={latestAttempt?.reviewStatus}
+                  correctCount={latestAttempt?.correctCount}
+                  totalCount={latestAttempt?.totalCount}
+                />
+              )}
+              {showStartButton && (
+                <Button variant="primary" size="sm" disabled={isUpcoming}>
+                  {isUpcoming
+                    ? "View"
+                    : isCompleted
+                    ? "Review"
+                    : "Start"}
+                </Button>
+              )}
+            </div>
           </div>
         </Card>
       </Link>
@@ -176,6 +258,17 @@ function DrillCardComponent({
         )}
       </div>
 
+      {/* Review Status Badge for completed drills */}
+      {showReviewBadge && (
+        <div className="mb-3">
+          <ReviewBadge
+            reviewStatus={latestAttempt?.reviewStatus}
+            correctCount={latestAttempt?.correctCount}
+            totalCount={latestAttempt?.totalCount}
+          />
+        </div>
+      )}
+
       {isOverdue && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
           <p className="text-xs text-red-700">This drill is overdue</p>
@@ -220,7 +313,7 @@ function DrillCardComponent({
                     }}
                     className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
                   >
-                    {isCompleted ? "Review Submission" : "Start"}
+                    {isCompleted ? "View Results" : "Start"}
                   </Button>
                 </Link>
               )}

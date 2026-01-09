@@ -41,10 +41,6 @@ interface MatchingPair {
   rightTranslation?: string;
 }
 
-interface DefinitionItem {
-  word: string;
-  hint?: string;
-}
 
 interface GrammarItem {
   pattern: string;
@@ -97,10 +93,6 @@ const DrillBuilder: React.FC = () => {
     { left: "", right: "", leftTranslation: "", rightTranslation: "" },
   ]);
 
-  // Definition
-  const [definitionItems, setDefinitionItems] = useState<DefinitionItem[]>([
-    { word: "", hint: "" },
-  ]);
 
   // Grammar
   const [grammarItems, setGrammarItems] = useState<GrammarItem[]>([
@@ -252,15 +244,6 @@ const DrillBuilder: React.FC = () => {
                 },
               ]
         );
-      } else if (drill.type === "definition" && drill.definition_items) {
-        setDefinitionItems(
-          drill.definition_items.length > 0
-            ? drill.definition_items.map((di: any) => ({
-                word: di.word || "",
-                hint: di.hint || "",
-              }))
-            : [{ word: "", hint: "" }]
-        );
       } else if (drill.type === "grammar" && drill.grammar_items) {
         setGrammarItems(
           drill.grammar_items.length > 0
@@ -390,24 +373,6 @@ const DrillBuilder: React.FC = () => {
     setMatchingPairs(updated);
   };
 
-  // Definition helpers
-  const addDefinitionItem = () => {
-    setDefinitionItems([...definitionItems, { word: "", hint: "" }]);
-  };
-
-  const removeDefinitionItem = (index: number) => {
-    setDefinitionItems(definitionItems.filter((_, i) => i !== index));
-  };
-
-  const updateDefinitionItem = (
-    index: number,
-    field: keyof DefinitionItem,
-    value: string
-  ) => {
-    const updated = [...definitionItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setDefinitionItems(updated);
-  };
 
   // Grammar helpers
   const addGrammarItem = () => {
@@ -565,9 +530,6 @@ const DrillBuilder: React.FC = () => {
               ]
         );
         break;
-      case "definition":
-        setDefinitionItems(items.length > 0 ? items : [{ word: "", hint: "" }]);
-        break;
       case "grammar":
         setGrammarItems(
           items.length > 0 ? items : [{ pattern: "", example: "", hint: "" }]
@@ -654,20 +616,12 @@ const DrillBuilder: React.FC = () => {
         );
         return;
       }
-    } else if (drillType === "definition") {
-      if (
-        definitionItems.length === 0 ||
-        definitionItems.some((d) => !d.word.trim())
-      ) {
-        toast.error("Please add at least one word for definition");
-        return;
-      }
     } else if (drillType === "grammar") {
       if (
         grammarItems.length === 0 ||
-        grammarItems.some((g) => !g.pattern.trim())
+        grammarItems.some((g) => !g.pattern.trim() || !g.example.trim())
       ) {
-        toast.error("Please add at least one grammar pattern");
+        toast.error("Please add at least one grammar pattern with an example sentence");
         return;
       }
     } else if (drillType === "sentence_writing") {
@@ -749,13 +703,6 @@ const DrillBuilder: React.FC = () => {
             right: p.right.trim(),
             leftTranslation: p.leftTranslation?.trim() || undefined,
             rightTranslation: p.rightTranslation?.trim() || undefined,
-          }));
-      } else if (drillType === "definition") {
-        drillData.definition_items = definitionItems
-          .filter((d) => d.word.trim())
-          .map((d) => ({
-            word: d.word.trim(),
-            hint: d.hint?.trim() || undefined,
           }));
       } else if (drillType === "grammar") {
         drillData.grammar_items = grammarItems
@@ -1289,70 +1236,6 @@ const DrillBuilder: React.FC = () => {
             </div>
           )}
 
-          {drillType === "definition" && (
-            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-lg font-bold text-gray-900">
-                  Definition Items<span className="text-red-500">*</span>
-                </h2>
-                <button
-                  onClick={addDefinitionItem}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-gray-50 text-[#3d8c40] font-bold text-sm rounded-xl hover:bg-emerald-50"
-                >
-                  <Plus className="w-4 h-4" /> Add Word
-                </button>
-              </div>
-              <div className="space-y-6">
-                {definitionItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-6 bg-gray-50/50 rounded-2xl relative border border-gray-100"
-                  >
-                    <button
-                      onClick={() => removeDefinitionItem(idx)}
-                      className="absolute top-4 right-4 text-red-400 hover:text-red-600"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    <h4 className="text-sm font-bold text-gray-900 mb-4">
-                      Word {idx + 1}
-                    </h4>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                          Word / Expression
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={item.word}
-                          onChange={(e) =>
-                            updateDefinitionItem(idx, "word", e.target.value)
-                          }
-                          placeholder="e.g. Abundant"
-                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                          Hint (optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={item.hint || ""}
-                          onChange={(e) =>
-                            updateDefinitionItem(idx, "hint", e.target.value)
-                          }
-                          placeholder="e.g. Think of 'a lot of something'"
-                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {drillType === "grammar" && (
             <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
@@ -1399,7 +1282,7 @@ const DrillBuilder: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                          Example Sentence (optional)
+                          Example Sentence<span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -1410,6 +1293,9 @@ const DrillBuilder: React.FC = () => {
                           placeholder="e.g. I used to play basketball every day"
                           className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
                         />
+                        <p className="text-xs text-gray-400 mt-1">
+                          This example will be shown to students as a guide for writing their sentences.
+                        </p>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5">
@@ -1650,7 +1536,6 @@ const DrillBuilder: React.FC = () => {
                       <option value="vocabulary">Vocabulary</option>
                       <option value="roleplay">Roleplay</option>
                       <option value="matching">Matching</option>
-                      <option value="definition">Definition</option>
                       <option value="grammar">Grammar</option>
                       <option value="sentence_writing">Sentence Writing</option>
                       <option value="summary">Summary</option>

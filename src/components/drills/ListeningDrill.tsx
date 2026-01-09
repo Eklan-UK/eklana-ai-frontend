@@ -4,10 +4,11 @@ import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MarkdownText } from "@/components/ui/MarkdownText";
-import { Loader2, Volume2, Pause, Play } from "lucide-react";
+import { Loader2, Volume2, Pause, Play, CheckCircle, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { useTTS } from "@/hooks/useTTS";
+import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 
 interface ListeningDrillProps {
@@ -94,22 +95,11 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
-      // Track activity
-      try {
-        await fetch('/api/v1/activities/recent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            type: 'drill',
-            resourceId: drill._id,
-            action: 'completed',
-            metadata: { title: drill.title, type: drill.type },
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to track activity:', error);
-      }
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+      });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -183,6 +173,49 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
           </div>
         </Card>
 
+        {/* Listening Status Card */}
+        <Card className={`mb-4 ${hasListened ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {hasListened ? (
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Headphones className="w-5 h-5 text-amber-600" />
+                </div>
+              )}
+              <div>
+                <p className={`text-sm font-medium ${hasListened ? 'text-green-900' : 'text-amber-900'}`}>
+                  {hasListened ? 'Listening Complete!' : 'Listening Required'}
+                </p>
+                <p className={`text-xs ${hasListened ? 'text-green-700' : 'text-amber-700'}`}>
+                  {hasListened 
+                    ? 'You can now complete this drill' 
+                    : 'Listen to the content or mark as listened'}
+                </p>
+              </div>
+            </div>
+            
+            {/* Mark as Listened Button */}
+            {!hasListened && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setHasListened(true);
+                  toast.success("Marked as listened!");
+                }}
+                className="border-amber-300 text-amber-700 hover:bg-amber-100"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Mark as Listened
+              </Button>
+            )}
+          </div>
+        </Card>
+
         {/* Instructions */}
         <Card className="mb-4 bg-blue-50 border-blue-200">
           <div className="flex items-start gap-2">
@@ -191,7 +224,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
               <p className="text-sm font-medium text-blue-900 mb-1">Instructions</p>
               <p className="text-sm text-blue-800">
                 Click the Play button to listen to the content. You can read along as you listen.
-                Complete the drill after you've listened to the content.
+                Once you've listened, click "Complete Drill" to finish.
               </p>
             </div>
           </div>
@@ -210,8 +243,16 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               Submitting...
             </>
+          ) : hasListened ? (
+            <>
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Complete Drill
+            </>
           ) : (
-            "Complete Drill"
+            <>
+              <Headphones className="w-5 h-5 mr-2" />
+              Listen First to Complete
+            </>
           )}
         </Button>
     </DrillLayout>

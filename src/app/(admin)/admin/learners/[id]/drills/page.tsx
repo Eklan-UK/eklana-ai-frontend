@@ -2,7 +2,21 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, BookOpen, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Loader2, 
+  BookOpen, 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  TrendingUp,
+  MessageSquare,
+  FileText,
+  PenTool,
+  Headphones,
+  ScrollText,
+  Link2,
+} from 'lucide-react';
 import { useLearnerById } from '@/hooks/useAdmin';
 import { useQuery } from '@tanstack/react-query';
 import { drillAPI } from '@/lib/api';
@@ -95,16 +109,16 @@ export default function StudentDrillsPage() {
   };
 
   const getTypeIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      vocabulary: "📚",
-      roleplay: "💬",
-      grammar: "✏️",
-      matching: "🔗",
-      summary: "📝",
-      definition: "📖",
-      sentence_writing: "✍️",
+    const icons: Record<string, React.ReactNode> = {
+      vocabulary: <BookOpen className="w-5 h-5 text-blue-500" />,
+      roleplay: <MessageSquare className="w-5 h-5 text-purple-500" />,
+      grammar: <FileText className="w-5 h-5 text-pink-500" />,
+      matching: <Link2 className="w-5 h-5 text-green-500" />,
+      summary: <ScrollText className="w-5 h-5 text-orange-500" />,
+      sentence_writing: <PenTool className="w-5 h-5 text-indigo-500" />,
+      listening: <Headphones className="w-5 h-5 text-cyan-500" />,
     };
-    return icons[type] || "📖";
+    return icons[type] || <BookOpen className="w-5 h-5 text-gray-500" />;
   };
 
   const totalAssigned = assignments.length;
@@ -233,7 +247,9 @@ export default function StudentDrillsPage() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className="text-2xl">{getTypeIcon(drill.type)}</span>
+                              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                {getTypeIcon(drill.type)}
+                              </div>
                               <h3 className="font-semibold text-gray-900">{drill.title}</h3>
                             </div>
                             <div className="flex flex-wrap gap-3 text-sm text-gray-500 ml-11">

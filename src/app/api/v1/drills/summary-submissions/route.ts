@@ -1,5 +1,5 @@
-// GET /api/v1/drills/sentence-submissions
-// Get all pending sentence drill submissions for review (admin/tutor only)
+// GET /api/v1/drills/summary-submissions
+// Get summary drill submissions for review
 import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
@@ -14,43 +14,42 @@ async function getHandler(
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();
-
-    // Ensure models are registered before populate
+    
+    // Ensure models are registered
     void Drill.modelName;
     void User.modelName;
 
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status") || "pending"; // pending, reviewed, all
+    const status = searchParams.get("status") || "pending";
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
     const page = parseInt(searchParams.get("page") || "1");
     const skip = (page - 1) * limit;
 
-    // Build query for sentence drill attempts
+    // Build query
     const query: Record<string, any> = {
-      sentenceResults: { $exists: true, $ne: null },
+      summaryResults: { $exists: true, $ne: null },
+      "summaryResults.summaryProvided": true,
     };
 
     if (status === "pending") {
-      query["sentenceResults.reviewStatus"] = "pending";
+      query["summaryResults.reviewStatus"] = { $in: ["pending", null] };
     } else if (status === "reviewed") {
-      query["sentenceResults.reviewStatus"] = "reviewed";
+      query["summaryResults.reviewStatus"] = "reviewed";
     }
-    // If status is "all", no filter on reviewStatus
+    // "all" status doesn't add any filter
 
-    // Get attempts with populated data
     const attempts = await DrillAttempt.find(query)
       .populate("learnerId", "firstName lastName email")
-      .populate("drillId", "title type sentence_drill_word sentence_writing_items")
+      .populate("drillId", "title type article_title")
       .sort({ completedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean()
       .exec();
 
-    // Get total count for pagination
     const total = await DrillAttempt.countDocuments(query);
 
-    // Group attempts by learner for easier display
+    // Group by learner
     const submissionsByLearner: Record<string, any> = {};
 
     for (const attempt of attempts) {
@@ -73,7 +72,7 @@ async function getHandler(
       submissionsByLearner[learnerId].submissions.push({
         attemptId: attempt._id,
         drill: attempt.drillId,
-        sentenceResults: attempt.sentenceResults,
+        summaryResults: attempt.summaryResults,
         completedAt: attempt.completedAt,
         score: attempt.score,
         timeSpent: attempt.timeSpent,
@@ -85,7 +84,7 @@ async function getHandler(
         code: "Success",
         data: {
           submissions: Object.values(submissionsByLearner),
-          attempts, // Also include raw attempts for flexibility
+          attempts,
           pagination: {
             total,
             page,
@@ -97,7 +96,7 @@ async function getHandler(
       { status: 200 }
     );
   } catch (error: any) {
-    console.error("Error fetching sentence submissions:", error);
+    console.error("Error fetching summary submissions:", error);
     return NextResponse.json(
       {
         code: "ServerError",
@@ -110,5 +109,4 @@ async function getHandler(
 }
 
 export const GET = withRole(["admin", "tutor"], getHandler);
-
 

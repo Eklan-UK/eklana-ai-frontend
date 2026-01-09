@@ -9,6 +9,7 @@ import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { sendDrillAssignmentNotification } from '@/lib/api/email.service';
 
 // Validation schemas
 const targetSentenceSchema = z.object({
@@ -166,14 +167,14 @@ async function postHandler(
 
 		// Validate assigned students - assigned_to now contains user IDs
 		let assignedUserIds: Types.ObjectId[] = [];
-		let studentUsers: Array<{ _id: Types.ObjectId; email: string }> = [];
+		let studentUsers: Array<{ _id: Types.ObjectId; email: string; firstName?: string; lastName?: string }> = [];
 		if (validated.assigned_to && validated.assigned_to.length > 0) {
 			const userIds = validated.assigned_to.map((id) => new Types.ObjectId(id));
 			studentUsers = await User.find({
 				_id: { $in: userIds },
 				role: 'user',
 			})
-				.select('_id email')
+				.select('_id email firstName lastName')
 				.lean()
 				.exec();
 
@@ -245,6 +246,8 @@ async function postHandler(
 				return {
 					_id: id,
 					email: user?.email || '',
+					firstName: user?.firstName || '',
+					lastName: user?.lastName || '',
 				};
 			});
 
@@ -265,16 +268,18 @@ async function postHandler(
 			const dueDate = new Date(validated.date);
 
 			// Create drill assignments for users that don't have one yet
-			const newAssignments = assignedUsers
-				.filter((user) => !existingUserIds.has(user._id.toString()))
-				.map((user) => ({
-					drillId: drill._id,
-					learnerId: user._id,
-					assignedBy: context.userId,
-					assignedAt: new Date(),
-					dueDate: dueDate,
-					status: 'pending' as const,
-				}));
+			const newAssignmentUsers = assignedUsers.filter(
+				(user) => !existingUserIds.has(user._id.toString())
+			);
+			
+			const newAssignments = newAssignmentUsers.map((user) => ({
+				drillId: drill._id,
+				learnerId: user._id,
+				assignedBy: context.userId,
+				assignedAt: new Date(),
+				dueDate: dueDate,
+				status: 'pending' as const,
+			}));
 
 			if (newAssignments.length > 0) {
 				// Bulk insert assignments (much faster than individual creates)
@@ -293,6 +298,37 @@ async function postHandler(
 					throw error;
 				});
 				assignmentCount = Array.isArray(createdAssignments) ? createdAssignments.length : 0;
+
+				// Send email notifications to newly assigned users asynchronously
+				// Don't block the response - emails are sent in the background
+				Promise.all(
+					newAssignmentUsers.map(async (user) => {
+						if (user.email) {
+							try {
+								await sendDrillAssignmentNotification({
+									studentEmail: user.email,
+									studentName: user.firstName || user.email.split('@')[0],
+									drillTitle: validated.title,
+									drillType: validated.type.replace('_', ' '),
+									dueDate: dueDate,
+									assignerName: creator.email,
+								});
+								logger.info('Drill assignment email sent', {
+									studentEmail: user.email,
+									drillId: drill._id.toString(),
+								});
+							} catch (emailError: any) {
+								logger.error('Failed to send drill assignment email', {
+									error: emailError.message,
+									studentEmail: user.email,
+									drillId: drill._id.toString(),
+								});
+							}
+						}
+					})
+				).catch((err) => {
+					logger.error('Error sending drill assignment emails', { error: err.message });
+				});
 			}
 
 			// Update drill's totalAssignments count

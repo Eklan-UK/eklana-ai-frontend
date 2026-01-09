@@ -53,16 +53,32 @@ const completeSchema = z.object({
 			attempts: z.number(),
 		})),
 	}).optional(),
-	grammarResults: z.object({
-		patternsPracticed: z.number(),
-		totalPatterns: z.number(),
-		accuracy: z.number(),
-		patternScores: z.array(z.object({
-			pattern: z.string(),
-			score: z.number(),
-			attempts: z.number(),
-		})),
-	}).optional(),
+	grammarResults: z.union([
+		// Old format (auto-scored)
+		z.object({
+			patternsPracticed: z.number(),
+			totalPatterns: z.number(),
+			accuracy: z.number(),
+			patternScores: z.array(z.object({
+				pattern: z.string(),
+				score: z.number(),
+				attempts: z.number(),
+			})),
+		}),
+		// New format (pending review)
+		z.object({
+			patterns: z.array(z.object({
+				pattern: z.string(),
+				example: z.string(),
+				hint: z.string().optional(),
+				sentences: z.array(z.object({
+					text: z.string(),
+					index: z.number(),
+				})),
+			})),
+			reviewStatus: z.enum(['pending', 'reviewed']).default('pending'),
+		}),
+	]).optional(),
 	sentenceWritingResults: z.object({
 		sentencesWritten: z.number(),
 		totalSentences: z.number(),
@@ -80,13 +96,26 @@ const completeSchema = z.object({
 			text: z.string(),
 			index: z.number(),
 		})),
+		// Support multi-word sentence drills
+		words: z.array(z.object({
+			word: z.string(),
+			definition: z.string(),
+			sentences: z.array(z.object({
+				text: z.string(),
+				index: z.number(),
+			})),
+		})).optional(),
 		reviewStatus: z.enum(['pending', 'reviewed']).default('pending'),
 	}).optional(),
 	summaryResults: z.object({
 		summaryProvided: z.boolean(),
-		score: z.number().optional(),
+		articleTitle: z.string().optional(),
+		articleContent: z.string().optional(),
+		summary: z.string().optional(),
 		wordCount: z.number().optional(),
+		score: z.number().optional(),
 		qualityScore: z.number().optional(),
+		reviewStatus: z.enum(['pending', 'reviewed']).default('pending'),
 	}).optional(),
 	listeningResults: z.object({
 		completed: z.boolean(),

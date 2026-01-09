@@ -9,6 +9,7 @@ import { CheckCircle, Mic, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import type { TextScore } from "@/services/speechace.service";
+import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService } from "@/services/speechace.service";
 import {
   DrillCompletionScreen,
@@ -398,22 +399,12 @@ export default function VocabularyDrill({
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
-      // Track activity
-      try {
-        await fetch("/api/v1/activities/recent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            type: "drill",
-            resourceId: drill._id,
-            action: "completed",
-            metadata: { title: drill.title, type: drill.type, score },
-          }),
-        });
-      } catch (error) {
-        console.error("Failed to track activity:", error);
-      }
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+        score,
+      });
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")

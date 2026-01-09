@@ -15,6 +15,9 @@ async function handler(
 	try {
 		await connectToDatabase();
 
+		// Ensure User model is registered before populate
+		void User.modelName;
+
 		const { drillId } = params;
 
 		if (!Types.ObjectId.isValid(drillId)) {

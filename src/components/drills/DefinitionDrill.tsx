@@ -10,6 +10,7 @@ import { CheckCircle, Loader2, BookOpen, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
+import { trackActivity } from "@/utils/activity-cache";
 
 interface DefinitionDrillProps {
   drill: any;
@@ -106,21 +107,12 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
-      try {
-        await fetch('/api/v1/activities/recent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            type: 'drill',
-            resourceId: drill._id,
-            action: 'completed',
-            metadata: { title: drill.title, type: drill.type, score },
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to track activity:', error);
-      }
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+        score,
+      });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {

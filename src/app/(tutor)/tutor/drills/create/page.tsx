@@ -699,7 +699,6 @@ function CreateDrillPageContent() {
                     <option value="vocabulary">Vocabulary</option>
                     <option value="roleplay">Role-play</option>
                     <option value="matching">Matching</option>
-                    <option value="definition">Definition</option>
                     <option value="summary">Summary</option>
                     <option value="grammar">Grammar</option>
                     <option value="sentence_writing">Sentence Writing</option>

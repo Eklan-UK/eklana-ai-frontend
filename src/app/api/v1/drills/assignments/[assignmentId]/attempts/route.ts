@@ -5,6 +5,7 @@ import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
+import Drill from '@/models/drill';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -14,6 +15,9 @@ async function getHandler(
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
+
+		// Ensure models are registered before populate
+		void Drill.modelName;
 
 		// Extract assignmentId from URL path
 		const url = new URL(req.url);

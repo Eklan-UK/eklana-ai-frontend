@@ -1,79 +1,110 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, Loader2, Sparkles, Lightbulb } from "lucide-react";
-import Link from "next/link";
+import {
+  Loader2,
+  BookOpen,
+  PenTool,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Lightbulb,
+  FileText,
+} from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
+import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
+import { trackActivity } from "@/utils/activity-cache";
 
 interface GrammarDrillProps {
   drill: any;
   assignmentId?: string;
 }
 
-export default function GrammarDrill({ drill, assignmentId }: GrammarDrillProps) {
+interface PatternItem {
+  pattern: string;
+  example: string;
+  hint?: string;
+}
+
+interface PatternAnswer {
+  sentence1: string;
+  sentence2: string;
+}
+
+export default function GrammarDrill({
+  drill,
+  assignmentId,
+}: GrammarDrillProps) {
+  const patternItems: PatternItem[] = useMemo(() => {
+    return (drill.grammar_items || []).map((item: any) => ({
+      pattern: item.pattern || "",
+      example: item.example || "",
+      hint: item.hint || undefined,
+    }));
+  }, [drill.grammar_items]);
+
+  const totalPatterns = patternItems.length;
+
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [showResults, setShowResults] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [answers, setAnswers] = useState<Record<number, PatternAnswer>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [startTime] = useState(Date.now());
 
-  const items = drill.grammar_items || [];
-  const currentItem = items[currentIndex];
-  const currentAnswer = answers[currentIndex] || "";
-  const hasAnswer = currentAnswer.trim().length > 0;
-
-  // Parse pattern to create fill-in-the-blank
-  const createPatternWithBlanks = (pattern: string) => {
-    // Replace placeholders like {word} or [word] with input fields
-    return pattern;
+  const currentPattern = patternItems[currentIndex];
+  const currentAnswer = answers[currentIndex] || {
+    sentence1: "",
+    sentence2: "",
   };
 
-  const handleAnswerChange = (value: string) => {
-    setAnswers({
-      ...answers,
-      [currentIndex]: value,
+  const isFirstPattern = currentIndex === 0;
+  const isLastPattern = currentIndex === totalPatterns - 1;
+
+  // Check if current pattern has both sentences filled
+  const isCurrentPatternComplete =
+    currentAnswer.sentence1.trim().length > 0 &&
+    currentAnswer.sentence2.trim().length > 0;
+
+  // Check if all patterns are complete
+  const allPatternsComplete = useMemo(() => {
+    return patternItems.every((_, idx) => {
+      const answer = answers[idx];
+      return (
+        answer &&
+        answer.sentence1.trim().length > 0 &&
+        answer.sentence2.trim().length > 0
+      );
     });
-  };
+  }, [patternItems, answers]);
 
-  const handleNext = () => {
-    if (!hasAnswer) {
-      toast.error("Please complete the grammar pattern before proceeding");
-      return;
-    }
-
-    if (currentIndex < items.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      const allAnswered = items.every((_: any, idx: number) => {
-        const answer = answers[idx];
-        return answer && answer.trim().length > 0;
-      });
-
-      if (allAnswered) {
-        setShowResults(true);
-      } else {
-        toast.error("Please answer all questions before reviewing");
-        const firstUnanswered = items.findIndex((_: any, idx: number) => {
-          const answer = answers[idx];
-          return !answer || answer.trim().length === 0;
-        });
-        if (firstUnanswered !== -1) {
-          setCurrentIndex(firstUnanswered);
-        }
-      }
-    }
+  const updateCurrentAnswer = (field: keyof PatternAnswer, value: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [currentIndex]: {
+        ...currentAnswer,
+        [field]: value,
+      },
+    }));
   };
 
   const handlePrevious = () => {
-    if (currentIndex > 0) {
+    if (!isFirstPattern) {
       setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (!isCurrentPatternComplete) {
+      toast.error("Please write both sentences before proceeding.");
+      return;
+    }
+    if (!isLastPattern) {
+      setCurrentIndex(currentIndex + 1);
     }
   };
 
@@ -83,53 +114,61 @@ export default function GrammarDrill({ drill, assignmentId }: GrammarDrillProps)
       return;
     }
 
+    if (!allPatternsComplete) {
+      toast.error("Please complete all patterns before submitting.");
+      // Find first incomplete pattern
+      const firstIncomplete = patternItems.findIndex((_, idx) => {
+        const answer = answers[idx];
+        return (
+          !answer ||
+          answer.sentence1.trim().length === 0 ||
+          answer.sentence2.trim().length === 0
+        );
+      });
+      if (firstIncomplete !== -1) {
+        setCurrentIndex(firstIncomplete);
+      }
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const totalQuestions = items.length;
-      const answeredCount = items.filter((_: any, idx: number) => {
-        const answer = answers[idx];
-        return answer && answer.trim().length > 0;
-      }).length;
-      const score = Math.round((answeredCount / totalQuestions) * 100);
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      const grammarResults = items.map((item: any, index: number) => ({
-        pattern: item.pattern,
-        answer: answers[index] || "",
-        hint: item.hint || "",
-        example: item.example || "",
-      }));
+      // Build grammar results for submission
+      const grammarResults = {
+        patterns: patternItems.map((item, idx) => ({
+          pattern: item.pattern,
+          example: item.example,
+          hint: item.hint || "",
+          sentences: [
+            { text: answers[idx]?.sentence1.trim() || "", index: 0 },
+            { text: answers[idx]?.sentence2.trim() || "", index: 1 },
+          ],
+        })),
+        reviewStatus: "pending",
+      };
 
       await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
-        score,
+        score: 0, // Score will be calculated after review
         timeSpent,
-        grammarResults: {
-          patterns: grammarResults,
-        },
-        platform: 'web',
+        grammarResults,
+        platform: "web",
       });
 
       setIsCompleted(true);
-      toast.success("Drill completed! Great job!");
+      toast.success("Drill submitted! Your submission is pending review.");
 
-      try {
-        await fetch('/api/v1/activities/recent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            type: 'drill',
-            resourceId: drill._id,
-            action: 'completed',
-            metadata: { title: drill.title, type: drill.type, score },
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to track activity:', error);
-      }
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+      });
     } catch (error: any) {
-      toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
+      toast.error(
+        "Failed to submit drill: " + (error.message || "Unknown error")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -137,213 +176,225 @@ export default function GrammarDrill({ drill, assignmentId }: GrammarDrillProps)
 
   if (isCompleted) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
-        <div className="h-6"></div>
-        <Header title="Drill Completed" />
-        <div className="max-w-md mx-auto px-4 py-6">
-          <Card className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
-            <p className="text-gray-600 mb-6">You've completed the grammar drill.</p>
-            <Link href="/account">
-              <Button variant="primary" size="lg" fullWidth>Continue Learning</Button>
-            </Link>
-          </Card>
-        </div>
-        <BottomNav />
-      </div>
+      <DrillCompletionScreen
+        title="Drill Submitted"
+        message="Your grammar sentences have been submitted for review. You'll be notified when your work has been reviewed."
+        drillType="grammar"
+      />
     );
   }
 
-  if (showResults) {
+  if (totalPatterns === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 pb-20 md:pb-0">
-        <div className="h-6"></div>
-        <Header title="Review Your Answers" />
-        
-        <div className="max-w-2xl mx-auto px-4 py-6">
-          <Card className="mb-4 bg-white/90 backdrop-blur-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-pink-500" />
-              Your Grammar Patterns
-            </h2>
-            <div className="space-y-6">
-              {items.map((item: any, index: number) => (
-                <div key={index} className="border-b border-gray-200 pb-6 last:border-0 last:pb-0">
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-8 h-8 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-sm font-bold">
-                        {index + 1}
-                      </span>
-                      <h3 className="text-lg font-bold text-gray-900">Pattern</h3>
-                    </div>
-                    <p className="text-base text-gray-700 font-mono bg-gray-50 p-3 rounded-lg">
-                      {item.pattern}
-                    </p>
-                    {item.example && (
-                      <p className="text-xs text-gray-500 mt-2">Example: {item.example}</p>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">Your answer:</p>
-                    <p className="text-sm text-gray-900 font-mono">{answers[index] || "No answer provided"}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setShowResults(false)}
-            >
-              Review Again
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              fullWidth
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit"
-              )}
-            </Button>
+      <DrillLayout title={drill.title}>
+        <Card className="mb-4">
+          <div className="flex flex-col items-center gap-3 text-amber-600 py-8">
+            <AlertCircle className="w-12 h-12" />
+            <p className="text-lg font-medium">No patterns found</p>
+            <p className="text-sm text-gray-500">
+              This drill may not be configured correctly. Please contact your
+              tutor.
+            </p>
           </div>
-        </div>
-        
-        <BottomNav />
-      </div>
+        </Card>
+      </DrillLayout>
     );
   }
-
-  const progress = items.length > 0 ? ((currentIndex + 1) / items.length) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 pb-20 md:pb-0">
-      <div className="h-6"></div>
-      <Header title={drill.title} />
-      
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Progress */}
-        <Card className="mb-6 bg-white/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              Pattern {currentIndex + 1} of {items.length}
-            </span>
-            <span className="text-sm font-bold text-pink-600">{Math.round(progress)}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-pink-500 to-purple-500 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+    <DrillLayout title={drill.title}>
+      {/* Context */}
+      {drill.context && (
+        <Card className="mb-4">
+          <p className="text-sm text-gray-700">{drill.context}</p>
         </Card>
+      )}
 
-        {/* Context */}
-        {drill.context && (
-          <Card className="mb-6 bg-pink-50 border-pink-200">
-            <p className="text-sm text-pink-800">{drill.context}</p>
-          </Card>
-        )}
+      {/* Progress */}
+      {totalPatterns > 1 && (
+        <DrillProgress
+          current={currentIndex + 1}
+          total={totalPatterns}
+          label="Pattern"
+        />
+      )}
 
-        {/* Main Card */}
-        <Card className="mb-6 bg-white/90 backdrop-blur-sm shadow-lg">
-          {currentItem && (
-            <div>
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-purple-400 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md">
-                      {currentIndex + 1}
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-700 mb-1">Grammar Pattern</h2>
-                      <p className="text-xs text-gray-500">Complete this pattern</p>
-                    </div>
-                  </div>
-                  <Sparkles className="w-6 h-6 text-pink-500" />
-                </div>
-
-                <div className="bg-gradient-to-r from-pink-100 to-purple-100 p-4 rounded-xl mb-4">
-                  <p className="text-lg font-mono text-gray-900 text-center">
-                    {currentItem.pattern}
-                  </p>
-                </div>
-
-                {currentItem.example && (
-                  <div className="flex items-start gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg mb-4">
-                    <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-purple-800 mb-1">Example</p>
-                      <p className="text-sm text-purple-900 font-mono">{currentItem.example}</p>
-                    </div>
-                  </div>
-                )}
-
-                {currentItem.hint && (
-                  <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <Lightbulb className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-yellow-800 mb-1">Hint</p>
-                      <p className="text-sm text-yellow-900">{currentItem.hint}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Write a sentence using this pattern:
-                </label>
-                <textarea
-                  className="w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all min-h-[120px] resize-none font-mono"
-                  placeholder="Type your sentence here..."
-                  value={currentAnswer}
-                  onChange={(e) => handleAnswerChange(e.target.value)}
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  {currentAnswer.length} characters
-                </p>
-              </div>
+      {/* Pattern Display Card */}
+      <Card className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+        <div className="text-center py-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold mb-3">
+            <FileText className="w-3 h-3" />
+            Grammar Pattern
+          </div>
+          
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+              {currentPattern?.pattern}
+            </h1>
+            <TTSButton text={currentPattern?.pattern || ""} size="md" />
+          </div>
+          
+          {currentPattern?.hint && (
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <Lightbulb className="w-4 h-4 text-amber-500" />
+              <p className="text-sm text-amber-700">{currentPattern.hint}</p>
             </div>
           )}
-        </Card>
+        </div>
+      </Card>
 
-        {/* Navigation */}
-        <div className="flex gap-3">
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-          >
-            Previous
-          </Button>
+      {/* Example Display - Always shown as guide */}
+      <Card className="mb-4 bg-green-50 border-green-200">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <BookOpen className="w-5 h-5 text-green-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-1">
+              Example (Use this as your guide)
+            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-lg text-green-900 font-medium">
+                "{currentPattern?.example}"
+              </p>
+              <TTSButton text={currentPattern?.example || ""} size="sm" />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Instructions */}
+      <Card className="mb-4 bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-2">
+          <PenTool className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-900 mb-1">Your Task</p>
+            <p className="text-sm text-blue-800">
+              Write <strong>two different sentences</strong> using the pattern above. 
+              Use the example as a guide for how to structure your sentences.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Sentence 1 Input */}
+      <Card className="mb-4">
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xs font-bold">
+              1
+            </span>
+            First Sentence:
+          </label>
+          <Textarea
+            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all min-h-[100px] resize-none"
+            placeholder="Write your first sentence using the pattern..."
+            value={currentAnswer.sentence1}
+            onChange={(e) => updateCurrentAnswer("sentence1", e.target.value)}
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            {currentAnswer.sentence1.length} characters
+          </p>
+        </div>
+      </Card>
+
+      {/* Sentence 2 Input */}
+      <Card className="mb-4">
+        <div className="mb-4">
+          <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <span className="w-6 h-6 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs font-bold">
+              2
+            </span>
+            Second Sentence:
+          </label>
+          <Textarea
+            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all min-h-[100px] resize-none"
+            placeholder="Write your second sentence using the pattern..."
+            value={currentAnswer.sentence2}
+            onChange={(e) => updateCurrentAnswer("sentence2", e.target.value)}
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            {currentAnswer.sentence2.length} characters
+          </p>
+        </div>
+      </Card>
+
+      {/* Navigation Buttons */}
+      <div className="flex gap-3">
+        {/* Previous Button */}
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={handlePrevious}
+          disabled={isFirstPattern}
+          className="flex-shrink-0"
+        >
+          <ChevronLeft className="w-5 h-5 mr-1" />
+          Previous
+        </Button>
+
+        {/* Next or Submit Button */}
+        {isLastPattern ? (
           <Button
             variant="primary"
-            size="md"
+            size="lg"
+            fullWidth
+            onClick={handleSubmit}
+            disabled={!isCurrentPatternComplete || isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit for Review"
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
             fullWidth
             onClick={handleNext}
-            disabled={!hasAnswer}
-            className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+            disabled={!isCurrentPatternComplete}
           >
-            {currentIndex === items.length - 1 ? "Review" : "Next"}
+            Next
+            <ChevronRight className="w-5 h-5 ml-1" />
           </Button>
-        </div>
+        )}
       </div>
-      
-      <BottomNav />
-    </div>
+
+      {/* Pattern Progress Indicators */}
+      {totalPatterns > 1 && (
+        <div className="mt-6 flex justify-center gap-2">
+          {patternItems.map((_, idx) => {
+            const answer = answers[idx];
+            const isComplete =
+              answer &&
+              answer.sentence1.trim().length > 0 &&
+              answer.sentence2.trim().length > 0;
+            const isCurrent = idx === currentIndex;
+
+            return (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${
+                  isCurrent
+                    ? "bg-purple-500 text-white ring-2 ring-purple-300"
+                    : isComplete
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+                title={`Pattern ${idx + 1}: ${patternItems[idx].pattern}`}
+              >
+                {idx + 1}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </DrillLayout>
   );
 }

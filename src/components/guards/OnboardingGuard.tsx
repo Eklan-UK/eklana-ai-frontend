@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
-import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
+import {
+  checkAuthFlowStatus,
+  getCachedProfileStatus,
+} from "@/utils/auth-flow";
 import { Loader2 } from "lucide-react";
 
 interface OnboardingGuardProps {
@@ -13,11 +16,17 @@ interface OnboardingGuardProps {
 /**
  * Route guard that checks if learner profile exists
  * Redirects to onboarding if user is a learner without a profile
+ * Uses cached profile status for faster loads
  */
 export function OnboardingGuard({ children }: OnboardingGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading: authLoading, hasHydrated } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    isLoading: authLoading,
+    hasHydrated,
+  } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
   const [isAllowed, setIsAllowed] = useState(false);
 
@@ -52,33 +61,58 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
         return;
       }
 
-      // Check verification and onboarding status
+      // Normalize role
+      const userRole = user.role === "learner" ? "user" : user.role;
+
+      // Admins and tutors don't need onboarding
+      if (userRole === "admin" || userRole === "tutor") {
+        setIsAllowed(true);
+        setIsChecking(false);
+        return;
+      }
+
+      // FAST PATH: Check cached profile status first (no API call)
+      const cachedHasProfile = getCachedProfileStatus();
+      if (cachedHasProfile === true) {
+        // User has profile - allow immediately
+        setIsAllowed(true);
+        setIsChecking(false);
+        return;
+      }
+
+      // If cached value says no profile, redirect to onboarding immediately
+      if (cachedHasProfile === false) {
+        if (pathname !== "/account/onboarding") {
+          router.push("/account/onboarding");
+        }
+        setIsAllowed(false);
+        setIsChecking(false);
+        return;
+      }
+
+      // SLOW PATH: No cached value, need to check API
       try {
-        // Normalize user role for checking
         const normalizedUser = {
           ...user,
-          role: user.role === 'learner' ? 'user' : user.role,
+          role: userRole,
         };
-        
+
         const status = await checkAuthFlowStatus(normalizedUser);
-        
-        // If verification is needed, that should be handled by VerificationGuard
-        // Here we only check onboarding
+
         if (status.shouldOnboard) {
-          // No onboarding, redirect to onboarding
           if (pathname !== "/account/onboarding") {
             router.push("/account/onboarding");
           }
           setIsAllowed(false);
         } else {
-          // Onboarding complete (or not needed for non-users), allow access
           setIsAllowed(true);
         }
       } catch (error: any) {
-        // On error, check if it's a Forbidden error
-        if (error?.message?.includes('Forbidden') || error?.code === 'Forbidden') {
-          // If forbidden, redirect to onboarding (user might need to complete it)
-          console.warn("Forbidden error checking onboarding, redirecting to onboarding:", error);
+        if (
+          error?.message?.includes("Forbidden") ||
+          error?.code === "Forbidden"
+        ) {
+          console.warn("Forbidden error, redirecting to onboarding:", error);
           if (pathname !== "/account/onboarding") {
             router.push("/account/onboarding");
           }
@@ -96,8 +130,26 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     checkOnboarding();
   }, [isAuthenticated, user, authLoading, hasHydrated, pathname, router]);
 
-  // Show loading state while hydrating or checking
-  if (!hasHydrated || isChecking || authLoading) {
+  // Show loading only if hydrating or still checking (but not if cached)
+  if (!hasHydrated || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If we have cached profile status, don't show loading
+  if (isChecking) {
+    const cachedHasProfile = getCachedProfileStatus();
+    if (cachedHasProfile === true) {
+      // Show content immediately since we know user has profile
+      return <>{children}</>;
+    }
+    // Still checking and no cached data
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -115,5 +167,3 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
 
   return <>{children}</>;
 }
-
-

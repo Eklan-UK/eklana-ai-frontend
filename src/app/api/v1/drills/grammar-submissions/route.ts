@@ -1,5 +1,5 @@
-// GET /api/v1/drills/sentence-submissions
-// Get all pending sentence drill submissions for review (admin/tutor only)
+// GET /api/v1/drills/grammar-submissions
+// Get all pending grammar drill submissions for review (admin/tutor only)
 import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
@@ -25,22 +25,22 @@ async function getHandler(
     const page = parseInt(searchParams.get("page") || "1");
     const skip = (page - 1) * limit;
 
-    // Build query for sentence drill attempts
+    // Build query for grammar drill attempts with patterns (new format)
     const query: Record<string, any> = {
-      sentenceResults: { $exists: true, $ne: null },
+      "grammarResults.patterns": { $exists: true, $ne: null, $not: { $size: 0 } },
     };
 
     if (status === "pending") {
-      query["sentenceResults.reviewStatus"] = "pending";
+      query["grammarResults.reviewStatus"] = "pending";
     } else if (status === "reviewed") {
-      query["sentenceResults.reviewStatus"] = "reviewed";
+      query["grammarResults.reviewStatus"] = "reviewed";
     }
     // If status is "all", no filter on reviewStatus
 
     // Get attempts with populated data
     const attempts = await DrillAttempt.find(query)
       .populate("learnerId", "firstName lastName email")
-      .populate("drillId", "title type sentence_drill_word sentence_writing_items")
+      .populate("drillId", "title type grammar_items")
       .sort({ completedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -73,7 +73,7 @@ async function getHandler(
       submissionsByLearner[learnerId].submissions.push({
         attemptId: attempt._id,
         drill: attempt.drillId,
-        sentenceResults: attempt.sentenceResults,
+        grammarResults: attempt.grammarResults,
         completedAt: attempt.completedAt,
         score: attempt.score,
         timeSpent: attempt.timeSpent,
@@ -97,7 +97,7 @@ async function getHandler(
       { status: 200 }
     );
   } catch (error: any) {
-    console.error("Error fetching sentence submissions:", error);
+    console.error("Error fetching grammar submissions:", error);
     return NextResponse.json(
       {
         code: "ServerError",
@@ -110,5 +110,4 @@ async function getHandler(
 }
 
 export const GET = withRole(["admin", "tutor"], getHandler);
-
 

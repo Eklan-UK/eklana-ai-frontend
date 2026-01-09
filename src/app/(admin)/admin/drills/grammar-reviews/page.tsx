@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
+  BookOpen,
+  Lightbulb,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -26,17 +28,18 @@ interface Learner {
   email: string;
 }
 
-interface SentenceResult {
-  word: string;
-  definition: string;
+interface PatternResult {
+  pattern: string;
+  example: string;
+  hint?: string;
   sentences: Array<{ text: string; index: number }>;
-  words?: Array<{
-    word: string;
-    definition: string;
-    sentences: Array<{ text: string; index: number }>;
-  }>;
+}
+
+interface GrammarResult {
+  patterns?: PatternResult[];
   reviewStatus: "pending" | "reviewed";
-  sentenceReviews?: Array<{
+  patternReviews?: Array<{
+    patternIndex: number;
     sentenceIndex: number;
     isCorrect: boolean;
     correctedText?: string;
@@ -51,7 +54,7 @@ interface Submission {
     title: string;
     type: string;
   };
-  sentenceResults: SentenceResult;
+  grammarResults: GrammarResult;
   completedAt: string;
   score?: number;
   timeSpent: number;
@@ -73,133 +76,154 @@ function ReviewModal({
   onSubmitReview: (
     attemptId: string,
     reviews: Array<{
+      patternIndex: number;
       sentenceIndex: number;
       isCorrect: boolean;
       correctedText?: string;
     }>
   ) => void;
 }) {
-  const { sentenceResults } = submission;
-  
-  // Handle multiple words case
-  const allWords = sentenceResults.words && sentenceResults.words.length > 0 
-    ? sentenceResults.words 
-    : [{ word: sentenceResults.word, definition: sentenceResults.definition, sentences: sentenceResults.sentences }];
-  
-  const totalWords = allWords.length;
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  
-  const currentWord = allWords[currentWordIndex];
-  const sentences = currentWord?.sentences || [];
-  const isAlreadyReviewed = sentenceResults.reviewStatus === "reviewed";
-  const existingReviews = sentenceResults.sentenceReviews || [];
+  const { grammarResults } = submission;
+  const patterns = grammarResults.patterns || [];
+  const totalPatterns = patterns.length;
+  const [currentPatternIndex, setCurrentPatternIndex] = useState(0);
+
+  const currentPattern = patterns[currentPatternIndex];
+  const sentences = currentPattern?.sentences || [];
+  const isAlreadyReviewed = grammarResults.reviewStatus === "reviewed";
+  const existingReviews = grammarResults.patternReviews || [];
 
   // Initialize reviews from existing reviews if already reviewed
-  // Track reviews per word
-  const [allWordReviews, setAllWordReviews] = useState<
-    Record<number, Array<{ isCorrect: boolean | null; correctedText: string }>>
+  const [allPatternReviews, setAllPatternReviews] = useState<
+    Record<
+      number,
+      Array<{ isCorrect: boolean | null; correctedText: string }>
+    >
   >(() => {
-    const initialReviews: Record<number, Array<{ isCorrect: boolean | null; correctedText: string }>> = {};
-    allWords.forEach((word, wordIdx) => {
-      const wordSentences = word.sentences || [];
+    const initialReviews: Record<
+      number,
+      Array<{ isCorrect: boolean | null; correctedText: string }>
+    > = {};
+    patterns.forEach((pattern, patternIdx) => {
+      const patternSentences = pattern.sentences || [];
       if (isAlreadyReviewed && existingReviews.length > 0) {
-        initialReviews[wordIdx] = wordSentences.map((_, idx) => {
-          // Calculate global sentence index for backwards compatibility
-          const globalIdx = allWords.slice(0, wordIdx).reduce((acc, w) => acc + (w.sentences?.length || 0), 0) + idx;
-          const existing = existingReviews.find((r) => r.sentenceIndex === globalIdx || r.sentenceIndex === idx);
+        initialReviews[patternIdx] = patternSentences.map((_, sentIdx) => {
+          const existing = existingReviews.find(
+            (r) =>
+              r.patternIndex === patternIdx && r.sentenceIndex === sentIdx
+          );
           return {
             isCorrect: existing?.isCorrect ?? null,
             correctedText: existing?.correctedText || "",
           };
         });
       } else {
-        initialReviews[wordIdx] = wordSentences.map(() => ({ isCorrect: null, correctedText: "" }));
+        initialReviews[patternIdx] = patternSentences.map(() => ({
+          isCorrect: null,
+          correctedText: "",
+        }));
       }
     });
     return initialReviews;
   });
 
-  const reviews = allWordReviews[currentWordIndex] || [];
-  const setReviews = (newReviews: Array<{ isCorrect: boolean | null; correctedText: string }> | ((prev: Array<{ isCorrect: boolean | null; correctedText: string }>) => Array<{ isCorrect: boolean | null; correctedText: string }>)) => {
-    setAllWordReviews(prev => ({
+  const reviews = allPatternReviews[currentPatternIndex] || [];
+  const setReviews = (
+    newReviews:
+      | Array<{ isCorrect: boolean | null; correctedText: string }>
+      | ((
+          prev: Array<{ isCorrect: boolean | null; correctedText: string }>
+        ) => Array<{ isCorrect: boolean | null; correctedText: string }>)
+  ) => {
+    setAllPatternReviews((prev) => ({
       ...prev,
-      [currentWordIndex]: typeof newReviews === 'function' ? newReviews(prev[currentWordIndex] || []) : newReviews,
+      [currentPatternIndex]:
+        typeof newReviews === "function"
+          ? newReviews(prev[currentPatternIndex] || [])
+          : newReviews,
     }));
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check if all words have been reviewed
-  const canSubmit = Object.values(allWordReviews).every(wordReviews => 
-    wordReviews.every((r) => r.isCorrect !== null)
+  // Check if all patterns have been reviewed
+  const canSubmit = Object.values(allPatternReviews).every((patternReviews) =>
+    patternReviews.every((r) => r.isCorrect !== null)
   );
-  
-  // Check if current word is complete
-  const isCurrentWordComplete = reviews.every((r) => r.isCorrect !== null);
-  
+
+  // Check if current pattern is complete
+  const isCurrentPatternComplete = reviews.every((r) => r.isCorrect !== null);
+
   // Navigation functions
-  const goToPreviousWord = () => {
-    if (currentWordIndex > 0) {
-      setCurrentWordIndex(currentWordIndex - 1);
+  const goToPreviousPattern = () => {
+    if (currentPatternIndex > 0) {
+      setCurrentPatternIndex(currentPatternIndex - 1);
     }
   };
-  
-  const goToNextWord = () => {
-    if (currentWordIndex < totalWords - 1) {
-      setCurrentWordIndex(currentWordIndex + 1);
+
+  const goToNextPattern = () => {
+    if (currentPatternIndex < totalPatterns - 1) {
+      setCurrentPatternIndex(currentPatternIndex + 1);
     }
   };
 
   const handleSubmit = async () => {
     if (!canSubmit) {
-      toast.error("Please review all sentences for all words before submitting.");
+      toast.error(
+        "Please review all sentences for all patterns before submitting."
+      );
       return;
     }
 
-    // Validate that corrections are provided for incorrect sentences across all words
+    // Validate that corrections are provided for incorrect sentences
     let hasIncorrectWithoutCorrection = false;
-    let incompleteWordIndex = -1;
-    
-    Object.entries(allWordReviews).forEach(([wordIdx, wordReviews]) => {
-      const hasIssue = wordReviews.some(
+    let incompletePatternIndex = -1;
+
+    Object.entries(allPatternReviews).forEach(([patternIdx, patternReviews]) => {
+      const hasIssue = patternReviews.some(
         (r) => r.isCorrect === false && !r.correctedText.trim()
       );
-      if (hasIssue && incompleteWordIndex === -1) {
+      if (hasIssue && incompletePatternIndex === -1) {
         hasIncorrectWithoutCorrection = true;
-        incompleteWordIndex = parseInt(wordIdx);
+        incompletePatternIndex = parseInt(patternIdx);
       }
     });
-    
+
     if (hasIncorrectWithoutCorrection) {
-      toast.error("Please provide corrections for sentences marked as incorrect.");
-      if (incompleteWordIndex !== -1) {
-        setCurrentWordIndex(incompleteWordIndex);
+      toast.error(
+        "Please provide corrections for sentences marked as incorrect."
+      );
+      if (incompletePatternIndex !== -1) {
+        setCurrentPatternIndex(incompletePatternIndex);
       }
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Flatten all reviews with global sentence indices
-      const sentenceReviews: Array<{
+      // Flatten all reviews
+      const grammarReviews: Array<{
+        patternIndex: number;
         sentenceIndex: number;
         isCorrect: boolean;
         correctedText?: string;
       }> = [];
-      
-      let globalIdx = 0;
-      Object.values(allWordReviews).forEach((wordReviews) => {
-        wordReviews.forEach((r) => {
-          sentenceReviews.push({
-            sentenceIndex: globalIdx,
-            isCorrect: r.isCorrect!,
-            correctedText: r.isCorrect ? undefined : r.correctedText || undefined,
-          });
-          globalIdx++;
-        });
-      });
 
-      await onSubmitReview(submission.attemptId, sentenceReviews);
+      Object.entries(allPatternReviews).forEach(
+        ([patternIdx, patternReviews]) => {
+          patternReviews.forEach((r, sentIdx) => {
+            grammarReviews.push({
+              patternIndex: parseInt(patternIdx),
+              sentenceIndex: sentIdx,
+              isCorrect: r.isCorrect!,
+              correctedText:
+                r.isCorrect ? undefined : r.correctedText || undefined,
+            });
+          });
+        }
+      );
+
+      await onSubmitReview(submission.attemptId, grammarReviews);
       onClose();
     } catch (error) {
       // Error handled by mutation
@@ -216,7 +240,7 @@ function ReviewModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                Review Submission
+                Review Grammar Submission
               </h2>
               <p className="text-sm text-gray-500">{submission.drill.title}</p>
             </div>
@@ -231,27 +255,29 @@ function ReviewModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Word Navigation (only show if multiple words) */}
-          {totalWords > 1 && (
+          {/* Pattern Navigation */}
+          {totalPatterns > 1 && (
             <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
               <button
-                onClick={goToPreviousWord}
-                disabled={currentWordIndex === 0}
+                onClick={goToPreviousPattern}
+                disabled={currentPatternIndex === 0}
                 className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Previous
               </button>
-              
+
               <div className="flex items-center gap-2">
-                {allWords.map((_, idx) => (
+                {patterns.map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setCurrentWordIndex(idx)}
+                    onClick={() => setCurrentPatternIndex(idx)}
                     className={`w-8 h-8 rounded-full text-sm font-medium transition ${
-                      idx === currentWordIndex
-                        ? "bg-blue-600 text-white"
-                        : Object.values(allWordReviews[idx] || []).every(r => r.isCorrect !== null)
+                      idx === currentPatternIndex
+                        ? "bg-pink-600 text-white"
+                        : Object.values(allPatternReviews[idx] || []).every(
+                            (r) => r.isCorrect !== null
+                          )
                         ? "bg-green-100 text-green-700 hover:bg-green-200"
                         : "bg-gray-200 text-gray-600 hover:bg-gray-300"
                     }`}
@@ -260,10 +286,10 @@ function ReviewModal({
                   </button>
                 ))}
               </div>
-              
+
               <button
-                onClick={goToNextWord}
-                disabled={currentWordIndex === totalWords - 1}
+                onClick={goToNextPattern}
+                disabled={currentPatternIndex === totalPatterns - 1}
                 className="flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
               >
                 Next
@@ -271,36 +297,50 @@ function ReviewModal({
               </button>
             </div>
           )}
-          
-          {/* Word Progress Indicator */}
-          {totalWords > 1 && (
+
+          {/* Pattern Progress Indicator */}
+          {totalPatterns > 1 && (
             <div className="text-center text-sm text-gray-500">
-              Word {currentWordIndex + 1} of {totalWords}
+              Pattern {currentPatternIndex + 1} of {totalPatterns}
             </div>
           )}
 
-          {/* Word and Definition */}
-          <div className="bg-blue-50 rounded-xl p-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Target Word: <span className="text-blue-600">{currentWord?.word || sentenceResults.word}</span>
-            </h3>
-            <div className="bg-white rounded-lg p-3">
-              <p className="text-xs text-gray-500 mb-1">Student's Definition:</p>
-              <p className="text-gray-900">{currentWord?.definition || sentenceResults.definition || "No definition provided"}</p>
+          {/* Pattern and Example */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="w-5 h-5 text-purple-600" />
+              <h3 className="text-lg font-bold text-gray-900">
+                Pattern: <span className="text-purple-600">{currentPattern?.pattern}</span>
+              </h3>
             </div>
+            <div className="bg-white rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <BookOpen className="w-4 h-4 text-green-600" />
+                <p className="text-xs font-semibold text-green-700">Example (Guide):</p>
+              </div>
+              <p className="text-gray-900 font-medium">"{currentPattern?.example}"</p>
+            </div>
+            {currentPattern?.hint && (
+              <div className="flex items-start gap-2 text-sm text-amber-700">
+                <Lightbulb className="w-4 h-4 mt-0.5" />
+                <p>{currentPattern.hint}</p>
+              </div>
+            )}
           </div>
 
           {/* Sentences to Review */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Review Sentences</h3>
+            <h3 className="font-semibold text-gray-900">
+              Review Student's Sentences
+            </h3>
 
             {sentences.map((sentence, idx) => (
               <div
                 key={idx}
                 className={`border rounded-xl p-4 transition ${
-                  reviews[idx].isCorrect === true
+                  reviews[idx]?.isCorrect === true
                     ? "border-green-300 bg-green-50"
-                    : reviews[idx].isCorrect === false
+                    : reviews[idx]?.isCorrect === false
                     ? "border-red-300 bg-red-50"
                     : "border-gray-200"
                 }`}
@@ -325,7 +365,7 @@ function ReviewModal({
                     }}
                     disabled={isAlreadyReviewed}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                      reviews[idx].isCorrect === true
+                      reviews[idx]?.isCorrect === true
                         ? "bg-green-600 text-white"
                         : isAlreadyReviewed
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
@@ -344,7 +384,7 @@ function ReviewModal({
                     }}
                     disabled={isAlreadyReviewed}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                      reviews[idx].isCorrect === false
+                      reviews[idx]?.isCorrect === false
                         ? "bg-red-600 text-white"
                         : isAlreadyReviewed
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
@@ -356,21 +396,24 @@ function ReviewModal({
                   </button>
                 </div>
 
-                {/* Correction Field (only if marked incorrect) */}
-                {reviews[idx].isCorrect === false && (
+                {/* Correction Field */}
+                {reviews[idx]?.isCorrect === false && (
                   <div className="mt-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {isAlreadyReviewed ? "Corrected Version:" : "Corrected Version (required):"}
+                      {isAlreadyReviewed
+                        ? "Corrected Version:"
+                        : "Corrected Version (required):"}
                     </label>
                     {isAlreadyReviewed ? (
                       <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
                         <p className="text-green-900">
-                          {reviews[idx].correctedText || "No correction provided"}
+                          {reviews[idx]?.correctedText ||
+                            "No correction provided"}
                         </p>
                       </div>
                     ) : (
                       <textarea
-                        value={reviews[idx].correctedText}
+                        value={reviews[idx]?.correctedText || ""}
                         onChange={(e) => {
                           const updated = [...reviews];
                           updated[idx] = {
@@ -380,7 +423,7 @@ function ReviewModal({
                           setReviews(updated);
                         }}
                         placeholder="Enter the corrected sentence..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 resize-none"
                         rows={2}
                       />
                     )}
@@ -400,9 +443,11 @@ function ReviewModal({
                   <CheckCircle className="w-4 h-4" />
                   Already reviewed
                 </span>
-              ) : totalWords > 1 ? (
+              ) : totalPatterns > 1 ? (
                 <>
-                  Word {currentWordIndex + 1}/{totalWords} • {reviews.filter((r) => r.isCorrect !== null).length}/{sentences.length} sentences reviewed
+                  Pattern {currentPatternIndex + 1}/{totalPatterns} •{" "}
+                  {reviews.filter((r) => r.isCorrect !== null).length}/
+                  {sentences.length} sentences reviewed
                 </>
               ) : (
                 <>
@@ -412,22 +457,22 @@ function ReviewModal({
               )}
             </p>
             <div className="flex items-center gap-3">
-              {/* Navigation buttons in footer for mobile */}
-              {totalWords > 1 && !isAlreadyReviewed && (
+              {/* Navigation buttons in footer */}
+              {totalPatterns > 1 && !isAlreadyReviewed && (
                 <div className="flex items-center gap-1 mr-2">
                   <button
-                    onClick={goToPreviousWord}
-                    disabled={currentWordIndex === 0}
+                    onClick={goToPreviousPattern}
+                    disabled={currentPatternIndex === 0}
                     className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition disabled:opacity-30"
-                    title="Previous Word"
+                    title="Previous Pattern"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={goToNextWord}
-                    disabled={currentWordIndex === totalWords - 1}
+                    onClick={goToNextPattern}
+                    disabled={currentPatternIndex === totalPatterns - 1}
                     className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition disabled:opacity-30"
-                    title="Next Word"
+                    title="Next Pattern"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -443,7 +488,7 @@ function ReviewModal({
                 <button
                   onClick={handleSubmit}
                   disabled={!canSubmit || isSubmitting}
-                  className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-6 py-2 bg-pink-600 text-white font-medium rounded-lg hover:bg-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
@@ -467,22 +512,23 @@ function ReviewModal({
 }
 
 // Main Page Component
-export default function SentenceReviewsPage() {
+export default function GrammarReviewsPage() {
   const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<"pending" | "reviewed" | "all">("pending");
-  const [expandedLearners, setExpandedLearners] = useState<Set<string>>(new Set());
-  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [statusFilter, setStatusFilter] = useState<
+    "pending" | "reviewed" | "all"
+  >("pending");
+  const [expandedLearners, setExpandedLearners] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedSubmission, setSelectedSubmission] =
+    useState<Submission | null>(null);
 
   // Fetch submissions
-  const {
-    data,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["sentence-submissions", statusFilter],
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["grammar-submissions", statusFilter],
     queryFn: async () => {
       const response = await fetch(
-        `/api/v1/drills/sentence-submissions?status=${statusFilter}&limit=100`,
+        `/api/v1/drills/grammar-submissions?status=${statusFilter}&limit=100`,
         { credentials: "include" }
       );
       if (!response.ok) {
@@ -500,22 +546,23 @@ export default function SentenceReviewsPage() {
   const reviewMutation = useMutation({
     mutationFn: async ({
       attemptId,
-      sentenceReviews,
+      grammarReviews,
     }: {
       attemptId: string;
-      sentenceReviews: Array<{
+      grammarReviews: Array<{
+        patternIndex: number;
         sentenceIndex: number;
         isCorrect: boolean;
         correctedText?: string;
       }>;
     }) => {
       const response = await fetch(
-        `/api/v1/drills/attempts/${attemptId}/review`,
+        `/api/v1/drills/attempts/${attemptId}/grammar-review`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ sentenceReviews }),
+          body: JSON.stringify({ grammarReviews }),
         }
       );
       if (!response.ok) {
@@ -526,7 +573,7 @@ export default function SentenceReviewsPage() {
     },
     onSuccess: () => {
       toast.success("Review submitted successfully!");
-      queryClient.invalidateQueries({ queryKey: ["sentence-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["grammar-submissions"] });
       setSelectedSubmission(null);
     },
     onError: (error: any) => {
@@ -568,10 +615,10 @@ export default function SentenceReviewsPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Sentence Drill Reviews
+            Grammar Drill Reviews
           </h1>
           <p className="text-gray-500 text-sm">
-            Review and grade student sentence submissions
+            Review and grade student grammar sentences
           </p>
         </div>
       </div>
@@ -618,7 +665,9 @@ export default function SentenceReviewsPage() {
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-gray-400" />
             <span className="text-sm text-gray-600">
-              <span className="font-bold text-gray-900">{submissions.length}</span>{" "}
+              <span className="font-bold text-gray-900">
+                {submissions.length}
+              </span>{" "}
               learners
             </span>
           </div>
@@ -632,7 +681,9 @@ export default function SentenceReviewsPage() {
         </div>
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <p className="text-red-600">Failed to load submissions. Please try again.</p>
+          <p className="text-red-600">
+            Failed to load submissions. Please try again.
+          </p>
         </div>
       ) : submissions.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
@@ -642,7 +693,7 @@ export default function SentenceReviewsPage() {
           </h3>
           <p className="text-gray-500">
             {statusFilter === "pending"
-              ? "All sentence drills have been reviewed!"
+              ? "All grammar drills have been reviewed!"
               : "No submissions found."}
           </p>
         </div>
@@ -659,8 +710,8 @@ export default function SentenceReviewsPage() {
                 className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-pink-600" />
                   </div>
                   <div className="text-left">
                     <h3 className="font-semibold text-gray-900">
@@ -672,7 +723,7 @@ export default function SentenceReviewsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                  <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium">
                     {learnerSubmissions.submissions.length} submission
                     {learnerSubmissions.submissions.length !== 1 ? "s" : ""}
                   </span>
@@ -699,33 +750,38 @@ export default function SentenceReviewsPage() {
                           </h4>
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              submission.sentenceResults.reviewStatus === "reviewed"
+                              submission.grammarResults.reviewStatus ===
+                              "reviewed"
                                 ? "bg-green-100 text-green-700"
                                 : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
-                            {submission.sentenceResults.reviewStatus === "reviewed"
+                            {submission.grammarResults.reviewStatus ===
+                            "reviewed"
                               ? "Reviewed"
                               : "Pending"}
                           </span>
-                          {submission.score !== undefined && (
+                          {submission.score !== undefined && submission.score > 0 && (
                             <span className="text-sm text-gray-500">
                               Score: {submission.score}%
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>Word: {submission.sentenceResults.word}</span>
+                          <span>
+                            {submission.grammarResults.patterns?.length || 0}{" "}
+                            patterns
+                          </span>
                           <span>•</span>
                           <span>{formatDate(submission.completedAt)}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => setSelectedSubmission(submission)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-blue-100 transition"
+                        className="flex items-center gap-2 px-4 py-2 bg-pink-50 text-pink-600 font-medium rounded-lg hover:bg-pink-100 transition"
                       >
                         <Eye className="w-4 h-4" />
-                        {submission.sentenceResults.reviewStatus === "reviewed"
+                        {submission.grammarResults.reviewStatus === "reviewed"
                           ? "View"
                           : "Review"}
                       </button>
@@ -744,7 +800,7 @@ export default function SentenceReviewsPage() {
           submission={selectedSubmission}
           onClose={() => setSelectedSubmission(null)}
           onSubmitReview={(attemptId, reviews) =>
-            reviewMutation.mutate({ attemptId, sentenceReviews: reviews })
+            reviewMutation.mutate({ attemptId, grammarReviews: reviews })
           }
         />
       )}

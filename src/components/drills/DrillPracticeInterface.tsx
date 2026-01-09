@@ -14,6 +14,7 @@ import SentenceDrill from "./SentenceDrill";
 import ListeningDrill from "./ListeningDrill";
 import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
+import { trackActivity } from "@/utils/activity-cache";
 
 interface DrillPracticeInterfaceProps {
   drill: any;
@@ -52,34 +53,19 @@ export default function DrillPracticeInterface({
             setAssignment(foundAssignment);
           }
         }
-
-        // Track recent activity (viewed)
-        try {
-          await fetch("/api/v1/activities/recent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              type: "drill",
-              resourceId: drill._id,
-              action: "viewed",
-              metadata: {
-                title: drill.title,
-                type: drill.type,
-                difficulty: drill.difficulty,
-              },
-            }),
-          });
-        } catch (error) {
-          // Silently fail
-          console.error("Failed to track activity:", error);
-        }
       } catch (error) {
         console.error("Failed to fetch assignment:", error);
       }
     };
 
     fetchAssignment();
+
+    // Track activity locally (no API call)
+    trackActivity("drill", drill._id, "viewed", {
+      title: drill.title,
+      type: drill.type,
+      difficulty: drill.difficulty,
+    });
   }, [drill._id, drill.title, drill.type, drill.difficulty, propAssignmentId]);
 
   // Render the appropriate drill interface based on type

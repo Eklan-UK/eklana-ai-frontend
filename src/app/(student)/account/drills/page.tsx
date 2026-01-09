@@ -9,6 +9,7 @@ import { Loader2, BookOpen } from "lucide-react";
 import { useLearnerDrills } from "@/hooks/useDrills";
 import { DrillCard } from "@/components/drills/DrillCard";
 import { getDrillStatus } from "@/utils/drill";
+import { trackActivity } from "@/utils/activity-cache";
 
 interface DrillItem {
   assignmentId: string;
@@ -34,6 +35,9 @@ interface DrillItem {
     score?: number;
     timeSpent?: number;
     completedAt?: string;
+    reviewStatus?: "pending" | "reviewed";
+    correctCount?: number;
+    totalCount?: number;
   };
 }
 
@@ -52,23 +56,9 @@ export default function DrillsPage() {
     error,
   } = useLearnerDrills({ limit: 100 });
 
-  const handleDrillClick = async (drillId: string, assignmentId?: string) => {
-    // Track recent activity
-    try {
-      await fetch("/api/v1/activities/recent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          type: "drill",
-          resourceId: drillId,
-          action: "viewed",
-        }),
-      });
-    } catch (error) {
-      // Silently fail - recent activities is not critical
-      console.error("Failed to track activity:", error);
-    }
+  const handleDrillClick = (drillId: string, assignmentId?: string) => {
+    // Track activity locally (no API call - instant)
+    trackActivity("drill", drillId, "viewed");
 
     // Build URL with assignmentId if available
     const url = assignmentId

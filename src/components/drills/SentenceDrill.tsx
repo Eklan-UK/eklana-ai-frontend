@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
+import { trackActivity } from "@/utils/activity-cache";
 
 interface SentenceDrillProps {
   drill: any;
@@ -188,22 +189,11 @@ export default function SentenceDrill({
       setIsCompleted(true);
       toast.success("Drill submitted! Your submission is pending review.");
 
-      // Track activity
-      try {
-        await fetch("/api/v1/activities/recent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            type: "drill",
-            resourceId: drill._id,
-            action: "completed",
-            metadata: { title: drill.title, type: drill.type },
-          }),
-        });
-      } catch (error) {
-        console.error("Failed to track activity:", error);
-      }
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+      });
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")

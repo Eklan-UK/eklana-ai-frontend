@@ -65,55 +65,90 @@ export const emailTemplates = {
 		dueDate?: string;
 		assignerName: string;
 	}) => ({
-		subject: `New Drill Assigned: ${data.drillTitle}`,
+		subject: `📚 New Drill Assigned: ${data.drillTitle}`,
 		html: `
 			<!DOCTYPE html>
 			<html>
 			<head>
-				<style>
-					body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-					.container { max-width: 600px; margin: 0 auto; padding: 20px; }
-					.header { background-color: #22c55e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-					.content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-					.button { display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
-					.footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-				</style>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>New Drill Assignment</title>
 			</head>
-			<body>
-				<div class="container">
-					<div class="header">
-						<h1>New Drill Assigned!</h1>
-					</div>
-					<div class="content">
-						<p>Hi ${data.studentName},</p>
-						<p>You have been assigned a new drill by ${data.assignerName}.</p>
-						<div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
-							<h3>${data.drillTitle}</h3>
-							<p><strong>Type:</strong> ${data.drillType}</p>
-							${data.dueDate ? `<p><strong>Due Date:</strong> ${data.dueDate}</p>` : ''}
+			<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6;">
+				<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+					<!-- Logo/Brand Header -->
+					<div style="text-align: center; margin-bottom: 30px;">
+						<div style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); padding: 12px 24px; border-radius: 12px;">
+							<span style="color: white; font-size: 24px; font-weight: bold;">eklan</span>
 						</div>
-						<a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/account/practice" class="button">View Drill</a>
-						<p style="margin-top: 30px;">Good luck with your practice!</p>
 					</div>
-					<div class="footer">
-						<p>This is an automated notification from Elkan Learning Platform.</p>
+					
+					<!-- Main Card -->
+					<div style="background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+						<!-- Green Header -->
+						<div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: center;">
+							<div style="font-size: 48px; margin-bottom: 10px;">📚</div>
+							<h1 style="margin: 0; font-size: 24px; font-weight: 600;">New Drill Assigned!</h1>
+						</div>
+						
+						<!-- Content -->
+						<div style="padding: 30px;">
+							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">Your tutor <strong>${data.assignerName}</strong> has assigned you a new practice drill.</p>
+							
+							<!-- Drill Info Card -->
+							<div style="background-color: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 25px 0;">
+								<h2 style="margin: 0 0 15px 0; font-size: 20px; color: #166534;">${data.drillTitle}</h2>
+								<div style="display: flex; flex-wrap: wrap; gap: 15px;">
+									<div style="flex: 1; min-width: 120px;">
+										<span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Type</span>
+										<span style="display: inline-block; background-color: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 500; text-transform: capitalize;">${data.drillType}</span>
+									</div>
+									${data.dueDate ? `
+									<div style="flex: 1; min-width: 120px;">
+										<span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Due Date</span>
+										<span style="font-size: 14px; font-weight: 500; color: #1f2937;">${data.dueDate}</span>
+									</div>
+									` : ''}
+								</div>
+							</div>
+							
+							<!-- CTA Button -->
+							<div style="text-align: center; margin: 30px 0;">
+								<a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/account/drills" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);">Start Practicing →</a>
+							</div>
+							
+							<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; text-align: center;">Good luck with your practice! 🍀</p>
+						</div>
+					</div>
+					
+					<!-- Footer -->
+					<div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+						<p style="margin: 0;">This is an automated notification from Elkan Learning Platform.</p>
+						<p style="margin: 10px 0 0 0;">If you have questions, contact your tutor directly.</p>
 					</div>
 				</div>
 			</body>
 			</html>
 		`,
 		text: `
-			Hi ${data.studentName},
-			
-			You have been assigned a new drill by ${data.assignerName}.
-			
-			Drill: ${data.drillTitle}
-			Type: ${data.drillType}
-			${data.dueDate ? `Due Date: ${data.dueDate}` : ''}
-			
-			Visit your dashboard to view and complete the drill.
-			
-			Good luck with your practice!
+Hi ${data.studentName},
+
+📚 New Drill Assigned!
+
+Your tutor ${data.assignerName} has assigned you a new practice drill.
+
+Drill: ${data.drillTitle}
+Type: ${data.drillType}
+${data.dueDate ? `Due Date: ${data.dueDate}` : ''}
+
+Visit your drills page to start practicing:
+${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/account/drills
+
+Good luck with your practice! 🍀
+
+---
+This is an automated notification from Elkan Learning Platform.
 		`,
 	}),
 

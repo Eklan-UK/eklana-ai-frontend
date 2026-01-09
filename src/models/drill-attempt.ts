@@ -56,13 +56,29 @@ export interface IDrillAttempt extends Document {
 	};
 
 	grammarResults?: {
-		patternsPracticed: number;
-		totalPatterns: number;
-		accuracy: number;
-		patternScores: Array<{
+		patternsPracticed?: number;
+		totalPatterns?: number;
+		accuracy?: number;
+		patternScores?: Array<{
 			pattern: string;
 			score: number;
 			attempts: number;
+		}>;
+		// New structure for reviewable grammar drills
+		patterns?: Array<{
+			pattern: string;
+			example: string;
+			hint?: string;
+			sentences: Array<{ text: string; index: number }>;
+		}>;
+		reviewStatus?: 'pending' | 'reviewed';
+		patternReviews?: Array<{
+			patternIndex: number;
+			sentenceIndex: number;
+			isCorrect: boolean;
+			correctedText?: string;
+			reviewedAt?: Date;
+			reviewedBy?: Types.ObjectId;
 		}>;
 	};
 
@@ -78,15 +94,24 @@ export interface IDrillAttempt extends Document {
 	};
 
 	sentenceResults?: {
-		word: string; // Target word
+		word: string; // Target word (for single word drills or backwards compatibility)
 		definition: string; // User's definition (not reviewed)
 		sentences: Array<{
 			text: string; // User's sentence
 			index: number; // 0 or 1
 		}>;
+		// Multi-word support
+		words?: Array<{
+			word: string;
+			definition: string;
+			sentences: Array<{
+				text: string;
+				index: number;
+			}>;
+		}>;
 		reviewStatus: 'pending' | 'reviewed';
 		sentenceReviews?: Array<{
-			sentenceIndex: number; // 0 or 1
+			sentenceIndex: number; // Global index across all words
 			isCorrect: boolean;
 			correctedText?: string; // Only if isCorrect is false
 			reviewedAt?: Date;
@@ -96,9 +121,20 @@ export interface IDrillAttempt extends Document {
 
 	summaryResults?: {
 		summaryProvided: boolean;
-		score?: number;
+		articleTitle?: string;
+		articleContent?: string;
+		summary?: string; // User's written summary
 		wordCount?: number;
+		score?: number;
 		qualityScore?: number;
+		reviewStatus?: 'pending' | 'reviewed';
+		review?: {
+			feedback?: string; // Admin/tutor feedback
+			isAcceptable: boolean;
+			correctedVersion?: string; // Optional improved version
+			reviewedAt?: Date;
+			reviewedBy?: Types.ObjectId;
+		};
 	};
 
 	listeningResults?: {
@@ -212,6 +248,38 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					attempts: Number,
 				},
 			],
+			// New structure for reviewable grammar drills
+			patterns: [
+				{
+					pattern: String,
+					example: String,
+					hint: String,
+					sentences: [
+						{
+							text: String,
+							index: Number,
+						},
+					],
+				},
+			],
+			reviewStatus: {
+				type: String,
+				enum: ['pending', 'reviewed'],
+				default: 'pending',
+			},
+			patternReviews: [
+				{
+					patternIndex: Number,
+					sentenceIndex: Number,
+					isCorrect: Boolean,
+					correctedText: String,
+					reviewedAt: Date,
+					reviewedBy: {
+						type: Schema.Types.ObjectId,
+						ref: 'User',
+					},
+				},
+			],
 		},
 		sentenceWritingResults: {
 			sentencesWritten: Number,
@@ -234,6 +302,19 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					index: Number,
 				},
 			],
+			// Multi-word support
+			words: [
+				{
+					word: String,
+					definition: String,
+					sentences: [
+						{
+							text: String,
+							index: Number,
+						},
+					],
+				},
+			],
 			reviewStatus: {
 				type: String,
 				enum: ['pending', 'reviewed'],
@@ -254,9 +335,27 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 		},
 		summaryResults: {
 			summaryProvided: Boolean,
-			score: Number,
+			articleTitle: String,
+			articleContent: String,
+			summary: String,
 			wordCount: Number,
+			score: Number,
 			qualityScore: Number,
+			reviewStatus: {
+				type: String,
+				enum: ['pending', 'reviewed'],
+				default: 'pending',
+			},
+			review: {
+				feedback: String,
+				isAcceptable: Boolean,
+				correctedVersion: String,
+				reviewedAt: Date,
+				reviewedBy: {
+					type: Schema.Types.ObjectId,
+					ref: 'User',
+				},
+			},
 		},
 		listeningResults: {
 			completed: Boolean,

@@ -12,6 +12,12 @@ import {
   CheckCircle,
   AlertCircle,
   Link as LinkIcon,
+  MessageSquare,
+  FileText,
+  PenTool,
+  Headphones,
+  ScrollText,
+  Link2,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -53,16 +59,17 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   };
 
   const getTypeIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      vocabulary: "📚",
-      roleplay: "💬",
-      grammar: "✏️",
-      matching: "🔗",
-      summary: "📝",
-      definition: "📖",
-      sentence_writing: "✍️",
+    const iconProps = { className: "w-6 h-6" };
+    const icons: Record<string, React.ReactNode> = {
+      vocabulary: <BookOpen {...iconProps} className="w-6 h-6 text-blue-500" />,
+      roleplay: <MessageSquare {...iconProps} className="w-6 h-6 text-purple-500" />,
+      grammar: <FileText {...iconProps} className="w-6 h-6 text-pink-500" />,
+      matching: <Link2 {...iconProps} className="w-6 h-6 text-green-500" />,
+      summary: <ScrollText {...iconProps} className="w-6 h-6 text-orange-500" />,
+      sentence_writing: <PenTool {...iconProps} className="w-6 h-6 text-indigo-500" />,
+      listening: <Headphones {...iconProps} className="w-6 h-6 text-cyan-500" />,
     };
-    return icons[type] || "📖";
+    return icons[type] || <BookOpen {...iconProps} className="w-6 h-6 text-gray-500" />;
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -151,7 +158,9 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
         {/* Drill Info */}
         <Card className="mb-6">
           <div className="flex items-start gap-4 mb-6">
-            <span className="text-4xl">{getTypeIcon(drill.type)}</span>
+            <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
+              {getTypeIcon(drill.type)}
+            </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {drill.title}

@@ -15,6 +15,9 @@ import {
   Moon,
   Layout,
   Mic,
+  FileCheck,
+  FileText,
+  BookOpen,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -27,6 +30,9 @@ const Sidebar: React.FC = () => {
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
+    { name: "Grammar Reviews", icon: FileText, path: "/admin/drills/grammar-reviews" },
+    { name: "Summary Reviews", icon: BookOpen, path: "/admin/drills/summary-reviews" },
     { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
     { name: "Analytics", icon: BarChart2, path: "/admin/analytics" },
     { name: "Settings", icon: Settings, path: "/admin/settings" },

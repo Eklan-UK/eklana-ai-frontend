@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useOnboardingStore } from "@/store/onboarding-store";
 import { useAuthStore } from "@/store/auth-store";
 import { userAPI } from "@/lib/api";
+import { markProfileComplete } from "@/utils/auth-flow";
 import { toast } from "sonner";
 
 const { useAuthStore: useAuthStoreDirect } = require("@/store/auth-store");
@@ -190,8 +191,8 @@ export default function OnboardingPage() {
       // Clear onboarding data
       reset();
 
-      // Refresh user data to get updated hasProfile status
-      await checkSession(true); // Force refresh to get updated hasProfile
+      // Mark profile as complete in auth store (cached locally)
+      markProfileComplete();
 
       // Small delay to show success message
       setTimeout(() => {

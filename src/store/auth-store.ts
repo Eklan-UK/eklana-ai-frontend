@@ -8,12 +8,15 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   hasHydrated: boolean;
-  lastSessionCheck: number | null; // Track when we last checked session
+  lastSessionCheck: number | null;
+  hasProfile: boolean | null; // Cache profile check
+  profileCheckedAt: number | null; // When profile was checked
   // Actions
   setUser: (user: any | null) => void;
   setSession: (session: any | null) => void;
   setLoading: (loading: boolean) => void;
   setHasHydrated: (hasHydrated: boolean) => void;
+  setHasProfile: (hasProfile: boolean) => void;
   login: (
     email: string,
     password: string,
@@ -32,8 +35,11 @@ interface AuthState {
   signInWithApple: () => Promise<void>;
 }
 
-// Session check throttle: only check once per 30 minutes unless forced
-const SESSION_CHECK_THROTTLE = 30 * 60 * 1000; // 30 minutes
+// Session check throttle: only check once per 2 hours unless forced
+const SESSION_CHECK_THROTTLE = 2 * 60 * 60 * 1000; // 2 hours
+
+// Profile check throttle: cache for 24 hours
+const PROFILE_CHECK_THROTTLE = 24 * 60 * 60 * 1000; // 24 hours
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -44,6 +50,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       hasHydrated: false,
       lastSessionCheck: null,
+      hasProfile: null,
+      profileCheckedAt: null,
 
       setUser: (user) =>
         set({
@@ -62,6 +70,12 @@ export const useAuthStore = create<AuthState>()(
 
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
+      setHasProfile: (hasProfile) =>
+        set({
+          hasProfile,
+          profileCheckedAt: Date.now(),
+        }),
+
       login: async (
         email: string,
         password: string,
@@ -70,16 +84,12 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          // Pass rememberMe option to Better Auth
-          // When true, session will use the configured expiresIn (30 days)
-          // When false, session will use default browser session duration
           const result = await authClient.signIn.email({
             email,
             password,
             rememberMe,
           });
 
-          // Handle successful login
           if (result.data?.user) {
             set({
               user: result.data.user,
@@ -91,18 +101,15 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
 
-          // Handle errors
           if (result.error) {
             set({ isLoading: false });
             throw new Error(result.error.message || "Login failed");
           }
 
-          // Unexpected case - no data and no error
           set({ isLoading: false });
           throw new Error("Login failed - no response data");
         } catch (error: any) {
           set({ isLoading: false });
-          // Re-throw to let UI handle the error
           throw error;
         }
       },
@@ -126,6 +133,9 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
+              // New users need onboarding
+              hasProfile: false,
+              profileCheckedAt: Date.now(),
             });
             return;
           }
@@ -145,19 +155,26 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-          // Clear local state immediately for better UX
+          // Clear local state immediately - THIS IS THE ONLY PLACE STATE IS CLEARED
           set({
             user: null,
             session: null,
             isAuthenticated: false,
             isLoading: false,
             lastSessionCheck: null,
+            hasProfile: null,
+            profileCheckedAt: null,
           });
 
-          // Then call server logout
+          // Clear any cached activities
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("activities-cache");
+          }
+
+          // Then call server logout (errors ignored - local state is cleared)
           await authClient.signOut();
         } catch (error) {
-          // State already cleared, so logout is "successful" locally
+          // State already cleared, logout is "successful" locally
           console.error("Logout error:", error);
         }
       },
@@ -165,62 +182,44 @@ export const useAuthStore = create<AuthState>()(
       checkSession: async (forceRefresh = false) => {
         const state = get();
 
-        // If we have a valid cached session and not forcing refresh, check throttle
-        if (
-          !forceRefresh &&
-          state.user &&
-          state.session &&
-          state.isAuthenticated &&
-          state.lastSessionCheck !== null
-        ) {
-          const timeSinceLastCheck = Date.now() - state.lastSessionCheck;
-
-          // If we checked recently (within throttle period), skip the check
-          if (timeSinceLastCheck < SESSION_CHECK_THROTTLE) {
-            set({ isLoading: false });
-            return;
-          }
-        }
-
-        // Use cached session if available and not forcing refresh
-        if (
-          !forceRefresh &&
-          state.user &&
-          state.session &&
-          state.isAuthenticated
-        ) {
+        // ALWAYS use cached session if available
+        // Only clear session on explicit logout
+        if (state.user && state.session && state.isAuthenticated) {
           set({ isLoading: false });
 
-          // Verify session in background without blocking UI
+          // Check throttle for background refresh
+          if (!forceRefresh && state.lastSessionCheck !== null) {
+            const timeSinceLastCheck = Date.now() - state.lastSessionCheck;
+            if (timeSinceLastCheck < SESSION_CHECK_THROTTLE) {
+              return; // Skip background check - checked recently
+            }
+          }
+
+          // Background refresh (non-blocking) - NEVER clears state on error
           authClient
             .getSession()
             .then((sessionResult) => {
               if (sessionResult?.data?.user) {
-                // Update with fresh data
+                // Update with fresh data silently
                 set({
                   user: sessionResult.data.user,
                   session: sessionResult.data,
                   isAuthenticated: true,
                   lastSessionCheck: Date.now(),
                 });
-              } else if (sessionResult?.error) {
-                // Network error or server error - keep cached session
-                console.warn("Background session check error:", sessionResult.error);
-                // Don't clear session on errors - user might be offline
               }
-              // sessionResult.data === null means explicit logout/invalid session
-              // But only clear if we explicitly got a "session not found" response
-              // NOT on network errors
+              // On any error or null response - DO NOT clear session
+              // User explicitly logged in, keep them logged in
             })
             .catch((error) => {
+              // Network error - keep cached session
               console.warn("Background session check failed:", error);
-              // Keep cached session on network error - user might be offline
             });
 
           return;
         }
 
-        // No cached session or forcing refresh
+        // No cached session - need to check server
         try {
           set({ isLoading: true });
 
@@ -234,26 +233,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               lastSessionCheck: Date.now(),
             });
-          } else if (sessionResult?.error) {
-            // API returned an error (network issue, server error, etc.)
-            console.warn("Session check returned error:", sessionResult.error);
-            
-            // On API error, preserve cached session if available
-            const currentState = get();
-            if (currentState.user && currentState.session) {
-              set({ isLoading: false });
-            } else {
-              // No cached session and error - user needs to login
-              set({
-                session: null,
-                user: null,
-                isAuthenticated: false,
-                isLoading: false,
-                lastSessionCheck: null,
-              });
-            }
           } else {
-            // Explicit null/no session response (user is logged out)
+            // No session from server AND no cached session
             set({
               session: null,
               user: null,
@@ -263,23 +244,15 @@ export const useAuthStore = create<AuthState>()(
             });
           }
         } catch (error) {
-          console.warn("Session check failed with exception:", error);
-
-          // On network error (catch block), preserve cached session
-          const currentState = get();
-          if (currentState.user && currentState.session) {
-            // Keep using cached session - user might be offline
-            set({ isLoading: false });
-          } else {
-            // No cached session available
-            set({
-              session: null,
-              user: null,
-              isAuthenticated: false,
-              isLoading: false,
-              lastSessionCheck: null,
-            });
-          }
+          console.warn("Session check failed:", error);
+          // No cached session and error - can't authenticate
+          set({
+            session: null,
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            lastSessionCheck: null,
+          });
         }
       },
 
@@ -287,13 +260,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          // Better Auth will redirect, so we don't need to handle response
           await authClient.signIn.social({
             provider: "google",
             callbackURL: `${window.location.origin}/auth/callback`,
           });
-
-          // Browser will redirect before this is reached
         } catch (error: any) {
           set({ isLoading: false });
           throw error;
@@ -304,13 +274,10 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          // Better Auth will redirect, so we don't need to handle response
           await authClient.signIn.social({
             provider: "apple",
             callbackURL: `${window.location.origin}/auth/callback`,
           });
-
-          // Browser will redirect before this is reached
         } catch (error: any) {
           set({ isLoading: false });
           throw error;
@@ -325,18 +292,18 @@ export const useAuthStore = create<AuthState>()(
         session: state.session,
         isAuthenticated: state.isAuthenticated,
         lastSessionCheck: state.lastSessionCheck,
+        hasProfile: state.hasProfile,
+        profileCheckedAt: state.profileCheckedAt,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
 
-          // If we have persisted session, use it initially without checking
+          // If we have persisted session, use it - NEVER check session on load
           if (state.user && state.session && state.isAuthenticated) {
             state.setLoading(false);
-            // Don't check session immediately - let components request it if needed
-            // This prevents unnecessary API calls on every page load
+            // Trust the cached session completely
           } else {
-            // No persisted session - will need to check
             state.setLoading(true);
           }
         }
@@ -344,3 +311,13 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Helper to check if profile check is still valid
+export function isProfileCheckValid(): boolean {
+  const state = useAuthStore.getState();
+  if (state.hasProfile === null || state.profileCheckedAt === null) {
+    return false;
+  }
+  const timeSinceCheck = Date.now() - state.profileCheckedAt;
+  return timeSinceCheck < PROFILE_CHECK_THROTTLE;
+}
