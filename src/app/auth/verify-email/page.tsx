@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 import { Mail, CheckCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
@@ -13,57 +14,81 @@ import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const { user, checkSession } = useAuthStore();
+  const { user, checkSession, isAuthenticated } = useAuthStore();
   const [isSending, setIsSending] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [manualEmail, setManualEmail] = useState("");
 
   useEffect(() => {
-    // Get user email from store or session
+    // Get user email from multiple sources (in priority order):
+    // 1. From auth store (if logged in)
+    // 2. From sessionStorage (set during signup or failed login)
+    // 3. Leave empty for manual entry
+    
     if (user?.email) {
       setUserEmail(user.email);
     } else {
-      // Try to refresh session to get user email
-      checkSession().then(() => {
-        const currentUser = useAuthStore.getState().user;
-        if (currentUser?.email) {
-          setUserEmail(currentUser.email);
-        }
-      });
+      // Check sessionStorage for pending verification email
+      const pendingEmail = sessionStorage.getItem("pendingVerificationEmail");
+      if (pendingEmail) {
+        setUserEmail(pendingEmail);
+      } else {
+        // Try to refresh session to get user email
+        checkSession().then(() => {
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser?.email) {
+            setUserEmail(currentUser.email);
+          }
+        });
+      }
     }
   }, [user, checkSession]);
 
   const handleSendVerificationEmail = async () => {
-    // Check if user is logged in
-    const { user: currentUser, isAuthenticated } = useAuthStore.getState();
+    const emailToVerify = userEmail || manualEmail;
     
-    if (!isAuthenticated || !currentUser) {
-      // Try to refresh session
-      await checkSession();
-      const refreshedUser = useAuthStore.getState().user;
-      
-      if (!refreshedUser || !useAuthStore.getState().isAuthenticated) {
-        toast.error("Please log in first to resend verification email");
-        router.push("/auth/login");
-        return;
-      }
+    if (!emailToVerify) {
+      toast.error("Please enter your email address");
+      return;
     }
 
     setIsSending(true);
     try {
-      await authService.sendVerificationEmail();
+      // First check if user is authenticated
+      const { isAuthenticated: isAuth, user: currentUser } = useAuthStore.getState();
+      
+      if (isAuth && currentUser) {
+        // User is authenticated - use the authenticated endpoint
+        try {
+          await authService.sendVerificationEmail();
+          setIsSent(true);
+          toast.success("Verification email sent! Please check your inbox.");
+          return;
+        } catch (authError: any) {
+          // If auth fails, fall through to public endpoint
+          console.log("Auth resend failed, trying public endpoint:", authError);
+        }
+      }
+      
+      // User not authenticated or auth endpoint failed - use public endpoint
+      await authService.sendVerificationEmailByEmail(emailToVerify);
       setIsSent(true);
       toast.success("Verification email sent! Please check your inbox.");
+      
+      // Store email for future use
+      sessionStorage.setItem("pendingVerificationEmail", emailToVerify);
+      if (!userEmail) {
+        setUserEmail(emailToVerify);
+      }
     } catch (error: any) {
-      // If 401 or 403, user might not be authenticated properly
-      if (error.message?.includes("401") || error.message?.includes("403") || error.message?.includes("Unauthorized")) {
-        toast.error("Please log in first to resend verification email");
+      if (error.message?.includes("Already") || error.message?.includes("already verified")) {
+        toast.success("Your email is already verified! You can sign in now.");
         router.push("/auth/login");
-      } else if (error.message?.includes("404") || error.message?.includes("Failed to send")) {
-        toast.info("Verification email was sent when you registered. Please check your inbox or spam folder.");
-        setIsSent(true);
+      } else if (error.message?.includes("Rate") || error.message?.includes("Too many")) {
+        toast.error("Too many requests. Please wait a minute before trying again.");
       } else {
-        toast.error(error.message || "Failed to send verification email");
+        toast.error(error.message || "Failed to send verification email. Please try again.");
       }
     } finally {
       setIsSending(false);
@@ -130,12 +155,27 @@ export default function VerifyEmailPage() {
                 request a new one.
               </p>
 
+              {/* Show email input if email is not known */}
+              {!userEmail && (
+                <div className="mb-4">
+                  <Input
+                    type="email"
+                    label="Email Address"
+                    placeholder="Enter your email"
+                    value={manualEmail}
+                    onChange={(e) => setManualEmail(e.target.value)}
+                    disabled={isSending}
+                    icon={<Mail className="w-5 h-5 text-gray-400" />}
+                  />
+                </div>
+              )}
+
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
                 onClick={handleSendVerificationEmail}
-                disabled={isSending || !userEmail}
+                disabled={isSending || (!userEmail && !manualEmail)}
               >
                 {isSending ? (
                   <>

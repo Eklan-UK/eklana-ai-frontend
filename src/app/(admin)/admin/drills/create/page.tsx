@@ -9,6 +9,7 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   Loader2,
+  Volume2,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
@@ -21,6 +22,14 @@ import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
 import { ParsedContent } from "@/services/document-parser.service";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import {
+  generateDrillAudio,
+  extractVocabularyTexts,
+  extractRoleplayTexts,
+  extractMatchingTexts,
+  extractContentText,
+  applyAudioUrls,
+} from "@/services/drill-audio.service";
 
 interface Sentence {
   english: string;
@@ -129,6 +138,11 @@ const DrillBuilder: React.FC = () => {
   );
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  
+  // Pre-generate TTS audio option
+  const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [audioProgress, setAudioProgress] = useState("");
 
   // Load drill data in edit mode
   const { data: drillData, isLoading: loadingDrill } = useDrillById(
@@ -658,7 +672,7 @@ const DrillBuilder: React.FC = () => {
         .filter(Boolean) as string[];
 
       // Build drill data based on type
-      const drillData: any = {
+      let drillData: any = {
         title: drillTitle,
         type: drillType,
         difficulty: difficulty.toLowerCase(),
@@ -727,6 +741,59 @@ const DrillBuilder: React.FC = () => {
         drillData.listening_drill_content = listeningContent.trim();
       }
 
+      // Pre-generate TTS audio if enabled
+      if (generateTTSAudio) {
+        setIsGeneratingAudio(true);
+        setAudioProgress("Extracting texts for audio generation...");
+
+        try {
+          // Extract texts based on drill type
+          let textsToGenerate: Array<{ id: string; text: string }> = [];
+
+          if (drillType === "vocabulary" && drillData.target_sentences) {
+            textsToGenerate = extractVocabularyTexts(drillData.target_sentences);
+          } else if (drillType === "roleplay" && drillData.roleplay_scenes) {
+            textsToGenerate = extractRoleplayTexts(drillData.roleplay_scenes);
+          } else if (drillType === "matching" && drillData.matching_pairs) {
+            textsToGenerate = extractMatchingTexts(drillData.matching_pairs);
+          } else if (drillType === "summary" && drillData.article_content) {
+            textsToGenerate = extractContentText(drillData.article_content, "summary");
+          } else if (drillType === "listening" && drillData.listening_drill_content) {
+            textsToGenerate = extractContentText(drillData.listening_drill_content, "listening");
+          }
+
+          if (textsToGenerate.length > 0) {
+            setAudioProgress(`Generating ${textsToGenerate.length} audio files...`);
+            
+            const audioResponse = await generateDrillAudio(
+              textsToGenerate,
+              drillType,
+              drillId || undefined
+            );
+
+            if (audioResponse.success && audioResponse.data) {
+              // Apply audio URLs to drill data
+              drillData = applyAudioUrls(drillData, audioResponse.data.results);
+              
+              const { success, failed } = audioResponse.data.summary;
+              if (failed > 0) {
+                toast.warning(`Generated ${success}/${success + failed} audio files. Some failed.`);
+              } else {
+                toast.success(`Generated ${success} audio files successfully!`);
+              }
+            } else {
+              toast.warning("Failed to generate audio, but drill will be saved without pre-generated audio.");
+            }
+          }
+        } catch (audioError: any) {
+          console.error("Audio generation error:", audioError);
+          toast.warning("Audio generation failed, but drill will be saved without pre-generated audio.");
+        } finally {
+          setIsGeneratingAudio(false);
+          setAudioProgress("");
+        }
+      }
+
       // If editing, use update API
       if (isEditMode && drillId) {
         await drillAPI.update(drillId, drillData);
@@ -743,6 +810,8 @@ const DrillBuilder: React.FC = () => {
       );
     } finally {
       setLoading(false);
+      setIsGeneratingAudio(false);
+      setAudioProgress("");
     }
   };
 
@@ -1588,6 +1657,37 @@ const DrillBuilder: React.FC = () => {
                   placeholder="https://example.com/audio.mp3"
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
+              </div>
+
+              {/* Pre-generate TTS Audio Option */}
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center h-6">
+                    <input
+                      type="checkbox"
+                      id="generateTTS"
+                      checked={generateTTSAudio}
+                      onChange={(e) => setGenerateTTSAudio(e.target.checked)}
+                      className="w-5 h-5 rounded text-green-600 focus:ring-green-500 accent-green-600"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="generateTTS" className="text-sm font-bold text-gray-900 cursor-pointer flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-green-600" />
+                      Pre-generate Audio (Recommended)
+                    </label>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Generates TTS audio using ElevenLabs when saving. Audio is stored on Cloudinary for instant playback.
+                      This reduces latency and API costs during student practice.
+                    </p>
+                    {isGeneratingAudio && (
+                      <div className="flex items-center gap-2 mt-2 text-green-700">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-xs font-medium">{audioProgress}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

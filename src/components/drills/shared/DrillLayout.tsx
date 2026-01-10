@@ -10,6 +10,10 @@ interface DrillLayoutProps {
   className?: string;
   backgroundGradient?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
+  /** Hide the bottom navigation bar during active practice */
+  hideNavigation?: boolean;
+  /** Show a minimal header without back button */
+  minimalHeader?: boolean;
 }
 
 const maxWidthClasses = {
@@ -24,7 +28,9 @@ const maxWidthClasses = {
 
 /**
  * Shared layout wrapper for all drill components
- * Provides consistent structure with Header, content area, and BottomNav
+ * Provides consistent structure with Header, content area, and optionally BottomNav
+ * 
+ * @param hideNavigation - Set to true during active practice to hide the bottom nav
  */
 export function DrillLayout({
   title,
@@ -32,15 +38,17 @@ export function DrillLayout({
   className = "",
   backgroundGradient = "bg-white",
   maxWidth = "md",
+  hideNavigation = true, // Default to hiding nav during drills
+  minimalHeader = false,
 }: DrillLayoutProps) {
   return (
-    <div className={`min-h-screen ${backgroundGradient} pb-20 md:pb-0`}>
+    <div className={`min-h-screen ${backgroundGradient} ${hideNavigation ? 'pb-6' : 'pb-20 md:pb-0'}`}>
       <div className="h-6"></div>
       <Header title={title} />
       <div className={`${maxWidthClasses[maxWidth]} mx-auto px-4 py-6 ${className}`}>
         {children}
       </div>
-      <BottomNav />
+      {!hideNavigation && <BottomNav />}
     </div>
   );
 }

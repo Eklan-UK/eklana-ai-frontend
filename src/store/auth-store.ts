@@ -28,6 +28,7 @@ interface AuthState {
     name: string;
     firstName?: string;
     lastName?: string;
+    role?: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
   checkSession: (forceRefresh?: boolean) => Promise<void>;
@@ -127,8 +128,26 @@ export const useAuthStore = create<AuthState>()(
           });
 
           if (result.data?.user) {
+            // Set the user role after registration via our API
+            if (data.role) {
+              try {
+                await fetch('/api/v1/users/set-role', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ 
+                    userId: result.data.user.id,
+                    role: data.role 
+                  }),
+                });
+              } catch (roleError) {
+                // Non-critical - role defaults to 'user' in schema
+                console.warn('Failed to set user role:', roleError);
+              }
+            }
+
             set({
-              user: result.data.user,
+              user: { ...result.data.user, role: data.role || 'user' },
               session: result.data,
               isAuthenticated: true,
               isLoading: false,

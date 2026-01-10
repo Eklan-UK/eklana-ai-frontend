@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
 import { Loader2, Mail, Lock, User } from "lucide-react";
+import { authService } from "@/services/auth.service";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -62,9 +63,22 @@ export default function RegisterPage() {
         name: `${formData.firstName} ${formData.lastName}`, // Better Auth uses name field
         firstName: formData.firstName,
         lastName: formData.lastName,
+        role: 'user', // Default role for student registration
       });
 
-      toast.success("Account created successfully! Please verify your email.");
+      // Better Auth should send verification email on signup (sendOnSignUp: true)
+      // But let's also explicitly send one to be sure
+      try {
+        await authService.sendVerificationEmailByEmail(formData.email);
+      } catch (emailError) {
+        // Better Auth might have already sent it, so don't fail if this errors
+        console.log("Additional verification email request:", emailError);
+      }
+
+      // Store email for the verify-email page
+      sessionStorage.setItem("pendingVerificationEmail", formData.email);
+      
+      toast.success("Account created! Please check your email to verify your account.");
       // Redirect to email verification page
       router.push("/auth/verify-email");
     } catch (error: any) {

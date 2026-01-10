@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
 import { Loader2, Mail, Lock } from "lucide-react";
 import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
+import { authService } from "@/services/auth.service";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -63,10 +64,10 @@ export default function LoginPage() {
         router.push(redirectPath);
       }
     } catch (error: any) {
-      // Handle EMAIL_NOT_VERIFIED error - still allow login but redirect to verification
+      // Handle EMAIL_NOT_VERIFIED error - resend verification email and redirect
       if (
         error.code === "EMAIL_NOT_VERIFIED" ||
-        (error.message?.includes("email") && error.message?.includes("verify"))
+        error.message?.toLowerCase().includes("email") && error.message?.toLowerCase().includes("verify")
       ) {
         // Try to get session anyway - user might still be logged in
         try {
@@ -78,9 +79,26 @@ export default function LoginPage() {
             return;
           }
         } catch (sessionError) {
-          // If we can't get session, show error
+          // If we can't get session, continue to send verification email
+        }
+        
+        // User is not logged in but email is not verified - send a new verification email
+        try {
+          await authService.sendVerificationEmailByEmail(email);
+          toast.info("Verification email sent! Please check your inbox and verify your email.");
+          // Store email in session storage for the verify-email page
+          sessionStorage.setItem("pendingVerificationEmail", email);
+          router.push("/auth/verify-email");
+          return;
+        } catch (resendError: any) {
+          console.error("Failed to resend verification email:", resendError);
+          toast.error("Please verify your email. Check your inbox or try signing up again.");
+          sessionStorage.setItem("pendingVerificationEmail", email);
+          router.push("/auth/verify-email");
+          return;
         }
       }
+      
       toast.error(
         error?.message || "Invalid email or password. Please try again."
       );

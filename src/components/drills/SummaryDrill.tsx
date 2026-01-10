@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -41,11 +41,29 @@ export default function SummaryDrill({
   const [currentMode, setCurrentMode] = useState<"read" | "listen" | "write">(
     "read"
   );
+  
+  // Pre-generated audio player
+  const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
+  const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { playAudio, isPlaying, stopAudio } = useTTS();
+  const { playAudio: playTTSAudio, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS();
 
   const articleTitle = drill.article_title || "Passage";
   const articleContent = drill.article_content || "";
+  const articleAudioUrl = drill.article_audio_url || "";
+  
+  // Combined playing state
+  const isPlaying = articleAudioUrl ? isPlayingPreGen : isTTSPlaying;
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+        preGenAudioRef.current = null;
+      }
+    };
+  }, []);
 
   // Calculate reading time (average 200 words per minute)
   const passageWordCount = articleContent
@@ -66,10 +84,42 @@ export default function SummaryDrill({
 
   const handlePlayPassage = async () => {
     if (isPlaying) {
-      stopAudio();
+      // Stop based on source
+      if (articleAudioUrl && preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+        preGenAudioRef.current.currentTime = 0;
+        setIsPlayingPreGen(false);
+      } else {
+        stopTTSAudio();
+      }
     } else {
       try {
-        await playAudio(articleContent);
+        if (articleAudioUrl) {
+          // Play from pre-generated URL
+          if (preGenAudioRef.current) {
+            preGenAudioRef.current.pause();
+          }
+          
+          const audio = new Audio(articleAudioUrl);
+          preGenAudioRef.current = audio;
+          
+          audio.onplay = () => setIsPlayingPreGen(true);
+          audio.onended = () => {
+            setIsPlayingPreGen(false);
+            setHasListened(true);
+          };
+          audio.onerror = () => {
+            setIsPlayingPreGen(false);
+            // Fallback to TTS
+            console.warn("Pre-generated audio failed, falling back to TTS");
+            playTTSAudio(articleContent);
+          };
+          
+          await audio.play();
+        } else {
+          // Fall back to TTS generation
+          await playTTSAudio(articleContent);
+        }
         setHasListened(true);
       } catch (error) {
         toast.error("Failed to play audio");
@@ -221,7 +271,7 @@ export default function SummaryDrill({
                 <BookOpen className="w-5 h-5 text-green-500" />
                 {articleTitle}
               </h2>
-                <TTSButton text={articleContent} size="md" />
+                <TTSButton text={articleContent} size="md" audioUrl={articleAudioUrl} />
               </div>
             </div>
 

@@ -9,7 +9,7 @@ const AUTH_BASE_URL = "/api/v1/auth";
  */
 export const authService = {
   /**
-   * Send email verification
+   * Send email verification (requires authentication)
    * Custom endpoint: POST /api/v1/auth/email/resend-verification
    */
   sendVerificationEmail: async () => {
@@ -21,6 +21,31 @@ export const authService = {
         headers: {
           "Content-Type": "application/json",
         },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Failed to send verification email" }));
+      throw new Error(error.message || "Failed to send verification email");
+    }
+
+    return await response.json();
+  },
+  
+  /**
+   * Send verification email by email address (public - no auth required)
+   * Use this for signup or when an unverified user tries to sign in
+   * Custom endpoint: POST /api/v1/auth/email/send-verification
+   */
+  sendVerificationEmailByEmail: async (email: string) => {
+    const response = await fetch(
+      `${AUTH_BASE_URL}/email/send-verification`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
       }
     );
 

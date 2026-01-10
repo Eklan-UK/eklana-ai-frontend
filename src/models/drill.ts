@@ -21,6 +21,12 @@ const DialogueTurnSchema = new Schema(
       default: "",
       description: "Optional translation of the dialogue text",
     },
+    // Pre-generated audio URL (Cloudinary)
+    audioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for this dialogue line",
+    },
   },
   { _id: false }
 );
@@ -70,6 +76,17 @@ const TargetSentenceSchema = new Schema(
       default: "",
       description: "Translation of the sentence",
     },
+    // Pre-generated audio URLs (Cloudinary)
+    wordAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the word",
+    },
+    sentenceAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sentence",
+    },
   },
   { _id: false }
 );
@@ -95,6 +112,17 @@ const MatchingPairSchema = new Schema(
       type: String,
       default: "",
       description: "Translation of the right item",
+    },
+    // Pre-generated audio URLs (Cloudinary)
+    leftAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for left item",
+    },
+    rightAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for right item",
     },
   },
   { _id: false }
@@ -180,6 +208,8 @@ export interface IDrill extends Document {
     wordTranslation?: string;
     text: string;
     translation?: string;
+    wordAudioUrl?: string;
+    sentenceAudioUrl?: string;
   }>;
 
   // Roleplay Drill Fields
@@ -187,6 +217,7 @@ export interface IDrill extends Document {
     speaker: "student" | "ai_0" | "ai_1" | "ai_2" | "ai_3";
     text: string;
     translation?: string;
+    audioUrl?: string;
   }>;
   roleplay_scenes: Array<{
     scene_name: string;
@@ -195,6 +226,7 @@ export interface IDrill extends Document {
       speaker: "student" | "ai_0" | "ai_1" | "ai_2" | "ai_3";
       text: string;
       translation?: string;
+      audioUrl?: string;
     }>;
   }>;
   student_character_name?: string;
@@ -207,6 +239,8 @@ export interface IDrill extends Document {
     right: string;
     leftTranslation?: string;
     rightTranslation?: string;
+    leftAudioUrl?: string;
+    rightAudioUrl?: string;
   }>;
 
   // Definition Drill Fields
@@ -234,10 +268,12 @@ export interface IDrill extends Document {
   // Listening Drill Fields
   listening_drill_title?: string; // Title for the listening content
   listening_drill_content?: string; // Rich text content (markdown supported)
+  listening_drill_audio_url?: string; // Pre-generated TTS audio URL
 
   // Summary Drill Fields
   article_title?: string;
   article_content?: string;
+  article_audio_url?: string; // Pre-generated TTS audio URL for article
 
   // Metadata
   created_by: string; // Email of the teacher/admin (kept for backward compatibility)
@@ -423,6 +459,11 @@ const drillSchema = new Schema<IDrill>(
       default: "",
       description: "Rich text content for listening drill (markdown supported)",
     },
+    listening_drill_audio_url: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for listening content",
+    },
 
     // Summary Drill Fields
     article_title: {
@@ -435,6 +476,12 @@ const drillSchema = new Schema<IDrill>(
       type: String,
       default: "",
       description: "Full content of the article to be summarized",
+    },
+    
+    article_audio_url: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the article content",
     },
 
     // Metadata

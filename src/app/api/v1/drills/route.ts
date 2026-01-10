@@ -17,12 +17,15 @@ const targetSentenceSchema = z.object({
 	wordTranslation: z.string().optional(),
 	text: z.string().min(1),
 	translation: z.string().optional(),
+	wordAudioUrl: z.string().optional(),
+	sentenceAudioUrl: z.string().optional(),
 });
 
 const dialogueTurnSchema = z.object({
 	speaker: z.enum(['student', 'ai_0', 'ai_1', 'ai_2', 'ai_3']),
 	text: z.string().min(1),
 	translation: z.string().optional(),
+	audioUrl: z.string().optional(),
 });
 
 const roleplaySceneSchema = z.object({
@@ -36,6 +39,8 @@ const matchingPairSchema = z.object({
 	right: z.string().min(1),
 	leftTranslation: z.string().optional(),
 	rightTranslation: z.string().optional(),
+	leftAudioUrl: z.string().optional(),
+	rightAudioUrl: z.string().optional(),
 });
 
 const definitionItemSchema = z.object({
@@ -78,8 +83,10 @@ const createDrillSchema = z.object({
 	sentence_drill_word: z.string().optional(), // For sentence drill
 	listening_drill_title: z.string().optional(), // For listening drill
 	listening_drill_content: z.string().optional(), // For listening drill
+	listening_drill_audio_url: z.string().optional(), // Pre-generated TTS audio URL
 	article_title: z.string().optional(),
 	article_content: z.string().optional(),
+	article_audio_url: z.string().optional(), // Pre-generated TTS audio URL
 	is_active: z.boolean().optional(),
 });
 
@@ -231,8 +238,10 @@ async function postHandler(
 		if (validated.sentence_drill_word !== undefined) drillData.sentence_drill_word = validated.sentence_drill_word;
 		if (validated.listening_drill_title !== undefined) drillData.listening_drill_title = validated.listening_drill_title;
 		if (validated.listening_drill_content !== undefined) drillData.listening_drill_content = validated.listening_drill_content;
+		if (validated.listening_drill_audio_url !== undefined) drillData.listening_drill_audio_url = validated.listening_drill_audio_url;
 		if (validated.article_title !== undefined) drillData.article_title = validated.article_title;
 		if (validated.article_content !== undefined) drillData.article_content = validated.article_content;
+		if (validated.article_audio_url !== undefined) drillData.article_audio_url = validated.article_audio_url;
 
 		const drill = await Drill.create(drillData);
 

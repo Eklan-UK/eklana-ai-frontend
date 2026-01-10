@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MarkdownText } from "@/components/ui/MarkdownText";
@@ -21,12 +21,17 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasListened, setHasListened] = useState(false);
+  
+  // Pre-generated audio player
+  const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
+  const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const contentTitle = drill.listening_drill_title || drill.title;
   const content = drill.listening_drill_content || "";
+  const audioUrl = drill.listening_drill_audio_url || "";
 
-  // TTS hook for playing content
-  const { playAudio, isGenerating: isGeneratingAudio, isPlaying, stopAudio } = useTTS({
+  // TTS hook for playing content (fallback)
+  const { playAudio: playTTSAudio, isGenerating: isGeneratingAudio, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
     autoPlay: false,
     onPlayStart: () => {
       setHasListened(true);
@@ -39,13 +44,59 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       toast.error("Failed to play audio");
     },
   });
+  
+  // Combined playing state
+  const isPlaying = audioUrl ? isPlayingPreGen : isTTSPlaying;
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+        preGenAudioRef.current = null;
+      }
+    };
+  }, []);
 
-  const handlePlay = () => {
-    if (!content.trim()) {
+  const handlePlay = async () => {
+    if (!content.trim() && !audioUrl) {
       toast.error("No content available to play");
       return;
     }
 
+    if (audioUrl) {
+      // Play from pre-generated URL
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+      }
+      
+      const audio = new Audio(audioUrl);
+      preGenAudioRef.current = audio;
+      
+      audio.onplay = () => {
+        setIsPlayingPreGen(true);
+        setHasListened(true);
+      };
+      audio.onended = () => setIsPlayingPreGen(false);
+      audio.onerror = () => {
+        setIsPlayingPreGen(false);
+        // Fallback to TTS
+        console.warn("Pre-generated audio failed, falling back to TTS");
+        playWithTTS();
+      };
+      
+      try {
+        await audio.play();
+      } catch (err) {
+        console.error("Error playing pre-generated audio:", err);
+        playWithTTS();
+      }
+    } else {
+      playWithTTS();
+    }
+  };
+  
+  const playWithTTS = () => {
     // Extract plain text from markdown for TTS
     const plainText = content
       .replace(/#{1,6}\s+/g, "") // Remove markdown headers
@@ -60,9 +111,19 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       .trim();
 
     if (plainText) {
-      playAudio(plainText);
+      playTTSAudio(plainText);
     } else {
       toast.error("No readable content found");
+    }
+  };
+  
+  const stopAudio = () => {
+    if (audioUrl && preGenAudioRef.current) {
+      preGenAudioRef.current.pause();
+      preGenAudioRef.current.currentTime = 0;
+      setIsPlayingPreGen(false);
+    } else {
+      stopTTSAudio();
     }
   };
 

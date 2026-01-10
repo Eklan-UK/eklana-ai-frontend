@@ -471,6 +471,11 @@ export default function VocabularyDrill({
                 text={currentText}
                 size="lg"
                 autoPlay={autoPlayAudio && !pronunciationScore}
+                audioUrl={
+                  currentScreen === "word"
+                    ? currentSentence.wordAudioUrl
+                    : currentSentence.sentenceAudioUrl
+                }
               />
             </div>
             {currentScreen === "word" && currentSentence.wordTranslation && (
@@ -507,6 +512,11 @@ export default function VocabularyDrill({
               size="lg"
               variant="button"
               autoPlay={autoPlayAudio && !pronunciationScore}
+              audioUrl={
+                currentScreen === "word"
+                  ? currentSentence.wordAudioUrl
+                  : currentSentence.sentenceAudioUrl
+              }
             />
           </div>
 

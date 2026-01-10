@@ -17,8 +17,10 @@ import {
   RotateCcw,
   ChevronRight,
   AlertCircle,
+  PartyPopper,
 } from "lucide-react";
 import { toast } from "sonner";
+import confetti from "canvas-confetti";
 import { drillAPI } from "@/lib/api";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
@@ -42,6 +44,16 @@ interface TurnProgress {
   attempts: number;
 }
 
+// Analytics collected silently during the session
+interface TurnAnalytics {
+  turnIndex: number;
+  text: string;
+  score: number;
+  textScore: TextScore | null;
+  attempts: number;
+  timestamp: Date;
+}
+
 interface CompletedMessage {
   id: string;
   speaker: string;
@@ -53,6 +65,16 @@ interface CompletedMessage {
 
 const PASS_THRESHOLD = 65;
 
+// Trigger confetti celebration
+const triggerConfetti = () => {
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 },
+    colors: ['#22c55e', '#16a34a', '#4ade80', '#86efac'],
+  });
+};
+
 export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProps) {
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
@@ -61,20 +83,30 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  
+  // Track if we're on review screen vs completion screen
+  const [showReview, setShowReview] = useState(false);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   const [waitingForAI, setWaitingForAI] = useState(false);
+  
+  // Silent analytics collection during the session
+  const [sessionAnalytics, setSessionAnalytics] = useState<TurnAnalytics[]>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // TTS for AI characters
-  const { playAudio, isGenerating: isTTSGenerating, isPlaying: isTTSPlaying, stopAudio } = useTTS({
-    autoPlay: true,
+  // Audio player ref for pre-generated audio
+  const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
+
+  // TTS for AI characters (fallback if no pre-generated audio)
+  const { playAudio: playTTSAudio, isGenerating: isTTSGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
+    autoPlay: false, // We'll control playback manually
     onPlayEnd: () => {
       setWaitingForAI(false);
       // After AI finishes speaking, move to next turn if it's student's turn
@@ -88,6 +120,56 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       toast.error("Failed to play AI audio");
     },
   });
+  
+  // Play audio from pre-generated URL or fall back to TTS
+  const playAudio = useCallback(async (text: string, audioUrl?: string) => {
+    if (audioUrl) {
+      // Play from pre-generated URL
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+      }
+      
+      const audio = new Audio(audioUrl);
+      preGenAudioRef.current = audio;
+      
+      audio.onplay = () => setIsPlayingPreGen(true);
+      audio.onended = () => {
+        setIsPlayingPreGen(false);
+        setWaitingForAI(false);
+        setTimeout(() => {
+          setCurrentTurnIndex(prev => prev + 1);
+        }, 500);
+      };
+      audio.onerror = () => {
+        setIsPlayingPreGen(false);
+        // Fallback to TTS
+        console.warn("Pre-generated audio failed, falling back to TTS");
+        playTTSAudio(text);
+      };
+      
+      try {
+        await audio.play();
+      } catch (err) {
+        console.error("Error playing pre-generated audio:", err);
+        // Fallback to TTS
+        playTTSAudio(text);
+      }
+    } else {
+      // Fall back to TTS generation
+      await playTTSAudio(text);
+    }
+  }, [playTTSAudio]);
+  
+  const stopAudio = useCallback(() => {
+    if (preGenAudioRef.current) {
+      preGenAudioRef.current.pause();
+      setIsPlayingPreGen(false);
+    }
+    stopTTSAudio();
+  }, [stopTTSAudio]);
+  
+  // Combined playing state
+  const isPlaying = isPlayingPreGen || isTTSPlaying;
 
   // Drill data
   const scenes = drill.roleplay_scenes || (drill.roleplay_dialogue ? [{ dialogue: drill.roleplay_dialogue }] : []);
@@ -118,13 +200,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [completedMessages, currentTurnIndex]);
 
-  // Auto-play AI turns
-  useEffect(() => {
-    if (isAITurn && !waitingForAI && !isTTSPlaying && !isTTSGenerating) {
-      playAITurn();
-    }
-  }, [currentTurnIndex, isAITurn, waitingForAI, isTTSPlaying, isTTSGenerating]);
-
+  // Play AI turn handler (defined before useEffect that uses it)
   const playAITurn = useCallback(async () => {
     if (!currentTurn || currentTurn.speaker === "student") return;
 
@@ -140,15 +216,17 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     };
     setCompletedMessages(prev => [...prev, aiMessage]);
 
-    // Play TTS
-    await playAudio(currentTurn.text);
-    
-    // Move to next turn after AI finishes
-      setTimeout(() => {
-      setCurrentTurnIndex(prev => prev + 1);
-      setWaitingForAI(false);
-    }, 500);
+    // Play from pre-generated URL if available, otherwise use TTS
+    const audioUrl = (currentTurn as any).audioUrl;
+    await playAudio(currentTurn.text, audioUrl);
   }, [currentTurn, playAudio]);
+
+  // Auto-play AI turns
+  useEffect(() => {
+    if (isAITurn && !waitingForAI && !isPlaying && !isTTSGenerating) {
+      playAITurn();
+    }
+  }, [currentTurnIndex, isAITurn, waitingForAI, isPlaying, isTTSGenerating, playAITurn]);
 
   // Recording functions
   const startRecording = async () => {
@@ -216,6 +294,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
         const passed = score >= PASS_THRESHOLD;
+        const newAttempts = (turnProgress[currentTurnIndex]?.attempts || 0) + 1;
 
         // Update turn progress
         setTurnProgress(prev => ({
@@ -223,13 +302,28 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           [currentTurnIndex]: {
             passed,
             score,
-            attempts: (prev[currentTurnIndex]?.attempts || 0) + 1,
+            attempts: newAttempts,
           },
         }));
 
+        // Silently collect analytics for review screen
+        setSessionAnalytics(prev => [
+          ...prev,
+          {
+            turnIndex: currentTurnIndex,
+            text: currentTurn.text,
+            score,
+            textScore,
+            attempts: newAttempts,
+            timestamp: new Date(),
+          },
+        ]);
+
         if (passed) {
+          // Trigger confetti celebration
+          triggerConfetti();
           toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
-    } else {
+        } else {
           toast.warning(
             `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to continue. Try again!`
           );
@@ -268,6 +362,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   const handleTryAgain = () => {
     setPronunciationScore(null);
+  };
+
+  // Go to review screen instead of completing immediately
+  const handleShowReview = () => {
+    setShowReview(true);
   };
 
   const handleSubmit = async () => {
@@ -319,6 +418,86 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   if (isCompleted) {
     return <DrillCompletionScreen drillType="roleplay" />;
+  }
+
+  // Review Screen - Shows all analytics collected during the session
+  if (showReview) {
+    const studentScores = Object.values(turnProgress).filter(p => p.score !== null);
+    const avgScore = studentScores.length > 0
+      ? Math.round(studentScores.reduce((sum, p) => sum + (p.score || 0), 0) / studentScores.length)
+      : 0;
+    const totalAttempts = Object.values(turnProgress).reduce((sum, p) => sum + p.attempts, 0);
+
+    return (
+      <DrillLayout title="Review Performance" hideNavigation>
+        {/* Overall Score */}
+        <Card className="mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <div className="text-center py-6">
+            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4">
+              <span className="text-3xl font-bold text-white">{avgScore}%</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Overall Score</h2>
+            <p className="text-sm text-gray-600">
+              {completedStudentTurns} lines completed • {totalAttempts} total attempts
+            </p>
+          </div>
+        </Card>
+
+        {/* Per-Turn Analytics */}
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Line-by-Line Analysis</h3>
+        <div className="space-y-4 mb-6">
+          {sessionAnalytics
+            .filter((a, index, arr) => 
+              // Only show the best attempt for each turn
+              arr.findIndex(b => b.turnIndex === a.turnIndex && b.score >= a.score) === index
+            )
+            .map((analytics, idx) => (
+              <Card key={idx} className="border-gray-200">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500 mb-1">Line {analytics.turnIndex + 1}</p>
+                    <p className="text-base text-gray-900">{analytics.text}</p>
+                  </div>
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold ${
+                    analytics.score >= PASS_THRESHOLD 
+                      ? "bg-green-100 text-green-600" 
+                      : "bg-amber-100 text-amber-600"
+                  }`}>
+                    {analytics.score.toFixed(0)}%
+                  </div>
+                </div>
+                {analytics.textScore && (
+                  <WordAnalytics pronunciationScore={analytics.textScore} />
+                )}
+                <div className="text-xs text-gray-500 mt-2">
+                  Attempts: {analytics.attempts}
+                </div>
+              </Card>
+            ))}
+        </div>
+
+        {/* Submit Button */}
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Complete Drill
+            </>
+          )}
+        </Button>
+      </DrillLayout>
+    );
   }
 
   return (
@@ -422,7 +601,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mb-4">
                 {isTTSGenerating ? (
                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-                ) : isTTSPlaying ? (
+                ) : isPlaying ? (
                   <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
                 ) : (
                   <Bot className="w-10 h-10 text-blue-600" />
@@ -455,7 +634,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Say this line:</p>
-                  <TTSButton text={currentTurn.text} size="sm" />
+                  <TTSButton 
+                    text={currentTurn.text} 
+                    size="sm" 
+                    audioUrl={(currentTurn as any).audioUrl}
+                  />
                 </div>
                 <p className="text-xl font-semibold text-gray-900 text-center">
                   "{currentTurn.text}"
@@ -512,7 +695,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
               </div>
 
-              {/* Score Display */}
+              {/* Simple Score Display - Analytics shown on review screen */}
               {pronunciationScore && !currentProgress.passed && (
                 <div className={`rounded-xl p-4 mb-4 ${
                   (pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
@@ -548,9 +731,15 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 </div>
               )}
 
-              {/* Word Analytics */}
-              {pronunciationScore && (
-                <WordAnalytics pronunciationScore={pronunciationScore} />
+              {/* Confetti celebration shown when passed - no analytics here */}
+              {currentProgress.passed && pronunciationScore && (
+                <div className="rounded-xl p-4 mb-4 bg-green-50 border border-green-200 text-center">
+                  <PartyPopper className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-lg font-bold text-green-700">
+                    {pronunciationScore.speechace_score.pronunciation.toFixed(0)}% - Passed!
+                  </p>
+                  <p className="text-sm text-green-600">Click Continue to proceed</p>
+                </div>
               )}
             </div>
           )}
@@ -587,32 +776,24 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           </>
         )}
           
-        {/* Conversation complete - Submit */}
+        {/* Conversation complete - Show Review first */}
         {isConversationComplete && (
           <Card className="mb-4 bg-green-50 border-green-200">
             <div className="text-center py-4">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <PartyPopper className="w-12 h-12 text-green-500 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-gray-900 mb-2">
                 Conversation Complete!
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                Great job completing all your lines. Submit to finish the drill.
+                Great job completing all your lines. Review your performance!
               </p>
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
-                onClick={handleSubmit}
-                disabled={isSubmitting}
+                onClick={handleShowReview}
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  "Complete Drill"
-                )}
+                Review Performance
               </Button>
             </div>
           </Card>

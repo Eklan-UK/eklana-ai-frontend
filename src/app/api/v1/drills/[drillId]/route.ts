@@ -214,6 +214,8 @@ const updateDrillSchema = z.object({
 		wordTranslation: z.string().optional(),
 		text: z.string(),
 		translation: z.string().optional(),
+		wordAudioUrl: z.string().optional(),
+		sentenceAudioUrl: z.string().optional(),
       })
     )
     .optional(),
@@ -230,6 +232,7 @@ const updateDrillSchema = z.object({
 			speaker: z.string(),
 			text: z.string(),
 			translation: z.string().optional(),
+			audioUrl: z.string().optional(),
           })
         ),
       })
@@ -243,6 +246,8 @@ const updateDrillSchema = z.object({
 		right: z.string(),
 		leftTranslation: z.string().optional(),
 		rightTranslation: z.string().optional(),
+		leftAudioUrl: z.string().optional(),
+		rightAudioUrl: z.string().optional(),
       })
     )
     .optional(),
@@ -279,9 +284,11 @@ const updateDrillSchema = z.object({
   // Listening drill fields
   listening_drill_title: z.string().optional(),
   listening_drill_content: z.string().optional(),
+  listening_drill_audio_url: z.string().optional(),
 	// Summary fields
 	article_title: z.string().optional(),
 	article_content: z.string().optional(),
+	article_audio_url: z.string().optional(),
 });
 
 async function putHandler(
@@ -425,10 +432,14 @@ async function putHandler(
       drill.listening_drill_title = validated.listening_drill_title;
     if (validated.listening_drill_content !== undefined)
       drill.listening_drill_content = validated.listening_drill_content;
+    if (validated.listening_drill_audio_url !== undefined)
+      drill.listening_drill_audio_url = validated.listening_drill_audio_url;
     if (validated.article_title !== undefined)
       drill.article_title = validated.article_title;
     if (validated.article_content !== undefined)
       drill.article_content = validated.article_content;
+    if (validated.article_audio_url !== undefined)
+      drill.article_audio_url = validated.article_audio_url;
 
 		drill.updated_date = new Date();
 

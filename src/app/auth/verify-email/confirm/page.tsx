@@ -31,6 +31,9 @@ function VerifyEmailConfirmContent() {
         // Verify email with token
         await authService.verifyEmail(token);
         
+        // Clear pending verification email from sessionStorage
+        sessionStorage.removeItem("pendingVerificationEmail");
+        
         // Refresh session to get updated user data
         await checkSession();
         

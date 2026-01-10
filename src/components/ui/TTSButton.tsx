@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { Button } from "./Button";
@@ -12,6 +13,8 @@ interface TTSButtonProps {
   className?: string;
   autoPlay?: boolean;
   disabled?: boolean;
+  /** Pre-generated audio URL (Cloudinary). If provided, plays directly from URL without TTS generation */
+  audioUrl?: string;
 }
 
 export function TTSButton({
@@ -22,16 +25,89 @@ export function TTSButton({
   className = "",
   autoPlay = false,
   disabled = false,
+  audioUrl,
 }: TTSButtonProps) {
-  const { playAudio, isGenerating, isPlaying, stopAudio } = useTTS({
-    autoPlay: autoPlay, // Pass autoPlay to hook
+  // Use TTS hook for generating audio on-the-fly
+  const { playAudio: playTTSAudio, isGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
+    autoPlay: autoPlay && !audioUrl, // Only auto-play via TTS if no audioUrl
   });
+  
+  // State for playing pre-generated audio
+  const [isPlayingUrl, setIsPlayingUrl] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Combined playing state
+  const isPlaying = audioUrl ? isPlayingUrl : isTTSPlaying;
+  
+  // Auto-play pre-generated audio if specified
+  useEffect(() => {
+    if (autoPlay && audioUrl && !isPlayingUrl) {
+      playFromUrl();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, audioUrl]);
+  
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playFromUrl = () => {
+    if (!audioUrl) return;
+    
+    // Stop any existing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    
+    audio.onplay = () => setIsPlayingUrl(true);
+    audio.onended = () => setIsPlayingUrl(false);
+    audio.onerror = () => {
+      setIsPlayingUrl(false);
+      // Fallback to TTS if pre-generated audio fails
+      console.warn("Pre-generated audio failed, falling back to TTS");
+      playTTSAudio(text, voiceId);
+    };
+    
+    audio.play().catch((err) => {
+      console.error("Error playing audio:", err);
+      setIsPlayingUrl(false);
+      // Fallback to TTS
+      playTTSAudio(text, voiceId);
+    });
+  };
+  
+  const stopUrlAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlayingUrl(false);
+    }
+  };
 
   const handleClick = () => {
     if (isPlaying) {
-      stopAudio();
+      // Stop based on source
+      if (audioUrl) {
+        stopUrlAudio();
+      } else {
+        stopTTSAudio();
+      }
     } else {
-      playAudio(text, voiceId);
+      // Play based on source
+      if (audioUrl) {
+        playFromUrl();
+      } else {
+        playTTSAudio(text, voiceId);
+      }
     }
   };
 
