@@ -271,7 +271,7 @@ export default function SummaryDrill({
                 <BookOpen className="w-5 h-5 text-green-500" />
                 {articleTitle}
               </h2>
-                <TTSButton text={articleContent} size="md" audioUrl={articleAudioUrl} />
+                {/*<TTSButton text={articleContent} size="md" audioUrl={articleAudioUrl} />*/}
               </div>
             </div>
 
