@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
 import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
 import { authService } from "@/services/auth.service";
 
@@ -20,6 +20,40 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Email not verified state
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const [verificationEmailSent, setVerificationEmailSent] = useState(false);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    setIsSendingVerification(true);
+    try {
+      await authService.sendVerificationEmailByEmail(email);
+      setVerificationEmailSent(true);
+      toast.success("Verification email sent! Please check your inbox.");
+      
+      // Store email for verify-email page
+      sessionStorage.setItem("pendingVerificationEmail", email);
+    } catch (error: any) {
+      if (error.message?.includes("Already") || error.message?.includes("already verified")) {
+        toast.success("Your email is already verified! Please try signing in again.");
+        setShowVerificationMessage(false);
+        setVerificationEmailSent(false);
+      } else if (error.message?.includes("Rate") || error.message?.includes("Too many")) {
+        toast.error("Too many requests. Please wait a minute before trying again.");
+      } else {
+        toast.error(error.message || "Failed to send verification email");
+      }
+    } finally {
+      setIsSendingVerification(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +62,10 @@ export default function LoginPage() {
       toast.error("Please fill in all fields");
       return;
     }
+
+    // Reset verification message state
+    setShowVerificationMessage(false);
+    setVerificationEmailSent(false);
 
     setIsSubmitting(true);
     try {
@@ -54,8 +92,16 @@ export default function LoginPage() {
       const redirectPath = getAuthRedirectPath(status);
 
       if (status.shouldVerify) {
-        toast.info("Please verify your email to continue");
-        router.push("/auth/verify-email");
+        // User logged in but not verified - show inline message
+        setShowVerificationMessage(true);
+        // Send verification email automatically
+        try {
+          await authService.sendVerificationEmailByEmail(email);
+          setVerificationEmailSent(true);
+          sessionStorage.setItem("pendingVerificationEmail", email);
+        } catch (sendError) {
+          console.error("Failed to send verification email:", sendError);
+        }
       } else if (status.shouldOnboard) {
         toast.info("Please complete your profile setup");
         router.push("/account/onboarding");
@@ -64,44 +110,27 @@ export default function LoginPage() {
         router.push(redirectPath);
       }
     } catch (error: any) {
-      // Handle EMAIL_NOT_VERIFIED error - resend verification email and redirect
+      // Handle EMAIL_NOT_VERIFIED error
       if (
         error.code === "EMAIL_NOT_VERIFIED" ||
-        error.message?.toLowerCase().includes("email") && error.message?.toLowerCase().includes("verify")
+        (error.message?.toLowerCase().includes("email") && 
+         error.message?.toLowerCase().includes("verify"))
       ) {
-        // Try to get session anyway - user might still be logged in
-        try {
-          await useAuthStore.getState().checkSession();
-          const { user } = useAuthStore.getState();
-          if (user) {
-            toast.info("Please verify your email to continue");
-            router.push("/auth/verify-email");
-            return;
-          }
-        } catch (sessionError) {
-          // If we can't get session, continue to send verification email
-        }
+        setShowVerificationMessage(true);
         
-        // User is not logged in but email is not verified - send a new verification email
+        // Automatically send verification email
         try {
           await authService.sendVerificationEmailByEmail(email);
-          toast.info("Verification email sent! Please check your inbox and verify your email.");
-          // Store email in session storage for the verify-email page
+          setVerificationEmailSent(true);
           sessionStorage.setItem("pendingVerificationEmail", email);
-          router.push("/auth/verify-email");
-          return;
-        } catch (resendError: any) {
-          console.error("Failed to resend verification email:", resendError);
-          toast.error("Please verify your email. Check your inbox or try signing up again.");
-          sessionStorage.setItem("pendingVerificationEmail", email);
-          router.push("/auth/verify-email");
-          return;
+        } catch (sendError: any) {
+          console.error("Failed to send verification email:", sendError);
         }
+      } else {
+        toast.error(
+          error?.message || "Invalid email or password. Please try again."
+        );
       }
-      
-      toast.error(
-        error?.message || "Invalid email or password. Please try again."
-      );
     } finally {
       setIsSubmitting(false);
     }
@@ -144,13 +173,92 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Email Not Verified Message */}
+        {showVerificationMessage && (
+          <div className={`mb-6 p-4 rounded-xl border-2 ${
+            verificationEmailSent 
+              ? "bg-green-50 border-green-200" 
+              : "bg-amber-50 border-amber-200"
+          }`}>
+            <div className="flex items-start gap-3">
+              {verificationEmailSent ? (
+                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <h3 className={`font-semibold ${
+                  verificationEmailSent ? "text-green-900" : "text-amber-900"
+                }`}>
+                  {verificationEmailSent 
+                    ? "Verification Email Sent!" 
+                    : "Email Not Verified"}
+                </h3>
+                <p className={`text-sm mt-1 ${
+                  verificationEmailSent ? "text-green-700" : "text-amber-700"
+                }`}>
+                  {verificationEmailSent 
+                    ? `We've sent a verification link to ${email}. Please check your inbox and click the link to verify your email.`
+                    : "Please verify your email address to sign in."}
+                </p>
+                
+                {!verificationEmailSent && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendVerification}
+                    disabled={isSendingVerification}
+                    className="mt-3 border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    {isSendingVerification ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4 mr-2" />
+                        Send Verification Email
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                {verificationEmailSent && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-xs text-green-600">
+                      Didn't receive it?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={isSendingVerification}
+                      className="text-xs text-green-700 font-semibold hover:text-green-800 underline disabled:opacity-50"
+                    >
+                      {isSendingVerification ? "Sending..." : "Resend"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <Input
             type="email"
             label="Email"
             placeholder="Enter your email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              // Reset verification state when email changes
+              if (showVerificationMessage) {
+                setShowVerificationMessage(false);
+                setVerificationEmailSent(false);
+              }
+            }}
             disabled={isSubmitting || isLoading}
             required
             icon={<Mail className="w-5 h-5 text-gray-400" />}

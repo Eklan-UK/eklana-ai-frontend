@@ -4,86 +4,40 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Mail, CheckCircle, Loader2 } from "lucide-react";
+import { Mail, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import { toast } from "sonner";
-import { useAuthStore } from "@/store/auth-store";
-import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
+import Link from "next/link";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
-  const { user, checkSession, isAuthenticated } = useAuthStore();
   const [isSending, setIsSending] = useState(false);
-  const [isSent, setIsSent] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const [manualEmail, setManualEmail] = useState("");
 
   useEffect(() => {
-    // Get user email from multiple sources (in priority order):
-    // 1. From auth store (if logged in)
-    // 2. From sessionStorage (set during signup or failed login)
-    // 3. Leave empty for manual entry
-    
-    if (user?.email) {
-      setUserEmail(user.email);
-    } else {
-      // Check sessionStorage for pending verification email
-      const pendingEmail = sessionStorage.getItem("pendingVerificationEmail");
-      if (pendingEmail) {
-        setUserEmail(pendingEmail);
-      } else {
-        // Try to refresh session to get user email
-        checkSession().then(() => {
-          const currentUser = useAuthStore.getState().user;
-          if (currentUser?.email) {
-            setUserEmail(currentUser.email);
-          }
-        });
-      }
+    // Get email from sessionStorage (set during signup or failed login)
+    const pendingEmail = sessionStorage.getItem("pendingVerificationEmail");
+    if (pendingEmail) {
+      setUserEmail(pendingEmail);
     }
-  }, [user, checkSession]);
+  }, []);
 
-  const handleSendVerificationEmail = async () => {
-    const emailToVerify = userEmail || manualEmail;
-    
-    if (!emailToVerify) {
-      toast.error("Please enter your email address");
+  const handleResendEmail = async () => {
+    if (!userEmail) {
+      toast.error("No email address found. Please try signing up again.");
+      router.push("/auth/register");
       return;
     }
 
     setIsSending(true);
     try {
-      // First check if user is authenticated
-      const { isAuthenticated: isAuth, user: currentUser } = useAuthStore.getState();
-      
-      if (isAuth && currentUser) {
-        // User is authenticated - use the authenticated endpoint
-        try {
-          await authService.sendVerificationEmail();
-          setIsSent(true);
-          toast.success("Verification email sent! Please check your inbox.");
-          return;
-        } catch (authError: any) {
-          // If auth fails, fall through to public endpoint
-          console.log("Auth resend failed, trying public endpoint:", authError);
-        }
-      }
-      
-      // User not authenticated or auth endpoint failed - use public endpoint
-      await authService.sendVerificationEmailByEmail(emailToVerify);
-      setIsSent(true);
+      await authService.sendVerificationEmailByEmail(userEmail);
       toast.success("Verification email sent! Please check your inbox.");
-      
-      // Store email for future use
-      sessionStorage.setItem("pendingVerificationEmail", emailToVerify);
-      if (!userEmail) {
-        setUserEmail(emailToVerify);
-      }
     } catch (error: any) {
       if (error.message?.includes("Already") || error.message?.includes("already verified")) {
         toast.success("Your email is already verified! You can sign in now.");
+        sessionStorage.removeItem("pendingVerificationEmail");
         router.push("/auth/login");
       } else if (error.message?.includes("Rate") || error.message?.includes("Too many")) {
         toast.error("Too many requests. Please wait a minute before trying again.");
@@ -95,132 +49,106 @@ export default function VerifyEmailPage() {
     }
   };
 
-  // Check if user is already verified
-  useEffect(() => {
-    const checkVerification = async () => {
-      // Wait a bit for auth to load, then check
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Try to get user from store
-      let currentUser = user;
-      if (!currentUser) {
-        await checkSession();
-        currentUser = useAuthStore.getState().user;
-      }
-      
-      if (currentUser) {
-        const status = await checkAuthFlowStatus(currentUser);
-        if (status.isVerified) {
-          // Already verified, redirect to appropriate page
-          const redirectPath = getAuthRedirectPath(status);
-          router.push(redirectPath);
-        }
-      }
-    };
-
-    checkVerification();
-  }, [user, router, checkSession]);
-
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
-      <Header showBack title="Verify Your Email" />
+      <Header title="Verify Your Email" />
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
-        <Card className="p-6">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-green-600" />
+        <Card className="p-8 bg-white shadow-xl rounded-3xl">
+          <div className="text-center">
+            {/* Animated Email Icon */}
+            <div className="relative w-20 h-20 mx-auto mb-6">
+              <div className="absolute inset-0 bg-green-200 rounded-full animate-ping opacity-25"></div>
+              <div className="relative w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                <Mail className="w-10 h-10 text-white" />
+              </div>
             </div>
+
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Verify Your Email Address
+              Check Your Email
             </h2>
-            <p className="text-sm text-gray-600">
-              We've sent a verification link to
-            </p>
-            {userEmail && (
-              <p className="text-sm font-semibold text-gray-900 mt-1">
-                {userEmail}
+            
+            {userEmail ? (
+              <>
+                <p className="text-gray-600 mb-2">
+                  We've sent a verification link to
+                </p>
+                <p className="text-lg font-semibold text-green-600 mb-6 break-all">
+                  {userEmail}
+                </p>
+              </>
+            ) : (
+              <p className="text-gray-600 mb-6">
+                We've sent you a verification link. Please check your email.
               </p>
             )}
-          </div>
 
-          {!isSent ? (
-            <>
-              <p className="text-sm text-gray-600 mb-6 text-center">
-                Please check your email and click the verification link to
-                activate your account. If you didn't receive the email, you can
-                request a new one.
-              </p>
+            {/* Instructions */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                What to do next:
+              </h3>
+              <ol className="text-sm text-gray-600 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+                  <span>Open your email inbox</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+                  <span>Find the email from <strong>eklan</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+                  <span>Click the verification link</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-bold flex-shrink-0 mt-0.5">4</span>
+                  <span>Return here and sign in</span>
+                </li>
+              </ol>
+            </div>
 
-              {/* Show email input if email is not known */}
-              {!userEmail && (
-                <div className="mb-4">
-                  <Input
-                    type="email"
-                    label="Email Address"
-                    placeholder="Enter your email"
-                    value={manualEmail}
-                    onChange={(e) => setManualEmail(e.target.value)}
-                    disabled={isSending}
-                    icon={<Mail className="w-5 h-5 text-gray-400" />}
-                  />
-                </div>
+            {/* Resend Button */}
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              onClick={handleResendEmail}
+              disabled={isSending || !userEmail}
+              className="mb-4"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-5 h-5 mr-2" />
+                  Resend Verification Email
+                </>
               )}
+            </Button>
 
+            {/* Back to Login */}
+            <Link href="/auth/login">
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
-                onClick={handleSendVerificationEmail}
-                disabled={isSending || (!userEmail && !manualEmail)}
+                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
               >
-                {isSending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-5 h-5 mr-2" />
-                    Send Verification Email
-                  </>
-                )}
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Login
               </Button>
-            </>
-          ) : (
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Verification email sent! Please check your inbox and click the
-                link to verify your email.
-              </p>
-              <Button
-                variant="outline"
-                size="lg"
-                fullWidth
-                onClick={handleSendVerificationEmail}
-                disabled={isSending}
-              >
-                {isSending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Resend Verification Email"
-                )}
-              </Button>
-            </div>
-          )}
+            </Link>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Didn't receive the email? Check your spam folder or try resending.
+            {/* Help text */}
+            <p className="text-xs text-gray-500 mt-6">
+              Didn't receive the email? Check your spam folder or click resend above.
             </p>
           </div>
         </Card>

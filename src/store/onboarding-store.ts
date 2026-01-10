@@ -5,17 +5,17 @@ interface OnboardingState {
   // Step 1: Name
   name: string;
   
-  // Step 2: User Type
-  userType: string | null; // "professional" | "student" | "browsing" | "ancestor"
+  // User Type (always "student" by default)
+  userType: string;
   
-  // Step 3: Learning Goals
-  learningGoal: string | null; // "conversations" | "professional" | "travel" | "interviews"
+  // Step 2: Learning Goals
+  learningGoal: string | null;
   
-  // Step 4: Nationality
+  // Step 3: Nationality
   nationality: string | null;
   
-  // Step 5: Language
-  language: string | null;
+  // Language (default to English)
+  language: string;
   
   // Actions
   setName: (name: string) => void;
@@ -43,10 +43,10 @@ interface OnboardingState {
 
 const initialState = {
   name: "",
-  userType: null,
+  userType: "student", // Default to student for all users
   learningGoal: null,
   nationality: null,
-  language: null,
+  language: "English", // Default to English for all users
 };
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -66,24 +66,14 @@ export const useOnboardingStore = create<OnboardingState>()(
         const state = get();
         return !!(
           state.name &&
-          state.userType &&
           state.learningGoal &&
-          state.nationality &&
-          state.language
+          state.nationality
         );
       },
 
       getFormattedData: () => {
         const state = get();
         
-        // Map user type to education level
-        const educationLevelMap: Record<string, string> = {
-          student: "undergraduate",
-          professional: "professional",
-          browsing: "undergraduate",
-          ancestor: "professional",
-        };
-
         // Map learning goal to learning goals array
         const learningGoalsMap: Record<string, string> = {
           conversations: "Speak naturally in conversations",
@@ -96,10 +86,7 @@ export const useOnboardingStore = create<OnboardingState>()(
           learningGoals: state.learningGoal
             ? [learningGoalsMap[state.learningGoal] || state.learningGoal]
             : [],
-          educationLevel:
-            state.userType && educationLevelMap[state.userType]
-              ? educationLevelMap[state.userType]
-              : undefined,
+          educationLevel: "undergraduate", // All users are students
           preferences: {
             sessionDuration: 60,
             preferredTimeSlots: [],
@@ -114,5 +101,3 @@ export const useOnboardingStore = create<OnboardingState>()(
     }
   )
 );
-
-
