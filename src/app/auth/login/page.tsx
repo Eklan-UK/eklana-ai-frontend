@@ -311,7 +311,7 @@ export default function LoginPage() {
               "Sign In"
             )}
           </Button>
-
+{/* 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300"></div>
@@ -371,7 +371,7 @@ export default function LoginPage() {
               </svg>
               Continue with Apple
             </Button>
-          </div>
+          </div> */}
 
           <p className="text-center text-sm text-gray-600">
             Don&apos;t have an account?{" "}
