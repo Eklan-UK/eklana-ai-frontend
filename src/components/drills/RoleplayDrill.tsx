@@ -13,7 +13,6 @@ import {
   Mic,
   Square,
   Volume2,
-  Lock,
   RotateCcw,
   ChevronRight,
   AlertCircle,
@@ -36,6 +35,7 @@ interface DialogueTurn {
   speaker: string;
   text: string;
   translation?: string;
+  audioUrl?: string;
 }
 
 interface TurnProgress {
@@ -91,7 +91,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
-  const [waitingForAI, setWaitingForAI] = useState(false);
+  
+  // AI turn state - track which turns have been played
+  const [playedAITurns, setPlayedAITurns] = useState<Set<number>>(new Set());
+  const [isPlayingAI, setIsPlayingAI] = useState(false);
   
   // Silent analytics collection during the session
   const [sessionAnalytics, setSessionAnalytics] = useState<TurnAnalytics[]>([]);
@@ -102,74 +105,16 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   // Audio player ref for pre-generated audio
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
 
   // TTS for AI characters (fallback if no pre-generated audio)
-  const { playAudio: playTTSAudio, isGenerating: isTTSGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
-    autoPlay: false, // We'll control playback manually
-    onPlayEnd: () => {
-      setWaitingForAI(false);
-      // After AI finishes speaking, move to next turn if it's student's turn
-      const nextTurn = dialogue[currentTurnIndex + 1];
-      if (nextTurn && nextTurn.speaker === "student") {
-        // Ready for student's turn
-      }
-    },
-    onError: () => {
-      setWaitingForAI(false);
-      toast.error("Failed to play AI audio");
-    },
+  const { 
+    playAudio: playTTSAudio, 
+    isGenerating: isTTSGenerating, 
+    isPlaying: isTTSPlaying, 
+    stopAudio: stopTTSAudio 
+  } = useTTS({
+    autoPlay: false,
   });
-  
-  // Play audio from pre-generated URL or fall back to TTS
-  const playAudio = useCallback(async (text: string, audioUrl?: string) => {
-    if (audioUrl) {
-      // Play from pre-generated URL
-      if (preGenAudioRef.current) {
-        preGenAudioRef.current.pause();
-      }
-      
-      const audio = new Audio(audioUrl);
-      preGenAudioRef.current = audio;
-      
-      audio.onplay = () => setIsPlayingPreGen(true);
-      audio.onended = () => {
-        setIsPlayingPreGen(false);
-        setWaitingForAI(false);
-        setTimeout(() => {
-          setCurrentTurnIndex(prev => prev + 1);
-        }, 500);
-      };
-      audio.onerror = () => {
-        setIsPlayingPreGen(false);
-        // Fallback to TTS
-        console.warn("Pre-generated audio failed, falling back to TTS");
-        playTTSAudio(text);
-      };
-      
-      try {
-        await audio.play();
-      } catch (err) {
-        console.error("Error playing pre-generated audio:", err);
-        // Fallback to TTS
-        playTTSAudio(text);
-      }
-    } else {
-      // Fall back to TTS generation
-      await playTTSAudio(text);
-    }
-  }, [playTTSAudio]);
-  
-  const stopAudio = useCallback(() => {
-    if (preGenAudioRef.current) {
-      preGenAudioRef.current.pause();
-      setIsPlayingPreGen(false);
-    }
-    stopTTSAudio();
-  }, [stopTTSAudio]);
-  
-  // Combined playing state
-  const isPlaying = isPlayingPreGen || isTTSPlaying;
 
   // Drill data
   const scenes = drill.roleplay_scenes || (drill.roleplay_dialogue ? [{ dialogue: drill.roleplay_dialogue }] : []);
@@ -200,33 +145,94 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [completedMessages, currentTurnIndex]);
 
-  // Play AI turn handler (defined before useEffect that uses it)
-  const playAITurn = useCallback(async () => {
-    if (!currentTurn || currentTurn.speaker === "student") return;
+  // Move to next turn after AI finishes
+  const moveToNextTurn = useCallback(() => {
+    setIsPlayingAI(false);
+    setCurrentTurnIndex(prev => prev + 1);
+  }, []);
 
-    setWaitingForAI(true);
+  // Play AI turn - only called once per turn
+  const playAITurn = useCallback(async (turn: DialogueTurn, turnIndex: number) => {
+    // Mark this turn as played immediately
+    setPlayedAITurns(prev => new Set([...prev, turnIndex]));
+    setIsPlayingAI(true);
     
     // Add AI message to completed messages
     const aiMessage: CompletedMessage = {
-      id: `msg-${Date.now()}`,
-      speaker: currentTurn.speaker,
-      text: currentTurn.text,
-      translation: currentTurn.translation,
+      id: `msg-${Date.now()}-${turnIndex}`,
+      speaker: turn.speaker,
+      text: turn.text,
+      translation: turn.translation,
       timestamp: new Date(),
     };
     setCompletedMessages(prev => [...prev, aiMessage]);
 
-    // Play from pre-generated URL if available, otherwise use TTS
-    const audioUrl = (currentTurn as any).audioUrl;
-    await playAudio(currentTurn.text, audioUrl);
-  }, [currentTurn, playAudio]);
-
-  // Auto-play AI turns
-  useEffect(() => {
-    if (isAITurn && !waitingForAI && !isPlaying && !isTTSGenerating) {
-      playAITurn();
+    // Play audio
+    const audioUrl = turn.audioUrl;
+    
+    if (audioUrl) {
+      // Play from pre-generated URL
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+      }
+      
+      const audio = new Audio(audioUrl);
+      preGenAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setTimeout(moveToNextTurn, 300);
+      };
+      audio.onerror = async () => {
+        // Fallback to TTS
+        console.warn("Pre-generated audio failed, falling back to TTS");
+        try {
+          await playTTSAudio(turn.text);
+          // TTS plays async, wait a bit then move on
+          setTimeout(moveToNextTurn, 500);
+        } catch {
+          moveToNextTurn();
+        }
+      };
+      
+      try {
+        await audio.play();
+      } catch (err) {
+        console.error("Error playing pre-generated audio:", err);
+        // Fallback to TTS
+        try {
+          await playTTSAudio(turn.text);
+          setTimeout(moveToNextTurn, 500);
+        } catch {
+          moveToNextTurn();
+        }
+      }
+    } else {
+      // Use TTS generation
+      try {
+        await playTTSAudio(turn.text);
+        // After TTS finishes, move to next turn
+        setTimeout(moveToNextTurn, 500);
+      } catch (error) {
+        console.error("TTS failed:", error);
+        toast.error("Failed to play AI audio");
+        moveToNextTurn();
+      }
     }
-  }, [currentTurnIndex, isAITurn, waitingForAI, isPlaying, isTTSGenerating, playAITurn]);
+  }, [playTTSAudio, moveToNextTurn]);
+
+  // Auto-play AI turns - only if not already played
+  useEffect(() => {
+    if (
+      isAITurn && 
+      currentTurn && 
+      !playedAITurns.has(currentTurnIndex) && 
+      !isPlayingAI &&
+      !isTTSGenerating &&
+      !isTTSPlaying
+    ) {
+      playAITurn(currentTurn, currentTurnIndex);
+    }
+  }, [currentTurnIndex, currentTurn, isAITurn, playedAITurns, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
 
   // Recording functions
   const startRecording = async () => {
@@ -416,6 +422,17 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
   };
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (preGenAudioRef.current) {
+        preGenAudioRef.current.pause();
+        preGenAudioRef.current = null;
+      }
+      stopTTSAudio();
+    };
+  }, [stopTTSAudio]);
+
   if (isCompleted) {
     return <DrillCompletionScreen drillType="roleplay" />;
   }
@@ -501,7 +518,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   }
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout title={drill.title} hideNavigation>
       {/* Progress */}
       <DrillProgress
         current={completedStudentTurns}
@@ -509,35 +526,35 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         label="Your lines"
       />
 
-        {/* Context */}
-        {drill.context && (
+      {/* Context */}
+      {drill.context && (
         <Card className="mb-4 bg-emerald-50 border-emerald-200">
-            <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2">
             <MessageCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-              <div>
+            <div>
               <p className="text-sm font-semibold text-emerald-900 mb-1">Scenario</p>
               <p className="text-sm text-emerald-800">{drill.context}</p>
-              </div>
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
+      )}
 
-        {/* Scene Info */}
-        {currentScene?.scene_name && (
+      {/* Scene Info */}
+      {currentScene?.scene_name && (
         <Card className="mb-4 bg-white/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Current Scene</p>
-                <p className="text-sm font-semibold text-gray-900">{currentScene.scene_name}</p>
-              </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Current Scene</p>
+              <p className="text-sm font-semibold text-gray-900">{currentScene.scene_name}</p>
+            </div>
             {scenes.length > 1 && (
               <div className="text-xs text-gray-500">
                 Scene {currentSceneIndex + 1} of {scenes.length}
               </div>
             )}
-            </div>
-          </Card>
-        )}
+          </div>
+        </Card>
+      )}
 
       {/* Conversation History */}
       <Card className="mb-4 max-h-64 overflow-y-auto">
@@ -546,51 +563,51 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
             <div className="text-center py-4 text-gray-500 text-sm">
               <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
               <p>Conversation will appear here</p>
-              </div>
-            ) : (
+            </div>
+          ) : (
             completedMessages.map((message) => {
-                const isUser = message.speaker === "student";
-                return (
+              const isUser = message.speaker === "student";
+              return (
+                <div
+                  key={message.id}
+                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                >
                   <div
-                    key={message.id}
-                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
                     className={`max-w-[85%] rounded-2xl p-3 ${
-                        isUser
-                          ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
-                          : "bg-gray-100 text-gray-900"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {isUser ? (
+                      isUser
+                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                        : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      {isUser ? (
                         <User className="w-3 h-3" />
-                        ) : (
+                      ) : (
                         <Bot className="w-3 h-3" />
-                        )}
-                        <span className="text-xs font-semibold opacity-90">
-                          {getSpeakerName(message.speaker)}
+                      )}
+                      <span className="text-xs font-semibold opacity-90">
+                        {getSpeakerName(message.speaker)}
                       </span>
                       {isUser && message.score !== undefined && (
                         <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                           {message.score}%
                         </span>
                       )}
-                      </div>
-                      <p className="text-sm">{message.text}</p>
-                      {message.translation && (
-                      <p className={`text-xs mt-1 opacity-75`}>
-                          {message.translation}
-                        </p>
-                      )}
                     </div>
+                    <p className="text-sm">{message.text}</p>
+                    {message.translation && (
+                      <p className="text-xs mt-1 opacity-75">
+                        {message.translation}
+                      </p>
+                    )}
                   </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </Card>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </Card>
 
       {/* Current Turn Interface */}
       {!isConversationComplete && currentTurn && (
@@ -601,7 +618,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mb-4">
                 {isTTSGenerating ? (
                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-                ) : isPlaying ? (
+                ) : isPlayingAI || isTTSPlaying ? (
                   <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
                 ) : (
                   <Bot className="w-10 h-10 text-blue-600" />
@@ -637,7 +654,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <TTSButton 
                     text={currentTurn.text} 
                     size="sm" 
-                    audioUrl={(currentTurn as any).audioUrl}
+                    audioUrl={currentTurn.audioUrl}
                   />
                 </div>
                 <p className="text-xl font-semibold text-gray-900 text-center">
@@ -797,7 +814,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               </Button>
             </div>
           </Card>
-          )}
+        )}
       </div>
     </DrillLayout>
   );
