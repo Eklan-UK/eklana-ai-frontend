@@ -8,8 +8,8 @@ interface OnboardingState {
   // User Type (always "student" by default)
   userType: string;
   
-  // Step 2: Learning Goals
-  learningGoal: string | null;
+  // Step 2: Learning Goals (multiple selection)
+  learningGoals: string[];
   
   // Step 3: Nationality
   nationality: string | null;
@@ -20,7 +20,7 @@ interface OnboardingState {
   // Actions
   setName: (name: string) => void;
   setUserType: (type: string) => void;
-  setLearningGoal: (goal: string) => void;
+  setLearningGoals: (goals: string[]) => void;
   setNationality: (nationality: string) => void;
   setLanguage: (language: string) => void;
   reset: () => void;
@@ -44,9 +44,17 @@ interface OnboardingState {
 const initialState = {
   name: "",
   userType: "student", // Default to student for all users
-  learningGoal: null,
+  learningGoals: [], // Now an array for multiple selection
   nationality: null,
   language: "English", // Default to English for all users
+};
+
+// Map goal IDs to readable labels
+const learningGoalsMap: Record<string, string> = {
+  conversations: "Speak naturally in conversations",
+  professional: "Sound professional at work",
+  travel: "Travel confidently",
+  interviews: "Prepare for Interviews",
 };
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -56,7 +64,7 @@ export const useOnboardingStore = create<OnboardingState>()(
 
       setName: (name) => set({ name }),
       setUserType: (userType) => set({ userType }),
-      setLearningGoal: (learningGoal) => set({ learningGoal }),
+      setLearningGoals: (learningGoals) => set({ learningGoals }),
       setNationality: (nationality) => set({ nationality }),
       setLanguage: (language) => set({ language }),
 
@@ -66,7 +74,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         const state = get();
         return !!(
           state.name &&
-          state.learningGoal &&
+          state.learningGoals.length > 0 &&
           state.nationality
         );
       },
@@ -74,18 +82,13 @@ export const useOnboardingStore = create<OnboardingState>()(
       getFormattedData: () => {
         const state = get();
         
-        // Map learning goal to learning goals array
-        const learningGoalsMap: Record<string, string> = {
-          conversations: "Speak naturally in conversations",
-          professional: "Sound professional at work",
-          travel: "Travel confidently",
-          interviews: "Prepare for Interviews",
-        };
+        // Map goal IDs to readable labels
+        const formattedGoals = state.learningGoals.map(
+          (goalId) => learningGoalsMap[goalId] || goalId
+        );
 
         return {
-          learningGoals: state.learningGoal
-            ? [learningGoalsMap[state.learningGoal] || state.learningGoal]
-            : [],
+          learningGoals: formattedGoals,
           educationLevel: "undergraduate", // All users are students
           preferences: {
             sessionDuration: 60,

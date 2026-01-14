@@ -176,13 +176,18 @@ async function handler(
 					const user = users.find((u) => u._id.toString() === assignment.learnerId.toString());
 					if (user?.email) {
 						try {
+							// Get best available name for the assigner (tutor or admin)
+							const assignerName = assigner.firstName 
+								? `${assigner.firstName}${assigner.lastName ? ' ' + assigner.lastName : ''}`
+								: assigner.email?.split('@')[0] || 'Your instructor';
+							
 							await sendDrillAssignmentNotification({
 								studentEmail: user.email,
 								studentName: user.firstName || 'Student',
 								drillTitle: drill.title,
 								drillType: drill.type,
 								dueDate: dueDate!,
-								assignerName: assigner.firstName || assigner.email,
+								assignerName: assignerName,
 							});
 						} catch (emailError: any) {
 							logger.error('Failed to send drill assignment email', {

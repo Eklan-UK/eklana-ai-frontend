@@ -13,7 +13,8 @@ const onboardSchema = z.object({
 	role: z.enum(['user', 'tutor']).optional(),
 	// Profile data
 	userType: z.enum(['professional', 'student', 'browsing', 'ancestor']).optional(),
-	learningGoal: z.string().optional(),
+	learningGoal: z.string().optional(), // Legacy single goal support
+	learningGoals: z.array(z.string()).optional(), // New multiple goals support
 	nationality: z.string().optional(),
 	language: z.string().optional(),
 });

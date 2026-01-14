@@ -9,6 +9,7 @@ import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { sendDrillReviewNotification } from '@/lib/api/email.service';
 
 const reviewSchema = z.object({
 	sentenceReviews: z.array(z.object({
@@ -114,16 +115,41 @@ async function handler(
 			score,
 		});
 
+		// Get the updated attempt with populated fields for the response
+		const updatedAttempt = await DrillAttempt.findById(attemptId)
+			.populate('drillId', 'title type')
+			.populate('learnerId', 'firstName lastName email')
+			.lean()
+			.exec();
+
+		// Send notification to student (async, don't block response)
+		if (updatedAttempt) {
+			const reviewer = await User.findById(context.userId).select('firstName lastName email').lean().exec();
+			const learner = updatedAttempt.learnerId as any;
+			const drill = updatedAttempt.drillId as any;
+			
+			if (learner?.email && drill) {
+				sendDrillReviewNotification({
+					studentEmail: learner.email,
+					studentName: learner.firstName || 'Student',
+					drillTitle: drill.title,
+					drillType: drill.type,
+					tutorName: reviewer?.firstName || reviewer?.email || 'Your tutor',
+					score,
+					correctCount,
+					totalCount: totalSentences,
+				}).catch((err) => {
+					logger.error('Failed to send review notification', { error: err.message });
+				});
+			}
+		}
+
 		return NextResponse.json(
 			{
 				code: 'Success',
 				message: 'Review submitted successfully',
 				data: {
-					attempt: await DrillAttempt.findById(attemptId)
-						.populate('drillId', 'title type')
-						.populate('learnerId', 'name email')
-						.lean()
-						.exec(),
+					attempt: updatedAttempt,
 				},
 			},
 			{ status: 200 }

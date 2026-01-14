@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MessageCircle, Briefcase, Plane, FileText, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useOnboardingStore } from "@/store/onboarding-store";
 
 export default function OnboardingLearningGoalsPage() {
   const router = useRouter();
-  const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+  const { setLearningGoals } = useOnboardingStore();
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
 
   const goals = [
     {
@@ -38,6 +40,21 @@ export default function OnboardingLearningGoalsPage() {
     },
   ];
 
+  const toggleGoal = (goalId: string) => {
+    setSelectedGoals((prev) =>
+      prev.includes(goalId)
+        ? prev.filter((id) => id !== goalId)
+        : [...prev, goalId]
+    );
+  };
+
+  const handleContinue = () => {
+    if (selectedGoals.length > 0) {
+      setLearningGoals(selectedGoals);
+      router.push("/account/onboarding/nationality");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Status Bar Space */}
@@ -49,8 +66,6 @@ export default function OnboardingLearningGoalsPage() {
         <div className="w-8 h-2 bg-green-600 rounded-full"></div>
         <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
         <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
       </div>
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
@@ -59,19 +74,19 @@ export default function OnboardingLearningGoalsPage() {
             Why are you learning English?
           </h1>
           <p className="text-base text-gray-600">
-            Select the main reason to personalize your learning experience
+            Select all that apply to personalize your learning experience
           </p>
         </div>
 
         <div className="space-y-3 mb-8">
           {goals.map((goal) => {
             const Icon = goal.Icon;
-            const isSelected = selectedGoal === goal.id;
+            const isSelected = selectedGoals.includes(goal.id);
 
             return (
               <button
                 key={goal.id}
-                onClick={() => setSelectedGoal(goal.id)}
+                onClick={() => toggleGoal(goal.id)}
                 className="w-full text-left"
               >
                 <Card
@@ -111,17 +126,23 @@ export default function OnboardingLearningGoalsPage() {
           })}
         </div>
 
+        {/* Selected count indicator */}
+        {selectedGoals.length > 0 && (
+          <p className="text-sm text-gray-500 text-center mb-4">
+            {selectedGoals.length} goal{selectedGoals.length > 1 ? "s" : ""} selected
+          </p>
+        )}
+
         <Button
           variant="primary"
           size="lg"
           fullWidth
-          disabled={!selectedGoal}
-          onClick={() => router.push("/account/onboarding/nationality")}
+          disabled={selectedGoals.length === 0}
+          onClick={handleContinue}
         >
-          Done
+          Continue
         </Button>
       </div>
     </div>
   );
 }
-

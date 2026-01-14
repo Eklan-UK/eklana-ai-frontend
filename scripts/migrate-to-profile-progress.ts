@@ -1,15 +1,3 @@
-/**
- * Migration script to refactor from Learner to Profile and Progress models
- * 
- * This script:
- * 1. Migrates Learner data to Profile
- * 2. Migrates LearnerPronunciationProgress to Progress (type: pronunciation)
- * 3. Updates User roles from "learner" to "user"
- * 4. Removes hasProfile field from User (no longer needed)
- * 
- * Run with: npx ts-node scripts/migrate-to-profile-progress.ts
- */
-
 import mongoose from 'mongoose';
 import User from '../src/models/user';
 import Profile from '../src/models/profile';
@@ -29,7 +17,7 @@ async function migrate() {
     // if it exists in the database for migration purposes
     const db = mongoose.connection.db;
     let profilesCreated = 0;
-    let profilesSkipped = 0;
+    let profilesSkipped = 0;  23
 
     try {
       const learnerCollection = db?.collection('learners');

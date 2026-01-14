@@ -20,17 +20,18 @@ export async function getTutorStudents() {
     }
 
     const data = await response.json();
-    // Transform data to include progress and drill counts
+    // Transform data to include user info and drill counts from API
     const students = (data.students || []).map((student: any) => {
       const user = student.userId || student;
       return {
         id: user._id || user.id,
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Unknown',
         email: user.email,
-        progress: 0, // TODO: Calculate from drill attempts
-        drillsCompleted: 0, // TODO: Get from drill assignments
-        drillsActive: 0, // TODO: Get from drill assignments
-        lastActivity: null, // TODO: Get from learning sessions
+        progress: student.progress || 0,
+        drillsCompleted: student.drillsCompleted || 0,
+        drillsActive: student.drillsActive || 0,
+        drillsTotal: student.drillsTotal || 0,
+        lastActivity: user.lastActivity || null,
         ...user,
       };
     });
@@ -46,4 +47,3 @@ export async function getTutorStudents() {
     return { students: [], total: 0, limit: 20, offset: 0 };
   }
 }
-

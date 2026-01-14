@@ -32,11 +32,11 @@ export default function OnboardingPage() {
 
   const {
     name,
-    learningGoal,
+    learningGoals,
     nationality,
     setName,
     setUserType,
-    setLearningGoal,
+    setLearningGoals,
     setNationality,
     getFormattedData,
     reset,
@@ -94,12 +94,19 @@ export default function OnboardingPage() {
     { id: "japanese", label: "Japanese", native: "日本語", flag: "🇯🇵" },
   ];
 
+  const toggleGoal = (goalId: string) => {
+    const newGoals = learningGoals.includes(goalId)
+      ? learningGoals.filter((id) => id !== goalId)
+      : [...learningGoals, goalId];
+    setLearningGoals(newGoals);
+  };
+
   const canProceed = () => {
     switch (currentStep) {
       case 1:
         return !!name.trim();
       case 2:
-        return !!learningGoal;
+        return learningGoals.length > 0;
       case 3:
         return !!nationality;
       default:
@@ -187,17 +194,17 @@ export default function OnboardingPage() {
               Why are you learning English?
             </h1>
             <p className="text-base text-gray-600 mb-8">
-              Select the main reason to personalize your learning experience
+              Select all that apply to personalize your learning experience
             </p>
             <div className="space-y-3">
               {goals.map((goal) => {
                 const Icon = goal.Icon;
-                const isSelected = learningGoal === goal.id;
+                const isSelected = learningGoals.includes(goal.id);
 
                 return (
                   <button
                     key={goal.id}
-                    onClick={() => setLearningGoal(goal.id)}
+                    onClick={() => toggleGoal(goal.id)}
                     className="w-full text-left"
                   >
                     <Card
@@ -238,6 +245,12 @@ export default function OnboardingPage() {
                 );
               })}
             </div>
+            {/* Selected count indicator */}
+            {learningGoals.length > 0 && (
+              <p className="text-sm text-gray-500 text-center mt-4">
+                {learningGoals.length} goal{learningGoals.length > 1 ? "s" : ""} selected
+              </p>
+            )}
           </div>
         );
 
