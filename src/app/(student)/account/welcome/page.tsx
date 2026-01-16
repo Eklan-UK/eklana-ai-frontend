@@ -17,9 +17,9 @@ export default function WelcomePage() {
           <Image
             src="/logo2.png"
             alt="eklan Logo"
-            width={80}
-            height={80}
-            className="rounded-2xl shadow-lg"
+            width={56}
+            height={56}
+            className="rounded-xl shadow-lg"
           />
         </div>
 
@@ -39,7 +39,7 @@ export default function WelcomePage() {
             variant="primary"
             size="lg"
             fullWidth
-            className="flex items-center justify-center gap-3"
+            className="gap-3"
           >
             <svg
               width="20"
@@ -63,7 +63,7 @@ export default function WelcomePage() {
             variant="outline"
             size="lg"
             fullWidth
-            className="flex items-center justify-center gap-3"
+            className="gap-3"
           >
             <svg
               width="20"
@@ -84,7 +84,7 @@ export default function WelcomePage() {
             variant="secondary"
             size="lg"
             fullWidth
-            className="flex items-center justify-center gap-3"
+            className="gap-3"
           >
             <svg
               width="20"

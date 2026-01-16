@@ -1,11 +1,12 @@
 // GET /api/v1/tutor/students/[studentId]
-// Get a single student's details with drill assignment counts
+// Get a single student's details with drill assignment counts and review status
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
 import Profile from '@/models/profile';
 import DrillAssignment from '@/models/drill-assignment';
+import DrillAttempt from '@/models/drill-attempt';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
@@ -98,29 +99,87 @@ async function handler(
 			inProgress: 0,
 		};
 
-		// Get recent drill assignments for this student
-		const recentAssignments = await DrillAssignment.find({
+		// Get all drill assignments for this student (assigned by this tutor)
+		const allAssignments = await DrillAssignment.find({
 			learnerId: studentObjectId,
 			assignedBy: context.userId,
 		})
 			.populate('drillId', 'title type difficulty')
 			.sort({ assignedAt: -1 })
-			.limit(10)
 			.lean()
 			.exec();
 
-		const recentDrills = recentAssignments.map((assignment) => {
+		// Get all drill attempts for this student to check review status
+		const studentAttempts = await DrillAttempt.find({
+			learnerId: studentObjectId,
+		})
+			.select('drillAssignmentId drillId sentenceResults summaryResults grammarResults score completedAt')
+			.lean()
+			.exec();
+
+		// Create a map of attempts by assignment ID
+		const attemptsByAssignment = new Map<string, any>();
+		studentAttempts.forEach(attempt => {
+			const key = attempt.drillAssignmentId?.toString();
+			if (key) {
+				attemptsByAssignment.set(key, attempt);
+			}
+		});
+
+		// Categorize drills
+		const pendingDrills: any[] = [];
+		const pendingReviewDrills: any[] = [];
+		const reviewedDrills: any[] = [];
+		const recentDrills: any[] = [];
+
+		allAssignments.forEach((assignment) => {
 			const drill = assignment.drillId as any;
-			return {
+			const attempt = attemptsByAssignment.get(assignment._id.toString());
+			
+			// Determine review status from attempt
+			let reviewStatus = null;
+			if (attempt) {
+				if (attempt.sentenceResults?.reviewStatus) {
+					reviewStatus = attempt.sentenceResults.reviewStatus;
+				} else if (attempt.summaryResults?.reviewStatus) {
+					reviewStatus = attempt.summaryResults.reviewStatus;
+				} else if (attempt.grammarResults?.reviewStatus) {
+					reviewStatus = attempt.grammarResults.reviewStatus;
+				}
+			}
+
+			const drillData = {
 				id: assignment._id,
+				drillId: drill?._id,
 				title: drill?.title || 'Unknown Drill',
 				type: drill?.type || 'unknown',
+				difficulty: drill?.difficulty,
 				status: assignment.status,
-				score: assignment.score,
-				completedAt: assignment.completedAt,
+				score: attempt?.score || assignment.score,
+				reviewStatus: reviewStatus,
+				completedAt: attempt?.completedAt || assignment.completedAt,
 				dueDate: assignment.dueDate,
 				assignedAt: assignment.assignedAt,
 			};
+
+			// Categorize
+			if (assignment.status === 'pending' || assignment.status === 'in-progress' || assignment.status === 'overdue') {
+				pendingDrills.push(drillData);
+			} else if (assignment.status === 'completed') {
+				if (reviewStatus === 'pending') {
+					pendingReviewDrills.push(drillData);
+				} else if (reviewStatus === 'reviewed') {
+					reviewedDrills.push(drillData);
+				} else {
+					// Completed drills without review requirement
+					reviewedDrills.push(drillData);
+				}
+			}
+
+			// Add to recent drills (first 10)
+			if (recentDrills.length < 10) {
+				recentDrills.push(drillData);
+			}
 		});
 
 		// Calculate progress percentage
@@ -137,10 +196,16 @@ async function handler(
 			progress,
 			drillsCompleted: counts.completed,
 			drillsActive: counts.pending + counts.inProgress,
+			drillsPendingReview: pendingReviewDrills.length,
+			drillsReviewed: reviewedDrills.length,
 			drillsTotal: counts.totalAssigned,
 			joinDate: user.createdAt,
 			lastActivity: user.lastActivity || null,
 			recentDrills,
+			// Categorized drill lists
+			assignedDrills: pendingDrills,
+			submittedDrills: pendingReviewDrills,
+			reviewedDrills: reviewedDrills,
 		};
 
 		logger.info('Student details fetched', {

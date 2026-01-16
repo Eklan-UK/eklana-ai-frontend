@@ -342,7 +342,7 @@ export default function OnboardingPage() {
               size="lg"
               onClick={handleBack}
               disabled={isSubmitting}
-              className="flex-1 items-center flex justify-center"
+              className="flex-1"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -354,7 +354,7 @@ export default function OnboardingPage() {
               size="lg"
               onClick={handleNext}
               disabled={!canProceed() || isSubmitting}
-              className="flex-1 flex items-center justify-center"
+              className="flex-1"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -365,7 +365,7 @@ export default function OnboardingPage() {
               size="lg"
               onClick={handleSubmit}
               disabled={!canProceed() || isSubmitting}
-              className="flex-1 items-center justify-center flex"
+              className="flex-1"
             >
               {isSubmitting ? (
                 <>

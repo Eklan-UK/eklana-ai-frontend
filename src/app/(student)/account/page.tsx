@@ -16,6 +16,7 @@ import Link from "next/link";
 import { getUserFirstName } from "@/utils/user";
 import { getCurrentUser } from "./get-user";
 import { getAssignedDrills } from "./get-drills";
+import { getUserProgress } from "./get-progress";
 import { getDrillTypeInfo, formatDate, getDrillStatus } from "@/utils/drill";
 import { generateMetadata } from "@/utils/seo";
 import { DrillCard } from "@/components/drills/DrillCard";
@@ -44,6 +45,7 @@ export default async function HomePage() {
   const userData = await getCurrentUser();
   const firstName = getUserFirstName(userData?.user);
   const { drills } = await getAssignedDrills();
+  const progress = await getUserProgress();
 
   // Show all drills regardless of status - no filtering
   const activeDrills = drills; // Show all drills as active
@@ -84,7 +86,7 @@ export default async function HomePage() {
             </div>
             <div className="bg-yellow-100 px-3 py-1.5 rounded-full flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-yellow-600" />
-              <span className="text-sm font-semibold text-gray-900">22</span>
+              <span className="text-sm font-semibold text-gray-900">{progress.streakDays}</span>
             </div>
             <button className="p-2">
               <svg
@@ -163,8 +165,11 @@ export default async function HomePage() {
                     <p className="text-sm font-medium text-gray-900">
                       Confidence
                     </p>
-                    <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                      <span>↗</span> +5% this week
+                    <p className={`text-xs flex items-center gap-1 mt-1 ${
+                      progress.weeklyChange.confidence >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      <span>{progress.weeklyChange.confidence >= 0 ? '↗' : '↘'}</span> 
+                      {progress.weeklyChange.confidence >= 0 ? '+' : ''}{progress.weeklyChange.confidence}% this week
                     </p>
                   </div>
                 </div>
@@ -190,12 +195,12 @@ export default async function HomePage() {
                       stroke="#3b82f6"
                       strokeWidth="4"
                       fill="none"
-                      strokeDasharray={`${74 * 0.74} ${74 * 0.26}`}
+                      strokeDasharray={`${176 * (progress.confidenceScore / 100)} ${176 * (1 - progress.confidenceScore / 100)}`}
                       strokeLinecap="round"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">74%</span>
+                    <span className="text-sm font-bold text-blue-600">{progress.confidenceScore}%</span>
                   </div>
                 </div>
               </div>
@@ -211,8 +216,11 @@ export default async function HomePage() {
                     <p className="text-sm font-medium text-gray-900">
                       Pronunciation
                     </p>
-                    <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                      <span>↗</span> +3% this week
+                    <p className={`text-xs flex items-center gap-1 mt-1 ${
+                      progress.weeklyChange.pronunciation >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      <span>{progress.weeklyChange.pronunciation >= 0 ? '↗' : '↘'}</span> 
+                      {progress.weeklyChange.pronunciation >= 0 ? '+' : ''}{progress.weeklyChange.pronunciation}% this week
                     </p>
                   </div>
                 </div>
@@ -238,13 +246,13 @@ export default async function HomePage() {
                       stroke="#22c55e"
                       strokeWidth="4"
                       fill="none"
-                      strokeDasharray={`${74 * 0.78} ${74 * 0.22}`}
+                      strokeDasharray={`${176 * (progress.pronunciationScore / 100)} ${176 * (1 - progress.pronunciationScore / 100)}`}
                       strokeLinecap="round"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-sm font-bold text-green-600">
-                      78%
+                      {progress.pronunciationScore}%
                     </span>
                   </div>
                 </div>

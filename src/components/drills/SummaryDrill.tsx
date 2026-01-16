@@ -44,6 +44,7 @@ export default function SummaryDrill({
   
   // Pre-generated audio player
   const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
+  const [hasStartedListening, setHasStartedListening] = useState(false); // Track if audio has been started
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const { playAudio: playTTSAudio, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS();
@@ -83,6 +84,12 @@ export default function SummaryDrill({
   };
 
   const handlePlayPassage = async () => {
+    // Only allow playing once - prevent multiple API requests
+    if (hasStartedListening && !isPlaying) {
+      toast.info("Audio has already been played. Continue to write your summary.");
+      return;
+    }
+    
     if (isPlaying) {
       // Stop based on source
       if (articleAudioUrl && preGenAudioRef.current) {
@@ -93,6 +100,9 @@ export default function SummaryDrill({
         stopTTSAudio();
       }
     } else {
+      // Mark as started immediately to prevent multiple requests
+      setHasStartedListening(true);
+      
       try {
         if (articleAudioUrl) {
           // Play from pre-generated URL
@@ -123,6 +133,8 @@ export default function SummaryDrill({
         setHasListened(true);
       } catch (error) {
         toast.error("Failed to play audio");
+        // Reset on error so user can try again
+        setHasStartedListening(false);
       }
     }
   };
@@ -322,21 +334,30 @@ export default function SummaryDrill({
 
               <button
                 onClick={handlePlayPassage}
+                disabled={hasListened && !isPlaying}
                 className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 transition-all ${
                   isPlaying
                     ? "bg-white/30 scale-110"
+                    : hasListened
+                    ? "bg-white/10 cursor-not-allowed"
                     : "bg-white/20 hover:bg-white/30"
                 }`}
               >
                 {isPlaying ? (
                   <Pause className="w-10 h-10 text-white" />
+                ) : hasListened ? (
+                  <CheckCircle className="w-10 h-10 text-white/70" />
                 ) : (
                   <Play className="w-10 h-10 text-white ml-1" />
                 )}
               </button>
 
               <p className="text-sm text-white/80">
-                {isPlaying ? "Playing..." : "Tap to play"}
+                {isPlaying 
+                  ? "Playing..." 
+                  : hasListened 
+                  ? "Audio played - Continue to write" 
+                  : "Tap to play (one time only)"}
               </p>
 
               {hasListened && (

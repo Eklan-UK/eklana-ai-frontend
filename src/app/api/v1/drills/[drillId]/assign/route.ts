@@ -73,8 +73,8 @@ async function handler(
 			);
 		}
 
-		// Verify assigner
-		const assigner = await User.findById(context.userId).select('role email firstName lastName').lean().exec();
+		// Verify assigner - include 'name' field for Better Auth users who may not have firstName/lastName
+		const assigner = await User.findById(context.userId).select('role email firstName lastName name').lean().exec();
 		if (!assigner) {
 			return NextResponse.json(
 				{
@@ -171,15 +171,22 @@ async function handler(
 			}
 
 			// Send email notifications asynchronously (don't block response)
+			// Use successfulAssignments to get the assignment IDs for deep linking
 			Promise.all(
-				newAssignments.map(async (assignment, index) => {
+				successfulAssignments.map(async (assignment: any) => {
 					const user = users.find((u) => u._id.toString() === assignment.learnerId.toString());
 					if (user?.email) {
 						try {
 							// Get best available name for the assigner (tutor or admin)
-							const assignerName = assigner.firstName 
-								? `${assigner.firstName}${assigner.lastName ? ' ' + assigner.lastName : ''}`
-								: assigner.email?.split('@')[0] || 'Your instructor';
+							// Check firstName/lastName first, then fall back to name field (Better Auth), then email
+							let assignerName = 'Your instructor';
+							if (assigner.firstName) {
+								assignerName = `${assigner.firstName}${assigner.lastName ? ' ' + assigner.lastName : ''}`.trim();
+							} else if ((assigner as any).name) {
+								assignerName = (assigner as any).name;
+							} else if (assigner.email) {
+								assignerName = assigner.email.split('@')[0];
+							}
 							
 							await sendDrillAssignmentNotification({
 								studentEmail: user.email,
@@ -188,6 +195,8 @@ async function handler(
 								drillType: drill.type,
 								dueDate: dueDate!,
 								assignerName: assignerName,
+								drillId: drillId,
+								assignmentId: assignment._id?.toString(),
 							});
 						} catch (emailError: any) {
 							logger.error('Failed to send drill assignment email', {

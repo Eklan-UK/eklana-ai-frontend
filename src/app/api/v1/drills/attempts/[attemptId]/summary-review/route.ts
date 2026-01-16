@@ -119,17 +119,27 @@ async function handler(
 
     // Send notification to student (async, don't block response)
     if (updatedAttempt) {
-      const reviewer = await User.findById(context.userId).select("firstName lastName email").lean().exec();
+      const reviewer = await User.findById(context.userId).select("firstName lastName email name").lean().exec();
       const learner = updatedAttempt.learnerId as any;
       const drill = updatedAttempt.drillId as any;
+      
+      // Get best available name for the reviewer (tutor)
+      let tutorName = "Your tutor";
+      if (reviewer?.firstName) {
+        tutorName = `${reviewer.firstName}${reviewer.lastName ? " " + reviewer.lastName : ""}`.trim();
+      } else if ((reviewer as any)?.name) {
+        tutorName = (reviewer as any).name;
+      } else if (reviewer?.email) {
+        tutorName = reviewer.email.split("@")[0];
+      }
       
       if (learner?.email && drill) {
         sendDrillReviewNotification({
           studentEmail: learner.email,
-          studentName: learner.firstName || "Student",
+          studentName: learner.firstName || learner.name || "Student",
           drillTitle: drill.title,
           drillType: drill.type,
-          tutorName: reviewer?.firstName || reviewer?.email || "Your tutor",
+          tutorName,
           score,
           feedback: validated.feedback,
           isAcceptable: validated.isAcceptable,

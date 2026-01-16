@@ -17,6 +17,8 @@ import {
   ChevronRight,
   AlertCircle,
   PartyPopper,
+  RefreshCw,
+  ArrowLeftRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -86,6 +88,17 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   
   // Track if we're on review screen vs completion screen
   const [showReview, setShowReview] = useState(false);
+  
+  // Role switching: allows student to practice as different character
+  // "original" = student speaks student lines, AI speaks AI lines
+  // "swapped" = student speaks AI lines, AI speaks student lines
+  const [roleMode, setRoleMode] = useState<"original" | "swapped">("original");
+  const [hasCompletedRound, setHasCompletedRound] = useState(false);
+  const [showRoleSwitchOption, setShowRoleSwitchOption] = useState(false);
+  
+  // Track progress for each role mode separately
+  const [originalRoleProgress, setOriginalRoleProgress] = useState<Record<number, TurnProgress>>({});
+  const [swappedRoleProgress, setSwappedRoleProgress] = useState<Record<number, TurnProgress>>({});
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -124,14 +137,34 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const aiCharacters = drill.ai_character_names || ["AI"];
 
   const currentTurn = dialogue[currentTurnIndex];
-  const isStudentTurn = currentTurn?.speaker === "student";
-  const isAITurn = currentTurn && currentTurn.speaker !== "student";
+  
+  // In swapped mode, roles are reversed:
+  // - Original student lines become AI lines (AI speaks them)
+  // - Original AI lines become student lines (student speaks them)
+  const isStudentTurn = roleMode === "original" 
+    ? currentTurn?.speaker === "student"
+    : currentTurn?.speaker !== "student";
+  const isAITurn = roleMode === "original"
+    ? currentTurn && currentTurn.speaker !== "student"
+    : currentTurn?.speaker === "student";
   const currentProgress = turnProgress[currentTurnIndex] || { passed: false, score: null, attempts: 0 };
 
   // Check if conversation is complete
   const isConversationComplete = currentTurnIndex >= dialogue.length;
-  const totalStudentTurns = dialogue.filter(d => d.speaker === "student").length;
+  
+  // Count turns based on current role mode
+  const totalStudentTurns = roleMode === "original"
+    ? dialogue.filter(d => d.speaker === "student").length
+    : dialogue.filter(d => d.speaker !== "student").length;
   const completedStudentTurns = Object.values(turnProgress).filter(p => p.passed).length;
+  
+  // Get character name for the role the student is currently playing
+  const currentStudentRole = roleMode === "original" 
+    ? studentCharacter 
+    : aiCharacters[0] || "AI";
+  const currentAIRole = roleMode === "original"
+    ? aiCharacters[0] || "AI"
+    : studentCharacter;
 
   // Get speaker display name
   const getSpeakerName = (speaker: string) => {
@@ -370,10 +403,48 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     setPronunciationScore(null);
   };
 
+  // Switch roles - student becomes AI character and vice versa
+  const handleSwitchRoles = () => {
+    // Save current progress to the appropriate role progress state
+    if (roleMode === "original") {
+      setOriginalRoleProgress(turnProgress);
+    } else {
+      setSwappedRoleProgress(turnProgress);
+    }
+    
+    // Toggle role mode
+    const newMode = roleMode === "original" ? "swapped" : "original";
+    setRoleMode(newMode);
+    
+    // Reset for new round
+    setCurrentTurnIndex(0);
+    setCompletedMessages([]);
+    setPlayedAITurns(new Set());
+    setPronunciationScore(null);
+    setShowRoleSwitchOption(false);
+    
+    // Load progress for the new role (if any previous progress exists)
+    const savedProgress = newMode === "original" ? originalRoleProgress : swappedRoleProgress;
+    setTurnProgress(savedProgress);
+    
+    // Clear session analytics for fresh round
+    setSessionAnalytics([]);
+    
+    toast.success(`Switched roles! You are now playing as ${newMode === "original" ? studentCharacter : aiCharacters[0] || "AI"}`);
+  };
+
   // Go to review screen instead of completing immediately
   const handleShowReview = () => {
     setShowReview(true);
   };
+  
+  // Show role switch option when conversation completes
+  useEffect(() => {
+    if (isConversationComplete && !showRoleSwitchOption && !showReview && !isCompleted) {
+      setHasCompletedRound(true);
+      setShowRoleSwitchOption(true);
+    }
+  }, [isConversationComplete, showRoleSwitchOption, showReview, isCompleted]);
 
   const handleSubmit = async () => {
     if (!assignmentId) {
@@ -519,6 +590,16 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   return (
     <DrillLayout title={drill.title} hideNavigation>
+      {/* Role Mode Indicator - only show when in swapped mode */}
+      {roleMode === "swapped" && (
+        <div className="mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl">
+          <ArrowLeftRight className="w-4 h-4 text-purple-600" />
+          <span className="text-sm text-purple-700">
+            <strong>Role Swapped:</strong> You're playing as <strong>{currentStudentRole}</strong>
+          </span>
+        </div>
+      )}
+      
       {/* Progress */}
       <DrillProgress
         current={completedStudentTurns}
@@ -566,29 +647,41 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
             </div>
           ) : (
             completedMessages.map((message) => {
-              const isUser = message.speaker === "student";
+              // In swapped mode, the "student" speaker messages are actually AI played
+              // and non-student speaker messages are what the user spoke
+              const isUserMessage = roleMode === "original" 
+                ? message.speaker === "student"
+                : message.speaker !== "student";
+              
+              // Get display name based on role mode
+              const displayName = roleMode === "original"
+                ? getSpeakerName(message.speaker)
+                : message.speaker === "student" 
+                  ? currentAIRole  // AI is now playing original student lines
+                  : currentStudentRole; // User is now playing original AI lines
+              
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                  className={`flex ${isUserMessage ? "justify-end" : "justify-start"}`}
                 >
                   <div
                     className={`max-w-[85%] rounded-2xl p-3 ${
-                      isUser
+                      isUserMessage
                         ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                         : "bg-gray-100 text-gray-900"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      {isUser ? (
+                      {isUserMessage ? (
                         <User className="w-3 h-3" />
                       ) : (
                         <Bot className="w-3 h-3" />
                       )}
                       <span className="text-xs font-semibold opacity-90">
-                        {getSpeakerName(message.speaker)}
+                        {displayName}
                       </span>
-                      {isUser && message.score !== undefined && (
+                      {isUserMessage && message.score !== undefined && (
                         <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                           {message.score}%
                         </span>
@@ -643,7 +736,12 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <div className="text-center mb-4">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
                   <User className="w-4 h-4" />
-                  Your turn as {studentCharacter}
+                  Your turn as {currentStudentRole}
+                  {roleMode === "swapped" && (
+                    <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-600 text-xs rounded-full">
+                      Switched
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -793,7 +891,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           </>
         )}
           
-        {/* Conversation complete - Show Review first */}
+        {/* Conversation complete - Show Review and Role Switch options */}
         {isConversationComplete && (
           <Card className="mb-4 bg-green-50 border-green-200">
             <div className="text-center py-4">
@@ -801,17 +899,44 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <h3 className="text-lg font-bold text-gray-900 mb-2">
                 Conversation Complete!
               </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Great job completing all your lines. Review your performance!
+              <p className="text-sm text-gray-600 mb-2">
+                Great job completing all your lines as <strong>{currentStudentRole}</strong>!
               </p>
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onClick={handleShowReview}
-              >
-                Review Performance
-              </Button>
+              
+              {/* Role mode indicator */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full text-sm mb-4">
+                <User className="w-4 h-4 text-green-600" />
+                <span className="text-gray-600">You played:</span>
+                <span className="font-semibold text-gray-900">{currentStudentRole}</span>
+              </div>
+              
+              <div className="space-y-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleShowReview}
+                >
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Review Performance
+                </Button>
+                
+                {/* Role Switch Option */}
+                <Button
+                  variant="outline"
+                  size="lg"
+                  fullWidth
+                  onClick={handleSwitchRoles}
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                >
+                  <ArrowLeftRight className="w-5 h-5 mr-2" />
+                  Switch Roles & Practice as {roleMode === "original" ? aiCharacters[0] || "AI" : studentCharacter}
+                </Button>
+                
+                <p className="text-xs text-gray-500 mt-2">
+                  Practice the conversation again from the other character's perspective
+                </p>
+              </div>
             </div>
           </Card>
         )}

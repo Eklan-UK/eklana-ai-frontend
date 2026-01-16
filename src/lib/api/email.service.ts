@@ -68,9 +68,19 @@ export const emailTemplates = {
     drillType: string;
     dueDate?: string;
     assignerName: string;
-  }) => ({
-    subject: `📚 New Drill Assigned: ${data.drillTitle}`,
-    html: `
+    drillId?: string;
+    assignmentId?: string;
+  }) => {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    // Deep link to specific drill if IDs are provided
+    const drillUrl =
+      data.drillId && data.assignmentId
+        ? `${appUrl}/account/drills/${data.drillId}?assignmentId=${data.assignmentId}`
+        : `${appUrl}/account/drills`;
+
+    return {
+      subject: `📚 New Drill Assigned: ${data.drillTitle}`,
+      html: `
 			<!DOCTYPE html>
 			<html>
 			<head>
@@ -132,9 +142,7 @@ export const emailTemplates = {
 							
 							<!-- CTA Button -->
 							<div style="text-align: center; margin: 30px 0;">
-								<a href="${
-                  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-                }/account/drills" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);">Start Practicing →</a>
+								<a href="${drillUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);">Start Practicing →</a>
 							</div>
 							
 							<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; text-align: center;">Good luck with your practice! 🍀</p>
@@ -150,7 +158,7 @@ export const emailTemplates = {
 			</body>
 			</html>
 		`,
-    text: `
+      text: `
 Hi ${data.studentName},
 
 📚 New Drill Assigned!
@@ -161,15 +169,16 @@ Drill: ${data.drillTitle}
 Type: ${data.drillType}
 ${data.dueDate ? `Due Date: ${data.dueDate}` : ""}
 
-Visit your drills page to start practicing:
-${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/account/drills
+Start practicing now:
+${drillUrl}
 
 Good luck with your practice! 🍀
 
 ---
 This is an automated notification from Eklan Ai.
 		`,
-  }),
+    };
+  },
 
   emailVerification: (data: { name: string; verificationLink: string }) => ({
     subject: "Verify Your Email Address",
@@ -249,6 +258,8 @@ export const sendDrillAssignmentNotification = async (data: {
   drillType: string;
   dueDate?: Date;
   assignerName: string;
+  drillId?: string;
+  assignmentId?: string;
 }): Promise<void> => {
   try {
     const template = emailTemplates.drillAssigned({
@@ -257,6 +268,8 @@ export const sendDrillAssignmentNotification = async (data: {
       drillType: data.drillType,
       dueDate: data.dueDate ? data.dueDate.toLocaleDateString() : undefined,
       assignerName: data.assignerName,
+      drillId: data.drillId,
+      assignmentId: data.assignmentId,
     });
 
     await sendEmail({

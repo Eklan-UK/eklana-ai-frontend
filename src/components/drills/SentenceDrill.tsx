@@ -348,7 +348,7 @@ export default function SentenceDrill({
           size="lg"
           onClick={handlePrevious}
           disabled={isFirstWord}
-          className="flex-shrink-0 flex items-center justify-center"
+          className="flex-shrink-0"
         >
           <ChevronLeft className="w-5 h-5 mr-1" />
           Previous
@@ -361,8 +361,6 @@ export default function SentenceDrill({
             size="lg"
             fullWidth
             onClick={handleSubmit}
-            className="flex items-center justify-center"
-
             disabled={!isCurrentWordComplete || isSubmitting}
           >
             {isSubmitting ? (
@@ -381,7 +379,7 @@ export default function SentenceDrill({
             fullWidth
             onClick={handleNext}
             disabled={!isCurrentWordComplete}
-            className="flex items-center w-10 justify-center "
+            className="w-10"
           >
             Next
             <ChevronRight className="w-5 h-5 ml-1" />

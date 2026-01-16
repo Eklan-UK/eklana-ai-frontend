@@ -198,7 +198,6 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
                 size="sm"
                 onClick={isPlaying ? stopAudio : handlePlay}
                 disabled={isGeneratingAudio || !content.trim()}
-                className="flex items-center justify-center"
               >
                 {isGeneratingAudio ? (
                   <>
@@ -269,7 +268,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
                   setHasListened(true);
                   toast.success("Marked as listened!");
                 }}
-                className="border-amber-300 flex items-center justify-center text-amber-700 hover:bg-amber-100"
+                className="border-amber-300 text-amber-700 hover:bg-amber-100"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
                 Mark as Listened
@@ -298,7 +297,6 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
           size="lg"
           fullWidth
           onClick={handleSubmit}
-          className="flex items-center justify-center"
           disabled={!hasListened || isSubmitting || !content.trim()}
         >
           {isSubmitting ? (

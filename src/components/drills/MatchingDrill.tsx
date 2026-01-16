@@ -447,7 +447,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
             variant="secondary"
             size="md"
             onClick={handleReset}
-            className="flex items-center gap-2"
+            className="gap-2"
             disabled={isSubmitting}
           >
             <Shuffle className="w-4 h-4" />
