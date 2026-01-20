@@ -105,8 +105,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   
-  // AI turn state - track which turns have been played
-  const [playedAITurns, setPlayedAITurns] = useState<Set<number>>(new Set());
+  // AI turn state - use ref for synchronous tracking to prevent double-play
+  const playedAITurnsRef = useRef<Set<number>>(new Set());
   const [isPlayingAI, setIsPlayingAI] = useState(false);
   
   // Silent analytics collection during the session
@@ -186,8 +186,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   // Play AI turn - only called once per turn
   const playAITurn = useCallback(async (turn: DialogueTurn, turnIndex: number) => {
-    // Mark this turn as played immediately
-    setPlayedAITurns(prev => new Set([...prev, turnIndex]));
+    // Check synchronously and mark as played immediately (ref is synchronous)
+    if (playedAITurnsRef.current.has(turnIndex)) {
+      return; // Already played, skip
+    }
+    playedAITurnsRef.current.add(turnIndex);
     setIsPlayingAI(true);
     
     // Add AI message to completed messages
@@ -258,14 +261,14 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     if (
       isAITurn && 
       currentTurn && 
-      !playedAITurns.has(currentTurnIndex) && 
+      !playedAITurnsRef.current.has(currentTurnIndex) && 
       !isPlayingAI &&
       !isTTSGenerating &&
       !isTTSPlaying
     ) {
       playAITurn(currentTurn, currentTurnIndex);
     }
-  }, [currentTurnIndex, currentTurn, isAITurn, playedAITurns, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
+  }, [currentTurnIndex, currentTurn, isAITurn, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
 
   // Recording functions
   const startRecording = async () => {
@@ -419,7 +422,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     // Reset for new round
     setCurrentTurnIndex(0);
     setCompletedMessages([]);
-    setPlayedAITurns(new Set());
+    playedAITurnsRef.current = new Set(); // Reset played turns tracking
     setPronunciationScore(null);
     setShowRoleSwitchOption(false);
     
