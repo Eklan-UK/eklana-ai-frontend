@@ -467,7 +467,7 @@ export default function VocabularyDrill({
               <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
                 {currentText}
               </h1>
-              <TTSButton
+              {/* <TTSButton
                 text={currentText}
                 size="lg"
                 autoPlay={autoPlayAudio && !pronunciationScore}
@@ -476,7 +476,7 @@ export default function VocabularyDrill({
                     ? currentSentence.wordAudioUrl
                     : currentSentence.sentenceAudioUrl
                 }
-              />
+              /> */}
             </div>
             {currentScreen === "word" && currentSentence.wordTranslation && (
               <p className="text-sm text-gray-500 mt-2">

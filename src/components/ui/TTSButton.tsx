@@ -133,7 +133,7 @@ export function TTSButton({
         ) : (
           <div className="flex items-center justify-center gap-2">
             <Volume2 className="w-4 h-4 mr-2" />
-            Play
+            Listen
           </div>
         )}
       </Button>
