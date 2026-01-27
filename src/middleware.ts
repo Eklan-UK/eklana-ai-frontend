@@ -34,7 +34,14 @@ export async function middleware(request: NextRequest) {
 
   // Allow API routes (they have their own auth)
   if (pathname.startsWith('/api')) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    
+    // Basic Rate Limiting headers (implementation note: real rate limiting should use a store like Redis)
+    // Here we just set standard headers that would be used by a proxy or upstream rate limiter
+    response.headers.set('X-RateLimit-Limit', '1000'); // Example limit
+    response.headers.set('X-RateLimit-Remaining', '999'); // Placeholder
+    
+    return response;
   }
 
   // For protected routes, let them through - authentication is handled by:

@@ -2,7 +2,7 @@
 // Caches user activities locally to reduce API calls and improve load times
 
 const CACHE_KEY = 'activities-cache';
-const MAX_ACTIVITIES = 50;
+const MAX_ACTIVITIES = 4; // Keep only 4 recent activities for display
 
 interface CachedActivity {
   type: string;
@@ -48,6 +48,7 @@ function saveCache(cache: ActivityCache) {
 /**
  * Track an activity locally (no API call)
  * Activities are stored in localStorage for fast access
+ * Each resourceId can only exist once - updates if already exists
  */
 export function trackActivity(
   type: string,
@@ -57,6 +58,11 @@ export function trackActivity(
 ) {
   const cache = getCache();
   
+  // Check if activity with same resourceId already exists
+  const existingIndex = cache.activities.findIndex(
+    (a) => a.resourceId === resourceId
+  );
+  
   const newActivity: CachedActivity = {
     type,
     resourceId,
@@ -65,20 +71,25 @@ export function trackActivity(
     timestamp: Date.now(),
   };
   
-  // Add to activities (most recent first)
+  if (existingIndex !== -1) {
+    // Remove existing entry (will be added to front)
+    cache.activities.splice(existingIndex, 1);
+  }
+  
+  // Add to front (most recent first)
   cache.activities.unshift(newActivity);
   
-  // Add to pending sync queue
+  // Add to pending sync queue (for server sync)
   cache.pendingSync.push(newActivity);
   
-  // Trim to max size
+  // Trim to max size (keep only MAX_ACTIVITIES)
   if (cache.activities.length > MAX_ACTIVITIES) {
     cache.activities = cache.activities.slice(0, MAX_ACTIVITIES);
   }
   
-  // Keep pending sync queue manageable
-  if (cache.pendingSync.length > MAX_ACTIVITIES) {
-    cache.pendingSync = cache.pendingSync.slice(-MAX_ACTIVITIES);
+  // Keep pending sync queue manageable (50 for batch sync)
+  if (cache.pendingSync.length > 50) {
+    cache.pendingSync = cache.pendingSync.slice(-50);
   }
   
   saveCache(cache);

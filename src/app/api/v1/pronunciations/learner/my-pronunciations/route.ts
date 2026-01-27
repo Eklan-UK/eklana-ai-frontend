@@ -1,89 +1,62 @@
 // GET /api/v1/pronunciations/learner/my-pronunciations
 // Get pronunciations assigned to the current learner
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api/middleware";
+import { withErrorHandler } from "@/lib/api/error-handler";
 import { connectToDatabase } from "@/lib/api/db";
-import PronunciationAssignment from "@/models/pronunciation-assignment";
-import { logger } from "@/lib/api/logger";
-import { Types } from "mongoose";
+import { parseQueryParams } from "@/lib/api/query-parser";
+import { apiResponse } from "@/lib/api/response";
+import { PronunciationAssignmentRepository } from "@/domain/pronunciations/pronunciation-assignment.repository";
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string }
-): Promise<NextResponse> {
-  try {
-    await connectToDatabase();
+  context: { userId: any; userRole: string }
+) {
+  await connectToDatabase();
 
-    const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "100");
-    const offset = parseInt(searchParams.get("offset") || "0");
-    const status = searchParams.get("status");
+  const queryParams = parseQueryParams(req);
+  const status = queryParams.status;
 
-    // Build query - use userId directly since learnerId now references User
-    const query: any = { learnerId: context.userId };
-    if (status) {
-      query.status = status;
-    }
+  const assignmentRepo = new PronunciationAssignmentRepository();
 
-    // Get assignments with pronunciation details
-    const assignments = await PronunciationAssignment.find(query)
-      .populate({
-        path: "pronunciationId",
-        populate: { path: "createdBy", select: "email firstName lastName" },
-      })
-      .populate("assignedBy", "email firstName lastName")
-      .sort({ assignedAt: -1 })
-      .limit(limit)
-      .skip(offset)
-      .lean()
-      .exec();
+  // Get learner's assignments
+  const assignments = await assignmentRepo.findMany({
+    learnerId: context.userId.toString(),
+    status,
+    limit: queryParams.limit,
+    offset: queryParams.offset,
+  });
 
-    const total = await PronunciationAssignment.countDocuments(query);
+  const total = await assignmentRepo.findMany({
+    learnerId: context.userId.toString(),
+    status,
+    limit: 10000, // Get all for count
+    offset: 0,
+  }).then(results => results.length);
 
-    // Format response
-    const pronunciations = assignments.map((assignment: any) => ({
-      assignmentId: assignment._id,
-      pronunciation: assignment.pronunciationId,
-      assignedBy: assignment.assignedBy,
-      assignedAt: assignment.assignedAt,
-      dueDate: assignment.dueDate,
-      status: assignment.status,
-      completedAt: assignment.completedAt,
-      attemptsCount: assignment.attemptsCount,
-      bestScore: assignment.bestScore,
-      lastAttemptAt: assignment.lastAttemptAt,
-    }));
+  // Format response
+  const pronunciations = assignments.map((assignment: any) => ({
+    assignmentId: assignment._id,
+    pronunciation: assignment.pronunciationId,
+    assignedBy: assignment.assignedBy,
+    assignedAt: assignment.assignedAt,
+    dueDate: assignment.dueDate,
+    status: assignment.status,
+    completedAt: assignment.completedAt,
+    attemptsCount: assignment.attemptsCount,
+    bestScore: assignment.bestScore,
+    lastAttemptAt: assignment.lastAttemptAt,
+  }));
 
-    return NextResponse.json(
-      {
-        code: "Success",
-        message: "Pronunciations retrieved successfully",
-        data: {
-          pronunciations,
-          pagination: {
-            total,
-            limit,
-            offset,
-            hasMore: offset + pronunciations.length < total,
-          },
-        },
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    logger.error("Error fetching learner pronunciations", {
-      error: error.message,
-      stack: error.stack,
-      userId: context.userId,
-    });
-    return NextResponse.json(
-      {
-        code: "ServerError",
-        message: error.message || "Failed to fetch pronunciations",
-      },
-      { status: 500 }
-    );
-  }
+  return apiResponse.success({
+    pronunciations,
+    pagination: {
+      total,
+      limit: queryParams.limit,
+      offset: queryParams.offset,
+      hasMore: queryParams.offset + pronunciations.length < total,
+    },
+  });
 }
 
-export const GET = withRole(["user"], handler);
+export const GET = withRole(["user"], withErrorHandler(handler));

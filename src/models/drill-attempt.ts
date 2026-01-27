@@ -155,19 +155,19 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			type: Schema.Types.ObjectId,
 			ref: 'DrillAssignment',
 			required: [true, 'Drill assignment ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { drillAssignmentId: 1, completedAt: -1 }
 		},
 	learnerId: {
 		type: Schema.Types.ObjectId,
 		ref: 'User', // learnerId now references User (kept name for backward compatibility)
 		required: [true, 'User ID is required'],
-		index: true,
+		// Removed index: true - covered by compound index { learnerId: 1, completedAt: -1 }
 	},
 		drillId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Drill',
 			required: [true, 'Drill ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { drillId: 1, completedAt: -1 }
 		},
 		startedAt: {
 			type: Date,

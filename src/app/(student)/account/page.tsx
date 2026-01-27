@@ -20,6 +20,11 @@ import { getUserProgress } from "./get-progress";
 import { getDrillTypeInfo, formatDate, getDrillStatus } from "@/utils/drill";
 import { generateMetadata } from "@/utils/seo";
 import { DrillCard } from "@/components/drills/DrillCard";
+import { TodaysFocusCard } from "@/components/daily-focus/TodaysFocusCard";
+import { RecentActivities } from "@/components/activity/RecentActivities";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { PushNotificationPrompt } from "@/components/notifications/PushNotificationPrompt";
+import { StreakBadge } from "@/components/streak/StreakBadge";
 
 // Revalidate every 30 seconds (ISR)
 export const revalidate = 30;
@@ -66,7 +71,7 @@ export default async function HomePage() {
               Hello, {firstName || "User"}! 👋
             </h1>
             <p className="text-sm md:text-base text-gray-600 mt-1">
-              Ready to build today&apos;s confidence?
+              Ready to improve your pronunciation and confidence today?
             </p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
@@ -84,70 +89,16 @@ export default async function HomePage() {
                 />
               </svg>
             </div>
-            <div className="bg-yellow-100 px-3 py-1.5 rounded-full flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-yellow-600" />
-              <span className="text-sm font-semibold text-gray-900">{progress.streakDays}</span>
-            </div>
-            <button className="p-2">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+            <StreakBadge />
+            <NotificationBell />
           </div>
         </div>
 
+        {/* Push Notification Prompt */}
+        <PushNotificationPrompt />
+
         {/* Today's Focus Card */}
-        <Card className="bg-gradient-to-br from-green-600 to-green-700 text-white mb-6 md:mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="bg-green-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-              <Flame className="w-3 h-3" /> TODAY&apos;S FOCUS
-            </span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-2">Really</h2>
-          <p className="text-green-100 mb-4">/&apos;ri:.əl.i/</p>
-          <div className="flex items-center gap-4 text-sm text-green-100 mb-6">
-            <div className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              <span>5-7 minutes</span>
-            </div>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <Target className="w-4 h-4" />
-              <span>Beginner-Intermediate</span>
-            </div>
-          </div>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 mb-4"
-          >
-            Start Today&apos;s Practice
-          </Button>
-          <p className="text-xs text-green-100 text-center">
-            Top 3% of Korean learners struggle with this R-L sound. Let&apos;s
-            fix it today.
-          </p>
-        </Card>
+        <TodaysFocusCard />
 
         {/* Your Progress Section */}
         <div className="mb-6 md:mb-8">
@@ -283,19 +234,18 @@ export default async function HomePage() {
             </Card>
           ) : (
             <div className="space-y-3 mb-4">
-              {/* Show all drills - no status filtering */}
+              {/* Show drills sorted by newest assigned first */}
               {(() => {
-                // Show all drills, sorted by date
+                // Sort by assignedAt descending (newest first)
                 const sortedDrills = [...drills].sort(
                   (a: any, b: any) => {
-                    return (
-                      new Date(a.drill?.date || a.date).getTime() - 
-                      new Date(b.drill?.date || b.date).getTime()
-                    );
+                    const dateA = new Date(a.assignedAt || a.createdAt || a.date).getTime();
+                    const dateB = new Date(b.assignedAt || b.createdAt || b.date).getTime();
+                    return dateB - dateA; // Descending - newest first
                   }
                 );
 
-                return sortedDrills.slice(0, 5); // Show up to 5 drills
+                return sortedDrills.slice(0, 4); // Show only 4 drills
               })().map((drill: any) => {
                 // drill.date is now the completion/due date
                 const dueDate = drill.dueDate
@@ -309,10 +259,11 @@ export default async function HomePage() {
                     key={drill._id || drill.drill?._id}
                     drill={drill.drill || drill}
                     assignmentId={drill.assignmentId}
+                    assignedBy={drill.assignedBy}
                     dueDate={dueDate.toISOString()}
                     completedAt={drill.completedAt}
                     status={getDrillStatus(drill)}
-                    variant="default"
+                    variant="detailed"
                     showStartButton={true}
                   />
                 );
@@ -337,115 +288,7 @@ export default async function HomePage() {
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="space-y-3">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M22 16.92V19.92C22.0011 20.1985 21.9441 20.4742 21.8325 20.7292C21.7209 20.9841 21.5573 21.2126 21.3528 21.3992C21.1482 21.5857 20.9074 21.7262 20.6446 21.8117C20.3818 21.8972 20.1028 21.9258 19.828 21.8957C19.5532 21.8655 19.2882 21.7772 19.05 21.636L16.5 20.136L14.05 21.636C13.8118 21.7772 13.5468 21.8655 13.272 21.8957C12.9972 21.9258 12.7182 21.8972 12.4554 21.8117C12.1926 21.7262 11.9518 21.5857 11.7472 21.3992C11.5427 21.2126 11.3791 20.9841 11.2675 20.7292C11.1559 20.4742 11.0989 20.1985 11.1 19.92V16.92"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M16.5 11.2C16.8978 11.2 17.2794 11.358 17.5607 11.6393C17.842 11.9206 18 12.3022 18 12.7C18 13.0978 17.842 13.4794 17.5607 13.7607C17.2794 14.042 16.8978 14.2 16.5 14.2L7.5 14.2C7.10218 14.2 6.72064 14.042 6.43934 13.7607C6.15804 13.4794 6 13.0978 6 12.7C6 12.3022 6.15804 11.9206 6.43934 11.6393C6.72064 11.358 7.10218 11.2 7.5 11.2L16.5 11.2Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Client Call Practice
-                    </p>
-                    <p className="text-xs text-gray-500">85% • 2 hours ago</p>
-                  </div>
-                </div>
-                <button className="text-blue-600 flex items-center gap-1 text-sm font-medium">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M8 2V14M2 8H14"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Redo
-                </button>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M3 18V12C3 9.61305 3.94821 7.32387 5.63604 5.63604C7.32387 3.94821 9.61305 3 12 3C14.3869 3 16.6761 3.94821 18.364 5.63604C20.0518 7.32387 21 9.61305 21 12V18"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M21 18C21 18.5304 20.7893 19.0391 20.4142 19.4142C20.0391 19.7893 19.5304 20 19 20H17L15 22H9L7 20H5C4.46957 20 3.96086 19.7893 3.58579 19.4142C3.21071 19.0391 3 18.5304 3 18V16"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Listening Exercise
-                    </p>
-                    <p className="text-xs text-gray-500">92% • Yesterday</p>
-                  </div>
-                </div>
-                <button className="text-blue-600 flex items-center gap-1 text-sm font-medium">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M8 2V14M2 8H14"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Redo
-                </button>
-              </div>
-            </Card>
-          </div>
+          <RecentActivities limit={4} />
         </div>
       </div>
 

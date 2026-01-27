@@ -1,0 +1,33 @@
+yarn run v1.22.22
+$ NODE_OPTIONS='--max-old-space-size=8192' next build --webpack
+⚠ `images.domains` is deprecated in favor of `images.remotePatterns`. Please update next.config.ts to protect your application from malicious users.
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/lord/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /home/lord/Elkan-project/front-end/package-lock.json
+
+▲ Next.js 16.1.1 (webpack)
+- Environments: .env.local
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: /home/lord/Elkan-project/front-end/node_modules/next-pwa/register.js
+> [PWA] Service worker: /home/lord/Elkan-project/front-end/public/sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+✓ Compiled successfully in 114s
+  Running TypeScript ...
+Failed to compile.
+
+src/app/api/v1/fcm/tokens/route.ts
+Type error: Route "src/app/api/v1/fcm/tokens/route.ts" does not match the required types of a Next.js Route.
+  "POST_withAuth" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null
+error Command failed with exit code 1.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

@@ -36,10 +36,12 @@ export default function PronunciationProblemsPage() {
   const [filterActive, setFilterActive] = useState<string>("all");
 
   // Fetch pronunciation problems
+  // For admin, don't pass isActive filter to get all problems (active and inactive)
   const { data, isLoading: loading, refetch } = useQuery({
     queryKey: ['pronunciation-problems', 'admin'],
     queryFn: async () => {
-      const response = await pronunciationProblemAPI.getAll({ isActive: undefined }); // Get all for admin
+      // Don't pass isActive at all for admin - API will return all problems
+      const response = await pronunciationProblemAPI.getAll();
       return response.data?.problems || [];
     },
   });

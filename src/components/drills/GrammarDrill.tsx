@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface GrammarDrillProps {
   drill: any;
@@ -232,6 +233,13 @@ export default function GrammarDrill({
               {currentPattern?.pattern}
             </h1>
             <TTSButton text={currentPattern?.pattern || ""} size="md" />
+            <BookmarkButton
+              itemId={currentPattern?.pattern || ""}
+              itemType="sentence"
+              content={currentPattern?.pattern || ""}
+              context={currentPattern?.hint}
+              sourceDrillId={drill._id}
+            />
           </div>
           
           {currentPattern?.hint && (

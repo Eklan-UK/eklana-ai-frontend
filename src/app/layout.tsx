@@ -3,6 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { FCMNotificationListener } from "@/components/notifications/FCMNotificationListener";
 
 export const metadata: Metadata = {
   title: "eklan AI - English Learning Platform",
@@ -57,12 +58,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`antialiased`}
-      >
+      <body className={`antialiased`}>
         <QueryProvider>
           <AuthProvider>
             <ToastProvider />
+            <FCMNotificationListener />
             {children}
           </AuthProvider>
         </QueryProvider>

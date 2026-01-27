@@ -18,7 +18,7 @@ async function getHandler(
 
 		const { searchParams } = new URL(req.url);
 		const difficulty = searchParams.get('difficulty');
-		const isActive = searchParams.get('isActive');
+		const isActiveParam = searchParams.get('isActive');
 
 		// Build query
 		const query: any = {};
@@ -26,9 +26,11 @@ async function getHandler(
 		// Learners can only see active problems, admins can see all
 		if (context.userRole !== 'admin') {
 			query.isActive = true;
-		} else if (isActive !== undefined) {
-			query.isActive = isActive === 'true';
+		} else if (isActiveParam !== null && isActiveParam !== 'undefined') {
+			// Only filter by isActive if explicitly provided (not null and not the string "undefined")
+			query.isActive = isActiveParam === 'true';
 		}
+		// If admin and isActive is not provided, don't filter (show all problems)
 
 		if (difficulty) {
 			query.difficulty = difficulty;

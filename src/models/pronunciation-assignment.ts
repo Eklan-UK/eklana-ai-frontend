@@ -25,13 +25,13 @@ const pronunciationAssignmentSchema = new Schema<IPronunciationAssignment>(
 			type: Schema.Types.ObjectId,
 			ref: 'Pronunciation',
 			required: [true, 'Pronunciation ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { pronunciationId: 1, learnerId: 1 }
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Learner',
 			required: [true, 'Learner ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { learnerId: 1, status: 1, dueDate: 1 }
 		},
 		assignedBy: {
 			type: Schema.Types.ObjectId,

@@ -80,8 +80,8 @@ export const requireRole = (allowedRoles: string[]) => {
 };
 
 // Helper to create authenticated API handler
-export const withAuth = (
-	handler: (req: NextRequest, context: { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+export const withAuth = <T = any>(
+	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
 ) => {
 	return async (req: NextRequest, context?: any) => {
 		const authResult = await requireAuth(req);
@@ -93,9 +93,9 @@ export const withAuth = (
 };
 
 // Helper to create role-protected API handler
-export const withRole = (
+export const withRole = <T = any>(
 	allowedRoles: string[],
-	handler: (req: NextRequest, context: { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
 ) => {
 	return async (req: NextRequest, context?: any) => {
 		const authResult = await requireAuth(req);

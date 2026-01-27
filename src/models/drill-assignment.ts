@@ -21,13 +21,13 @@ const drillAssignmentSchema = new Schema<IDrillAssignment>(
 			type: Schema.Types.ObjectId,
 			ref: 'Drill',
 			required: [true, 'Drill ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { drillId: 1, learnerId: 1 }
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,
 			ref: 'User',
 			required: [true, 'User ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { learnerId: 1, status: 1, dueDate: 1 }
 		},
 		assignedBy: {
 			type: Schema.Types.ObjectId,

@@ -21,7 +21,8 @@ export function useAllDrills(filters?: {
         type: filters?.type,
         difficulty: filters?.difficulty,
       });
-      return response.drills || [];
+      console.log(response)
+      return response.data?.drills || [];
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
@@ -154,6 +155,19 @@ export function useLearnerDrills(learnerId: string, learnerEmail?: string) {
       return response.drills || [];
     },
     enabled: !!learnerId && !!learnerEmail,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+// Get drill assignments for a learner (admin/tutor)
+export function useLearnerDrillAssignments(learnerId: string) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "drill-assignments"],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerDrillAssignments(learnerId);
+      return response.data;
+    },
+    enabled: !!learnerId,
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }

@@ -27,6 +27,7 @@ import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
 import { DrillCompletionScreen, DrillLayout, DrillProgress, WordAnalytics } from "./shared";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface RoleplayDrillProps {
   drill: any;
@@ -751,12 +752,23 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               {/* Text to Speak */}
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Say this line:</p>
-                  <TTSButton 
-                    text={currentTurn.text} 
-                    size="sm" 
-                    audioUrl={currentTurn.audioUrl}
-                  />
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Say this line:</p>
+                    <TTSButton 
+                      text={currentTurn.text} 
+                      size="sm" 
+                      audioUrl={currentTurn.audioUrl}
+                    />
+                    <BookmarkButton
+                      itemId={currentTurn.text}
+                      itemType="sentence"
+                      content={currentTurn.text}
+                      translation={currentTurn.translation}
+                      context={currentScene?.context}
+                      sourceDrillId={drill._id}
+                      className="ml-1"
+                    />
+                  </div>
                 </div>
                 <p className="text-xl font-semibold text-gray-900 text-center">
                   "{currentTurn.text}"

@@ -1,15 +1,18 @@
 // POST /api/v1/drills/[drillId]/complete
 // Complete a drill and create an attempt record
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
+import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
-import Drill from '@/models/drill';
-import DrillAssignment from '@/models/drill-assignment';
-import DrillAttempt from '@/models/drill-attempt';
-import User from '@/models/user';
-import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { parseRequestBody } from '@/lib/api/request-parser';
+import { validateRequest } from '@/lib/api/validation';
+import { apiResponse, ValidationError } from '@/lib/api/response';
+import { DrillService } from '@/domain/drills/drill.service';
+import { DrillRepository } from '@/domain/drills/drill.repository';
+import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
+import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 
 const completeSchema = z.object({
 	drillAssignmentId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -54,18 +57,16 @@ const completeSchema = z.object({
 		})),
 	}).optional(),
 	grammarResults: z.union([
-		// Old format (auto-scored)
 		z.object({
-		patternsPracticed: z.number(),
-		totalPatterns: z.number(),
-		accuracy: z.number(),
-		patternScores: z.array(z.object({
-			pattern: z.string(),
-			score: z.number(),
-			attempts: z.number(),
-		})),
+			patternsPracticed: z.number(),
+			totalPatterns: z.number(),
+			accuracy: z.number(),
+			patternScores: z.array(z.object({
+				pattern: z.string(),
+				score: z.number(),
+				attempts: z.number(),
+			})),
 		}),
-		// New format (pending review)
 		z.object({
 			patterns: z.array(z.object({
 				pattern: z.string(),
@@ -96,7 +97,6 @@ const completeSchema = z.object({
 			text: z.string(),
 			index: z.number(),
 		})),
-		// Support multi-word sentence drills
 		words: z.array(z.object({
 			word: z.string(),
 			definition: z.string(),
@@ -129,81 +129,32 @@ async function handler(
 	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string },
 	params: { drillId: string }
-): Promise<NextResponse> {
-	try {
-		await connectToDatabase();
+) {
+	await connectToDatabase();
 
-		const { drillId } = params;
-		const body = await req.json();
-		const validated = completeSchema.parse(body);
+	const { drillId } = params;
 
-		// Validate drill ID
-		if (!Types.ObjectId.isValid(drillId)) {
-			return NextResponse.json(
-				{
-					code: 'ValidationError',
-					message: 'Invalid drill ID format',
-				},
-				{ status: 400 }
-			);
-		}
+	if (!Types.ObjectId.isValid(drillId)) {
+		throw new ValidationError('Invalid drill ID format');
+	}
 
-		// Verify drill exists
-		const drill = await Drill.findById(drillId).lean().exec();
-		if (!drill) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Drill not found',
-				},
-				{ status: 404 }
-			);
-		}
+	const body = await parseRequestBody(req);
+	const validated = validateRequest(completeSchema, body);
 
-		// Verify assignment exists and belongs to user
-		const assignment = await DrillAssignment.findById(validated.drillAssignmentId).lean().exec();
-		if (!assignment) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Drill assignment not found',
-				},
-				{ status: 404 }
-			);
-		}
+	// Initialize services
+	const drillRepo = new DrillRepository();
+	const assignmentRepo = new AssignmentRepository();
+	const attemptRepo = new AttemptRepository();
+	const drillService = new DrillService(drillRepo, assignmentRepo, attemptRepo);
 
-		// Verify assignment belongs to the user (learnerId now references User directly)
-		if (assignment.learnerId.toString() !== context.userId.toString()) {
-			return NextResponse.json(
-				{
-					code: 'Forbidden',
-					message: 'You do not have permission to complete this drill assignment',
-				},
-				{ status: 403 }
-			);
-		}
-
-		// Verify assignment is for the correct drill
-		if (assignment.drillId.toString() !== drillId) {
-			return NextResponse.json(
-				{
-					code: 'ValidationError',
-					message: 'Drill assignment does not match drill ID',
-				},
-				{ status: 400 }
-			);
-		}
-
-		// Create drill attempt
-		const attempt = await DrillAttempt.create({
-			drillAssignmentId: new Types.ObjectId(validated.drillAssignmentId),
-			learnerId: context.userId, // learnerId now references User (kept for backward compatibility)
-			drillId: new Types.ObjectId(drillId),
-			startedAt: new Date(Date.now() - validated.timeSpent * 1000), // Approximate start time
-			completedAt: new Date(),
-			timeSpent: validated.timeSpent,
-			score: validated.score,
-			maxScore: 100,
+	// Complete drill
+	const result = await drillService.completeDrill(drillId, {
+		drillId,
+		drillAssignmentId: validated.drillAssignmentId,
+		learnerId: context.userId.toString(),
+		score: validated.score,
+		timeSpent: validated.timeSpent,
+		results: {
 			vocabularyResults: validated.vocabularyResults,
 			roleplayResults: validated.roleplayResults,
 			matchingResults: validated.matchingResults,
@@ -214,70 +165,18 @@ async function handler(
 			summaryResults: validated.summaryResults,
 			listeningResults: validated.listeningResults,
 			deviceInfo: validated.deviceInfo,
-			platform: validated.platform || 'web',
-		});
+			platform: validated.platform,
+		},
+	});
 
-		// Update assignment status
-		await DrillAssignment.findByIdAndUpdate(
-			validated.drillAssignmentId,
-			{
-				status: 'completed',
-				completedAt: new Date(),
-				score: validated.score,
-			},
-			{ new: true }
-		);
-
-		logger.info('Drill completed successfully', {
-			drillId,
-			assignmentId: validated.drillAssignmentId,
-			userId: context.userId,
-			score: validated.score,
-			attemptId: attempt._id,
-		});
-
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Drill completed successfully',
-				data: {
-					attempt: {
-						id: attempt._id.toString(),
-						score: attempt.score,
-						timeSpent: attempt.timeSpent,
-						completedAt: attempt.completedAt?.toISOString(),
-					},
-				},
-			},
-			{ status: 200 }
-		);
-	} catch (error: any) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{
-					code: 'ValidationError',
-					message: 'Validation failed',
-					errors: error.issues,
-				},
-				{ status: 400 }
-			);
-		}
-
-		logger.error('Error completing drill', {
-			error: error.message,
-			stack: error.stack,
-			drillId: params.drillId,
-			userId: context.userId,
-		});
-
-		return NextResponse.json(
-			{
-				code: 'ServerError',
-				message: error.message || 'Failed to complete drill',
-			},
-			{ status: 500 }
-		);
-	}
+	return apiResponse.success({
+		attempt: {
+			id: result.attempt._id.toString(),
+			score: result.attempt.score,
+			timeSpent: result.attempt.timeSpent,
+			completedAt: result.attempt.completedAt?.toISOString(),
+		},
+	});
 }
 
 export async function POST(
@@ -285,8 +184,7 @@ export async function POST(
 	{ params }: { params: Promise<{ drillId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withAuth((req, context) =>
+	return withAuth(withErrorHandler((req, context) =>
 		handler(req, context, resolvedParams)
-	)(req);
+	))(req);
 }
-

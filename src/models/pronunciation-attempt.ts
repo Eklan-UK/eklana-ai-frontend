@@ -49,12 +49,12 @@ const pronunciationAttemptSchema = new Schema<IPronunciationAttempt>(
 		problemId: {
 			type: Schema.Types.ObjectId,
 			ref: 'PronunciationProblem',
-			index: true,
+			// Removed index: true - covered by compound index { problemId: 1, learnerId: 1, createdAt: -1 }
 		},
 		wordId: {
 			type: Schema.Types.ObjectId,
 			ref: 'PronunciationWord',
-			index: true,
+			// Removed index: true - covered by compound index { wordId: 1, attemptNumber: -1 }
 		},
 		progressId: {
 			type: Schema.Types.ObjectId,
@@ -65,18 +65,18 @@ const pronunciationAttemptSchema = new Schema<IPronunciationAttempt>(
 		pronunciationAssignmentId: {
 			type: Schema.Types.ObjectId,
 			ref: 'PronunciationAssignment',
-			index: true,
+			// Removed index: true - covered by compound index { pronunciationAssignmentId: 1, attemptNumber: -1 }
 		},
 		pronunciationId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Pronunciation',
-			index: true,
+			// Removed index: true - covered by compound index { pronunciationId: 1, passed: 1 }
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Learner',
 			required: [true, 'Learner ID is required'],
-			index: true,
+			// Removed index: true - covered by compound index { learnerId: 1, createdAt: -1 }
 		},
 		textScore: {
 			type: Number,

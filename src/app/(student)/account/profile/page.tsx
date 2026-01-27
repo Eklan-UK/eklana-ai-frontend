@@ -4,7 +4,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Header } from "@/components/layout/Header";
-import { Settings, TrendingUp, Mic, Clock, Calendar, Flame, ChevronRight } from "lucide-react";
+import { Settings, TrendingUp, Mic, Clock, Calendar, Flame, ChevronRight, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserInitials, getUserDisplayName } from "@/utils/user";
@@ -67,13 +67,15 @@ export default function ProfilePage() {
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8 -mt-6 md:-mt-8">
         {/* Key Metrics */}
         <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-          <Card className="text-center">
-            <div className="flex justify-center mb-2">
-              <TrendingUp className="w-8 h-8 text-yellow-600" />
-            </div>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">+12%</p>
-            <p className="text-xs md:text-sm text-gray-500">Confidence</p>
-          </Card>
+          <Link href="/account/bookmarks">
+            <Card className="text-center h-full hover:bg-gray-50 transition-colors cursor-pointer">
+              <div className="flex justify-center mb-2">
+                <Bookmark className="w-8 h-8 text-indigo-600" />
+              </div>
+              <p className="text-sm md:text-base font-bold text-gray-900 mt-1">Bookmarks</p>
+              <p className="text-xs text-gray-500">View Saved</p>
+            </Card>
+          </Link>
           <Card className="text-center">
             <div className="flex justify-center mb-2">
               <Mic className="w-8 h-8 text-green-600" />

@@ -54,6 +54,7 @@ const AdminDrillPage: React.FC = () => {
   });
   const deleteMutation = useDeleteDrill();
   const queryClient = useQueryClient();
+  console.log(drills)
 
   const handleDelete = async (drillId: string) => {
     if (

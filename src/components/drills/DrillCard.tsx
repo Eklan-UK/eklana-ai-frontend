@@ -180,28 +180,30 @@ function DrillCardComponent({
         <Card
           className={`${typeInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer ${className}`}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{typeInfo.icon}</span>
-              <span className="font-medium text-gray-900">{drill.title}</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-lg sm:text-xl flex-shrink-0">{typeInfo.icon}</span>
+              <span className="font-medium text-gray-900 text-sm sm:text-base truncate">{drill.title}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {showReviewBadge && (
-                <ReviewBadge
-                  reviewStatus={latestAttempt?.reviewStatus}
-                  correctCount={latestAttempt?.correctCount}
-                  totalCount={latestAttempt?.totalCount}
-                />
+                <div className="hidden sm:block">
+                  <ReviewBadge
+                    reviewStatus={latestAttempt?.reviewStatus}
+                    correctCount={latestAttempt?.correctCount}
+                    totalCount={latestAttempt?.totalCount}
+                  />
+                </div>
               )}
-            {showStartButton && (
-              <Button variant="primary" size="sm" disabled={isUpcoming}>
-                {isUpcoming
-                  ? "View"
-                  : isCompleted
-                    ? "Review"
-                  : "Start"}
-              </Button>
-            )}
+              {showStartButton && (
+                <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
+                  {isUpcoming
+                    ? "View"
+                    : isCompleted
+                      ? "Review"
+                    : "Start"}
+                </Button>
+              )}
             </div>
           </div>
         </Card>
@@ -212,47 +214,57 @@ function DrillCardComponent({
   return (
     <Card
       key={assignmentId || drill._id}
-      className={`p-4 hover:shadow-md transition-shadow ${className}`}
+      className={`p-3 sm:p-4 hover:shadow-md transition-shadow ${className}`}
       onMouseEnter={handleMouseEnter}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div
-          className="flex items-start gap-3 flex-1 cursor-pointer"
-          onClick={() => onStartClick?.(drill._id, assignmentId)}
-        >
-          <span className="text-2xl">{getDrillIcon(drill.type)}</span>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 mb-1 truncate">
+      {/* Header: Icon, Title, Status Badge */}
+      <div className="flex items-start gap-2 sm:gap-3 mb-3">
+        <span className="text-xl sm:text-2xl flex-shrink-0">{getDrillIcon(drill.type)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2 sm:truncate">
               {drill.title}
             </h3>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500 capitalize">
-                {drill.type}
-              </span>
-              <span className="text-xs text-gray-400">•</span>
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Target className="w-3 h-3" />
-                <span className="capitalize">{drill.difficulty}</span>
-              </div>
+            <div className="flex-shrink-0 hidden sm:block">
+              {getStatusBadge({
+                drill,
+                dueDate,
+                completedAt,
+                assignmentStatus: status,
+              })}
             </div>
           </div>
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className="text-xs text-gray-500 capitalize">
+              {drill.type}
+            </span>
+            <span className="text-xs text-gray-400">•</span>
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <Target className="w-3 h-3" />
+              <span className="capitalize">{drill.difficulty}</span>
+            </div>
+          </div>
+          {/* Mobile status badge */}
+          <div className="sm:hidden mt-2">
+            {getStatusBadge({
+              drill,
+              dueDate,
+              completedAt,
+              assignmentStatus: status,
+            })}
+          </div>
         </div>
-        {getStatusBadge({
-          drill,
-          dueDate,
-          completedAt,
-          assignmentStatus: status,
-        })}
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+      {/* Due date and score info */}
+      <div className="flex items-center gap-2 sm:gap-4 text-xs text-gray-500 mb-3 flex-wrap">
         <div className="flex items-center gap-1">
-          <Calendar className="w-3 h-3" />
-          <span>Due: {formatDate(calculatedDueDate.toISOString())}</span>
+          <Calendar className="w-3 h-3 flex-shrink-0" />
+          <span className="whitespace-nowrap">Due: {formatDate(calculatedDueDate.toISOString())}</span>
         </div>
         {latestAttempt?.score !== undefined && (
           <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" />
+            <CheckCircle className="w-3 h-3 flex-shrink-0" />
             <span>Score: {latestAttempt.score}%</span>
           </div>
         )}
@@ -275,51 +287,50 @@ function DrillCardComponent({
         </div>
       )}
 
-      <div className="flex w-full items-center justify-between">
-        <div>
+      {/* Footer: Assigned by + Action button */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-w-0">
           {assignedBy && variant === "detailed" && (
-            <p className="text-xs text-gray-400 ">
+            <p className="text-xs text-gray-400 truncate">
               Assigned by: {assignedBy.firstName} {assignedBy.lastName}
             </p>
           )}
         </div>
 
-        <div>
-          {showStartButton && (
-            <div className="flex justify-end">
-              {isUpcoming ? (
-                <Link href={`/account/drills/${drill._id}`}>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={true}
-                    className="bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed"
-                  >
-                    View
-                  </Button>
-                </Link>
-              ) : (
-                <Link href={drillUrl}>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // If onStartClick is provided and drill is not completed, use it
-                      if (onStartClick && !isCompleted) {
-                        e.preventDefault();
-                        onStartClick(drill._id, assignmentId);
-                      }
-                    }}
-                    className="bg-[#22c55e] hover:bg-[#16a34a] text-white"
-                  >
-                    {isCompleted ? "View Results" : "Start"}
-                  </Button>
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
+        {showStartButton && (
+          <div className="flex-shrink-0">
+            {isUpcoming ? (
+              <Link href={`/account/drills/${drill._id}`}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={true}
+                  className="bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed text-xs sm:text-sm px-3 sm:px-4"
+                >
+                  View
+                </Button>
+              </Link>
+            ) : (
+              <Link href={drillUrl}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // If onStartClick is provided and drill is not completed, use it
+                    if (onStartClick && !isCompleted) {
+                      e.preventDefault();
+                      onStartClick(drill._id, assignmentId);
+                    }
+                  }}
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white text-xs sm:text-sm px-3 sm:px-4"
+                >
+                  {isCompleted ? "View Results" : "Start"}
+                </Button>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );

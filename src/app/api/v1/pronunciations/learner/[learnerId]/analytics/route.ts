@@ -1,7 +1,7 @@
 // GET /api/v1/pronunciations/learner/[learnerId]/analytics
 // Get pronunciation analytics for a learner
 import { NextRequest, NextResponse } from 'next/server';
-import { withRole } from '@/lib/api/middleware';
+import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
@@ -18,6 +18,21 @@ async function handler(
 		await connectToDatabase();
 
 		const { learnerId } = params;
+
+		// Check permissions: Admin/Tutor or the learner themselves
+		if (
+			context.userRole !== 'admin' &&
+			context.userRole !== 'tutor' &&
+			context.userId.toString() !== learnerId
+		) {
+			return NextResponse.json(
+				{
+					code: 'Forbidden',
+					message: "You don't have permission to access these analytics",
+				},
+				{ status: 403 }
+			);
+		}
 
 		// Find user (learnerId is now userId)
 		const user = await User.findById(learnerId)
@@ -40,113 +55,207 @@ async function handler(
 		const limit = parseInt(searchParams.get('limit') || '100');
 		const offset = parseInt(searchParams.get('offset') || '0');
 
-		const assignments = await PronunciationAssignment.find({
-			learnerId: new Types.ObjectId(learnerId),
-		})
-			.populate('pronunciationId', 'title text difficulty')
-			.sort({ assignedAt: -1 })
-			.limit(limit)
-			.skip(offset)
-			.lean()
-			.exec();
+		// Use aggregation to get assignments with statistics in one query
+		const assignmentsAggregation = await PronunciationAssignment.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{
+				$lookup: {
+					from: 'pronunciations',
+					localField: 'pronunciationId',
+					foreignField: '_id',
+					as: 'pronunciation',
+				},
+			},
+			{ $unwind: { path: '$pronunciation', preserveNullAndEmptyArrays: true } },
+			{
+				$project: {
+					_id: 1,
+					pronunciationId: 1,
+					status: 1,
+					bestScore: 1,
+					completedAt: 1,
+					lastAttemptAt: 1,
+					assignedAt: 1,
+					'title': '$pronunciation.title',
+					'text': '$pronunciation.text',
+					'difficulty': '$pronunciation.difficulty',
+				},
+			},
+			{ $sort: { assignedAt: -1 } },
+			{ $skip: offset },
+			{ $limit: limit },
+		]);
 
-		// Get attempts with limit - don't load all at once
-		const attemptLimit = parseInt(searchParams.get('attemptLimit') || '500');
-		const allAttempts = await PronunciationAttempt.find({
-			learnerId: new Types.ObjectId(learnerId),
-		})
-			.select('textScore passed incorrectLetters incorrectPhonemes createdAt')
-			.sort({ createdAt: -1 })
-			.limit(attemptLimit)
-			.lean()
-			.exec();
+		// Get overall statistics using aggregation (more efficient)
+		const overallStats = await PronunciationAssignment.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{
+				$group: {
+					_id: '$status',
+					count: { $sum: 1 },
+				},
+			},
+		]);
 
-		// Calculate overall statistics
-		const totalAssignments = assignments.length;
-		const completedAssignments = assignments.filter((a) => a.status === 'completed').length;
-		const inProgressAssignments = assignments.filter((a) => a.status === 'in-progress').length;
-		const pendingAssignments = assignments.filter((a) => a.status === 'pending').length;
+		const statusCounts = overallStats.reduce((acc, item) => {
+			acc[item._id] = item.count;
+			return acc;
+		}, {} as Record<string, number>);
 
-		// Calculate average scores
-		const allScores = allAttempts.map((a) => a.textScore);
-		const averageScore = allScores.length > 0
-			? allScores.reduce((sum, score) => sum + score, 0) / allScores.length
+		const totalAssignments = statusCounts['completed'] + statusCounts['in-progress'] + statusCounts['pending'] + (statusCounts['overdue'] || 0) + (statusCounts['skipped'] || 0);
+		const completedAssignments = statusCounts['completed'] || 0;
+		const inProgressAssignments = statusCounts['in-progress'] || 0;
+		const pendingAssignments = statusCounts['pending'] || 0;
+
+		// Calculate average score and pass rate using aggregation (much more efficient)
+		const attemptStats = await PronunciationAttempt.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{
+				$group: {
+					_id: null,
+					averageScore: { $avg: '$textScore' },
+					totalAttempts: { $sum: 1 },
+					passedCount: {
+						$sum: { $cond: [{ $eq: ['$passed', true] }, 1, 0] },
+					},
+				},
+			},
+		]);
+
+		const stats = attemptStats[0] || { averageScore: 0, totalAttempts: 0, passedCount: 0 };
+		const averageScore = stats.averageScore || 0;
+		const passRate = stats.totalAttempts > 0
+			? (stats.passedCount / stats.totalAttempts) * 100
 			: 0;
 
-		// Calculate pass rate
-		const passedAttempts = allAttempts.filter((a) => a.passed).length;
-		const passRate = allAttempts.length > 0
-			? (passedAttempts / allAttempts.length) * 100
-			: 0;
+		// Get most problematic letters/phonemes using aggregation (much faster)
+		const topIncorrectLettersAgg = await PronunciationAttempt.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{ $unwind: { path: '$incorrectLetters', preserveNullAndEmptyArrays: true } },
+			{ $match: { incorrectLetters: { $ne: null } } },
+			{
+				$group: {
+					_id: '$incorrectLetters',
+					count: { $sum: 1 },
+				},
+			},
+			{ $sort: { count: -1 } },
+			{ $limit: 10 },
+			{
+				$project: {
+					_id: 0,
+					letter: '$_id',
+					count: 1,
+				},
+			},
+		]);
 
-		// Get most problematic letters/phonemes
-		const incorrectLettersCount: Record<string, number> = {};
-		const incorrectPhonemesCount: Record<string, number> = {};
+		const topIncorrectPhonemesAgg = await PronunciationAttempt.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{ $unwind: { path: '$incorrectPhonemes', preserveNullAndEmptyArrays: true } },
+			{ $match: { incorrectPhonemes: { $ne: null } } },
+			{
+				$group: {
+					_id: '$incorrectPhonemes',
+					count: { $sum: 1 },
+				},
+			},
+			{ $sort: { count: -1 } },
+			{ $limit: 10 },
+			{
+				$project: {
+					_id: 0,
+					phoneme: '$_id',
+					count: 1,
+				},
+			},
+		]);
 
-		allAttempts.forEach((attempt) => {
-			attempt.incorrectLetters?.forEach((letter: string) => {
-				incorrectLettersCount[letter] = (incorrectLettersCount[letter] || 0) + 1;
-			});
-			attempt.incorrectPhonemes?.forEach((phoneme: string) => {
-				incorrectPhonemesCount[phoneme] = (incorrectPhonemesCount[phoneme] || 0) + 1;
-			});
-		});
-
-		const topIncorrectLetters = Object.entries(incorrectLettersCount)
-			.sort(([, a], [, b]) => b - a)
-			.slice(0, 10)
-			.map(([letter, count]) => ({ letter, count }));
-
-		const topIncorrectPhonemes = Object.entries(incorrectPhonemesCount)
-			.sort(([, a], [, b]) => b - a)
-			.slice(0, 10)
-			.map(([phoneme, count]) => ({ phoneme, count }));
-
-		// Calculate progress over time (last 30 days)
+		// Calculate progress over time (last 30 days) using aggregation
 		const thirtyDaysAgo = new Date();
 		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-		const recentAttempts = allAttempts.filter(
-			(a) => new Date(a.createdAt) >= thirtyDaysAgo
-		);
+		const accuracyTrendAgg = await PronunciationAttempt.aggregate([
+			{
+				$match: {
+					learnerId: new Types.ObjectId(learnerId),
+					createdAt: { $gte: thirtyDaysAgo },
+				},
+			},
+			{
+				$group: {
+					_id: {
+						$dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+					},
+					averageScore: { $avg: '$textScore' },
+					attempts: { $sum: 1 },
+				},
+			},
+			{ $sort: { _id: 1 } },
+			{
+				$project: {
+					_id: 0,
+					date: '$_id',
+					averageScore: { $round: ['$averageScore', 2] },
+					attempts: 1,
+				},
+			},
+		]);
 
-		// Group by date for trend analysis
-		const dailyScores: Record<string, number[]> = {};
-		recentAttempts.forEach((attempt) => {
-			const date = new Date(attempt.createdAt).toISOString().split('T')[0];
-			if (!dailyScores[date]) {
-				dailyScores[date] = [];
-			}
-			dailyScores[date].push(attempt.textScore);
-		});
+		// Get word-level statistics using aggregation
+		const wordStatsAgg = await PronunciationAssignment.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{
+				$lookup: {
+					from: 'pronunciations',
+					localField: 'pronunciationId',
+					foreignField: '_id',
+					as: 'pronunciation',
+				},
+			},
+			{ $unwind: { path: '$pronunciation', preserveNullAndEmptyArrays: true } },
+			{
+				$lookup: {
+					from: 'pronunciation_attempts',
+					localField: '_id',
+					foreignField: 'pronunciationAssignmentId',
+					as: 'attempts',
+				},
+			},
+			{
+				$project: {
+					pronunciationId: '$pronunciation._id',
+					title: '$pronunciation.title',
+					text: '$pronunciation.text',
+					difficulty: '$pronunciation.difficulty',
+					attempts: { $size: '$attempts' },
+					bestScore: { $ifNull: ['$bestScore', 0] },
+					status: 1,
+					completedAt: 1,
+					lastAttemptAt: 1,
+				},
+			},
+			{ $sort: { assignedAt: -1 } },
+			{ $limit: limit },
+		]);
 
-		const accuracyTrend = Object.entries(dailyScores)
-			.map(([date, scores]) => ({
-				date,
-				averageScore: scores.reduce((sum, s) => sum + s, 0) / scores.length,
-				attempts: scores.length,
-			}))
-			.sort((a, b) => a.date.localeCompare(b.date));
+		// Format assignments for response
+		const assignments = assignmentsAggregation.map((a: any) => ({
+			_id: a._id,
+			pronunciationId: a.pronunciationId,
+			title: a.title,
+			text: a.text,
+			difficulty: a.difficulty,
+			status: a.status,
+			bestScore: a.bestScore,
+			completedAt: a.completedAt,
+			lastAttemptAt: a.lastAttemptAt,
+		}));
 
-		// Get word-level statistics
-		const wordStats = assignments.map((assignment: any) => {
-			const pronunciation = assignment.pronunciationId;
-			const wordAttempts = allAttempts.filter(
-				(a: any) => a.pronunciationId?._id?.toString() === pronunciation._id?.toString()
-			);
-
-			return {
-				pronunciationId: pronunciation._id,
-				title: pronunciation.title,
-				text: pronunciation.text,
-				difficulty: pronunciation.difficulty,
-				attempts: wordAttempts.length,
-				bestScore: assignment.bestScore || 0,
-				status: assignment.status,
-				completedAt: assignment.completedAt,
-				lastAttemptAt: assignment.lastAttemptAt,
-			};
-		});
+		const wordStats = wordStatsAgg;
+		const topIncorrectLetters = topIncorrectLettersAgg;
+		const topIncorrectPhonemes = topIncorrectPhonemesAgg;
+		const accuracyTrend = accuracyTrendAgg;
 
 		return NextResponse.json(
 			{
@@ -162,7 +271,7 @@ async function handler(
 						completedAssignments,
 						inProgressAssignments,
 						pendingAssignments,
-						totalAttempts: allAttempts.length,
+						totalAttempts: stats.totalAttempts || 0,
 						averageScore: Math.round(averageScore * 100) / 100,
 						passRate: Math.round(passRate * 100) / 100,
 					},
@@ -197,7 +306,7 @@ export async function GET(
 	{ params }: { params: Promise<{ learnerId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['admin', 'tutor'], (req, context) =>
+	return withAuth((req, context) =>
 		handler(req, context, resolvedParams)
 	)(req);
 }

@@ -86,7 +86,11 @@ export const drillAPI = {
 
   // Get drill by ID
   getById: (drillId: string) => {
-    return apiRequest<{ drill: any }>(`/drills/${drillId}`);
+    return apiRequest<{ 
+      code?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/drills/${drillId}`);
   },
 
   // Create drill
@@ -295,6 +299,21 @@ export const pronunciationAPI = {
       };
     }>(`/pronunciations/learner/${learnerId}/analytics`, {
       method: 'GET',
+    });
+  },
+  // Get overall pronunciation analytics
+  getOverallAnalytics: (days?: number) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        stats: any;
+        problemAreas: any;
+        difficultWords: any[];
+      };
+    }>('/pronunciations/analytics/overall', {
+      method: 'GET',
+      params: days ? { days } : undefined,
     });
   },
 };
@@ -583,6 +602,150 @@ export const adminAPI = {
     }>('/admin/learners', {
       method: 'GET',
       params,
+    });
+  },
+
+  // Get drill assignments for a learner (admin/tutor)
+  getLearnerDrillAssignments: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        assignments: any[];
+        statistics: {
+          total: number;
+          completed: number;
+          inProgress: number;
+          pending: number;
+          overdue: number;
+          averageScore: number;
+          completionRate: number;
+        };
+      };
+    }>(`/admin/learners/${learnerId}/drill-assignments`, {
+      method: 'GET',
+    });
+  },
+};
+
+// Daily Focus API
+export const dailyFocusAPI = {
+  // Get today's daily focus
+  getToday: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      dailyFocus?: any;
+    }>('/daily-focus/today', {
+      method: 'GET',
+    });
+  },
+
+  // Get daily focus by ID
+  getById: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      dailyFocus?: any;
+    }>(`/daily-focus/${id}`, {
+      method: 'GET',
+    });
+  },
+
+  // Get progress for a daily focus
+  getProgress: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        progress: any;
+      };
+    }>(`/daily-focus/${id}/progress`, {
+      method: 'GET',
+    });
+  },
+
+  // Save progress for a daily focus
+  saveProgress: (id: string, data: {
+    currentQuestionIndex: number;
+    answers: Array<{
+      questionType: string;
+      questionIndex: number;
+      userAnswer: any;
+      isCorrect?: boolean;
+      isSubmitted: boolean;
+    }>;
+    isCompleted?: boolean;
+    finalScore?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        progress: any;
+      };
+    }>(`/daily-focus/${id}/progress`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  // Complete daily focus
+  complete: (id: string, data: {
+    score: number;
+    correctAnswers: number;
+    totalQuestions: number;
+    timeSpent?: number;
+    answers?: any[];
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        message: string;
+        score: number;
+        streakUpdated: boolean;
+        badgeUnlocked: {
+          badgeId: string;
+          badgeName: string;
+          milestone: number;
+        } | null;
+      };
+    }>(`/daily-focus/${id}/complete`, {
+      method: 'POST',
+      data,
+    });
+  },
+};
+
+// Streak API
+export const streakAPI = {
+  // Get user's streak data
+  getStreak: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        currentStreak: number;
+        longestStreak: number;
+        lastActivityDate: string | null;
+        streakStartDate: string | null;
+        todayCompleted: boolean;
+        yesterdayCompleted: boolean;
+        weeklyActivity: Array<{
+          date: string;
+          completed: boolean;
+          score?: number;
+        }>;
+        badges: Array<{
+          badgeId: string;
+          badgeName: string;
+          unlockedAt: string;
+          milestone: number;
+        }>;
+      };
+    }>('/users/streak', {
+      method: 'GET',
     });
   },
 };

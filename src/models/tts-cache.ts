@@ -22,7 +22,7 @@ const ttsCacheSchema = new Schema<ITTSCache>(
       type: String,
       required: true,
       unique: true,
-      index: true,
+      // index: true removed - using schema.index() below instead
     },
     text: {
       type: String,
@@ -63,9 +63,6 @@ const ttsCacheSchema = new Schema<ITTSCache>(
 
 // Index for cache lookup
 ttsCacheSchema.index({ textHash: 1 }, { unique: true });
-
-// Index for cleanup - find old unused entries
-ttsCacheSchema.index({ lastAccessedAt: 1 });
 
 // TTL index - automatically remove entries not accessed in 90 days
 ttsCacheSchema.index(

@@ -167,6 +167,18 @@ export function useLearnerPronunciationAnalytics(learnerId: string) {
   });
 }
 
+// Get overall pronunciation analytics (admin)
+export function useOverallPronunciationAnalytics(days?: number) {
+  return useQuery({
+    queryKey: ["pronunciations", "analytics", "overall", days],
+    queryFn: async () => {
+      const response = await pronunciationAPI.getOverallAnalytics(days);
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
+}
+
 // ===== Pronunciation Problems Hooks =====
 
 // Get all pronunciation problems

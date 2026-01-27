@@ -11,6 +11,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface DefinitionDrillProps {
   drill: any;
@@ -163,7 +164,16 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                         </span>
                         {item.word}
                       </h3>
-                      <TTSButton text={item.word} />
+                      <div className="flex items-center gap-2">
+                        <TTSButton text={item.word} />
+                        <BookmarkButton
+                          itemId={item.word}
+                          itemType="word"
+                          content={item.word}
+                          context={item.hint}
+                          sourceDrillId={drill._id}
+                        />
+                      </div>
                     </div>
                     {item.hint && (
                       <div className="flex items-start gap-2 mt-2 p-2 bg-yellow-50 rounded-lg">
@@ -260,7 +270,16 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                       <p className="text-xs text-gray-500 mt-1">Define this word</p>
                     </div>
                   </div>
-                  <TTSButton text={currentItem.word} />
+                  <div className="flex items-center gap-2">
+                    <TTSButton text={currentItem.word} />
+                    <BookmarkButton
+                      itemId={currentItem.word}
+                      itemType="word"
+                      content={currentItem.word}
+                      context={currentItem.hint}
+                      sourceDrillId={drill._id}
+                    />
+                  </div>
                 </div>
 
                 {currentItem.hint && (

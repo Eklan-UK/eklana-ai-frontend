@@ -19,6 +19,7 @@ import {
   FileCheck,
   FileText,
   BookOpen,
+  CalendarDays,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -28,6 +29,7 @@ const Sidebar: React.FC = () => {
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+    { name: "Daily Focus", icon: CalendarDays, path: "/admin/daily-focus" },
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },

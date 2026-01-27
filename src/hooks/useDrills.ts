@@ -70,8 +70,21 @@ export function useDrill(drillId: string) {
   return useQuery({
     queryKey: queryKeys.drills.detail(drillId),
     queryFn: async () => {
-      const response = await drillAPI.getById(drillId);
-      return response.drill;
+      const response: any = await drillAPI.getById(drillId);
+      // Handle both old and new response structures
+      if (response?.data?.drill) {
+        return response.data.drill;
+      }
+      if (response?.drill) {
+        return response.drill;
+      }
+      // If response is the drill directly
+      if (response?._id) {
+        return response;
+      }
+      // Log for debugging
+      console.error('Invalid drill response format:', response);
+      throw new Error('Invalid response format: drill not found in response');
     },
     enabled: !!drillId,
   });
@@ -129,8 +142,21 @@ export function usePrefetchDrill() {
     queryClient.prefetchQuery({
       queryKey: queryKeys.drills.detail(drillId),
       queryFn: async () => {
-        const response = await drillAPI.getById(drillId);
-        return response.drill;
+        const response: any = await drillAPI.getById(drillId);
+        // Handle both old and new response structures
+        if (response?.data?.drill) {
+          return response.data.drill;
+        }
+        if (response?.drill) {
+          return response.drill;
+        }
+        // If response is the drill directly
+        if (response?._id) {
+          return response;
+        }
+        // Log for debugging
+        console.error('Invalid drill response format:', response);
+        throw new Error('Invalid response format: drill not found in response');
       },
       staleTime: 1000 * 60 * 5, // 5 minutes
     });

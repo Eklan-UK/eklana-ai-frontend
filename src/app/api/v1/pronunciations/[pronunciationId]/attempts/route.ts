@@ -1,127 +1,82 @@
 // GET /api/v1/pronunciations/[pronunciationId]/attempts
 // Get pronunciation attempts for a learner
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
+import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
-import PronunciationAttempt from '@/models/pronunciation-attempt';
-import PronunciationAssignment from '@/models/pronunciation-assignment';
-import User from '@/models/user';
-import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import { parseQueryParams } from '@/lib/api/query-parser';
+import { apiResponse, ValidationError, NotFoundError, ForbiddenError } from '@/lib/api/response';
+import { userService } from '@/lib/api/user.service';
+import { PronunciationAssignmentRepository } from '@/domain/pronunciations/pronunciation-assignment.repository';
+import { PronunciationAttemptRepository } from '@/domain/pronunciations/pronunciation-attempt.repository';
 
 async function handler(
 	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string },
 	params: { pronunciationId: string }
-): Promise<NextResponse> {
-	try {
-		await connectToDatabase();
+) {
+	await connectToDatabase();
 
-		const { pronunciationId } = params;
-		const { searchParams } = new URL(req.url);
-		const learnerIdParam = searchParams.get('learnerId');
+	const { pronunciationId } = params;
+	const { searchParams } = new URL(req.url);
+	const learnerIdParam = searchParams.get('learnerId');
 
-		// Determine which user's attempts to fetch
-		let targetUserId: Types.ObjectId;
-		if (learnerIdParam && (context.userRole === 'admin' || context.userRole === 'tutor')) {
-			// Admin/tutor can view any user's attempts
-			if (!Types.ObjectId.isValid(learnerIdParam)) {
-				return NextResponse.json(
-					{
-						code: 'ValidationError',
-						message: 'Invalid learner ID format',
-					},
-					{ status: 400 }
-				);
-			}
-			targetUserId = new Types.ObjectId(learnerIdParam);
-		} else {
-			// User can only view their own attempts
-			targetUserId = context.userId;
+	// Determine which user's attempts to fetch
+	let targetUserId: Types.ObjectId;
+	if (learnerIdParam && (context.userRole === 'admin' || context.userRole === 'tutor')) {
+		// Admin/tutor can view any user's attempts
+		if (!Types.ObjectId.isValid(learnerIdParam)) {
+			throw new ValidationError('Invalid learner ID format');
 		}
-
-		// Verify user exists
-		const user = await User.findById(targetUserId).lean().exec();
-		if (!user) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'User not found',
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Find assignment (learnerId now references User)
-		const assignment = await PronunciationAssignment.findOne({
-			pronunciationId,
-			learnerId: targetUserId,
-		}).lean().exec();
-
-		if (!assignment) {
-			return NextResponse.json(
-				{
-					code: 'NotFoundError',
-					message: 'Pronunciation assignment not found',
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Get attempts with pagination to prevent memory issues
-		const limit = parseInt(searchParams.get('limit') || '50');
-		const offset = parseInt(searchParams.get('offset') || '0');
-
-		const attempts = await PronunciationAttempt.find({
-			pronunciationAssignmentId: assignment._id,
-		})
-			.sort({ attemptNumber: 1 })
-			.limit(limit)
-			.skip(offset)
-			.lean()
-			.exec();
-
-		const totalAttempts = await PronunciationAttempt.countDocuments({
-			pronunciationAssignmentId: assignment._id,
-		});
-
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Attempts retrieved successfully',
-				data: {
-					assignment: {
-						_id: assignment._id,
-						status: assignment.status,
-						attemptsCount: assignment.attemptsCount,
-						bestScore: assignment.bestScore,
-						completedAt: assignment.completedAt,
-					},
-					attempts,
-					pagination: {
-						total: totalAttempts,
-						limit,
-						offset,
-						hasMore: offset + attempts.length < totalAttempts,
-					},
-				},
-			},
-			{ status: 200 }
-		);
-	} catch (error: any) {
-		logger.error('Error fetching pronunciation attempts', {
-			error: error.message,
-			stack: error.stack,
-			pronunciationId: params.pronunciationId,
-		});
-		return NextResponse.json(
-			{
-				code: 'ServerError',
-				message: error.message || 'Failed to fetch attempts',
-			},
-			{ status: 500 }
-		);
+		targetUserId = new Types.ObjectId(learnerIdParam);
+	} else {
+		// User can only view their own attempts
+		targetUserId = context.userId;
 	}
+
+	// Verify user exists
+	const user = await userService.findById(targetUserId.toString());
+	if (!user) {
+		throw new NotFoundError('User');
+	}
+
+	const assignmentRepo = new PronunciationAssignmentRepository();
+	const attemptRepo = new PronunciationAttemptRepository();
+
+	// Find assignment
+	const assignment = await assignmentRepo.findByPronunciationAndLearner(
+		pronunciationId,
+		targetUserId.toString()
+	);
+
+	if (!assignment) {
+		throw new NotFoundError('Pronunciation assignment');
+	}
+
+	// Get attempts
+	const queryParams = parseQueryParams(req);
+	const result = await attemptRepo.findByAssignmentId(assignment._id.toString(), {
+		limit: queryParams.limit,
+		offset: queryParams.offset,
+	});
+
+	return apiResponse.success({
+		assignment: {
+			_id: assignment._id,
+			status: assignment.status,
+			attemptsCount: assignment.attemptsCount,
+			bestScore: assignment.bestScore,
+			completedAt: assignment.completedAt,
+		},
+		attempts: result.attempts,
+		pagination: {
+			total: result.total,
+			limit: queryParams.limit,
+			offset: queryParams.offset,
+			hasMore: queryParams.offset + result.attempts.length < result.total,
+		},
+	});
 }
 
 export async function GET(
@@ -129,8 +84,7 @@ export async function GET(
 	{ params }: { params: Promise<{ pronunciationId: string }> }
 ) {
 	const resolvedParams = await params;
-	return withRole(['user', 'admin', 'tutor'], (req, context) =>
+	return withRole(['admin', 'tutor', 'user'], withErrorHandler((req, context) =>
 		handler(req, context, resolvedParams)
-	)(req);
+	))(req);
 }
-

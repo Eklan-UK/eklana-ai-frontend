@@ -47,15 +47,17 @@ async function getDrill(drillId: string, assignmentId?: string) {
     }
 
     const data = await response.json();
+    const drillData = data?.data
+    console.log(drillData)
 
-    if (!data || !data.drill) {
+    if (!drillData) {
       console.error("No drill data in response:", data);
       return null;
     }
 
-    console.log("Successfully fetched drill:", data.drill._id);
+    console.log("Successfully fetched drill:", drillData.drill._id);
     // Return full response including assignment info if available
-    return data;
+    return drillData;
   } catch (error: any) {
     // Handle timeout specifically
     if (error.name === "TimeoutError" || error.name === "AbortError") {
@@ -84,6 +86,8 @@ export default async function DrillDetailPage({
   }
 
   const drillData = await getDrill(id, assignmentId);
+  console.log("drillData",drillData)
+  console.log(drillData)
 
   if (!drillData) {
     console.error(`Drill not found for ID: ${id}`);

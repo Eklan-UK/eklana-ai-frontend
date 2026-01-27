@@ -117,9 +117,15 @@ function CreateDrillPageContent() {
     const savedDraft = localStorage.getItem(DRAFT_KEY);
     if (savedDraft) {
       try {
-        return JSON.parse(savedDraft);
+        const parsedDraft = JSON.parse(savedDraft);
+        // Basic validation of parsed draft structure could go here
+        if (parsedDraft && typeof parsedDraft === 'object') {
+          return parsedDraft;
+        }
       } catch (e) {
-        // Invalid draft, use default
+        // Invalid draft, clear it and use default
+        console.warn("Failed to parse saved draft:", e);
+        localStorage.removeItem(DRAFT_KEY);
       }
     }
 

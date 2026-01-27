@@ -57,8 +57,18 @@ export default function DrillsPage() {
   } = useLearnerDrills({ limit: 100 });
 
   const handleDrillClick = (drillId: string, assignmentId?: string) => {
-    // Track activity locally (no API call - instant)
-    trackActivity("drill", drillId, "viewed");
+    // Find the drill to get its title for tracking
+    const drillItem = drills.find(
+      (d) => d.drill._id === drillId || d.assignmentId === assignmentId
+    );
+    
+    // Track activity locally with drill metadata
+    trackActivity("drill", drillId, "started", {
+      title: drillItem?.drill?.title,
+      drillTitle: drillItem?.drill?.title,
+      type: drillItem?.drill?.type,
+      assignmentId,
+    });
 
     // Build URL with assignmentId if available
     const url = assignmentId
@@ -69,14 +79,21 @@ export default function DrillsPage() {
   };
 
   // Show all drills regardless of status - filter only by completion for completed tab
-  const filteredDrills = drills.filter((item) => {
-    const status = getDrillStatus(item);
-    if (activeTab === "completed") {
-      return status === "completed";
-    }
-    // For ongoing and upcoming tabs, show all non-completed drills
-    return status !== "completed";
-  });
+  const filteredDrills = drills
+    .filter((item) => {
+      const status = getDrillStatus(item);
+      if (activeTab === "completed") {
+        return status === "completed";
+      }
+      // For ongoing and upcoming tabs, show all non-completed drills
+      return status !== "completed";
+    })
+    // Sort by newest assigned first (assignedAt descending)
+    .sort((a, b) => {
+      const dateA = new Date(a.assignedAt || a.drill?.date || 0).getTime();
+      const dateB = new Date(b.assignedAt || b.drill?.date || 0).getTime();
+      return dateB - dateA; // Descending - newest first
+    });
 
   // Calculate stats based on date-based status
   const stats = {

@@ -17,6 +17,7 @@ import {
   DrillProgress,
   WordAnalytics,
 } from "./shared";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface VocabularyDrillProps {
   drill: any;
@@ -477,6 +478,27 @@ export default function VocabularyDrill({
                     : currentSentence.sentenceAudioUrl
                 }
               /> */}
+              {currentScreen === "word" && (
+                <BookmarkButton
+                  itemId={currentWord}
+                  itemType="word"
+                  content={currentWord}
+                  translation={currentSentence.wordTranslation}
+                  context={currentSentence.text}
+                  sourceDrillId={drill._id}
+                  className="ml-2"
+                />
+              )}
+              {currentScreen === "sentence" && (
+                <BookmarkButton
+                  itemId={currentText}
+                  itemType="sentence"
+                  content={currentText}
+                  translation={currentSentence.translation}
+                  sourceDrillId={drill._id}
+                  className="ml-2"
+                />
+              )}
             </div>
             {currentScreen === "word" && currentSentence.wordTranslation && (
               <p className="text-sm text-gray-500 mt-2">
@@ -511,7 +533,7 @@ export default function VocabularyDrill({
               text={currentText}
               size="lg"
               variant="button"
-              autoPlay={autoPlayAudio && !pronunciationScore}
+              autoPlay={false}
               audioUrl={
                 currentScreen === "word"
                   ? currentSentence.wordAudioUrl

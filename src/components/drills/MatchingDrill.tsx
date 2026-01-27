@@ -10,6 +10,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface MatchingDrillProps {
   drill: any;
@@ -361,7 +362,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
                     key={`left-${item.id}-${index}`}
                     onClick={() => handleLeftClick(index)}
                     disabled={isMatched}
-                    className={`w-full p-4 rounded-xl text-left transition-all duration-200 ${
+                    className={`w-full p-4 rounded-xl text-left transition-all duration-200 group ${
                       isMatched
                         ? "bg-green-100 border-2 border-green-500 cursor-default opacity-75"
                         : isSelected
@@ -410,7 +411,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
                     key={`right-${item.id}-${index}`}
                     onClick={() => handleRightClick(index)}
                     disabled={isMatched}
-                    className={`w-full p-4 rounded-xl text-left transition-all duration-200 ${
+                    className={`w-full p-4 rounded-xl text-left transition-all duration-200 group ${
                       isMatched
                         ? "bg-green-100 border-2 border-green-500 cursor-default opacity-75"
                         : isSelected

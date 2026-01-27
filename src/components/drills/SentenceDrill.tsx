@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface SentenceDrillProps {
   drill: any;
@@ -193,10 +194,10 @@ export default function SentenceDrill({
       trackActivity("drill", drill._id, "completed", {
         title: drill.title,
         type: drill.type,
-        });
+      });
     } catch (error: any) {
       toast.error(
-        "Failed to submit drill: " + (error.message || "Unknown error")
+        "Failed to submit drill: " + (error.message || "Unknown error"),
       );
     } finally {
       setIsSubmitting(false);
@@ -260,6 +261,13 @@ export default function SentenceDrill({
                   {currentWord.word}
                 </h1>
                 <TTSButton text={currentWord.word} size="lg" />
+                <BookmarkButton
+                  itemId={currentWord.word}
+                  itemType="word"
+                  content={currentWord.word}
+                  context={currentWord.hint}
+                  sourceDrillId={drill._id}
+                />
               </div>
               {currentWord.hint && (
                 <p className="text-sm text-blue-600 mt-2 bg-blue-50 px-4 py-2 rounded-lg inline-block">
@@ -407,8 +415,8 @@ export default function SentenceDrill({
                   isCurrent
                     ? "bg-green-500 text-white ring-2 ring-green-300"
                     : isComplete
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      ? "bg-green-100 text-green-700 hover:bg-green-200"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
                 title={`Word ${idx + 1}: ${wordItems[idx].word}`}
               >

@@ -100,13 +100,7 @@ export default function PracticePage() {
             </Card>
           </Link>
         </div>
-
-        {/* Note about drills */}
-        <Card className="bg-blue-50 border-blue-200 mb-6">
-          <p className="text-sm text-blue-800">
-            💡 <strong>Tip:</strong> Check your assigned drills on the home page. Each drill has a unique interface designed for its specific practice type.
-          </p>
-        </Card>
+        
       </div>
 
       <BottomNav />

@@ -1,197 +1,67 @@
 // POST /api/v1/drills/attempts/[attemptId]/review
 // Review a sentence drill attempt (tutor/admin only)
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
+import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
-import DrillAttempt from '@/models/drill-attempt';
-import Drill from '@/models/drill';
-import User from '@/models/user';
-import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { sendDrillReviewNotification } from '@/lib/api/email.service';
+import { parseRequestBody } from '@/lib/api/request-parser';
+import { validateRequest } from '@/lib/api/validation';
+import { apiResponse, ValidationError } from '@/lib/api/response';
+import { AttemptReviewService } from '@/domain/attempts/attempt-review.service';
+import { AttemptRepository } from '@/domain/attempts/attempt.repository';
+import { DrillRepository } from '@/domain/drills/drill.repository';
+import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
 
 const reviewSchema = z.object({
 	sentenceReviews: z.array(z.object({
-		sentenceIndex: z.number().int().min(0), // 0, 1, 2, etc.
+		sentenceIndex: z.number().int().min(0),
 		isCorrect: z.boolean(),
 		correctedText: z.string().optional(),
-	})).min(1), // Must have at least 1 review
+	})).min(1),
 });
 
 async function handler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string; params?: { attemptId?: string } }
-): Promise<NextResponse> {
-	try {
-		await connectToDatabase();
+	context: { userId: Types.ObjectId; userRole: string },
+	params: { attemptId: string }
+) {
+	await connectToDatabase();
 
-		// Ensure models are registered before populate
-		void Drill.modelName;
-		void User.modelName;
+	const { attemptId } = params;
 
-		// Extract attemptId from URL path
-		const url = new URL(req.url);
-		const pathParts = url.pathname.split('/');
-		const attemptIdIndex = pathParts.indexOf('attempts') + 1;
-		const attemptId = pathParts[attemptIdIndex] || context.params?.attemptId;
-
-		// Validate attempt ID
-		if (!attemptId || !Types.ObjectId.isValid(attemptId)) {
-			return NextResponse.json(
-				{
-					code: 'InvalidRequest',
-					message: 'Invalid or missing attempt ID',
-				},
-				{ status: 400 }
-			);
-		}
-
-		const body = await req.json();
-		const validated = reviewSchema.parse(body);
-
-		// Find the attempt
-		const attempt = await DrillAttempt.findById(attemptId)
-			.populate('drillId', 'type')
-			.exec();
-
-		if (!attempt) {
-			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Attempt not found',
-				},
-				{ status: 404 }
-			);
-		}
-
-		// Verify it's a sentence drill (sentence or sentence_writing type)
-		const drillType = attempt.drillId && (attempt.drillId as any).type;
-		if (drillType && drillType !== 'sentence' && drillType !== 'sentence_writing') {
-			return NextResponse.json(
-				{
-					code: 'InvalidRequest',
-					message: 'This endpoint is only for sentence drills',
-				},
-				{ status: 400 }
-			);
-		}
-
-		// Verify it has sentenceResults
-		if (!attempt.sentenceResults) {
-			return NextResponse.json(
-				{
-					code: 'InvalidRequest',
-					message: 'This attempt does not have sentence results',
-				},
-				{ status: 400 }
-			);
-		}
-
-		// Update the attempt with reviews
-		const sentenceReviews = validated.sentenceReviews.map((review) => ({
-			sentenceIndex: review.sentenceIndex,
-			isCorrect: review.isCorrect,
-			correctedText: review.isCorrect ? undefined : review.correctedText,
-			reviewedAt: new Date(),
-			reviewedBy: context.userId,
-		}));
-
-		// Calculate score based on correct sentences
-		const correctCount = validated.sentenceReviews.filter((r) => r.isCorrect).length;
-		const totalSentences = validated.sentenceReviews.length;
-		const score = Math.round((correctCount / totalSentences) * 100);
-
-		attempt.sentenceResults.reviewStatus = 'reviewed';
-		attempt.sentenceResults.sentenceReviews = sentenceReviews;
-		attempt.score = score;
-		attempt.updatedAt = new Date();
-
-		await attempt.save();
-
-		logger.info('Sentence drill reviewed', {
-			attemptId: attempt._id.toString(),
-			reviewerId: context.userId.toString(),
-			score,
-		});
-
-		// Get the updated attempt with populated fields for the response
-		const updatedAttempt = await DrillAttempt.findById(attemptId)
-			.populate('drillId', 'title type')
-			.populate('learnerId', 'firstName lastName email')
-			.lean()
-			.exec();
-
-		// Send notification to student (async, don't block response)
-		if (updatedAttempt) {
-			const reviewer = await User.findById(context.userId).select('firstName lastName email name').lean().exec();
-			const learner = updatedAttempt.learnerId as any;
-			const drill = updatedAttempt.drillId as any;
-			
-			// Get best available name for the reviewer (tutor)
-			let tutorName = 'Your tutor';
-			if (reviewer?.firstName) {
-				tutorName = `${reviewer.firstName}${reviewer.lastName ? ' ' + reviewer.lastName : ''}`.trim();
-			} else if ((reviewer as any)?.name) {
-				tutorName = (reviewer as any).name;
-			} else if (reviewer?.email) {
-				tutorName = reviewer.email.split('@')[0];
-			}
-			
-			if (learner?.email && drill) {
-				sendDrillReviewNotification({
-					studentEmail: learner.email,
-					studentName: learner.firstName || learner.name || 'Student',
-					drillTitle: drill.title,
-					drillType: drill.type,
-					tutorName,
-					score,
-					correctCount,
-					totalCount: totalSentences,
-				}).catch((err) => {
-					logger.error('Failed to send review notification', { error: err.message });
-				});
-			}
-		}
-
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Review submitted successfully',
-				data: {
-					attempt: updatedAttempt,
-				},
-			},
-			{ status: 200 }
-		);
-	} catch (error: any) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json(
-				{
-					code: 'ValidationError',
-					message: 'Invalid request data',
-					errors: error.issues,
-				},
-				{ status: 400 }
-			);
-		}
-
-		logger.error('Error reviewing sentence drill', {
-			error: error.message,
-			stack: error.stack,
-		});
-
-		return NextResponse.json(
-			{
-				code: 'ServerError',
-				message: 'Internal Server Error',
-				error: error.message,
-			},
-			{ status: 500 }
-		);
+	if (!Types.ObjectId.isValid(attemptId)) {
+		throw new ValidationError('Invalid or missing attempt ID');
 	}
+
+	const body = await parseRequestBody(req);
+	const validated = validateRequest(reviewSchema, body);
+
+	// Initialize services
+	const attemptRepo = new AttemptRepository();
+	const drillRepo = new DrillRepository();
+	const assignmentRepo = new AssignmentRepository();
+	const reviewService = new AttemptReviewService(attemptRepo, drillRepo, assignmentRepo);
+
+	// Review attempt
+	const updatedAttempt = await reviewService.reviewSentenceAttempt(
+		attemptId,
+		context.userId.toString(),
+		validated.sentenceReviews
+	);
+
+	return apiResponse.success({
+		attempt: updatedAttempt,
+	});
 }
 
-export const POST = withRole(['admin', 'tutor'], handler);
-
-
+export async function POST(
+	req: NextRequest,
+	{ params }: { params: Promise<{ attemptId: string }> }
+) {
+	const resolvedParams = await params;
+	return withRole(['admin', 'tutor'], withErrorHandler((req, context) =>
+		handler(req, context, resolvedParams)
+	))(req);
+}
