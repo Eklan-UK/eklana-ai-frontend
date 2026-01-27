@@ -39,13 +39,8 @@ export function TodaysFocusCard() {
   }, []);
 
   const checkCompletionStatus = async () => {
-    try {
-      const response = await streakAPI.getStreak();
-      const data = (response as any).data || response;
-      setTodayCompleted(data?.todayCompleted || false);
-    } catch (error) {
-      console.error("Failed to check completion status:", error);
-    }
+    // Streak is disabled - always show as not completed
+    setTodayCompleted(false);
   };
 
   const fetchTodaysFocus = async () => {

@@ -46,6 +46,9 @@ export const BADGE_DEFINITIONS = [
 ];
 
 export class StreakService {
+  // Feature flag to disable streak functionality
+  private static readonly STREAK_ENABLED = false; // Set to false to disable
+
   /**
    * Get normalized date string (YYYY-MM-DD) for a given date in UTC
    */
@@ -85,6 +88,11 @@ export class StreakService {
     timeSpent: number = 0,
     answers?: any[]
   ): Promise<{ streakUpdated: boolean; badgeUnlocked: Badge | null }> {
+    // Early return if streak is disabled
+    if (!this.STREAK_ENABLED) {
+      return { streakUpdated: false, badgeUnlocked: null };
+    }
+
     try {
       // Only record if score >= 70%
       if (score < 70) {
@@ -414,6 +422,20 @@ export class StreakService {
    * Get streak data for a user
    */
   static async getStreakData(userId: string): Promise<StreakData> {
+    // Early return if streak is disabled
+    if (!this.STREAK_ENABLED) {
+      return {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastActivityDate: null,
+        streakStartDate: null,
+        todayCompleted: false,
+        yesterdayCompleted: false,
+        weeklyActivity: this.getEmptyWeeklyActivity(),
+        badges: [],
+      };
+    }
+
     try {
       const todayString = this.getTodayString();
       const yesterdayString = this.getYesterdayString();

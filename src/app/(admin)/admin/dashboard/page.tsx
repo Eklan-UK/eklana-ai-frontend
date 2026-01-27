@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Target,
   Flame,
-  Bell,
 } from "lucide-react";
 import Link from "next/link";
 import { adminService } from "@/services/admin.service";
@@ -36,42 +35,8 @@ const Dashboard: React.FC = () => {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: learners = [], isLoading: learnersLoading } = useRecentLearners(10);
   const { data: pronunciationAnalytics, isLoading: pronunciationLoading } = useOverallPronunciationAnalytics();
-  const [sendingTestNotification, setSendingTestNotification] = useState(false);
 
   const loading = statsLoading || learnersLoading || pronunciationLoading;
-
-  const handleSendTestNotification = async () => {
-    setSendingTestNotification(true);
-    try {
-      const response = await fetch("/api/v1/fcm/test-notification", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast.success(
-          `Test notification sent to ${data.tokenCount} device(s)`,
-          {
-            description: `Delivered to ${data.successCount} device(s)`,
-          },
-        );
-      } else {
-        toast.error("Failed to send test notification", {
-          description: data.message || "Unknown error occurred",
-        });
-      }
-    } catch (error) {
-      toast.error("Error sending test notification", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    } finally {
-      setSendingTestNotification(false);
-    }
-  };
 
   // Default stats with all optional properties
   const statsWithDefaults: DashboardStats = stats
@@ -133,23 +98,6 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleSendTestNotification}
-            disabled={sendingTestNotification}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-500 text-white font-medium rounded-xl hover:bg-blue-600 disabled:bg-blue-400 transition-all shadow-sm disabled:cursor-not-allowed"
-          >
-            {sendingTestNotification ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Bell className="w-4 h-4" />
-                Test Notification
-              </>
-            )}
-          </button>
           <Link
             href="/admin/daily-focus/create"
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-sm"
