@@ -1,6 +1,6 @@
 "use client";
 
-import DOMPurify from "dompurify";
+import DOMPurify from "isomorphic-dompurify";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -13,9 +13,8 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
   // Sanitize the content before rendering
   // Note: react-markdown already escapes HTML by default (unless rehype-raw is used),
   // but explicitly using DOMPurify adds an extra layer of defense for the input string itself.
-  const sanitizedContent = typeof window !== 'undefined' 
-    ? DOMPurify.sanitize(children) 
-    : children; // On server-side, we trust react-markdown's default escaping or use a node-compatible sanitizer if needed
+  // isomorphic-dompurify works on both server and client
+  const sanitizedContent = DOMPurify.sanitize(children);
 
   return (
     <div className={`prose prose-sm max-w-none ${className}`}>
