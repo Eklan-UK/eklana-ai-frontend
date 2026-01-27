@@ -371,7 +371,7 @@ export class StreakService {
       for (const badgeDef of BADGE_DEFINITIONS) {
         // Check if badge is already unlocked
         const alreadyUnlocked = userStreak.badges.some(
-          b => b.badgeId === badgeDef.badgeId
+          (b: Badge) => b.badgeId === badgeDef.badgeId
         );
 
         if (!alreadyUnlocked && userStreak.currentStreak >= badgeDef.milestone) {

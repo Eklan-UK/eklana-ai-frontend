@@ -15,8 +15,8 @@ export function StreakBadge() {
   const fetchStreak = async () => {
     try {
       const response = await streakAPI.getStreak();
-      const data = response.data || response;
-      setCurrentStreak(data.currentStreak || 0);
+      const data = (response as any).data || response;
+      setCurrentStreak(data?.currentStreak || 0);
     } catch (error: any) {
       console.error("Failed to fetch streak:", error);
     } finally {

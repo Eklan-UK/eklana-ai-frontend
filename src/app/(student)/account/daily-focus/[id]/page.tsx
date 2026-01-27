@@ -191,7 +191,7 @@ export default function DailyFocusPracticePage() {
     try {
       setLoading(true);
       const response = await dailyFocusAPI.getById(id);
-      const data = response.dailyFocus || response.data?.dailyFocus;
+      const data = response.dailyFocus || (response as any).data?.dailyFocus;
 
       if (!data) {
         throw new Error("Failed to fetch daily focus");
@@ -399,15 +399,15 @@ export default function DailyFocusPracticePage() {
         })),
       });
 
-      const result = response.data || response;
+      const result = (response as any).data || response;
       
-      if (result.streakUpdated) {
+      if (result?.streakUpdated) {
         toast.success("Daily focus completed! Your streak has been updated! 🔥");
       } else {
         toast.success("Daily focus completed!");
       }
 
-      if (result.badgeUnlocked) {
+      if (result?.badgeUnlocked) {
         setBadgeUnlocked(result.badgeUnlocked);
         // Show badge unlock celebration
         confetti({

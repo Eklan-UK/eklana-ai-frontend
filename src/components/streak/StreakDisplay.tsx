@@ -37,7 +37,7 @@ export function StreakDisplay() {
   const fetchStreakData = async () => {
     try {
       const response = await streakAPI.getStreak();
-      const data = response.data || response;
+      const data = (response as any).data || response;
       setStreakData(data);
     } catch (error: any) {
       console.error("Failed to fetch streak data:", error);
