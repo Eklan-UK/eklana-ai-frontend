@@ -316,6 +316,25 @@ export const pronunciationAPI = {
       params: days ? { days } : undefined,
     });
   },
+
+  // Create pronunciation attempt from drill
+  createDrillAttempt: (data: {
+    text: string;
+    audioBase64: string;
+    drillId?: string;
+    drillAttemptId?: string;
+    drillType?: string;
+    passingThreshold?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      attempt?: any;
+    }>('/pronunciations/drill-attempt', {
+      method: 'POST',
+      data,
+    });
+  },
 };
 
 // Pronunciation Problems API (New Global System)

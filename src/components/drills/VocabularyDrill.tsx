@@ -7,7 +7,7 @@ import { TTSButton } from "@/components/ui/TTSButton";
 import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
 import { CheckCircle, Mic, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI } from "@/lib/api";
+import { drillAPI, pronunciationAPI } from "@/lib/api";
 import type { TextScore } from "@/services/speechace.service";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService } from "@/services/speechace.service";
@@ -231,6 +231,22 @@ export default function VocabularyDrill({
     }
   };
 
+  // Helper function to convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        const base64 = base64String.includes(',')
+          ? base64String.split(',')[1]
+          : base64String;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentSentence) return;
 
@@ -305,6 +321,21 @@ export default function VocabularyDrill({
               0
             )}%. You need at least 65% to pass. Try again!`
           );
+        }
+
+        // Record pronunciation attempt
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          await pronunciationAPI.createDrillAttempt({
+            text: textToAnalyze,
+            audioBase64,
+            drillId: drill._id,
+            drillType: 'vocabulary',
+            passingThreshold: 65,
+          });
+        } catch (error) {
+          // Log but don't fail the drill if pronunciation recording fails
+          console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce - missing textScore");

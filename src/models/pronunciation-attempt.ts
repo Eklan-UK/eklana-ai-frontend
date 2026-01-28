@@ -10,6 +10,10 @@ export interface IPronunciationAttempt extends Document {
 	// Legacy structure: assignment-based (for backward compatibility)
 	pronunciationAssignmentId?: Types.ObjectId; // Reference to PronunciationAssignment
 	pronunciationId?: Types.ObjectId; // Reference to Pronunciation
+	// Drill-related fields (for pronunciations from drills)
+	drillId?: Types.ObjectId; // Reference to Drill
+	drillAttemptId?: Types.ObjectId; // Reference to DrillAttempt
+	drillType?: string; // 'vocabulary', 'roleplay', 'sentence', etc.
 	learnerId: Types.ObjectId; // Reference to Learner
 	// Speechace evaluation results
 	textScore: number; // Overall pronunciation score (0-100)
@@ -71,6 +75,19 @@ const pronunciationAttemptSchema = new Schema<IPronunciationAttempt>(
 			type: Schema.Types.ObjectId,
 			ref: 'Pronunciation',
 			// Removed index: true - covered by compound index { pronunciationId: 1, passed: 1 }
+		},
+		// Drill-related fields
+		drillId: {
+			type: Schema.Types.ObjectId,
+			ref: 'Drill',
+		},
+		drillAttemptId: {
+			type: Schema.Types.ObjectId,
+			ref: 'DrillAttempt',
+		},
+		drillType: {
+			type: String,
+			enum: ['vocabulary', 'roleplay', 'sentence', 'other'],
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,
@@ -168,6 +185,9 @@ pronunciationAttemptSchema.index({ pronunciationId: 1, passed: 1 });
 // General indexes
 pronunciationAttemptSchema.index({ learnerId: 1, createdAt: -1 });
 pronunciationAttemptSchema.index({ learnerId: 1, passed: 1, createdAt: -1 });
+// Drill-related indexes
+pronunciationAttemptSchema.index({ drillId: 1, learnerId: 1, createdAt: -1 });
+pronunciationAttemptSchema.index({ drillAttemptId: 1, createdAt: -1 });
 
 export default models?.PronunciationAttempt || model<IPronunciationAttempt>('PronunciationAttempt', pronunciationAttemptSchema);
 

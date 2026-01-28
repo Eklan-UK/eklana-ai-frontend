@@ -325,5 +325,139 @@ export class PronunciationService {
       assignment: updatedAssignment,
     };
   }
+
+  /**
+   * Create a pronunciation attempt from a drill (standalone, not linked to assignment)
+   */
+  async createDrillPronunciationAttempt(params: {
+    learnerId: string;
+    text: string;
+    audioBase64: string;
+    drillId?: string;
+    drillAttemptId?: string;
+    drillType?: string;
+    passingThreshold?: number;
+  }): Promise<any> {
+    // 1. Upload audio recording
+    let audioUrl: string | undefined;
+    let audioDuration: number | undefined;
+    try {
+      let cleanAudioBase64 = params.audioBase64;
+      if (cleanAudioBase64.includes(',')) {
+        cleanAudioBase64 = cleanAudioBase64.split(',')[1];
+      }
+
+      const audioBuffer = Buffer.from(cleanAudioBase64, 'base64');
+      const uploadResult = await uploadToCloudinary(audioBuffer, {
+        folder: 'eklan/pronunciations/drill-attempts',
+        publicId: `drill_attempt_${Date.now()}_${params.learnerId}`,
+        resourceType: 'raw',
+      });
+      audioUrl = uploadResult.secureUrl;
+      // Note: Duration calculation would require audio processing library
+      // For now, we'll leave it undefined
+    } catch (error: any) {
+      logger.warn('Failed to upload drill attempt audio', { error: error.message });
+      // Continue without audio URL - not critical
+    }
+
+    // 2. Evaluate pronunciation using Speechace
+    let evaluationResult;
+    try {
+      let cleanAudioBase64 = params.audioBase64;
+      if (cleanAudioBase64.includes(',')) {
+        cleanAudioBase64 = cleanAudioBase64.split(',')[1];
+      }
+
+      evaluationResult = await speechaceService.scorePronunciation(
+        params.text,
+        cleanAudioBase64,
+        params.learnerId
+      );
+    } catch (error: any) {
+      logger.error('Speechace evaluation failed for drill attempt', { error: error.message });
+      throw new ValidationError('Failed to evaluate pronunciation: ' + error.message);
+    }
+
+    // 3. Extract incorrect letters/phonemes
+    const incorrectLetters: string[] = [];
+    const incorrectPhonemes: string[] = [];
+
+    if (evaluationResult.word_scores) {
+      for (const wordScore of evaluationResult.word_scores) {
+        if (wordScore.score < (params.passingThreshold || 70)) {
+          for (const letter of wordScore.word) {
+            if (!incorrectLetters.includes(letter.toLowerCase())) {
+              incorrectLetters.push(letter.toLowerCase());
+            }
+          }
+        }
+
+        if (wordScore.phonemes) {
+          for (const phoneme of wordScore.phonemes) {
+            if (phoneme.score < (params.passingThreshold || 70)) {
+              if (!incorrectPhonemes.includes(phoneme.phoneme)) {
+                incorrectPhonemes.push(phoneme.phoneme);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Determine if passed
+    const passed = evaluationResult.text_score >= (params.passingThreshold || 70);
+
+    // 5. Create attempt record (without assignment)
+    const attemptData: any = {
+      learnerId: new Types.ObjectId(params.learnerId),
+      textScore: evaluationResult.text_score,
+      fluencyScore: evaluationResult.fluency_score,
+      passed,
+      passingThreshold: params.passingThreshold || 70,
+      wordScores: evaluationResult.word_scores || [],
+      incorrectLetters,
+      incorrectPhonemes,
+      audioUrl,
+      audioDuration,
+      textFeedback: evaluationResult.text_feedback,
+      wordFeedback: evaluationResult.word_feedback || [],
+      attemptNumber: 1, // Standalone attempts start at 1
+    };
+
+    // Add drill-related fields if provided
+    if (params.drillId) {
+      attemptData.drillId = new Types.ObjectId(params.drillId);
+    }
+    if (params.drillAttemptId) {
+      attemptData.drillAttemptId = new Types.ObjectId(params.drillAttemptId);
+    }
+    if (params.drillType) {
+      attemptData.drillType = params.drillType;
+    }
+
+    const attempt = await this.attemptRepo.create(attemptData);
+
+    logger.info('Drill pronunciation attempt created', {
+      attemptId: attempt._id,
+      userId: params.learnerId,
+      drillId: params.drillId,
+      score: evaluationResult.text_score,
+      passed,
+    });
+
+    return {
+      _id: attempt._id,
+      textScore: evaluationResult.text_score,
+      fluencyScore: evaluationResult.fluency_score,
+      passed,
+      wordScores: evaluationResult.word_scores,
+      incorrectLetters,
+      incorrectPhonemes,
+      textFeedback: evaluationResult.text_feedback,
+      wordFeedback: evaluationResult.word_feedback,
+      audioUrl,
+    };
+  }
 }
 

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
-import { drillAPI } from "@/lib/api";
+import { drillAPI, pronunciationAPI } from "@/lib/api";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
@@ -310,6 +310,22 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
   };
 
+  // Helper function to convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        const base64 = base64String.includes(',')
+          ? base64String.split(',')[1]
+          : base64String;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentTurn) return;
 
@@ -370,6 +386,21 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           toast.warning(
             `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to continue. Try again!`
           );
+        }
+
+        // Record pronunciation attempt
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          await pronunciationAPI.createDrillAttempt({
+            text: currentTurn.text,
+            audioBase64,
+            drillId: drill._id,
+            drillType: 'roleplay',
+            passingThreshold: PASS_THRESHOLD,
+          });
+        } catch (error) {
+          // Log but don't fail the drill if pronunciation recording fails
+          console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce");
