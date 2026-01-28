@@ -46,11 +46,19 @@ export default function DrillPracticeInterface({
         const response = await drillAPI.getLearnerDrills();
         if (response.data?.drills) {
           const foundAssignment = response.data.drills.find(
-            (item: any) => item.drill?._id === drill._id
+            (item: any) => item.drill?._id === drill._id || item.drill?._id?.toString() === drill._id?.toString()
           );
           if (foundAssignment?.assignmentId) {
-            setAssignmentId(foundAssignment.assignmentId);
-            setAssignment(foundAssignment);
+            // Verify the assignment matches the drill
+            if (foundAssignment.drill?._id?.toString() === drill._id?.toString()) {
+              setAssignmentId(foundAssignment.assignmentId);
+              setAssignment(foundAssignment);
+            } else {
+              console.warn('Assignment drill ID mismatch', {
+                assignmentDrillId: foundAssignment.drill?._id,
+                currentDrillId: drill._id,
+              });
+            }
           }
         }
       } catch (error) {

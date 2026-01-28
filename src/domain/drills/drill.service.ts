@@ -425,8 +425,33 @@ export class DrillService {
     }
 
     // 4. Verify assignment is for the correct drill
-    if (assignment.drillId.toString() !== drillId) {
-      throw new ValidationError('Drill assignment does not match drill ID');
+    // Handle both populated (object) and unpopulated (ObjectId) drillId in a type-safe way
+    const assignmentDrillId: any = (assignment as any).drillId;
+    let assignmentDrillIdStr: string;
+
+    if (assignmentDrillId && typeof assignmentDrillId === 'object' && '_id' in assignmentDrillId) {
+      // drillId is populated (object with _id)
+      assignmentDrillIdStr = assignmentDrillId._id.toString();
+    } else {
+      // drillId is likely an ObjectId or string
+      assignmentDrillIdStr = String(assignmentDrillId);
+    }
+
+    const requestedDrillIdStr = String(drillId);
+
+    if (assignmentDrillIdStr !== requestedDrillIdStr) {
+      logger.error('Drill assignment mismatch', {
+        assignmentId: params.drillAssignmentId,
+        assignmentDrillId: assignmentDrillIdStr,
+        requestedDrillId: requestedDrillIdStr,
+        learnerId: params.learnerId,
+        assignmentDrillIdRaw: assignmentDrillId,
+        assignmentDrillIdType: typeof assignmentDrillId,
+        requestedDrillIdType: typeof drillId,
+      });
+      throw new ValidationError(
+        `Drill assignment does not match drill ID. Assignment is for drill ${assignmentDrillIdStr}, but you're trying to complete drill ${requestedDrillIdStr}`
+      );
     }
 
     // 5. Create drill attempt

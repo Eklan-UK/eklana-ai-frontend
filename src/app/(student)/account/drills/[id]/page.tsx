@@ -98,10 +98,30 @@ export default async function DrillDetailPage({
   const drill = drillData.drill || drillData;
   const assignmentInfo = drillData.assignment;
 
+  // Verify assignment matches drill if both are provided
+  let validAssignmentId = assignmentId || assignmentInfo?.assignmentId;
+  if (validAssignmentId && assignmentInfo) {
+    const assignmentDrillId = assignmentInfo.drillId || assignmentInfo.drill?._id;
+    const currentDrillId = drill._id || drill.id || id;
+    
+    // Normalize IDs for comparison
+    const assignmentDrillIdStr = assignmentDrillId?.toString();
+    const currentDrillIdStr = currentDrillId?.toString();
+    
+    if (assignmentDrillIdStr && currentDrillIdStr && assignmentDrillIdStr !== currentDrillIdStr) {
+      console.warn('Assignment drill ID mismatch, ignoring assignmentId', {
+        assignmentDrillId: assignmentDrillIdStr,
+        currentDrillId: currentDrillIdStr,
+        assignmentId: validAssignmentId,
+      });
+      validAssignmentId = undefined; // Don't use mismatched assignment
+    }
+  }
+
   return (
     <DrillPracticeInterface
       drill={drill}
-      assignmentId={assignmentId || assignmentInfo?.assignmentId}
+      assignmentId={validAssignmentId}
     />
   );
 }

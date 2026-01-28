@@ -142,7 +142,15 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
     try {
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      await drillAPI.complete(drill._id, {
+      // Verify drill ID format
+      const drillId = drill._id?.toString();
+      if (!drillId) {
+        toast.error("Invalid drill ID. Cannot submit drill.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      await drillAPI.complete(drillId, {
         drillAssignmentId: assignmentId,
         score: 100, // Listening drills are completion-based
         timeSpent,
