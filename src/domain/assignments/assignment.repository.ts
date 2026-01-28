@@ -1,5 +1,6 @@
 import DrillAssignment from '@/models/drill-assignment';
-import '@/models/drill'; // Ensure Drill model is registered for populate() calls
+import Drill from '@/models/drill';
+import User from '@/models/user';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import type { DrillAssignment as AssignmentType, CreateAssignmentData, AssignmentFilters } from './assignment.types';
@@ -14,8 +15,8 @@ export class AssignmentRepository {
   async findById(assignmentId: string): Promise<AssignmentType | null> {
     try {
       return await DrillAssignment.findById(assignmentId)
-        .populate('drillId', 'title type difficulty')
-        .populate('assignedBy', 'firstName lastName email')
+        .populate({ path: 'drillId', model: Drill, select: 'title type difficulty' })
+        .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         .lean()
         .exec();
     } catch (error: any) {
@@ -45,8 +46,8 @@ export class AssignmentRepository {
       }
 
       const queryBuilder = DrillAssignment.find(query)
-        .populate('drillId', 'title type difficulty')
-        .populate('assignedBy', 'firstName lastName email')
+        .populate({ path: 'drillId', model: Drill, select: 'title type difficulty' })
+        .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         .sort({ assignedAt: -1 });
 
       if (filters.limit) {
@@ -165,8 +166,8 @@ export class AssignmentRepository {
       const query = { drillId: new Types.ObjectId(drillId) };
 
       const assignments = await DrillAssignment.find(query)
-        .populate('learnerId', 'firstName lastName email')
-        .populate('assignedBy', 'firstName lastName email')
+        .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
+        .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         .sort({ assignedAt: -1 })
         .limit(filters?.limit || 100)
         .skip(filters?.offset || 0)
@@ -205,8 +206,12 @@ export class AssignmentRepository {
       }
 
       const assignments = await DrillAssignment.find(query)
-        .populate('drillId', 'title type difficulty date duration_days context audio_example_url')
-        .populate('assignedBy', 'firstName lastName email')
+        .populate({
+          path: 'drillId',
+          model: Drill,
+          select: 'title type difficulty date duration_days context audio_example_url',
+        })
+        .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         .sort({ assignedAt: -1 })
         .limit(filters?.limit || 20)
         .skip(filters?.offset || 0)
