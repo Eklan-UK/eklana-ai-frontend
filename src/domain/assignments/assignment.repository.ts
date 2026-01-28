@@ -1,4 +1,5 @@
 import DrillAssignment from '@/models/drill-assignment';
+import '@/models/drill'; // Ensure Drill model is registered for populate() calls
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import type { DrillAssignment as AssignmentType, CreateAssignmentData, AssignmentFilters } from './assignment.types';
