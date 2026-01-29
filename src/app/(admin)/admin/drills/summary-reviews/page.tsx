@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDrillReviews, type SummarySubmission } from "@/hooks/useDrillReviews";
 import {
   Loader2,
   CheckCircle,
@@ -315,19 +316,8 @@ export default function SummaryReviewsPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [expandedLearners, setExpandedLearners] = useState<Set<string>>(new Set());
 
-  // Fetch summary submissions
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["summary-submissions", filterStatus],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/v1/drills/summary-submissions?status=${filterStatus}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch submissions");
-      }
-      return response.json();
-    },
-  });
+  // Fetch summary submissions using shared hook
+  const { data, isLoading, error } = useDrillReviews("summary", filterStatus, 100);
 
   // Submit review mutation
   const submitReviewMutation = useMutation({
@@ -375,7 +365,11 @@ export default function SummaryReviewsPage() {
     setExpandedLearners(newExpanded);
   };
 
-  const submissions: LearnerSubmissions[] = data?.data?.submissions || [];
+  // Transform to summary-specific submissions
+  const submissions: LearnerSubmissions[] = (data?.submissions || []).map(ls => ({
+    learner: ls.learner,
+    submissions: ls.submissions.filter((s): s is SummarySubmission => 'summaryResults' in s) as Submission[],
+  })).filter(ls => ls.submissions.length > 0);
   const totalPending = submissions.reduce(
     (acc, ls) =>
       acc +
@@ -383,6 +377,7 @@ export default function SummaryReviewsPage() {
         .length,
     0
   );
+
 
   return (
     <div className="min-h-screen bg-gray-50">

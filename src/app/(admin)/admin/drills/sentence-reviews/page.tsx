@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDrillReviews, type SentenceSubmission } from "@/hooks/useDrillReviews";
 import {
   ArrowLeft,
   Loader2,
@@ -473,28 +474,12 @@ export default function SentenceReviewsPage() {
   const [expandedLearners, setExpandedLearners] = useState<Set<string>>(new Set());
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
-  // Fetch submissions
+  // Fetch submissions using shared hook
   const {
     data,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["sentence-submissions", statusFilter],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/v1/drills/sentence-submissions?status=${statusFilter}&limit=100`,
-        { credentials: "include" }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch submissions");
-      }
-      const data = await response.json();
-      return data.data as {
-        submissions: LearnerSubmissions[];
-        pagination: { total: number };
-      };
-    },
-  });
+  } = useDrillReviews("sentence", statusFilter, 100);
 
   // Review mutation
   const reviewMutation = useMutation({
@@ -554,7 +539,11 @@ export default function SentenceReviewsPage() {
     });
   };
 
-  const submissions = data?.submissions || [];
+  // Transform to sentence-specific submissions
+  const submissions: LearnerSubmissions[] = (data?.submissions || []).map(ls => ({
+    learner: ls.learner,
+    submissions: ls.submissions.filter((s): s is SentenceSubmission => 'sentenceResults' in s) as Submission[],
+  })).filter(ls => ls.submissions.length > 0);
   const totalCount = data?.pagination?.total || 0;
 
   return (

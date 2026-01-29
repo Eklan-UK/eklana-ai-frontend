@@ -1,4 +1,6 @@
 import DrillAttempt from '@/models/drill-attempt';
+import User from '@/models/user';
+import Drill from '@/models/drill';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 
@@ -211,8 +213,8 @@ export class AttemptRepository {
       }
 
       const attempts = await DrillAttempt.find(query)
-        .populate('learnerId', 'firstName lastName email')
-        .populate('drillId', 'title type sentence_drill_word sentence_writing_items')
+        .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
+        .populate({ path: 'drillId', model: Drill, select: 'title type sentence_drill_word sentence_writing_items' })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)
@@ -248,8 +250,8 @@ export class AttemptRepository {
       }
 
       const attempts = await DrillAttempt.find(query)
-        .populate('learnerId', 'firstName lastName email')
-        .populate('drillId', 'title type grammar_items')
+        .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
+        .populate({ path: 'drillId', model: Drill, select: 'title type grammar_items' })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)
@@ -286,8 +288,8 @@ export class AttemptRepository {
       }
 
       const attempts = await DrillAttempt.find(query)
-        .populate('learnerId', 'firstName lastName email')
-        .populate('drillId', 'title type article_title')
+        .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
+        .populate({ path: 'drillId', model: Drill, select: 'title type article_title' })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDrillReviews, type GrammarSubmission } from "@/hooks/useDrillReviews";
 import {
   ArrowLeft,
   Loader2,
@@ -523,24 +524,8 @@ export default function GrammarReviewsPage() {
   const [selectedSubmission, setSelectedSubmission] =
     useState<Submission | null>(null);
 
-  // Fetch submissions
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["grammar-submissions", statusFilter],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/v1/drills/grammar-submissions?status=${statusFilter}&limit=100`,
-        { credentials: "include" }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch submissions");
-      }
-      const data = await response.json();
-      return data.data as {
-        submissions: LearnerSubmissions[];
-        pagination: { total: number };
-      };
-    },
-  });
+  // Fetch submissions using shared hook
+  const { data, isLoading, error } = useDrillReviews("grammar", statusFilter, 100);
 
   // Review mutation
   const reviewMutation = useMutation({
@@ -601,7 +586,11 @@ export default function GrammarReviewsPage() {
     });
   };
 
-  const submissions = data?.submissions || [];
+  // Transform to grammar-specific submissions
+  const submissions: LearnerSubmissions[] = (data?.submissions || []).map(ls => ({
+    learner: ls.learner,
+    submissions: ls.submissions.filter((s): s is GrammarSubmission => 'grammarResults' in s) as Submission[],
+  })).filter(ls => ls.submissions.length > 0);
   const totalCount = data?.pagination?.total || 0;
 
   return (
