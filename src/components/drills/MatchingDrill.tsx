@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
@@ -31,6 +32,7 @@ interface ShuffledItem {
 }
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
+  const router = useRouter();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
   const [rightItems, setRightItems] = useState<ShuffledItem[]>([]);
@@ -264,27 +266,43 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
               type: drill.type,
               score,
         });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
       setIsSubmitting(false);
     }
   };
 
+  // Refresh on mount if completed
+  useEffect(() => {
+    if (isCompleted) {
+      router.refresh();
+    }
+  }, [isCompleted, router]);
+
   if (isCompleted) {
     return (
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
-        <Header title="Drill Completed" />
+        <Header title="Drill Completed" showBack={true} />
         <div className="max-w-md mx-auto px-4 py-6">
           <Card className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
             <p className="text-gray-600 mb-6">You've completed the matching drill.</p>
-            <Link href="/account">
-              <Button variant="primary" size="lg" fullWidth>
-                Continue Learning
-              </Button>
-            </Link>
+            <Button 
+              variant="primary" 
+              size="lg" 
+              fullWidth
+              onClick={() => {
+                router.refresh();
+                router.push("/account");
+              }}
+            >
+              Continue Learning
+            </Button>
           </Card>
         </div>
         <BottomNav />
@@ -299,7 +317,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 pb-20 md:pb-0">
       <div className="h-6"></div>
-      <Header title={drill.title} />
+      <Header title={drill.title} showBack={true} />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Progress Bar */}

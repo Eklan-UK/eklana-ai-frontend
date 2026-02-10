@@ -51,6 +51,7 @@ export interface CompleteDrillParams {
     sentenceResults?: any;
     summaryResults?: any;
     listeningResults?: any;
+    fillBlankResults?: any;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';
   };

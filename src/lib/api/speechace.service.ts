@@ -1,6 +1,4 @@
 // Speechace service for pronunciation assessment
-import axios from 'axios';
-import FormData from 'form-data';
 import { logger } from './logger';
 import config from './config';
 
@@ -87,34 +85,41 @@ class SpeechaceService {
 		questionInfo?: string
 	): Promise<SpeechaceScoreResponse & { text_score: number; word_scores: Array<{ word: string; score: number; phonemes?: Array<{ phoneme: string; score: number }> }> }> {
 		try {
-			// Convert base64 to buffer for form data
+			// Convert base64 to buffer and then to Blob for native FormData
 			const audioBuffer = Buffer.from(audioBase64, 'base64');
+			const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
 
-			// Speechace API uses form-data with key as query parameter
+			// Use native FormData
 			const formData = new FormData();
 			formData.append('text', text);
-			formData.append('user_audio_file', audioBuffer, {
-				filename: 'audio.wav',
-				contentType: 'audio/wav',
-			});
+			formData.append('user_audio_file', audioBlob, 'audio.wav');
+			
 			if (questionInfo) {
 				formData.append('question_info', questionInfo);
 			}
 
-			const response = await axios.post<any>(
-				`${this.apiEndpoint}/api/scoring/text/v9/json?key=${encodeURIComponent(this.apiKey)}&dialect=en-us&user_id=${encodeURIComponent(userId)}`,
-				formData,
-				{
-					headers: {
-						...formData.getHeaders(),
-					},
-					timeout: 30000, // 30 second timeout
-				}
-			);
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+			const url = `${this.apiEndpoint}/api/scoring/text/v9/json?key=${encodeURIComponent(this.apiKey)}&dialect=en-us&user_id=${encodeURIComponent(userId)}`;
+			
+			const response = await fetch(url, {
+				method: 'POST',
+				body: formData,
+				signal: controller.signal,
+			});
+
+			clearTimeout(timeoutId);
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(`Speechace API error: ${response.status} ${response.statusText} - ${errorBody}`);
+			}
+
+			const rawData = await response.json();
 
 			// Extract the score from the response
 			// The API returns text_score (snake_case) object with speechace_score.pronunciation
-			const rawData = response.data;
 			// The API response has text_score (snake_case), not textScore (camelCase)
 			const textScoreObj = rawData.text_score || rawData.textScore;
 			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation || 
@@ -128,6 +133,7 @@ class SpeechaceService {
 				phonemes: ws.phone_score_list?.map((ps) => ({
 					phoneme: ps.phone,
 					score: ps.quality_score,
+					sound_most_like: ps.sound_most_like, // Added sound_most_like to preserve data
 				})),
 			})) || [];
 
@@ -143,26 +149,15 @@ class SpeechaceService {
 			logger.info('Speechace pronunciation score generated', {
 				userId,
 				text,
-				textScore: JSON.stringify(rawData),
+				score: pronunciationScore,
 			});
 
 			return normalizedResponse;
 		} catch (error: any) {
 			logger.error('Speechace API error', {
 				error: error.message,
-				response: error.response?.data,
-				status: error.response?.status,
+				cause: error.cause,
 			});
-
-			if (error.response) {
-				throw new Error(
-					`Speechace API error: ${error.response.data?.message || error.response.statusText}`
-				);
-			}
-
-			if (error.request) {
-				throw new Error('Speechace API request failed: No response received');
-			}
 
 			throw new Error(`Speechace API error: ${error.message}`);
 		}

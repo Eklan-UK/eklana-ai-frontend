@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -79,6 +80,7 @@ const triggerConfetti = () => {
 };
 
 export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProps) {
+  const router = useRouter();
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [completedMessages, setCompletedMessages] = useState<CompletedMessage[]>([]);
@@ -521,6 +523,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         type: drill.type,
         score: avgScore,
       });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -540,7 +545,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   }, [stopTTSAudio]);
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="roleplay" />;
+    return <DrillCompletionScreen drillType="roleplay" refreshOnMount={true} />;
   }
 
   // Review Screen - Shows all analytics collected during the session

@@ -36,18 +36,31 @@ export async function uploadToCloudinary(
       resourceType = 'image',
     } = options;
 
+    const uploadOptions: any = {
+      folder,
+      public_id: publicId,
+      resource_type: resourceType,
+      transformation: transformation || (resourceType === 'video' ? [
+        { quality: 'auto', fetch_format: 'auto' },
+      ] : [
+        { width: 500, height: 500, crop: 'fill', gravity: 'face' },
+        { quality: 'auto', fetch_format: 'auto' },
+      ]),
+    };
+
+    // Use upload_stream for all resources (including large videos), with extended timeouts for video
     return new Promise((resolve, reject) => {
+      // Set timeout for video uploads (5 minutes)
+      const timeout = resourceType === 'video' ? 300000 : 60000;
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Upload timeout: File upload took too long'));
+      }, timeout);
+
       const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          public_id: publicId,
-          resource_type: resourceType,
-          transformation: transformation || [
-            { width: 500, height: 500, crop: 'fill', gravity: 'face' },
-            { quality: 'auto', fetch_format: 'auto' },
-          ],
-        },
+        uploadOptions,
         (error, result) => {
+          clearTimeout(timeoutId);
+          
           if (error) {
             logger.error('Cloudinary upload error', { error: error.message });
             reject(error);
@@ -73,7 +86,7 @@ export async function uploadToCloudinary(
     });
   } catch (error: any) {
     logger.error('Error uploading to Cloudinary', { error: error.message });
-    throw new Error(`Failed to upload image: ${error.message}`);
+    throw new Error(`Failed to upload file: ${error.message}`);
   }
 }
 

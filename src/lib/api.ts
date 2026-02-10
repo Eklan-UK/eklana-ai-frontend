@@ -148,6 +148,7 @@ export const drillAPI = {
     sentenceWritingResults?: any;
     summaryResults?: any;
     listeningResults?: any;
+    fillBlankResults?: any;
     sentenceResults?: any;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';

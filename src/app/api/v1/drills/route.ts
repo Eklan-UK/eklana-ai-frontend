@@ -63,9 +63,32 @@ const sentenceWritingItemSchema = z.object({
 	hint: z.string().optional(),
 });
 
+const fillBlankItemSchema = z.object({
+	sentence: z.string().min(1),
+	blanks: z.array(
+		z.object({
+			position: z.number().int().min(0),
+			correctAnswer: z.string().min(1),
+			options: z.array(z.string().min(1)).min(2),
+			hint: z.string().optional(),
+		}).superRefine((data, ctx) => {
+			// Check that correctAnswer is in options
+			if (!data.options.includes(data.correctAnswer)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Options must include the correct answer",
+					path: ["options"],
+				});
+			}
+		})
+	).min(1), // At least one blank per sentence
+	translation: z.string().optional(),
+	audioUrl: z.string().optional(),
+});
+
 const createDrillSchema = z.object({
 	title: z.string().min(1).max(200),
-	type: z.enum(['vocabulary', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening']),
+	type: z.enum(['vocabulary', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank']),
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
 	duration_days: z.number().int().min(1).optional(),
@@ -91,6 +114,7 @@ const createDrillSchema = z.object({
 	article_title: z.string().optional(),
 	article_content: z.string().optional(),
 	article_audio_url: z.string().optional(),
+	fill_blank_items: z.array(fillBlankItemSchema).optional(),
 	is_active: z.boolean().optional(),
 });
 
@@ -179,6 +203,7 @@ async function postHandler(
 	if (validated.article_title !== undefined) drillData.article_title = validated.article_title;
 	if (validated.article_content !== undefined) drillData.article_content = validated.article_content;
 	if (validated.article_audio_url !== undefined) drillData.article_audio_url = validated.article_audio_url;
+	if (validated.fill_blank_items !== undefined) drillData.fill_blank_items = validated.fill_blank_items;
 
 	// Create drill
 	const result = await drillService.createDrill({

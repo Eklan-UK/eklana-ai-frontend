@@ -13,6 +13,7 @@ export interface AuthenticatedRequest extends NextRequest {
 
 /**
  * Better Auth authentication middleware for Next.js API routes
+ * Supports both cookie-based (web) and Bearer token (mobile) authentication
  */
 export const requireAuth = async (
 	req: NextRequest
@@ -29,7 +30,88 @@ export const requireAuth = async (
 			);
 		}
 
-		// Get session from Better Auth using request headers
+		// Check for Bearer token (mobile apps)
+		const authHeader = req.headers.get('authorization');
+		logger.info('Auth middleware check', {
+			hasAuthHeader: !!authHeader,
+			authHeaderPrefix: authHeader?.substring(0, 10),
+			url: req.url,
+		});
+		
+		if (authHeader?.startsWith('Bearer ')) {
+			const token = authHeader.substring(7);
+			logger.info('Processing Bearer token', {
+				tokenLength: token.length,
+				tokenPrefix: token.substring(0, 20) + '...',
+			});
+			
+			try {
+				// Query session directly from database using the token
+				const mongoose = await import('mongoose');
+				const db = mongoose.default.connection.db;
+				
+				if (db) {
+					const sessionsCollection = db.collection('sessions');
+					
+					logger.info('Querying sessions collection', {
+						token: token.substring(0, 20) + '...',
+					});
+					
+					const session = await sessionsCollection.findOne({
+						token: token,
+						expiresAt: { $gt: new Date() }, // Check if not expired
+					});
+
+					logger.info('Session query result', {
+						found: !!session,
+						hasUserId: !!session?.userId,
+						expiresAt: session?.expiresAt,
+					});
+
+					if (session && session.userId) {
+						// Get user data
+						const usersCollection = db.collection('users');
+						const user = await usersCollection.findOne({
+							_id: new Types.ObjectId(session.userId),
+						});
+
+						logger.info('User query result', {
+							found: !!user,
+							userId: user?._id?.toString(),
+							role: user?.role,
+						});
+
+						if (user) {
+							// Normalize role
+							let userRole = (user.role as 'admin' | 'user' | 'tutor' | 'learner') || 'user';
+							if (userRole === 'learner') {
+								userRole = 'user';
+							}
+
+							logger.info('Bearer token authentication successful', {
+								userId: user._id.toString(),
+								userRole,
+							});
+
+							return {
+								userId: new Types.ObjectId(user._id),
+								userRole: userRole as 'admin' | 'user' | 'tutor',
+							};
+						}
+					}
+				}
+				
+				logger.warn('Bearer token validation failed - session not found or expired');
+			} catch (tokenError) {
+				logger.error('Bearer token verification error', {
+					error: tokenError instanceof Error ? tokenError.message : 'Unknown error',
+					stack: tokenError instanceof Error ? tokenError.stack : undefined,
+				});
+				// Fall through to cookie-based auth
+			}
+		}
+
+		// Try cookie-based session (web apps)
 		const session = await auth.api.getSession({
 			headers: fromNodeHeaders(Object.fromEntries(req.headers.entries())),
 		});

@@ -121,6 +121,24 @@ const completeSchema = z.object({
 		completed: z.boolean(),
 		timeSpent: z.number(),
 	}).optional(),
+	fillBlankResults: z.object({
+		items: z.array(
+			z.object({
+				sentence: z.string(),
+				blanks: z.array(
+					z.object({
+						position: z.number(),
+						selectedAnswer: z.string(),
+						correctAnswer: z.string(),
+						isCorrect: z.boolean(),
+					})
+				),
+			})
+		).optional(),
+		totalBlanks: z.number().optional(),
+		correctBlanks: z.number().optional(),
+		score: z.number().optional(),
+	}).optional(),
 	deviceInfo: z.string().optional(),
 	platform: z.enum(['web', 'ios', 'android']).optional(),
 });
@@ -164,6 +182,7 @@ async function handler(
 			sentenceResults: validated.sentenceResults,
 			summaryResults: validated.summaryResults,
 			listeningResults: validated.listeningResults,
+			fillBlankResults: validated.fillBlankResults,
 			deviceInfo: validated.deviceInfo,
 			platform: validated.platform,
 		},

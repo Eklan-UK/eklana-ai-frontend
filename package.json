@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev ",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build --webpack",
     "build:low-mem": "NODE_OPTIONS='--max-old-space-size=4096' next build --webpack",
     "start": "next start",

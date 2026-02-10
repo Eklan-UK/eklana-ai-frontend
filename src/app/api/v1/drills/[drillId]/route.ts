@@ -27,6 +27,7 @@ const updateDrillSchema = z.object({
 		"sentence_writing",
 		"sentence",
 		"listening",
+		"fill_blank",
 	]).optional(),
 	difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
 	date: z.string().datetime().optional(),
@@ -85,6 +86,17 @@ const updateDrillSchema = z.object({
 	article_title: z.string().optional(),
 	article_content: z.string().optional(),
 	article_audio_url: z.string().optional(),
+	fill_blank_items: z.array(z.object({
+		sentence: z.string().min(1),
+		blanks: z.array(z.object({
+			position: z.number().int().min(0),
+			correctAnswer: z.string().min(1),
+			options: z.array(z.string().min(1)).min(2),
+			hint: z.string().optional(),
+		})).min(1),
+		translation: z.string().optional(),
+		audioUrl: z.string().optional(),
+	})).optional(),
 });
 
 // GET handler

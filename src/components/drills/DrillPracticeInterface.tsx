@@ -12,6 +12,7 @@ import SummaryDrill from "./SummaryDrill";
 import GrammarDrill from "./GrammarDrill";
 import SentenceDrill from "./SentenceDrill";
 import ListeningDrill from "./ListeningDrill";
+import FillBlankDrill from "./FillBlankDrill";
 import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
@@ -98,11 +99,13 @@ export default function DrillPracticeInterface({
         return <SentenceDrill {...commonProps} />;
       case "listening":
         return <ListeningDrill {...commonProps} />;
+      case "fill_blank":
+        return <FillBlankDrill {...commonProps} />;
       default:
         return (
           <div className="min-h-screen bg-white pb-20 md:pb-0">
             <div className="h-6"></div>
-            <Header title="Unknown Drill Type" />
+            <Header title="Unknown Drill Type" showBack={true} />
             <div className="max-w-md mx-auto px-4 py-6">
               <Card>
                 <p className="text-gray-600">

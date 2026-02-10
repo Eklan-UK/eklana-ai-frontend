@@ -90,6 +90,16 @@ interface DrillFormData {
   listening_drill_title?: string;
   listening_drill_content?: string;
   sentence_drill_word?: string;
+  fill_blank_items?: Array<{
+    sentence: string;
+    blanks: Array<{
+      position: number;
+      correctAnswer: string;
+      options: string[];
+      hint?: string;
+    }>;
+    translation?: string;
+  }>;
 }
 
 function CreateDrillPageContent() {
@@ -166,6 +176,20 @@ function CreateDrillPageContent() {
       article_title: "",
       listening_drill_title: "",
       listening_drill_content: "",
+      fill_blank_items: [
+        {
+          sentence: "",
+          blanks: [
+            {
+              position: 0,
+              correctAnswer: "",
+              options: ["", ""],
+              hint: "",
+            },
+          ],
+          translation: "",
+        },
+      ],
     };
   });
 
@@ -233,6 +257,20 @@ function CreateDrillPageContent() {
             listening_drill_title: drill.listening_drill_title || "",
             listening_drill_content: drill.listening_drill_content || "",
             sentence_drill_word: drill.sentence_drill_word || "",
+            fill_blank_items: drill.fill_blank_items || [
+              {
+                sentence: "",
+                blanks: [
+                  {
+                    position: 0,
+                    correctAnswer: "",
+                    options: ["", ""],
+                    hint: "",
+                  },
+                ],
+                translation: "",
+              },
+            ],
           });
     }
   }, [isEditMode, drillData, existingDrill]);
@@ -357,6 +395,13 @@ function CreateDrillPageContent() {
           updatedFormData.sentence_drill_word = items[0].word;
         }
         break;
+      case 'fill_blank':
+        updatedFormData.fill_blank_items = items.length > 0 ? items : [{
+          sentence: "",
+          blanks: [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }],
+          translation: "",
+        }];
+        break;
     }
 
     setFormData(updatedFormData);
@@ -454,6 +499,21 @@ function CreateDrillPageContent() {
         delete submitData.article_title;
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
+      } else if (formData.type === "fill_blank") {
+        delete submitData.target_sentences;
+        delete submitData.roleplay_dialogue;
+        delete submitData.roleplay_scenes;
+        delete submitData.student_character_name;
+        delete submitData.ai_character_names;
+        delete submitData.matching_pairs;
+        delete submitData.definition_items;
+        delete submitData.grammar_items;
+        delete submitData.sentence_writing_items;
+        delete submitData.article_content;
+        delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
+        delete submitData.sentence_drill_word;
       } else {
         // vocabulary
         delete submitData.roleplay_dialogue;
@@ -468,6 +528,7 @@ function CreateDrillPageContent() {
         delete submitData.article_title;
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
+        delete submitData.fill_blank_items;
       }
 
       // Convert date to ISO string
@@ -507,6 +568,7 @@ function CreateDrillPageContent() {
   const isRoleplay = formData.type === "roleplay";
   const isMatching = formData.type === "matching";
   const isDefinition = formData.type === "definition";
+  const isFillBlank = formData.type === "fill_blank";
   const isSummary = formData.type === "summary";
   const isGrammar = formData.type === "grammar";
   const isSentenceWriting = formData.type === "sentence_writing";
@@ -710,6 +772,7 @@ function CreateDrillPageContent() {
                     <option value="sentence_writing">Sentence Writing</option>
                     <option value="sentence">Sentence (Review)</option>
                     <option value="listening">Listening</option>
+                    <option value="fill_blank">Fill in the Blank</option>
                   </Select>
                 </div>
 
@@ -1395,6 +1458,270 @@ function CreateDrillPageContent() {
                             }}
                             placeholder="e.g., Think of 'a lot of something'"
                           />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {isFillBlank && (
+            <Card className="p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Fill in the Blank Sentences *
+                </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      fill_blank_items: [
+                        ...(formData.fill_blank_items || []),
+                        {
+                          sentence: "",
+                          blanks: [
+                            {
+                              position: 0,
+                              correctAnswer: "",
+                              options: ["", ""],
+                              hint: "",
+                            },
+                          ],
+                          translation: "",
+                        },
+                      ],
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Sentence
+                </Button>
+              </div>
+              <div className="space-y-6">
+                {(formData.fill_blank_items || []).map((item, itemIndex) => (
+                  <Card key={itemIndex} className="border-purple-100">
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <h4 className="font-semibold text-gray-900">
+                          Sentence {itemIndex + 1}
+                        </h4>
+                        {(formData.fill_blank_items || []).length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                fill_blank_items: (formData.fill_blank_items || []).filter(
+                                  (_, i) => i !== itemIndex
+                                ),
+                              });
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Sentence with Blanks *</Label>
+                          <Input
+                            value={item.sentence}
+                            onChange={(e) => {
+                              const items = [...(formData.fill_blank_items || [])];
+                              items[itemIndex].sentence = e.target.value;
+                              setFormData({ ...formData, fill_blank_items: items });
+                            }}
+                            placeholder='e.g., "I ___ to the store ___ buy milk." (Use ___ for blanks)'
+                            required
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Use "___" (three underscores) to mark where blanks should appear
+                          </p>
+                        </div>
+
+                        <div>
+                          <Label>Translation (Optional)</Label>
+                          <Input
+                            value={item.translation || ""}
+                            onChange={(e) => {
+                              const items = [...(formData.fill_blank_items || [])];
+                              items[itemIndex].translation = e.target.value;
+                              setFormData({ ...formData, fill_blank_items: items });
+                            }}
+                            placeholder="e.g., I went to the store to buy milk."
+                          />
+                        </div>
+
+                        {/* Blanks Section */}
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label>Blanks in this Sentence *</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const items = [...(formData.fill_blank_items || [])];
+                                const blankCount = items[itemIndex].blanks.length;
+                                items[itemIndex].blanks.push({
+                                  position: blankCount,
+                                  correctAnswer: "",
+                                  options: ["", ""],
+                                  hint: "",
+                                });
+                                setFormData({ ...formData, fill_blank_items: items });
+                              }}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add Blank
+                            </Button>
+                          </div>
+
+                          {item.blanks.map((blank, blankIndex) => {
+                            return (
+                              <Card
+                                key={blankIndex}
+                                className="p-4 mb-4 bg-gray-50 border border-gray-200"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <h5 className="font-medium text-gray-700">
+                                    Blank {blankIndex + 1}
+                                  </h5>
+                                  {item.blanks.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const items = [...(formData.fill_blank_items || [])];
+                                        items[itemIndex].blanks = items[itemIndex].blanks.filter(
+                                          (_, i) => i !== blankIndex
+                                        );
+                                        // Recalculate positions
+                                        items[itemIndex].blanks = items[itemIndex].blanks.map(
+                                          (b, i) => ({ ...b, position: i })
+                                        );
+                                        setFormData({ ...formData, fill_blank_items: items });
+                                      }}
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+
+                                <div className="space-y-3">
+                                  <div>
+                                    <Label>Correct Answer *</Label>
+                                    <Input
+                                      value={blank.correctAnswer}
+                                      onChange={(e) => {
+                                        const items = [...(formData.fill_blank_items || [])];
+                                        items[itemIndex].blanks[blankIndex].correctAnswer =
+                                          e.target.value;
+                                        // Ensure correct answer is in options
+                                        const options = items[itemIndex].blanks[blankIndex].options;
+                                        if (!options.includes(e.target.value) && e.target.value) {
+                                          items[itemIndex].blanks[blankIndex].options = [
+                                            e.target.value,
+                                            ...options.filter((o) => o),
+                                          ];
+                                        }
+                                        setFormData({ ...formData, fill_blank_items: items });
+                                      }}
+                                      placeholder="e.g., went"
+                                      required
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <Label>
+                                      Options * (must include correct answer, min 2)
+                                    </Label>
+                                    {blank.options.map((option, optionIndex) => (
+                                      <div key={optionIndex} className="flex gap-2 mb-2">
+                                        <Input
+                                          value={option}
+                                          onChange={(e) => {
+                                            const items = [
+                                              ...(formData.fill_blank_items || []),
+                                            ];
+                                            items[itemIndex].blanks[blankIndex].options[
+                                              optionIndex
+                                            ] = e.target.value;
+                                            setFormData({
+                                              ...formData,
+                                              fill_blank_items: items,
+                                            });
+                                          }}
+                                          placeholder={`Option ${optionIndex + 1}`}
+                                          className="flex-1"
+                                        />
+                                        {blank.options.length > 2 && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const items = [
+                                                ...(formData.fill_blank_items || []),
+                                              ];
+                                              items[itemIndex].blanks[blankIndex].options =
+                                                items[itemIndex].blanks[blankIndex].options.filter(
+                                                  (_, i) => i !== optionIndex
+                                                );
+                                              setFormData({
+                                                ...formData,
+                                                fill_blank_items: items,
+                                              });
+                                            }}
+                                            className="text-red-500"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const items = [...(formData.fill_blank_items || [])];
+                                        items[itemIndex].blanks[blankIndex].options.push("");
+                                        setFormData({ ...formData, fill_blank_items: items });
+                                      }}
+                                      className="mt-2"
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Add Option
+                                    </Button>
+                                  </div>
+
+                                  <div>
+                                    <Label>Hint (Optional)</Label>
+                                    <Input
+                                      value={blank.hint || ""}
+                                      onChange={(e) => {
+                                        const items = [...(formData.fill_blank_items || [])];
+                                        items[itemIndex].blanks[blankIndex].hint = e.target.value;
+                                        setFormData({ ...formData, fill_blank_items: items });
+                                      }}
+                                      placeholder="e.g., Past tense of 'go'"
+                                    />
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

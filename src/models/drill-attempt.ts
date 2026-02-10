@@ -142,6 +142,21 @@ export interface IDrillAttempt extends Document {
 		timeSpent: number;
 	};
 
+	fillBlankResults?: {
+		items: Array<{
+			sentence: string;
+			blanks: Array<{
+				position: number;
+				selectedAnswer: string;
+				correctAnswer: string;
+				isCorrect: boolean;
+			}>;
+		}>;
+		totalBlanks?: number;
+		correctBlanks?: number;
+		score?: number;
+	};
+
 	// Metadata
 	deviceInfo?: string;
 	platform?: 'web' | 'ios' | 'android';
@@ -360,6 +375,24 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 		listeningResults: {
 			completed: Boolean,
 			timeSpent: Number,
+		},
+		fillBlankResults: {
+			items: [
+				{
+					sentence: String,
+					blanks: [
+						{
+							position: Number,
+							selectedAnswer: String,
+							correctAnswer: String,
+							isCorrect: Boolean,
+						},
+					],
+				},
+			],
+			totalBlanks: Number,
+			correctBlanks: Number,
+			score: Number,
 		},
 		deviceInfo: {
 			type: String,

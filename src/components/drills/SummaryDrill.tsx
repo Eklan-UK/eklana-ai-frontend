@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -30,6 +31,7 @@ export default function SummaryDrill({
   drill,
   assignmentId,
 }: SummaryDrillProps) {
+  const router = useRouter();
   const [summary, setSummary] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -187,6 +189,9 @@ export default function SummaryDrill({
         title: drill.title,
         type: drill.type,
         });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -201,6 +206,7 @@ export default function SummaryDrill({
       <DrillCompletionScreen
         title="Summary Submitted"
         message="Your summary has been submitted for review. You'll receive feedback from your tutor soon."
+        refreshOnMount={true}
         drillType="summary"
       />
     );

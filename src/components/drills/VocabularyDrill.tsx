@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -148,6 +149,7 @@ export default function VocabularyDrill({
   drill,
   assignmentId,
 }: VocabularyDrillProps) {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -437,6 +439,9 @@ export default function VocabularyDrill({
         type: drill.type,
         score,
         });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -448,7 +453,7 @@ export default function VocabularyDrill({
 
   // Completed state
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="vocabulary" />;
+    return <DrillCompletionScreen drillType="vocabulary" refreshOnMount={true} />;
   }
 
   // No content state

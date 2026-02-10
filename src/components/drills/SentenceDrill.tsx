@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -67,6 +68,7 @@ export default function SentenceDrill({
   drill,
   assignmentId,
 }: SentenceDrillProps) {
+  const router = useRouter();
   const wordItems = useMemo(() => getWordItems(drill), [drill]);
   const totalWords = wordItems.length;
 
@@ -195,6 +197,9 @@ export default function SentenceDrill({
         title: drill.title,
         type: drill.type,
       });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error"),
@@ -210,6 +215,7 @@ export default function SentenceDrill({
         title="Drill Submitted"
         message="Your submission has been sent for review. You'll be notified when your sentences have been reviewed."
         drillType="sentence"
+        refreshOnMount={true}
       />
     );
   }

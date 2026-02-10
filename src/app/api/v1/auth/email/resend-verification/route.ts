@@ -70,10 +70,13 @@ async function handler(
 			} else {
 				const verificationSchema = new mongoose.Schema({
 					userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-					token: { type: String, required: true, unique: true },
+					token: { type: String, required: false, sparse: true },
 					expiresAt: { type: Date, required: true },
 					createdAt: { type: Date, default: Date.now },
 				}, { collection: 'verifications', timestamps: true });
+				
+				// Create sparse unique index on token (allows multiple nulls)
+				verificationSchema.index({ token: 1 }, { unique: true, sparse: true });
 				
 				Verification = mongoose.model('Verification', verificationSchema);
 			}

@@ -35,6 +35,18 @@ export const getAuth = async () => {
     if (baseURL && !trustedOrigins.includes(baseURL)) {
       trustedOrigins.push(baseURL);
     }
+    
+    // Add mobile app redirect URIs to trusted origins
+    // These are needed for OAuth callbacks from mobile apps
+    const mobileOrigins = [
+      'elkan://', // Custom scheme for production
+      'exp://', // Expo development scheme
+    ];
+    mobileOrigins.forEach(origin => {
+      if (!trustedOrigins.includes(origin)) {
+        trustedOrigins.push(origin);
+      }
+    });
 
     logger.info("Initializing Better Auth", { baseURL, trustedOrigins });
 

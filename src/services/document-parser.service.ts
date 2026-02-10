@@ -63,6 +63,7 @@ export interface ParsedContent {
     | "summary"
     | "listening"
     | "sentence"
+    | "fill_blank"
     | "unknown";
   confidence: number;
   extractedData: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -41,6 +42,7 @@ export default function GrammarDrill({
   drill,
   assignmentId,
 }: GrammarDrillProps) {
+  const router = useRouter();
   const patternItems: PatternItem[] = useMemo(() => {
     return (drill.grammar_items || []).map((item: any) => ({
       pattern: item.pattern || "",
@@ -166,6 +168,9 @@ export default function GrammarDrill({
         title: drill.title,
         type: drill.type,
       });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -181,6 +186,7 @@ export default function GrammarDrill({
         title="Drill Submitted"
         message="Your grammar sentences have been submitted for review. You'll be notified when your work has been reviewed."
         drillType="grammar"
+        refreshOnMount={true}
       />
     );
   }

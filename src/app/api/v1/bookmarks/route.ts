@@ -10,7 +10,7 @@ const createBookmarkSchema = z.object({
   drillId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: 'Invalid drill ID',
   }),
-  type: z.enum(['word', 'sentence']),
+  type: z.enum(['word', 'sentence', 'drill']),
   content: z.string().min(1),
   translation: z.string().optional(),
   context: z.string().optional(),

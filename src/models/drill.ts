@@ -181,6 +181,63 @@ const SentenceWritingItemSchema = new Schema(
   { _id: false }
 );
 
+const FillBlankItemSchema = new Schema(
+  {
+    sentence: {
+      type: String,
+      required: true,
+      description: "Sentence with blanks marked (e.g., 'I ___ to the store ___ buy milk')",
+    },
+    blanks: {
+      type: [
+        {
+          position: {
+            type: Number,
+            required: true,
+            description: "Index of the blank in the sentence (0-based)",
+          },
+          correctAnswer: {
+            type: String,
+            required: true,
+            description: "The correct word to fill this blank",
+          },
+          options: {
+            type: [String],
+            required: true,
+            validate: {
+              validator: function(v: string[]) {
+                // Must have at least 2 options (including correct answer)
+                return v.length >= 2 && v.includes(this.correctAnswer);
+              },
+              message: "Options must include the correct answer and have at least 2 choices",
+            },
+            description: "Array of options for this blank (must include correctAnswer)",
+          },
+          hint: {
+            type: String,
+            default: "",
+            description: "Optional hint for this blank",
+          },
+        },
+      ],
+      required: true,
+      default: [],
+      description: "Array of blanks in this sentence",
+    },
+    translation: {
+      type: String,
+      default: "",
+      description: "Optional translation of the sentence",
+    },
+    audioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sentence",
+    },
+  },
+  { _id: false }
+);
+
 // Main Drill Schema
 export interface IDrill extends Document {
   _id: Types.ObjectId;
@@ -194,7 +251,8 @@ export interface IDrill extends Document {
     | "grammar"
     | "sentence_writing"
     | "sentence"
-    | "listening";
+    | "listening"
+    | "fill_blank";
   difficulty: "beginner" | "intermediate" | "advanced";
   date: Date;
   duration_days: number;
@@ -275,6 +333,19 @@ export interface IDrill extends Document {
   article_content?: string;
   article_audio_url?: string; // Pre-generated TTS audio URL for article
 
+  // Fill Blank Drill Fields
+  fill_blank_items: Array<{
+    sentence: string;  // "I ___ to the store ___ buy milk"
+    blanks: Array<{
+      position: number;  // 0, 1 (index of blank in sentence)
+      correctAnswer: string;  // "went", "to"
+      options: string[];  // ["went", "go", "going", "gone"] - must include correctAnswer
+      hint?: string;
+    }>;
+    translation?: string;
+    audioUrl?: string;
+  }>;
+
   // Metadata
   created_by: string; // Email of the teacher/admin (kept for backward compatibility)
   createdById?: Types.ObjectId; // ObjectId reference to creator (preferred)
@@ -313,9 +384,10 @@ const drillSchema = new Schema<IDrill>(
           "definition",
           "summary",
           "grammar",
-          "sentence_writing",
-          "sentence",
-          "listening",
+        "sentence_writing",
+        "sentence",
+        "listening",
+        "fill_blank",
         ],
         message: "{VALUE} is not a valid drill type",
       },
@@ -482,6 +554,13 @@ const drillSchema = new Schema<IDrill>(
       type: String,
       default: "",
       description: "Pre-generated TTS audio URL for the article content",
+    },
+
+    // Fill Blank Drill Fields
+    fill_blank_items: {
+      type: [FillBlankItemSchema],
+      default: [],
+      description: "Array of sentences with blanks for fill-in-the-blank drills",
     },
 
     // Metadata

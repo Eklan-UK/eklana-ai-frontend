@@ -14,6 +14,8 @@ interface DrillLayoutProps {
   hideNavigation?: boolean;
   /** Show a minimal header without back button */
   minimalHeader?: boolean;
+  /** Show back button in header */
+  showBack?: boolean;
 }
 
 const maxWidthClasses = {
@@ -40,11 +42,12 @@ export function DrillLayout({
   maxWidth = "md",
   hideNavigation = true, // Default to hiding nav during drills
   minimalHeader = false,
+  showBack = true, // Default to showing back button
 }: DrillLayoutProps) {
   return (
     <div className={`min-h-screen ${backgroundGradient} ${hideNavigation ? 'pb-6' : 'pb-20 md:pb-0'}`}>
       <div className="h-6"></div>
-      <Header title={title} />
+      <Header title={title} showBack={showBack} />
       <div className={`${maxWidthClasses[maxWidth]} mx-auto px-4 py-6 ${className}`}>
         {children}
       </div>

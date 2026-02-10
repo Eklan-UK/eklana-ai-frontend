@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
@@ -19,6 +20,7 @@ interface DefinitionDrillProps {
 }
 
 export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrillProps) {
+  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
@@ -114,6 +116,9 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         type: drill.type,
         score,
         });
+
+      // Refresh the page to update drill status
+      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -121,19 +126,34 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     }
   };
 
+  // Refresh on mount if completed
+  useEffect(() => {
+    if (isCompleted) {
+      router.refresh();
+    }
+  }, [isCompleted, router]);
+
   if (isCompleted) {
     return (
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
-        <Header title="Drill Completed" />
+        <Header title="Drill Completed" showBack={true} />
         <div className="max-w-md mx-auto px-4 py-6">
           <Card className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
             <p className="text-gray-600 mb-6">You've completed the definition drill.</p>
-            <Link href="/account">
-              <Button variant="primary" size="lg" fullWidth>Continue Learning</Button>
-            </Link>
+            <Button 
+              variant="primary" 
+              size="lg" 
+              fullWidth
+              onClick={() => {
+                router.refresh();
+                router.push("/account");
+              }}
+            >
+              Continue Learning
+            </Button>
           </Card>
         </div>
         <BottomNav />
@@ -145,7 +165,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-20 md:pb-0">
         <div className="h-6"></div>
-        <Header title="Review Your Definitions" />
+        <Header title="Review Your Definitions" showBack={true} />
         
         <div className="max-w-2xl mx-auto px-4 py-6">
           <Card className="mb-4 bg-white/90 backdrop-blur-sm">
@@ -229,7 +249,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-20 md:pb-0">
       <div className="h-6"></div>
-      <Header title={drill.title} />
+      <Header title={drill.title} showBack={true} />
       
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Progress */}

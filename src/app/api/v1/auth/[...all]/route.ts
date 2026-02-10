@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10; // Increase timeout to 10 seconds (Vercel Pro+)
 
+// Log that the route file is loaded
+logger.info("Better Auth route handler loaded");
+
 // Cache handlers globally across serverless invocations
 let cachedHandlers: any = null;
 
@@ -21,12 +24,13 @@ async function getHandlers() {
     const auth = await getAuth();
 
     if (!auth) {
+      logger.error("Better Auth instance is null");
       throw new Error("Better Auth instance is null");
     }
 
     // Create and cache handlers
     cachedHandlers = toNextJsHandler(auth);
-    logger.info("Better Auth handlers initialized");
+    logger.info("Better Auth handlers initialized successfully");
 
     return cachedHandlers;
   } catch (error: any) {
@@ -35,17 +39,42 @@ async function getHandlers() {
       stack: error.stack,
     });
     throw error;
-  }
+}
 }
 
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    logger.info("Auth GET request received", { 
+      pathname: url.pathname, 
+      search: url.search,
+      fullUrl: req.url
+    });
+    
     const handlers = await getHandlers();
-    return handlers.GET(req);
+    if (!handlers || !handlers.GET) {
+      logger.error("Handlers not available", { handlers: !!handlers });
+      return Response.json(
+        { error: "Authentication handlers not initialized" },
+        { status: 503 }
+      );
+    }
+    
+    logger.info("Calling Better Auth GET handler");
+    const response = await handlers.GET(req);
+    logger.info("Better Auth GET handler responded", { 
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    return response;
   } catch (error: any) {
-    logger.error("GET request failed", { error: error.message });
+    logger.error("GET request failed", { 
+      error: error.message, 
+      stack: error.stack,
+      url: req.url
+    });
     return Response.json(
-      { error: "Authentication service temporarily unavailable" },
+      { error: "Authentication service temporarily unavailable", details: error.message },
       { status: 503 }
     );
   }

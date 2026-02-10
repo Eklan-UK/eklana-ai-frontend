@@ -121,6 +121,32 @@ const DrillBuilder: React.FC = () => {
   const [listeningTitle, setListeningTitle] = useState("");
   const [listeningContent, setListeningContent] = useState("");
 
+  // Fill Blank
+  interface FillBlankItem {
+    sentence: string;
+    blanks: Array<{
+      position: number;
+      correctAnswer: string;
+      options: string[];
+      hint?: string;
+    }>;
+    translation?: string;
+  }
+  const [fillBlankItems, setFillBlankItems] = useState<FillBlankItem[]>([
+    {
+      sentence: "",
+      blanks: [
+        {
+          position: 0,
+          correctAnswer: "",
+          options: ["", ""],
+          hint: "",
+        },
+      ],
+      translation: "",
+    },
+  ]);
+
   // Common fields
   const [drillTitle, setDrillTitle] = useState("");
   const [drillType, setDrillType] = useState("vocabulary");
@@ -138,7 +164,7 @@ const DrillBuilder: React.FC = () => {
   );
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  
+
   // Pre-generate TTS audio option
   const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -206,11 +232,11 @@ const DrillBuilder: React.FC = () => {
         setVocabularyItems(
           drill.target_sentences.length > 0
             ? drill.target_sentences.map((ts: any) => ({
-                word: ts.word || "",
-                wordTranslation: ts.wordTranslation || "",
-                text: ts.text || "",
-                translation: ts.translation || "",
-              }))
+              word: ts.word || "",
+              wordTranslation: ts.wordTranslation || "",
+              text: ts.text || "",
+              translation: ts.translation || "",
+            }))
             : [{ word: "", wordTranslation: "", text: "", translation: "" }]
         );
       } else if (drill.type === "roleplay") {
@@ -219,53 +245,53 @@ const DrillBuilder: React.FC = () => {
           drill.ai_character_names && drill.ai_character_names.length > 0
             ? drill.ai_character_names
             : drill.ai_character_name
-            ? [drill.ai_character_name]
-            : [""]
+              ? [drill.ai_character_name]
+              : [""]
         );
         setRoleplayScenes(
           drill.roleplay_scenes && drill.roleplay_scenes.length > 0
             ? drill.roleplay_scenes.map((scene: any) => ({
-                scene_name: scene.scene_name || "",
-                context: scene.context || "",
-                dialogue: scene.dialogue || [],
-              }))
+              scene_name: scene.scene_name || "",
+              context: scene.context || "",
+              dialogue: scene.dialogue || [],
+            }))
             : [
-                {
-                  scene_name: "Scene 1",
-                  context: "",
-                  dialogue: [
-                    { speaker: "ai_0", text: "", translation: "" },
-                    { speaker: "student", text: "", translation: "" },
-                  ],
-                },
-              ]
+              {
+                scene_name: "Scene 1",
+                context: "",
+                dialogue: [
+                  { speaker: "ai_0", text: "", translation: "" },
+                  { speaker: "student", text: "", translation: "" },
+                ],
+              },
+            ]
         );
       } else if (drill.type === "matching" && drill.matching_pairs) {
         setMatchingPairs(
           drill.matching_pairs.length > 0
             ? drill.matching_pairs.map((mp: any) => ({
-                left: mp.left || "",
-                right: mp.right || "",
-                leftTranslation: mp.leftTranslation || "",
-                rightTranslation: mp.rightTranslation || "",
-              }))
+              left: mp.left || "",
+              right: mp.right || "",
+              leftTranslation: mp.leftTranslation || "",
+              rightTranslation: mp.rightTranslation || "",
+            }))
             : [
-                {
-                  left: "",
-                  right: "",
-                  leftTranslation: "",
-                  rightTranslation: "",
-                },
-              ]
+              {
+                left: "",
+                right: "",
+                leftTranslation: "",
+                rightTranslation: "",
+              },
+            ]
         );
       } else if (drill.type === "grammar" && drill.grammar_items) {
         setGrammarItems(
           drill.grammar_items.length > 0
             ? drill.grammar_items.map((gi: any) => ({
-                pattern: gi.pattern || "",
-                hint: gi.hint || "",
-                example: gi.example || "",
-              }))
+              pattern: gi.pattern || "",
+              hint: gi.hint || "",
+              example: gi.example || "",
+            }))
             : [{ pattern: "", hint: "", example: "" }]
         );
       } else if (
@@ -275,9 +301,9 @@ const DrillBuilder: React.FC = () => {
         setSentenceWritingItems(
           drill.sentence_writing_items.length > 0
             ? drill.sentence_writing_items.map((swi: any) => ({
-                word: swi.word || "",
-                hint: swi.hint || "",
-              }))
+              word: swi.word || "",
+              hint: swi.hint || "",
+            }))
             : [{ word: "", hint: "" }]
         );
       } else if (drill.type === "summary") {
@@ -286,6 +312,36 @@ const DrillBuilder: React.FC = () => {
       } else if (drill.type === "listening") {
         setListeningTitle(drill.listening_drill_title || "");
         setListeningContent(drill.listening_drill_content || "");
+      } else if (drill.type === "fill_blank" && drill.fill_blank_items) {
+        setFillBlankItems(
+          drill.fill_blank_items.length > 0
+            ? drill.fill_blank_items.map((item: any) => ({
+              sentence: item.sentence || "",
+              blanks: item.blanks || [
+                {
+                  position: 0,
+                  correctAnswer: "",
+                  options: ["", ""],
+                  hint: "",
+                },
+              ],
+              translation: item.translation || "",
+            }))
+            : [
+              {
+                sentence: "",
+                blanks: [
+                  {
+                    position: 0,
+                    correctAnswer: "",
+                    options: ["", ""],
+                    hint: "",
+                  },
+                ],
+                translation: "",
+              },
+            ]
+        );
       }
     }
   }, [isEditMode, drillData, users]);
@@ -520,13 +576,13 @@ const DrillBuilder: React.FC = () => {
           items.length > 0
             ? items
             : [
-                {
-                  left: "",
-                  right: "",
-                  leftTranslation: "",
-                  rightTranslation: "",
-                },
-              ]
+              {
+                left: "",
+                right: "",
+                leftTranslation: "",
+                rightTranslation: "",
+              },
+            ]
         );
         break;
       case "roleplay":
@@ -534,14 +590,14 @@ const DrillBuilder: React.FC = () => {
           items.length > 0
             ? items
             : [
-                {
-                  scene_name: "Scene 1",
-                  dialogue: [
-                    { speaker: "ai_0", text: "", translation: "" },
-                    { speaker: "student", text: "", translation: "" },
-                  ],
-                },
-              ]
+              {
+                scene_name: "Scene 1",
+                dialogue: [
+                  { speaker: "ai_0", text: "", translation: "" },
+                  { speaker: "student", text: "", translation: "" },
+                ],
+              },
+            ]
         );
         break;
       case "grammar":
@@ -569,6 +625,21 @@ const DrillBuilder: React.FC = () => {
         if (title) {
           setListeningTitle(title);
         }
+        break;
+      case "fill_blank":
+        setFillBlankItems(
+          items.length > 0
+            ? items
+            : [
+              {
+                sentence: "",
+                blanks: [
+                  { position: 0, correctAnswer: "", options: ["", ""], hint: "" },
+                ],
+                translation: "",
+              },
+            ]
+        );
         break;
     }
 
@@ -656,6 +727,33 @@ const DrillBuilder: React.FC = () => {
         toast.error("Please provide both listening title and content");
         return;
       }
+    } else if (drillType === "fill_blank") {
+      if (fillBlankItems.length === 0 || !fillBlankItems.some(item => item.sentence.trim())) {
+        toast.error("Please add at least one sentence with blanks");
+        return;
+      }
+      // Validate each item has at least one blank with correct answer and options
+      for (const item of fillBlankItems) {
+        if (!item.sentence.trim()) continue;
+        if (item.blanks.length === 0) {
+          toast.error(`Sentence "${item.sentence.substring(0, 30)}..." must have at least one blank`);
+          return;
+        }
+        for (const blank of item.blanks) {
+          if (!blank.correctAnswer.trim()) {
+            toast.error("All blanks must have a correct answer");
+            return;
+          }
+          if (blank.options.length < 2 || !blank.options.some(opt => opt.trim())) {
+            toast.error("Each blank must have at least 2 options");
+            return;
+          }
+          if (!blank.options.includes(blank.correctAnswer)) {
+            toast.error("Options must include the correct answer");
+            return;
+          }
+        }
+      }
     }
 
     if (selectedUsers.size === 0) {
@@ -739,6 +837,21 @@ const DrillBuilder: React.FC = () => {
       } else if (drillType === "listening") {
         drillData.listening_drill_title = listeningTitle.trim();
         drillData.listening_drill_content = listeningContent.trim();
+      } else if (drillType === "fill_blank") {
+        drillData.fill_blank_items = fillBlankItems
+          .filter((item) => item.sentence.trim())
+          .map((item) => ({
+            sentence: item.sentence.trim(),
+            blanks: item.blanks
+              .filter((blank) => blank.correctAnswer.trim() && blank.options.length >= 2)
+              .map((blank, idx) => ({
+                position: idx,
+                correctAnswer: blank.correctAnswer.trim(),
+                options: blank.options.filter((opt) => opt.trim()),
+                hint: blank.hint?.trim() || undefined,
+              })),
+            translation: item.translation?.trim() || undefined,
+          }));
       }
 
       // Pre-generate TTS audio if enabled
@@ -764,7 +877,7 @@ const DrillBuilder: React.FC = () => {
 
           if (textsToGenerate.length > 0) {
             setAudioProgress(`Generating ${textsToGenerate.length} audio files...`);
-            
+
             const audioResponse = await generateDrillAudio(
               textsToGenerate,
               drillType,
@@ -774,7 +887,7 @@ const DrillBuilder: React.FC = () => {
             if (audioResponse.success && audioResponse.data) {
               // Apply audio URLs to drill data
               drillData = applyAudioUrls(drillData, audioResponse.data.results);
-              
+
               const { success, failed } = audioResponse.data.summary;
               if (failed > 0) {
                 toast.warning(`Generated ${success}/${success + failed} audio files. Some failed.`);
@@ -1041,9 +1154,8 @@ const DrillBuilder: React.FC = () => {
                         updated[idx] = e.target.value;
                         setAiCharacterNames(updated);
                       }}
-                      placeholder={`e.g. ${
-                        idx === 0 ? "Waiter" : idx === 1 ? "Manager" : "Host"
-                      }`}
+                      placeholder={`e.g. ${idx === 0 ? "Waiter" : idx === 1 ? "Manager" : "Host"
+                        }`}
                       className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
                     {aiCharacterNames.length > 1 && (
@@ -1128,11 +1240,10 @@ const DrillBuilder: React.FC = () => {
                           {scene.dialogue.map((turn, turnIdx) => (
                             <div
                               key={turnIdx}
-                              className={`p-4 rounded-xl border ${
-                                turn.speaker === "student"
+                              className={`p-4 rounded-xl border ${turn.speaker === "student"
                                   ? "bg-blue-50/30 border-blue-100"
                                   : "bg-purple-50/30 border-purple-100"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <select
@@ -1538,6 +1649,261 @@ const DrillBuilder: React.FC = () => {
               </div>
             </div>
           )}
+
+          {drillType === "fill_blank" && (
+            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-gray-900">
+                  Fill in the Blank Sentences<span className="text-red-500">*</span>
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFillBlankItems([
+                      ...fillBlankItems,
+                      {
+                        sentence: "",
+                        blanks: [
+                          {
+                            position: 0,
+                            correctAnswer: "",
+                            options: ["", ""],
+                            hint: "",
+                          },
+                        ],
+                        translation: "",
+                      },
+                    ]);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Sentence
+                </button>
+              </div>
+              <div className="space-y-6">
+                {fillBlankItems.map((item, itemIndex) => (
+                  <div key={itemIndex} className="border border-gray-200 rounded-xl p-6 bg-gray-50">
+                    <div className="flex items-start justify-between mb-4">
+                      <h3 className="font-semibold text-gray-900">
+                        Sentence {itemIndex + 1}
+                      </h3>
+                      {fillBlankItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFillBlankItems(
+                              fillBlankItems.filter((_, i) => i !== itemIndex)
+                            );
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Sentence with Blanks<span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={item.sentence}
+                          onChange={(e) => {
+                            const updated = [...fillBlankItems];
+                            updated[itemIndex].sentence = e.target.value;
+                            setFillBlankItems(updated);
+                          }}
+                          placeholder='e.g., "I ___ to the store ___ buy milk." (Use ___ for blanks)'
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                          Use "___" (three underscores) to mark where blanks should appear
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Translation (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={item.translation || ""}
+                          onChange={(e) => {
+                            const updated = [...fillBlankItems];
+                            updated[itemIndex].translation = e.target.value;
+                            setFillBlankItems(updated);
+                          }}
+                          placeholder="e.g., I went to the store to buy milk."
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                        />
+                      </div>
+
+                      {/* Blanks Section */}
+                      <div className="border-t pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-xs font-bold text-gray-600">
+                            Blanks in this Sentence<span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...fillBlankItems];
+                              updated[itemIndex].blanks.push({
+                                position: updated[itemIndex].blanks.length,
+                                correctAnswer: "",
+                                options: ["", ""],
+                                hint: "",
+                              });
+                              setFillBlankItems(updated);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Add Blank
+                          </button>
+                        </div>
+
+                        {item.blanks.map((blank, blankIndex) => (
+                          <div
+                            key={blankIndex}
+                            className="p-4 mb-4 bg-white border border-gray-200 rounded-xl"
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <h4 className="font-medium text-gray-700">
+                                Blank {blankIndex + 1}
+                              </h4>
+                              {item.blanks.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...fillBlankItems];
+                                    updated[itemIndex].blanks = updated[itemIndex].blanks.filter(
+                                      (_, i) => i !== blankIndex
+                                    );
+                                    updated[itemIndex].blanks = updated[itemIndex].blanks.map(
+                                      (b, i) => ({ ...b, position: i })
+                                    );
+                                    setFillBlankItems(updated);
+                                  }}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                                  Correct Answer<span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={blank.correctAnswer}
+                                  onChange={(e) => {
+                                    const updated = [...fillBlankItems];
+                                    updated[itemIndex].blanks[blankIndex].correctAnswer =
+                                      e.target.value;
+                                    // Ensure correct answer is in options
+                                    const options =
+                                      updated[itemIndex].blanks[blankIndex].options;
+                                    if (
+                                      !options.includes(e.target.value) &&
+                                      e.target.value
+                                    ) {
+                                      updated[itemIndex].blanks[blankIndex].options = [
+                                        e.target.value,
+                                        ...options.filter((o) => o),
+                                      ];
+                                    }
+                                    setFillBlankItems(updated);
+                                  }}
+                                  placeholder="e.g., went"
+                                  className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                                  Options<span className="text-red-500">*</span> (must include
+                                  correct answer, min 2)
+                                </label>
+                                {blank.options.map((option, optionIndex) => (
+                                  <div key={optionIndex} className="flex gap-2 mb-2">
+                                    <input
+                                      type="text"
+                                      value={option}
+                                      onChange={(e) => {
+                                        const updated = [...fillBlankItems];
+                                        updated[itemIndex].blanks[blankIndex].options[
+                                          optionIndex
+                                        ] = e.target.value;
+                                        setFillBlankItems(updated);
+                                      }}
+                                      placeholder={`Option ${optionIndex + 1}`}
+                                      className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                                    />
+                                    {blank.options.length > 2 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = [...fillBlankItems];
+                                          updated[itemIndex].blanks[blankIndex].options =
+                                            updated[itemIndex].blanks[blankIndex].options.filter(
+                                              (_, i) => i !== optionIndex
+                                            );
+                                          setFillBlankItems(updated);
+                                        }}
+                                        className="text-red-500 hover:text-red-700 px-2"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...fillBlankItems];
+                                    updated[itemIndex].blanks[blankIndex].options.push("");
+                                    setFillBlankItems(updated);
+                                  }}
+                                  className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Add Option
+                                </button>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                                  Hint (Optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  value={blank.hint || ""}
+                                  onChange={(e) => {
+                                    const updated = [...fillBlankItems];
+                                    updated[itemIndex].blanks[blankIndex].hint = e.target.value;
+                                    setFillBlankItems(updated);
+                                  }}
+                                  placeholder="e.g., Past tense of 'go'"
+                                  className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-8">
@@ -1609,6 +1975,7 @@ const DrillBuilder: React.FC = () => {
                       <option value="sentence_writing">Sentence Writing</option>
                       <option value="summary">Summary</option>
                       <option value="listening">Listening</option>
+                      <option value="fill_blank">Fill in the Blank</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
@@ -1742,9 +2109,8 @@ const DrillBuilder: React.FC = () => {
                     return (
                       <div
                         key={user._id}
-                        className={`flex items-center gap-3 ${
-                          !isSelected ? "opacity-50" : ""
-                        }`}
+                        className={`flex items-center gap-3 ${!isSelected ? "opacity-50" : ""
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -1780,12 +2146,10 @@ const DrillBuilder: React.FC = () => {
               {isEditMode ? "Updating..." : "Creating..."}
             </>
           ) : isEditMode ? (
-            `Update Drill for ${selectedUsers.size} user${
-              selectedUsers.size !== 1 ? "s" : ""
+            `Update Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""
             }`
           ) : (
-            `Create Drill for ${selectedUsers.size} user${
-              selectedUsers.size !== 1 ? "s" : ""
+            `Create Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""
             }`
           )}
         </button>
