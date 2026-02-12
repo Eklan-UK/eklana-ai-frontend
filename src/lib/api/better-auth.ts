@@ -48,7 +48,15 @@ export const getAuth = async () => {
       }
     });
 
-    logger.info("Initializing Better Auth", { baseURL, trustedOrigins });
+    // Calculate the OAuth redirect URI for logging/debugging
+    const oauthRedirectURI = `${baseURL}/api/v1/auth/callback/google`;
+    
+    logger.info("Initializing Better Auth", { 
+      baseURL, 
+      trustedOrigins,
+      oauthRedirectURI: "Google OAuth redirect URI: " + oauthRedirectURI,
+      note: "Make sure this exact URI is registered in Google Cloud Console"
+    });
 
     // Create and cache Better Auth instance
     authInstance = betterAuth({
@@ -131,6 +139,7 @@ export const getAuth = async () => {
           phone: { type: "string", required: false },
           dateOfBirth: { type: "date", required: false },
           lastLoginAt: { type: "date", required: false },
+          hasProfile: { type: "boolean", required: false, default: false },
         },
       },
     });

@@ -1,5 +1,7 @@
 // models/daily-focus.ts
 import { Schema, model, models, Document, Types } from "mongoose";
+// Import User model to ensure it's registered before this schema references it
+import '@/models/user';
 
 // Question item schemas for different practice formats
 const FillInBlankQuestionSchema = new Schema(

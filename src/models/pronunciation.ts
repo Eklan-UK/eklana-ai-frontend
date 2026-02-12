@@ -1,5 +1,7 @@
 // models/pronunciation.model.ts
 import { Schema, model, models, Document, Types } from 'mongoose';
+// Import User model to ensure it's registered before this schema references it
+import '@/models/user';
 
 export interface IPronunciation extends Document {
 	_id: Types.ObjectId;

@@ -3,8 +3,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole, withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
-import PronunciationWord from '@/models/pronunciation-word';
+// Import User FIRST to ensure it's registered before PronunciationWord references it
+import User from '@/models/user';
 import PronunciationProblem from '@/models/pronunciation-problem';
+import PronunciationWord from '@/models/pronunciation-word';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { uploadToCloudinary } from '@/services/cloudinary.service';

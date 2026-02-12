@@ -5,6 +5,7 @@ import { withRole, withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import PronunciationProblem from '@/models/pronunciation-problem';
 import PronunciationWord from '@/models/pronunciation-word';
+import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 

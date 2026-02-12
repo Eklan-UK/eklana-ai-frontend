@@ -69,9 +69,21 @@ async function handler(
 				language: validated.language,
 				...body, // Include any other profile fields
 			});
+			
+			// Update user's hasProfile flag after profile creation
+			await User.findByIdAndUpdate(context.userId, { 
+				hasProfile: true 
+			});
+			
 			logger.info('User onboarded with profile', { userId: context.userId });
 		} else if (role === 'tutor') {
 			await createTutorProfile(context.userId, body);
+			
+			// Tutors also get hasProfile = true (they don't need Profile, but onboarding is complete)
+			await User.findByIdAndUpdate(context.userId, { 
+				hasProfile: true 
+			});
+			
 			logger.info('User onboarded as tutor', { userId: context.userId });
 		}
 

@@ -34,6 +34,7 @@ export interface IUser extends Document {
     youtube?: string;
   };
   lastLoginAt?: Date;
+  hasProfile?: boolean; // Indicates if user has completed onboarding/profile setup
   createdAt: Date;
   updatedAt: Date;
 }
@@ -153,6 +154,11 @@ const userSchema = new Schema<IUser>(
     lastLoginAt: {
       type: Date,
     },
+    hasProfile: {
+      type: Boolean,
+      default: false,
+      index: true, // Index for faster queries
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt
@@ -229,6 +235,17 @@ userSchema.pre("save", async function () {
   if (!this.username && this.email) {
     const emailPrefix = this.email.split("@")[0];
     this.username = `${emailPrefix}_${Date.now()}`;
+  }
+
+  // Ensure hasProfile is false for new users (especially OAuth users)
+  // Only set to false if this is a new document and hasProfile is not explicitly set
+  if (this.isNew && this.hasProfile === undefined) {
+    this.hasProfile = false;
+  }
+  
+  // For admin/tutor roles, set hasProfile to true
+  if (this.role === 'admin' || this.role === 'tutor') {
+    this.hasProfile = true;
   }
 
   // Hash password before saving (only if password is provided and modified)

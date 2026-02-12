@@ -4,11 +4,132 @@ import { Types } from 'mongoose';
 import { getAuth } from './better-auth';
 import { logger } from './logger';
 import { fromNodeHeaders } from 'better-auth/node';
+import { connectToDatabase } from './db';
 
 // Extend NextRequest to include user info
 export interface AuthenticatedRequest extends NextRequest {
 	userId?: Types.ObjectId;
 	userRole?: 'admin' | 'user' | 'tutor';
+}
+
+/**
+ * Validate Bearer token from mobile app
+ */
+async function validateBearerToken(token: string): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | null> {
+	try {
+		const mongoose = await connectToDatabase();
+		const db = mongoose.connection.db;
+
+		if (!db) {
+			logger.error('Database connection not available for Bearer token validation');
+			return null;
+		}
+
+		const sessionsCollection = db.collection('sessions');
+		const usersCollection = db.collection('users');
+
+		// Find session by token
+		// Better Auth might use 'id' or 'token' field, we use 'sessionToken'
+		// Try multiple field names to be compatible
+		const session = await sessionsCollection.findOne({
+			$or: [
+				{ sessionToken: token },
+				{ id: token },
+				{ token: token },
+			],
+			expiresAt: { $gt: new Date() }, // Session not expired
+		});
+
+		if (!session) {
+			logger.warn('Session not found or expired for Bearer token', {
+				tokenLength: token.length,
+				tokenPrefix: token.substring(0, 10),
+			});
+			
+			// Debug: Check if any sessions exist
+			const totalSessions = await sessionsCollection.countDocuments({});
+			logger.info('Total sessions in database:', totalSessions);
+			
+			return null;
+		}
+
+		logger.info('Session found for Bearer token', {
+			sessionId: session._id,
+			userId: session.userId,
+			expiresAt: session.expiresAt,
+		});
+
+		// Handle userId as string or ObjectId
+		let userId: Types.ObjectId;
+		if (typeof session.userId === 'string') {
+			try {
+				userId = new Types.ObjectId(session.userId);
+			} catch (error) {
+				logger.error('Failed to convert userId string to ObjectId', {
+					userId: session.userId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+				return null;
+			}
+		} else if (session.userId instanceof Types.ObjectId) {
+			userId = session.userId;
+		} else if (session.userId && typeof session.userId === 'object' && 'toString' in session.userId) {
+			// Handle MongoDB ObjectId wrapper
+			userId = new Types.ObjectId(session.userId.toString());
+		} else {
+			// Try to convert
+			try {
+				userId = new Types.ObjectId(String(session.userId));
+			} catch (error) {
+				logger.error('Failed to convert userId to ObjectId', {
+					userId: session.userId,
+					userIdType: typeof session.userId,
+					error: error instanceof Error ? error.message : String(error),
+				});
+				return null;
+			}
+		}
+
+		logger.info('Looking up user with userId', {
+			userId: userId.toString(),
+			userIdType: typeof session.userId,
+		});
+
+		// Get user from session - try both ObjectId and string
+		const user = await usersCollection.findOne({
+			$or: [
+				{ _id: userId },
+				{ _id: new Types.ObjectId(String(session.userId)) },
+			],
+		});
+
+		if (!user) {
+			logger.warn('User not found for session userId:', userId);
+			return null;
+		}
+
+		// Normalize role (handle legacy "learner" role)
+		let userRole = (user.role as 'admin' | 'user' | 'tutor' | 'learner') || 'user';
+		if (userRole === 'learner') {
+			userRole = 'user';
+		}
+
+		logger.info('Bearer token validated successfully', {
+			userId: userId.toString(),
+			userRole,
+		});
+
+		return {
+			userId: new Types.ObjectId(user._id),
+			userRole: userRole as 'admin' | 'user' | 'tutor',
+		};
+	} catch (error: any) {
+		logger.error('Error validating Bearer token', {
+			error: error.message,
+			stack: error.stack,
+		});
+		return null;
+	}
 }
 
 /**
@@ -19,6 +140,45 @@ export const requireAuth = async (
 	req: NextRequest
 ): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | NextResponse> => {
 	try {
+		// First, check for Bearer token (mobile app)
+		const authHeader = req.headers.get('authorization');
+		if (authHeader && authHeader.startsWith('Bearer ')) {
+			const token = authHeader.substring(7).trim(); // Remove 'Bearer ' prefix and trim whitespace
+			
+			if (token) {
+				logger.info('Bearer token found in request, validating...', {
+					tokenLength: token.length,
+					tokenPrefix: token.substring(0, 20),
+					url: req.url,
+				});
+				const bearerAuth = await validateBearerToken(token);
+				
+				if (bearerAuth) {
+					logger.info('Bearer token validated successfully', {
+						userId: bearerAuth.userId.toString(),
+						userRole: bearerAuth.userRole,
+					});
+					return bearerAuth;
+				} else {
+					logger.warn('Bearer token validation failed', {
+						tokenLength: token.length,
+					});
+					// For mobile requests with Bearer tokens, don't fall back to cookies
+					// Mobile apps don't use cookies, so return 401 immediately
+					return NextResponse.json(
+						{
+							code: 'AuthenticationError',
+							message: 'Not authenticated. Please log in.',
+						},
+						{ status: 401 }
+					);
+				}
+			} else {
+				logger.warn('Bearer token is empty');
+			}
+		}
+
+		// Fall back to Better Auth cookie-based session (web)
 		const auth = await getAuth();
 		if (!auth) {
 			return NextResponse.json(
@@ -28,87 +188,6 @@ export const requireAuth = async (
 				},
 				{ status: 503 }
 			);
-		}
-
-		// Check for Bearer token (mobile apps)
-		const authHeader = req.headers.get('authorization');
-		logger.info('Auth middleware check', {
-			hasAuthHeader: !!authHeader,
-			authHeaderPrefix: authHeader?.substring(0, 10),
-			url: req.url,
-		});
-		
-		if (authHeader?.startsWith('Bearer ')) {
-			const token = authHeader.substring(7);
-			logger.info('Processing Bearer token', {
-				tokenLength: token.length,
-				tokenPrefix: token.substring(0, 20) + '...',
-			});
-			
-			try {
-				// Query session directly from database using the token
-				const mongoose = await import('mongoose');
-				const db = mongoose.default.connection.db;
-				
-				if (db) {
-					const sessionsCollection = db.collection('sessions');
-					
-					logger.info('Querying sessions collection', {
-						token: token.substring(0, 20) + '...',
-					});
-					
-					const session = await sessionsCollection.findOne({
-						token: token,
-						expiresAt: { $gt: new Date() }, // Check if not expired
-					});
-
-					logger.info('Session query result', {
-						found: !!session,
-						hasUserId: !!session?.userId,
-						expiresAt: session?.expiresAt,
-					});
-
-					if (session && session.userId) {
-						// Get user data
-						const usersCollection = db.collection('users');
-						const user = await usersCollection.findOne({
-							_id: new Types.ObjectId(session.userId),
-						});
-
-						logger.info('User query result', {
-							found: !!user,
-							userId: user?._id?.toString(),
-							role: user?.role,
-						});
-
-						if (user) {
-							// Normalize role
-							let userRole = (user.role as 'admin' | 'user' | 'tutor' | 'learner') || 'user';
-							if (userRole === 'learner') {
-								userRole = 'user';
-							}
-
-							logger.info('Bearer token authentication successful', {
-								userId: user._id.toString(),
-								userRole,
-							});
-
-							return {
-								userId: new Types.ObjectId(user._id),
-								userRole: userRole as 'admin' | 'user' | 'tutor',
-							};
-						}
-					}
-				}
-				
-				logger.warn('Bearer token validation failed - session not found or expired');
-			} catch (tokenError) {
-				logger.error('Bearer token verification error', {
-					error: tokenError instanceof Error ? tokenError.message : 'Unknown error',
-					stack: tokenError instanceof Error ? tokenError.stack : undefined,
-				});
-				// Fall through to cookie-based auth
-			}
 		}
 
 		// Try cookie-based session (web apps)

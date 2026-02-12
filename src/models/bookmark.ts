@@ -1,4 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose';
+// Import User model to ensure it's registered before this schema references it
+import '@/models/user';
 
 export interface IBookmark extends Document {
   userId: Types.ObjectId;

@@ -4,6 +4,8 @@
  */
 
 import mongoose, { Schema, Document, Model } from "mongoose";
+// Import User model to ensure it's registered before this schema references it
+import '@/models/user';
 
 export interface IFCMToken extends Document {
   userId: mongoose.Types.ObjectId;

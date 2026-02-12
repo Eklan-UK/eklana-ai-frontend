@@ -15,6 +15,7 @@ export interface SessionUser {
   isEmailVerified?: boolean;
   avatar?: string;
   image?: string;
+  hasProfile?: boolean;
 }
 
 export interface ServerSession {
@@ -70,6 +71,7 @@ export async function getServerSession(): Promise<ServerSession> {
           session.user.isEmailVerified || session.user.emailVerified,
         avatar: session.user.avatar || session.user.image,
         image: session.user.image || session.user.avatar,
+        hasProfile: session.user.hasProfile || false,
       },
       session,
     };
@@ -119,6 +121,7 @@ export async function getSessionFromHeaders(
           session.user.isEmailVerified || session.user.emailVerified,
         avatar: session.user.avatar || session.user.image,
         image: session.user.image || session.user.avatar,
+        hasProfile: session.user.hasProfile || false,
       },
       session,
     };

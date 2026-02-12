@@ -1,6 +1,5 @@
 // Utility functions for authentication flow
-import { userAPI } from '@/lib/api';
-import { useAuthStore, isProfileCheckValid } from '@/store/auth-store';
+import { useAuthStore } from '@/store/auth-store';
 
 export interface AuthFlowStatus {
   isVerified: boolean;
@@ -36,39 +35,15 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
     hasOnboarding = true;
     shouldOnboard = false;
   } else if (userRole === 'user' || !userRole) {
-    // For users, check cached profile status first
-    const authState = useAuthStore.getState();
+    // For users, check hasProfile from user object (no API call needed!)
+    // hasProfile is now part of the user object returned from Better Auth
+    hasOnboarding = user?.hasProfile === true;
+    shouldOnboard = !hasOnboarding;
     
-    // Use cached profile check if valid
-    if (isProfileCheckValid() && authState.hasProfile !== null) {
-      hasOnboarding = authState.hasProfile;
-      shouldOnboard = !hasOnboarding;
-    } else {
-      // Need to check via API
-    try {
-      const response = await userAPI.checkProfile();
-      hasOnboarding = response.hasProfile || false;
-      shouldOnboard = !hasOnboarding;
-        
-        // Cache the result in auth store
-        authState.setHasProfile(hasOnboarding);
-    } catch (error: any) {
-        // On error, check if we have cached value
-        if (authState.hasProfile !== null) {
-          // Use cached value even if expired
-          hasOnboarding = authState.hasProfile;
-          shouldOnboard = !hasOnboarding;
-        } else if (error?.message?.includes('Forbidden') || error?.code === 'Forbidden') {
-          // If forbidden, assume needs onboarding
-        hasOnboarding = false;
-        shouldOnboard = true;
-      } else {
-        // On other errors, assume no onboarding
-        console.error('Error checking profile:', error);
-        hasOnboarding = false;
-        shouldOnboard = true;
-        }
-      }
+    // Update auth store cache for consistency
+    const authState = useAuthStore.getState();
+    if (authState.hasProfile !== hasOnboarding) {
+      authState.setHasProfile(hasOnboarding);
     }
   } else {
     // Unknown role - assume needs onboarding
@@ -97,16 +72,22 @@ export function getCachedProfileStatus(): boolean | null {
     return true;
   }
   
-  // Return cached value if valid
-  if (isProfileCheckValid()) {
-    return authState.hasProfile;
+  // Check hasProfile from user object first (most reliable)
+  if (authState.user?.hasProfile === true) {
+    return true;
   }
   
-  // Return cached value even if expired (better than null)
-  if (authState.hasProfile !== null) {
-    return authState.hasProfile;
+  // Fallback to cached value from store
+  if (authState.hasProfile === true) {
+    return true;
   }
   
+  // If explicitly false, return false
+  if (authState.hasProfile === false || authState.user?.hasProfile === false) {
+    return false;
+  }
+  
+  // No data available
   return null;
 }
 

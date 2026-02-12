@@ -60,12 +60,19 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: !!user,
         }),
 
-      setSession: (session) =>
+      setSession: (session) => {
+        const user = session?.user || null;
+        const hasProfile = user?.hasProfile === true || 
+                          (user?.role === 'admin' || user?.role === 'tutor');
+        
         set({
           session,
-          user: session?.user || null,
-          isAuthenticated: !!session?.user,
-        }),
+          user,
+          isAuthenticated: !!user,
+          hasProfile,
+          profileCheckedAt: user ? Date.now() : null,
+        });
+      },
 
       setLoading: (loading) => set({ isLoading: loading }),
 
@@ -92,12 +99,19 @@ export const useAuthStore = create<AuthState>()(
           });
 
           if (result.data?.user) {
+            const user = result.data.user as any;
+            // Determine hasProfile from user object or role
+            const hasProfile = user.hasProfile === true || 
+                              (user.role === 'admin' || user.role === 'tutor');
+            
             set({
-              user: result.data.user,
+              user,
               session: result.data,
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
+              hasProfile, // Set from user object
+              profileCheckedAt: Date.now(),
             });
             return;
           }
@@ -146,14 +160,18 @@ export const useAuthStore = create<AuthState>()(
               }
             }
 
+            const user = { ...result.data.user, role: data.role || 'user' } as any;
+            // New users don't have profile yet (unless admin/tutor)
+            const hasProfile = user.hasProfile === true || 
+                              (user.role === 'admin' || user.role === 'tutor');
+            
             set({
-              user: { ...result.data.user, role: data.role || 'user' },
+              user,
               session: result.data,
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
-              // New users need onboarding
-              hasProfile: false,
+              hasProfile, // Set from user object
               profileCheckedAt: Date.now(),
             });
             return;
@@ -219,12 +237,18 @@ export const useAuthStore = create<AuthState>()(
             .getSession()
             .then((sessionResult) => {
               if (sessionResult?.data?.user) {
+                const user = sessionResult.data.user as any;
+                const hasProfile = user.hasProfile === true || 
+                                  (user.role === 'admin' || user.role === 'tutor');
+                
                 // Update with fresh data silently
                 set({
-                  user: sessionResult.data.user,
+                  user,
                   session: sessionResult.data,
                   isAuthenticated: true,
                   lastSessionCheck: Date.now(),
+                  hasProfile,
+                  profileCheckedAt: Date.now(),
                 });
               }
               // On null response - DO NOT clear session
@@ -246,12 +270,18 @@ export const useAuthStore = create<AuthState>()(
           const sessionResult = await authClient.getSession();
 
           if (sessionResult?.data?.user) {
+            const user = sessionResult.data.user as any;
+            const hasProfile = user.hasProfile === true || 
+                              (user.role === 'admin' || user.role === 'tutor');
+            
             set({
-              user: sessionResult.data.user,
+              user,
               session: sessionResult.data,
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
+              hasProfile,
+              profileCheckedAt: Date.now(),
             });
           } else {
             // No session from server AND no cached session - user is not logged in
