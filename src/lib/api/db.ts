@@ -34,12 +34,35 @@ export const connectToDatabase = async (): Promise<typeof mongoose> => {
     throw new Error("MONGO_URI is not defined in the configuration.");
   }
 
-  // Return cached connection if available
+  // Return cached connection if available and healthy
   if (cached.conn) {
-    logger.info("Using cached MongoDB connection", {
-      readyState: cached.conn.connection.readyState,
-    });
-    return cached.conn;
+    const readyState = cached.conn.connection.readyState;
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    if (readyState === 1) {
+      logger.info("Using cached MongoDB connection", {
+        readyState,
+      });
+      return cached.conn;
+    } else if (readyState === 0) {
+      // Connection is disconnected, clear cache and reconnect
+      logger.warn("Cached MongoDB connection is disconnected, reconnecting...", {
+        readyState,
+      });
+      cached.conn = null;
+      cached.promise = null;
+    } else {
+      // Connection is in transition state, wait a bit and check again
+      logger.info("MongoDB connection in transition state, waiting...", {
+        readyState,
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (cached.conn && cached.conn.connection.readyState === 1) {
+        return cached.conn;
+      }
+      // Still not ready, clear and reconnect
+      cached.conn = null;
+      cached.promise = null;
+    }
   }
 
   // If already connecting, wait for that promise
@@ -80,25 +103,48 @@ export const connectToDatabase = async (): Promise<typeof mongoose> => {
     },
   };
 
-  // Create connection promise and cache it
-  cached.promise = mongoose
-    .connect(config.MONGO_URI, connectionOptions)
-    .then((mongooseInstance) => {
-      logger.info("MongoDB connected successfully", {
-        host: mongooseInstance.connection.host,
-        readyState: mongooseInstance.connection.readyState,
-      });
-      return mongooseInstance;
-    })
-    .catch((error) => {
-      // Reset promise on connection failure
-      cached.promise = null;
-      logger.error("MongoDB connection failed", {
-        error: error.message,
-        stack: error.stack,
-      });
-      throw error;
+  // Create connection promise with retry logic
+  cached.promise = (async () => {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const mongooseInstance = await mongoose.connect(config.MONGO_URI!, connectionOptions);
+        
+        // Verify connection is actually ready
+        if (mongooseInstance.connection.readyState === 1) {
+          logger.info("MongoDB connected successfully", {
+            host: mongooseInstance.connection.host,
+            readyState: mongooseInstance.connection.readyState,
+            attempt,
+          });
+          return mongooseInstance;
+        } else {
+          throw new Error(`Connection established but readyState is ${mongooseInstance.connection.readyState}`);
+        }
+      } catch (error: any) {
+        lastError = error;
+        logger.warn(`MongoDB connection attempt ${attempt}/${maxRetries} failed`, {
+          error: error.message,
+          attempt,
+        });
+        
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+    
+    // All retries failed
+    cached.promise = null;
+    logger.error("MongoDB connection failed after all retries", {
+      error: lastError?.message,
+      stack: lastError?.stack,
     });
+    throw lastError || new Error("MongoDB connection failed");
+  })();
 
   try {
     cached.conn = await cached.promise;

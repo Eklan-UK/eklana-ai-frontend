@@ -20,6 +20,7 @@ export default function CreatePronunciationProblemPage() {
     description: "",
     phonemes: [] as string[],
     phonemeInput: "",
+    type: "word" as "word" | "sound" | "sentence", // Required: words will inherit this type
     difficulty: "intermediate",
     estimatedTimeMinutes: "",
     order: "0",
@@ -46,8 +47,8 @@ export default function CreatePronunciationProblemPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || formData.phonemes.length === 0) {
-      toast.error("Title and at least one phoneme are required");
+    if (!formData.title || formData.phonemes.length === 0 || !formData.type) {
+      toast.error("Title, type, and at least one phoneme are required");
       return;
     }
 
@@ -56,6 +57,7 @@ export default function CreatePronunciationProblemPage() {
         title: formData.title,
         description: formData.description || undefined,
         phonemes: formData.phonemes,
+        type: formData.type, // Required field
         difficulty: formData.difficulty,
         estimatedTimeMinutes: formData.estimatedTimeMinutes
           ? parseInt(formData.estimatedTimeMinutes)
@@ -115,6 +117,24 @@ export default function CreatePronunciationProblemPage() {
             placeholder="Brief description of the pronunciation practice"
             rows={3}
           />
+        </div>
+
+        {/* Type */}
+        <div>
+          <Label htmlFor="type">Primary Type (Optional)</Label>
+          <Select
+            id="type"
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value as "" | "word" | "sound" | "sentence" })}
+          >
+            <option value="">None (Mixed types)</option>
+            <option value="word">Word</option>
+            <option value="sound">Sound</option>
+            <option value="sentence">Sentence</option>
+          </Select>
+          <p className="text-xs text-gray-500 mt-1">
+            Optional: Set a primary type for this problem to help with filtering. Individual words can have different types.
+          </p>
         </div>
 
         {/* Phonemes */}

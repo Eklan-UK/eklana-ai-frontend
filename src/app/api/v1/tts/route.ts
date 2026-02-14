@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import TTSCache from '@/models/tts-cache';
 import { logger } from '@/lib/api/logger';
+import { config } from '@/lib/api/config';
 import crypto from 'crypto';
 
 // Generate hash for cache lookup
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     logger.info('TTS cache miss, generating new audio', { textHash, textLength: text.length });
 
     // Call ElevenLabs API
-    const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+    const elevenLabsApiKey = config.ELEVEN_LABS_API_KEY || process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
     if (!elevenLabsApiKey) {
       return NextResponse.json(
         { code: 'ConfigError', message: 'TTS service not configured' },
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_monolingual_v1',
+          model_id: 'eleven_multilingual_v2',
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,

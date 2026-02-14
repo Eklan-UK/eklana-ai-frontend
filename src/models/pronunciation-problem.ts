@@ -9,6 +9,7 @@ export interface IPronunciationProblem extends Document {
 	slug: string; // URL-friendly identifier (unique)
 	description?: string;
 	phonemes: string[]; // Target phonemes for this problem (e.g., ["r", "l"])
+	type: 'word' | 'sound' | 'sentence'; // Required: primary type for this problem (words inherit this type)
 	difficulty: 'beginner' | 'intermediate' | 'advanced';
 	estimatedTimeMinutes?: number;
 	createdBy: Types.ObjectId; // Admin who created it
@@ -48,6 +49,12 @@ const pronunciationProblemSchema = new Schema<IPronunciationProblem>(
 				message: 'At least one phoneme is required',
 			},
 		},
+		type: {
+			type: String,
+			enum: ['word', 'sound', 'sentence'],
+			required: [true, 'Type is required'], // Required: words inherit this type
+			index: true,
+		},
 		difficulty: {
 			type: String,
 			enum: ['beginner', 'intermediate', 'advanced'],
@@ -84,6 +91,7 @@ const pronunciationProblemSchema = new Schema<IPronunciationProblem>(
 // Note: slug index is automatically created by unique: true on the field
 pronunciationProblemSchema.index({ createdBy: 1, createdAt: -1 });
 pronunciationProblemSchema.index({ difficulty: 1, isActive: 1 });
+pronunciationProblemSchema.index({ type: 1, isActive: 1 }); // Index for type filtering
 pronunciationProblemSchema.index({ order: 1, isActive: 1 });
 pronunciationProblemSchema.index({ phonemes: 1 });
 

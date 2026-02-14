@@ -100,6 +100,8 @@ async function postHandler(
 		const word = formData.get('word') as string;
 		const ipa = formData.get('ipa') as string;
 		const phonemes = (formData.get('phonemes') as string)?.split(',').map(p => p.trim()).filter(Boolean) || [];
+		// Type is inherited from problem, not from form data
+		const type = problem.type || 'word'; // Use problem's type, fallback to 'word'
 		const difficulty = (formData.get('difficulty') as string) || 'intermediate';
 		const order = parseInt(formData.get('order') as string) || 0;
 		const audioFile = formData.get('audio') as File | null;
@@ -110,6 +112,17 @@ async function postHandler(
 				{
 					code: 'ValidationError',
 					message: 'Word, IPA, and at least one phoneme are required',
+				},
+				{ status: 400 }
+			);
+		}
+
+		// Validate that problem has a type
+		if (!problem.type) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Pronunciation problem must have a type set before adding words',
 				},
 				{ status: 400 }
 			);
@@ -139,6 +152,7 @@ async function postHandler(
 			ipa,
 			phonemes,
 			problemId: problem._id,
+			type: type,
 			difficulty: difficulty || 'intermediate',
 			audioUrl: audioUrl,
 			audioFileName: audioFileName,

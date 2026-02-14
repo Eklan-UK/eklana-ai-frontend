@@ -16,14 +16,32 @@ export interface AuthenticatedRequest extends NextRequest {
  * Validate Bearer token from mobile app
  */
 async function validateBearerToken(token: string): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | null> {
-	try {
-		const mongoose = await connectToDatabase();
-		const db = mongoose.connection.db;
+	const maxRetries = 2;
+	let lastError: Error | null = null;
+	
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			const mongoose = await connectToDatabase();
+			const db = mongoose.connection.db;
 
-		if (!db) {
-			logger.error('Database connection not available for Bearer token validation');
-			return null;
-		}
+			if (!db) {
+				logger.error('Database connection not available for Bearer token validation');
+				if (attempt < maxRetries) {
+					await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+					continue;
+				}
+				return null;
+			}
+
+			// Verify connection is ready
+			if (mongoose.connection.readyState !== 1) {
+				logger.warn(`MongoDB connection not ready (state: ${mongoose.connection.readyState}), retrying...`);
+				if (attempt < maxRetries) {
+					await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+					continue;
+				}
+				return null;
+			}
 
 		const sessionsCollection = db.collection('sessions');
 		const usersCollection = db.collection('users');
@@ -114,22 +132,47 @@ async function validateBearerToken(token: string): Promise<{ userId: Types.Objec
 			userRole = 'user';
 		}
 
-		logger.info('Bearer token validated successfully', {
-			userId: userId.toString(),
-			userRole,
-		});
+			logger.info('Bearer token validated successfully', {
+				userId: userId.toString(),
+				userRole,
+			});
 
-		return {
-			userId: new Types.ObjectId(user._id),
-			userRole: userRole as 'admin' | 'user' | 'tutor',
-		};
-	} catch (error: any) {
-		logger.error('Error validating Bearer token', {
-			error: error.message,
-			stack: error.stack,
-		});
-		return null;
+			return {
+				userId: new Types.ObjectId(user._id),
+				userRole: userRole as 'admin' | 'user' | 'tutor',
+			};
+		} catch (error: any) {
+			lastError = error;
+			// Check if it's a connection error that we can retry
+			const isConnectionError = error.message?.includes('connection') || 
+			                          error.message?.includes('closed') ||
+			                          error.message?.includes('MongoServerSelectionError');
+			
+			if (isConnectionError && attempt < maxRetries) {
+				logger.warn(`Bearer token validation attempt ${attempt}/${maxRetries} failed (connection error), retrying...`, {
+					error: error.message,
+				});
+				await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+				continue;
+			}
+			
+			// Non-retryable error or max retries reached
+			logger.error('Error validating Bearer token', {
+				error: error.message,
+				stack: error.stack,
+				attempt,
+			});
+			if (attempt === maxRetries) {
+				return null;
+			}
+		}
 	}
+	
+	// All retries failed
+	logger.error('Bearer token validation failed after all retries', {
+		error: lastError?.message,
+	});
+	return null;
 }
 
 /**

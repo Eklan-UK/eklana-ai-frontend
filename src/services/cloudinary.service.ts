@@ -9,6 +9,10 @@ if (config.CLOUDINARY_CLOUD_NAME && config.CLOUDINARY_API_KEY && config.CLOUDINA
     cloud_name: config.CLOUDINARY_CLOUD_NAME,
     api_key: config.CLOUDINARY_API_KEY,
     api_secret: config.CLOUDINARY_API_SECRET,
+    // Increase timeout for large file uploads (videos)
+    // Note: These are in milliseconds
+    api_timeout: 600000, // 10 minutes
+    upload_timeout: 600000, // 10 minutes
   });
 } else {
   logger.warn('Cloudinary credentials not configured. Image uploads will fail.');
@@ -50,11 +54,17 @@ export async function uploadToCloudinary(
 
     // Use upload_stream for all resources (including large videos), with extended timeouts for video
     return new Promise((resolve, reject) => {
-      // Set timeout for video uploads (5 minutes)
-      const timeout = resourceType === 'video' ? 300000 : 60000;
+      // Set timeout for video uploads (10 minutes), images (2 minutes)
+      const timeout = resourceType === 'video' ? 600000 : 120000;
       const timeoutId = setTimeout(() => {
         reject(new Error('Upload timeout: File upload took too long'));
       }, timeout);
+
+      logger.info('Starting Cloudinary upload', {
+        resourceType,
+        bufferSize: buffer.length,
+        bufferSizeMB: (buffer.length / 1024 / 1024).toFixed(2),
+      });
 
       const uploadStream = cloudinary.uploader.upload_stream(
         uploadOptions,
@@ -62,7 +72,13 @@ export async function uploadToCloudinary(
           clearTimeout(timeoutId);
           
           if (error) {
-            logger.error('Cloudinary upload error', { error: error.message });
+            logger.error('Cloudinary upload error', { 
+              error: error.message || error,
+              http_code: (error as any).http_code,
+              name: (error as any).name,
+              resourceType,
+              bufferSize: buffer.length,
+            });
             reject(error);
             return;
           }
@@ -71,6 +87,11 @@ export async function uploadToCloudinary(
             reject(new Error('Upload failed: No result from Cloudinary'));
             return;
           }
+
+          logger.info('File uploaded successfully to Cloudinary', {
+            publicId: result.public_id,
+            resourceType,
+          });
 
           resolve({
             url: result.url,
@@ -83,6 +104,19 @@ export async function uploadToCloudinary(
       // Convert buffer to stream
       const stream = Readable.from(buffer);
       stream.pipe(uploadStream);
+      
+      // Handle stream errors
+      stream.on('error', (error) => {
+        clearTimeout(timeoutId);
+        logger.error('Stream error during upload', { error: error.message });
+        reject(error);
+      });
+      
+      uploadStream.on('error', (error) => {
+        clearTimeout(timeoutId);
+        logger.error('Upload stream error', { error: error.message });
+        reject(error);
+      });
     });
   } catch (error: any) {
     logger.error('Error uploading to Cloudinary', { error: error.message });

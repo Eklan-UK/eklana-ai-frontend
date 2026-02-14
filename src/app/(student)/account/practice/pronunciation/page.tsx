@@ -10,12 +10,20 @@ import { Mic, BookOpen, Clock, TrendingUp, Loader2, ChevronRight } from "lucide-
 import { usePronunciationProblems } from "@/hooks/usePronunciations";
 import Link from "next/link";
 
+type FilterType = "all" | "word" | "sound" | "sentence";
+
 export default function PronunciationPracticePage() {
   const router = useRouter();
+  const [typeFilter, setTypeFilter] = useState<FilterType>("all");
 
   // Fetch all pronunciation problems
   const { data, isLoading, error } = usePronunciationProblems();
   const problems = data?.problems || [];
+
+  // Filter problems by type
+  const filteredProblems = typeFilter === "all" 
+    ? problems 
+    : problems.filter((p: any) => p.type === typeFilter);
 
   const getDifficultyColor = (difficulty: string) => {
     const colors: Record<string, string> = {
@@ -34,6 +42,42 @@ export default function PronunciationPracticePage() {
       <Header title="Pronunciation Practice" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8">
+        {/* Type Filter */}
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+          <Button
+            variant={typeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("all")}
+            className="whitespace-nowrap"
+          >
+            All Types
+          </Button>
+          <Button
+            variant={typeFilter === "word" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("word")}
+            className="whitespace-nowrap"
+          >
+            Words
+          </Button>
+          <Button
+            variant={typeFilter === "sound" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("sound")}
+            className="whitespace-nowrap"
+          >
+            Sounds
+          </Button>
+          <Button
+            variant={typeFilter === "sentence" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("sentence")}
+            className="whitespace-nowrap"
+          >
+            Sentences
+          </Button>
+        </div>
+
         {/* Introduction */}
         <Card className="mb-6 bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
           <div className="p-6">
@@ -69,9 +113,17 @@ export default function PronunciationPracticePage() {
               Check back later for new pronunciation practice problems.
             </p>
           </Card>
+        ) : filteredProblems.length === 0 ? (
+          <Card className="p-8 text-center">
+            <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No problems found</h3>
+            <p className="text-gray-500 text-sm">
+              No pronunciation problems match the selected filter.
+            </p>
+          </Card>
         ) : (
           <div className="space-y-4">
-            {problems.map((problem: any) => (
+            {filteredProblems.map((problem: any) => (
               <Link key={problem._id} href={`/account/practice/pronunciation/${problem.slug}`}>
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <div className="p-6">
@@ -86,6 +138,11 @@ export default function PronunciationPracticePage() {
                           </p>
                         )}
                         <div className="flex items-center gap-3 flex-wrap">
+                          {problem.type && (
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 capitalize">
+                              {problem.type}
+                            </span>
+                          )}
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(
                               problem.difficulty

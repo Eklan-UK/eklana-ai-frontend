@@ -44,11 +44,17 @@ async function handler(
 			problemId: problem._id,
 			isActive: true,
 		})
-			.select('word ipa phonemes order audioUrl useTTS')
 			.sort({ order: 1 })
 			.limit(wordLimit)
 			.lean()
 			.exec();
+
+		// Ensure all words have type field (fallback to problem type if missing)
+		// This handles cases where words were created before the type field was added
+		const wordsWithType = words.map((word: any) => ({
+			...word,
+			type: word.type || problem.type || 'word', // Fallback to problem type, then 'word'
+		}));
 
 		// Get learner progress for this problem
 		let progress = null;
@@ -69,7 +75,7 @@ async function handler(
 				progressRecords.filter((p) => p.passed).map((p) => p.wordId.toString())
 			);
 
-			nextWord = words.find((word) => !completedWordIds.has(word._id.toString()));
+			nextWord = wordsWithType.find((word) => !completedWordIds.has(word._id.toString()));
 
 			// Create progress object (plain object, not Map, for JSON serialization)
 			const progressObject: Record<string, any> = {};
@@ -87,9 +93,9 @@ async function handler(
 			});
 
 			progress = {
-				totalWords: words.length,
+				totalWords: wordsWithType.length,
 				completedWords: completedWordIds.size,
-				progressPercentage: words.length > 0 ? (completedWordIds.size / words.length) * 100 : 0,
+				progressPercentage: wordsWithType.length > 0 ? (completedWordIds.size / wordsWithType.length) * 100 : 0,
 				wordProgress: progressObject,
 				nextWord: nextWord ? {
 					_id: nextWord._id,
@@ -106,7 +112,7 @@ async function handler(
 				message: 'Pronunciation problem retrieved successfully',
 				data: {
 					problem,
-					words,
+					words: wordsWithType, // Use words with type field populated
 					progress, // Only for learners
 				},
 			},

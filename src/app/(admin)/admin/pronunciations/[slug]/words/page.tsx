@@ -89,6 +89,7 @@ export default function ManageWordsPage() {
     formDataToSend.append("word", formData.word);
     formDataToSend.append("ipa", formData.ipa);
     formDataToSend.append("phonemes", formData.phonemes.join(","));
+    // Type is automatically inherited from the problem, no need to send it
     formDataToSend.append("difficulty", formData.difficulty);
     formDataToSend.append("order", formData.order || "0");
 

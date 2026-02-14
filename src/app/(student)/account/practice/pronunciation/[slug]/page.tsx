@@ -47,6 +47,7 @@ export default function PronunciationWordPracticePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [isSavingAnalytics, setIsSavingAnalytics] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "word" | "sound" | "sentence">("all");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -63,7 +64,14 @@ export default function PronunciationWordPracticePage() {
     }
   }, [words, progress]);
 
-  const currentWord = words[currentWordIndex];
+  // Filter words by type
+  const filteredWords = typeFilter === "all" 
+    ? words 
+    : words.filter((w: any) => w.type === typeFilter);
+  
+  // Ensure currentWordIndex is within bounds
+  const safeIndex = Math.min(currentWordIndex, filteredWords.length - 1);
+  const currentWord = filteredWords[safeIndex >= 0 ? safeIndex : 0];
 
   // Start recording
   const startRecording = async () => {
@@ -199,7 +207,7 @@ export default function PronunciationWordPracticePage() {
   const handleNextWord = () => {
     setPronunciationScore(null);
     setAudioBlob(null);
-    if (currentWordIndex < words.length - 1) {
+    if (currentWordIndex < filteredWords.length - 1) {
       setCurrentWordIndex(currentWordIndex + 1);
       if (autoPlayAudio) {
         // TTS will be triggered by TTSButton autoPlay
@@ -258,7 +266,7 @@ export default function PronunciationWordPracticePage() {
     );
   }
 
-  if (words.length === 0) {
+  if (words.length === 0 || filteredWords.length === 0) {
     return (
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
@@ -268,7 +276,9 @@ export default function PronunciationWordPracticePage() {
             <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No words available</h3>
             <p className="text-gray-500 text-sm mb-4">
-              This problem doesn't have any words to practice yet.
+              {typeFilter === "all" 
+                ? "This problem doesn't have any words to practice yet."
+                : `This problem doesn't have any ${typeFilter} items to practice. Try selecting a different type.`}
             </p>
             <Link href="/account/practice/pronunciation">
               <Button variant="outline">Back to Problems</Button>
@@ -279,7 +289,7 @@ export default function PronunciationWordPracticePage() {
     );
   }
 
-  const wordProgress = progress?.wordProgress?.[currentWord._id.toString()];
+  const wordProgress = currentWord ? progress?.wordProgress?.[currentWord._id.toString()] : null;
   const isPassed = wordProgress?.passed || (pronunciationScore && pronunciationScore.speechace_score.pronunciation >= 70);
 
   return (
@@ -290,9 +300,57 @@ export default function PronunciationWordPracticePage() {
       <Header showBack title="Pronunciation Practice" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
+        {/* Type Filter */}
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
+          <Button
+            variant={typeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setTypeFilter("all");
+              setCurrentWordIndex(0);
+            }}
+            className="whitespace-nowrap"
+          >
+            All
+          </Button>
+          <Button
+            variant={typeFilter === "word" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setTypeFilter("word");
+              setCurrentWordIndex(0);
+            }}
+            className="whitespace-nowrap"
+          >
+            Words
+          </Button>
+          <Button
+            variant={typeFilter === "sound" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setTypeFilter("sound");
+              setCurrentWordIndex(0);
+            }}
+            className="whitespace-nowrap"
+          >
+            Sounds
+          </Button>
+          <Button
+            variant={typeFilter === "sentence" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setTypeFilter("sentence");
+              setCurrentWordIndex(0);
+            }}
+            className="whitespace-nowrap"
+          >
+            Sentences
+          </Button>
+        </div>
+
         {/* Progress Indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          {words.map((_, index) => (
+          {filteredWords.map((_, index) => (
             <div
               key={index}
               className={`h-2 rounded-full transition-all ${
@@ -303,25 +361,31 @@ export default function PronunciationWordPracticePage() {
         </div>
 
         {/* Word Card */}
-        <Card className="mb-6 bg-gradient-to-br from-green-50 to-blue-50">
-          <div className="text-center py-8">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900">
-                {currentWord.word}
-              </h1>
-              <TTSButton
-                text={currentWord.word}
-                size="lg"
-                autoPlay={autoPlayAudio && !pronunciationScore}
-              />
-            </div>
-            <p className="text-lg md:text-xl text-gray-600 mb-6">
-              {currentWord.ipa}
-            </p>
+        {currentWord && (
+          <Card className="mb-6 bg-gradient-to-br from-green-50 to-blue-50">
+            <div className="text-center py-8">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900">
+                  {currentWord.word}
+                </h1>
+                <TTSButton
+                  text={currentWord.word}
+                  size="lg"
+                  autoPlay={autoPlayAudio && !pronunciationScore}
+                />
+              </div>
+              <p className="text-lg md:text-xl text-gray-600 mb-6">
+                {currentWord.ipa}
+              </p>
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500 mb-4">
+              {currentWord?.type && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 capitalize">
+                  {currentWord.type}
+                </span>
+              )}
               <div className="flex items-center gap-1">
                 <Volume2 className="w-4 h-4" />
-                <span className="capitalize">{currentWord.difficulty || problem.difficulty}</span>
+                <span className="capitalize">{currentWord?.difficulty || problem.difficulty}</span>
               </div>
               {problem.estimatedTimeMinutes && (
                 <>
@@ -352,31 +416,35 @@ export default function PronunciationWordPracticePage() {
               />
               <span>Auto-play pronunciation</span>
             </label>
-          </div>
-        </Card>
+            </div>
+          </Card>
+        )}
 
         {/* Listen Section */}
-        <Card className="mb-6">
-          <div className="text-center py-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Listen to the correct pronunciation
-            </h3>
-            <div className="flex items-center justify-center gap-4">
-              <TTSButton
-                text={currentWord.word}
-                size="lg"
-                variant="button"
-                autoPlay={autoPlayAudio && !pronunciationScore}
-              />
+        {currentWord && (
+          <Card className="mb-6">
+            <div className="text-center py-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Listen to the correct pronunciation
+              </h3>
+              <div className="flex items-center justify-center gap-4">
+                <TTSButton
+                  text={currentWord.word}
+                  size="lg"
+                  variant="button"
+                  autoPlay={autoPlayAudio && !pronunciationScore}
+                />
+              </div>
+              <p className="text-sm text-gray-500 mt-4">
+                Click to hear &quot;{currentWord.word}&quot; pronounced correctly
+              </p>
             </div>
-            <p className="text-sm text-gray-500 mt-4">
-              Click to hear &quot;{currentWord.word}&quot; pronounced correctly
-            </p>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Record Section */}
-        <Card className="mb-6">
+        {currentWord && (
+          <Card className="mb-6">
           <div className="text-center py-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Record your pronunciation
@@ -417,9 +485,10 @@ export default function PronunciationWordPracticePage() {
             )}
           </div>
         </Card>
+        )}
 
         {/* Pronunciation Score Section */}
-        {pronunciationScore && (
+        {pronunciationScore && currentWord && (
           <div className="mb-6 space-y-4">
             <PronunciationScore textScore={pronunciationScore} />
             
@@ -442,19 +511,20 @@ export default function PronunciationWordPracticePage() {
         )}
 
         {/* Actions */}
-        <div className="space-y-3">
-          {pronunciationScore && currentWordIndex < words.length - 1 && (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={handleNextWord}
-              disabled={isRecording || isAnalyzing}
-            >
-              Next Word
-            </Button>
-          )}
-          {pronunciationScore && currentWordIndex === words.length - 1 && (
+        {currentWord && (
+          <div className="space-y-3">
+            {pronunciationScore && currentWordIndex < filteredWords.length - 1 && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={handleNextWord}
+                disabled={isRecording || isAnalyzing}
+              >
+                Next Word
+              </Button>
+            )}
+            {pronunciationScore && currentWordIndex === filteredWords.length - 1 && (
             <Button
               variant="primary"
               size="lg"
@@ -485,7 +555,8 @@ export default function PronunciationWordPracticePage() {
           >
             Back to Practice
           </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       <BottomNav />

@@ -5,6 +5,7 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import TTSCache from '@/models/tts-cache';
 import { logger } from '@/lib/api/logger';
+import { config } from '@/lib/api/config';
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 
@@ -71,7 +72,7 @@ async function generateSingleTTS(
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_monolingual_v1',
+        model_id: 'eleven_multilingual_v2',
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
@@ -179,9 +180,9 @@ async function handler(
 
     await connectToDatabase();
 
-    const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+    const elevenLabsApiKey = config.ELEVEN_LABS_API_KEY || process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
     if (!elevenLabsApiKey) {
-      logger.warn('ELEVENLABS_API_KEY not configured - returning empty results');
+      logger.warn('ELEVEN_LABS_API_KEY not configured - returning empty results');
       // Return success with no audio URLs instead of failing
       return NextResponse.json({
         code: 'Success',

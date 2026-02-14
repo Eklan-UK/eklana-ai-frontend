@@ -19,6 +19,7 @@ async function getHandler(
 
 		const { searchParams } = new URL(req.url);
 		const difficulty = searchParams.get('difficulty');
+		const type = searchParams.get('type');
 		const isActiveParam = searchParams.get('isActive');
 
 		// Build query
@@ -35,6 +36,11 @@ async function getHandler(
 
 		if (difficulty) {
 			query.difficulty = difficulty;
+		}
+
+		// Filter by type if provided
+		if (type && ['word', 'sound', 'sentence'].includes(type)) {
+			query.type = type;
 		}
 
 		// Add pagination to prevent loading all problems
@@ -120,7 +126,7 @@ async function postHandler(
 		await connectToDatabase();
 
 		const body = await req.json();
-		const { title, description, phonemes, difficulty, estimatedTimeMinutes, order } = body;
+		const { title, description, phonemes, type, difficulty, estimatedTimeMinutes, order } = body;
 
 		// Validate required fields
 		if (!title || !phonemes || !Array.isArray(phonemes) || phonemes.length === 0) {
@@ -162,12 +168,24 @@ async function postHandler(
 			);
 		}
 
+		// Validate type if provided
+		if (type && !['word', 'sound', 'sentence'].includes(type)) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Type must be one of: word, sound, sentence',
+				},
+				{ status: 400 }
+			);
+		}
+
 		// Create problem
 		const problem = await PronunciationProblem.create({
 			title,
 			slug,
 			description: description || undefined,
 			phonemes,
+			type: type || undefined,
 			difficulty: difficulty || 'intermediate',
 			estimatedTimeMinutes: estimatedTimeMinutes || undefined,
 			order: order || 0,
