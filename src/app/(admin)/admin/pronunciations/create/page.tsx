@@ -20,7 +20,7 @@ export default function CreatePronunciationProblemPage() {
     description: "",
     phonemes: [] as string[],
     phonemeInput: "",
-    type: "word" as "word" | "sound" | "sentence", // Required: words will inherit this type
+    type: "" as "" | "word" | "sound" | "sentence", // Optional: words can have different types
     difficulty: "intermediate",
     estimatedTimeMinutes: "",
     order: "0",
@@ -47,8 +47,8 @@ export default function CreatePronunciationProblemPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || formData.phonemes.length === 0 || !formData.type) {
-      toast.error("Title, type, and at least one phoneme are required");
+    if (!formData.title || formData.phonemes.length === 0) {
+      toast.error("Title and at least one phoneme are required");
       return;
     }
 
@@ -57,7 +57,7 @@ export default function CreatePronunciationProblemPage() {
         title: formData.title,
         description: formData.description || undefined,
         phonemes: formData.phonemes,
-        type: formData.type, // Required field
+        type: formData.type || undefined, // Optional field
         difficulty: formData.difficulty,
         estimatedTimeMinutes: formData.estimatedTimeMinutes
           ? parseInt(formData.estimatedTimeMinutes)
@@ -125,7 +125,10 @@ export default function CreatePronunciationProblemPage() {
           <Select
             id="type"
             value={formData.type}
-            onChange={(e) => setFormData({ ...formData, type: e.target.value as "" | "word" | "sound" | "sentence" })}
+            onChange={(e) => {
+              const value = e.target.value as "" | "word" | "sound" | "sentence";
+              setFormData({ ...formData, type: value });
+            }}
           >
             <option value="">None (Mixed types)</option>
             <option value="word">Word</option>

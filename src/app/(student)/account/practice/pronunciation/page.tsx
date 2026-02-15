@@ -45,7 +45,7 @@ export default function PronunciationPracticePage() {
         {/* Type Filter */}
         <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
           <Button
-            variant={typeFilter === "all" ? "default" : "outline"}
+            variant={typeFilter === "all" ? "primary" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("all")}
             className="whitespace-nowrap"
@@ -53,7 +53,7 @@ export default function PronunciationPracticePage() {
             All Types
           </Button>
           <Button
-            variant={typeFilter === "word" ? "default" : "outline"}
+            variant={typeFilter === "word" ? "primary" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("word")}
             className="whitespace-nowrap"
@@ -61,7 +61,7 @@ export default function PronunciationPracticePage() {
             Words
           </Button>
           <Button
-            variant={typeFilter === "sound" ? "default" : "outline"}
+            variant={typeFilter === "sound" ? "primary" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("sound")}
             className="whitespace-nowrap"
@@ -69,7 +69,7 @@ export default function PronunciationPracticePage() {
             Sounds
           </Button>
           <Button
-            variant={typeFilter === "sentence" ? "default" : "outline"}
+            variant={typeFilter === "sentence" ? "primary" : "outline"}
             size="sm"
             onClick={() => setTypeFilter("sentence")}
             className="whitespace-nowrap"

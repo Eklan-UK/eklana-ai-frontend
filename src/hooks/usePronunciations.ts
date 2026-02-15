@@ -224,6 +224,7 @@ export function useCreatePronunciationProblem() {
       title: string;
       description?: string;
       phonemes: string[];
+      type?: 'word' | 'sound' | 'sentence';
       difficulty?: string;
       estimatedTimeMinutes?: number;
       order?: number;

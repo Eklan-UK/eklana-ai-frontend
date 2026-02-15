@@ -303,7 +303,7 @@ export default function PronunciationWordPracticePage() {
         {/* Type Filter */}
         <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
           <Button
-            variant={typeFilter === "all" ? "default" : "outline"}
+            variant={typeFilter === "all" ? "primary" : "outline"}
             size="sm"
             onClick={() => {
               setTypeFilter("all");
@@ -314,7 +314,7 @@ export default function PronunciationWordPracticePage() {
             All
           </Button>
           <Button
-            variant={typeFilter === "word" ? "default" : "outline"}
+            variant={typeFilter === "word" ? "primary" : "outline"}
             size="sm"
             onClick={() => {
               setTypeFilter("word");
@@ -325,7 +325,7 @@ export default function PronunciationWordPracticePage() {
             Words
           </Button>
           <Button
-            variant={typeFilter === "sound" ? "default" : "outline"}
+            variant={typeFilter === "sound" ? "primary" : "outline"}
             size="sm"
             onClick={() => {
               setTypeFilter("sound");
@@ -336,7 +336,7 @@ export default function PronunciationWordPracticePage() {
             Sounds
           </Button>
           <Button
-            variant={typeFilter === "sentence" ? "default" : "outline"}
+            variant={typeFilter === "sentence" ? "primary" : "outline"}
             size="sm"
             onClick={() => {
               setTypeFilter("sentence");
