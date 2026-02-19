@@ -158,7 +158,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             </div>
             
             <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
-              <p style="margin: 0;">This is an automated notification from eklan Learning Platform.</p>
+              <p style="margin: 0;">This is an automated notification from Eklan.</p>
             </div>
           </div>
         </body>

@@ -151,7 +151,7 @@ export const emailTemplates = {
 					
 					<!-- Footer -->
 					<div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
-						<p style="margin: 0;">This is an automated notification from Elkan Ai.</p>
+						<p style="margin: 0;">This is an automated notification from Eklan.</p>
 						<p style="margin: 10px 0 0 0;">If you have questions, contact your instructor directly.</p>
 					</div>
 				</div>
