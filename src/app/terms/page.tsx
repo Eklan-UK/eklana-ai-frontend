@@ -54,7 +54,7 @@ export default function TermsPage() {
     {
       title: "10. Contact Information",
       content:
-        "If you have any questions about these Terms of Use, please contact us at hello@eklan.ai.ai.",
+        "If you have any questions about these Terms of Use, please contact us at hello@eklan.ai.",
     },
   ];
 

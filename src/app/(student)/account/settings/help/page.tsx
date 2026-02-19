@@ -67,8 +67,8 @@ export default function HelpPage() {
     },
     {
       title: "Email Us",
-      description: "hello@eklan.ai.ai",
-      href: "mailto:hello@eklan.ai.ai",
+      description: "hello@eklan.ai",
+      href: "mailto:hello@eklan.ai",
       icon: Mail,
     },
   ];
