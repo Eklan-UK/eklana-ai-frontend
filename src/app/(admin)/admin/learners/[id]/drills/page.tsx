@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  ArrowLeft, 
-  Loader2, 
-  BookOpen, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  Loader2,
+  BookOpen,
+  CheckCircle,
+  Clock,
+  AlertCircle,
   TrendingUp,
   MessageSquare,
   FileText,
@@ -32,34 +32,34 @@ function useStudentDrillAssignments(studentId: string) {
     queryKey: ['students', studentId, 'assignments'],
     queryFn: async () => {
       const response = await fetch(`/api/v1/drills/learner/${studentId}/assignments`, {
-          credentials: 'include',
-        });
-        
+        credentials: 'include',
+      });
+
       if (response.ok) {
         const data = await response.json();
         return data.data?.assignments || data.assignments || [];
       }
-      
-          // Fallback: fetch from learner drills endpoint
-          const drillsResponse = await drillAPI.getLearnerDrills();
-          if (drillsResponse.data?.drills) {
+
+      // Fallback: fetch from learner drills endpoint
+      const drillsResponse = await drillAPI.getLearnerDrills();
+      if (drillsResponse.data?.drills) {
         return drillsResponse.data.drills
-              .filter((item: any) => {
-                const userId = item.drill?.created_by || item.userId;
-                return userId === studentId || item.userId?._id === studentId;
-              })
-              .map((item: any) => ({
-                ...item,
-                drill: item.drill || item,
-                assignmentId: item.assignmentId || item._id,
-              }));
+          .filter((item: any) => {
+            const userId = item.drill?.created_by || item.userId;
+            return userId === studentId || item.userId?._id === studentId;
+          })
+          .map((item: any) => ({
+            ...item,
+            drill: item.drill || item,
+            assignmentId: item.assignmentId || item._id,
+          }));
       }
       return [];
     },
     enabled: !!studentId,
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
-          }
+}
 
 export default function StudentDrillsPage() {
   const params = useParams();
@@ -111,7 +111,7 @@ export default function StudentDrillsPage() {
   const getTypeIcon = (type: string) => {
     const icons: Record<string, React.ReactNode> = {
       vocabulary: <BookOpen className="w-5 h-5 text-blue-500" />,
-      roleplay: <MessageSquare className="w-5 h-5 text-purple-500" />,
+      roleplay: <MessageSquare className="w-5 h-5 text-primary-500" />,
       grammar: <FileText className="w-5 h-5 text-pink-500" />,
       matching: <Link2 className="w-5 h-5 text-green-500" />,
       summary: <ScrollText className="w-5 h-5 text-orange-500" />,
@@ -122,25 +122,25 @@ export default function StudentDrillsPage() {
   };
 
   const totalAssigned = assignments.length;
-  const completed = assignments.filter((a: any) => 
+  const completed = assignments.filter((a: any) =>
     a.status === 'completed' || a.assignmentStatus === 'completed'
   ).length;
-  const inProgress = assignments.filter((a: any) => 
+  const inProgress = assignments.filter((a: any) =>
     a.status === 'in-progress' || a.status === 'in_progress' || a.assignmentStatus === 'in-progress'
   ).length;
-  const pending = assignments.filter((a: any) => 
+  const pending = assignments.filter((a: any) =>
     a.status === 'pending' || a.assignmentStatus === 'pending'
   ).length;
   const overdue = assignments.filter((a: any) => {
     const dueDate = a.dueDate ? new Date(a.dueDate) : null;
-    const isOverdue = dueDate && dueDate < new Date() && 
+    const isOverdue = dueDate && dueDate < new Date() &&
       a.status !== 'completed' && a.assignmentStatus !== 'completed';
     return isOverdue || a.status === 'overdue';
   }).length;
 
   const averageScore = assignments
     .filter((a: any) => a.score !== undefined && a.score !== null)
-    .reduce((acc: number, a: any) => acc + (a.score || 0), 0) / 
+    .reduce((acc: number, a: any) => acc + (a.score || 0), 0) /
     (assignments.filter((a: any) => a.score !== undefined && a.score !== null).length || 1);
 
   if (loading) {
@@ -151,14 +151,14 @@ export default function StudentDrillsPage() {
     );
   }
 
-  const studentName = student 
+  const studentName = student
     ? `${student.firstName || ""} ${student.lastName || ""}`.trim() || student.email || "Unknown"
     : "Unknown";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <div className="h-6"></div>
-      
+
       <div className="max-w-6xl mx-auto px-4 py-6 md:px-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -185,7 +185,7 @@ export default function StudentDrillsPage() {
               <BookOpen className="w-8 h-8 text-gray-400" />
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -195,7 +195,7 @@ export default function StudentDrillsPage() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -205,7 +205,7 @@ export default function StudentDrillsPage() {
               <Clock className="w-8 h-8 text-yellow-500" />
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -223,7 +223,7 @@ export default function StudentDrillsPage() {
         <Card>
           <div className="p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">All Drills</h2>
-            
+
             {assignments.length === 0 ? (
               <div className="text-center py-12">
                 <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -236,7 +236,7 @@ export default function StudentDrillsPage() {
                   const status = assignment.status || assignment.assignmentStatus || 'pending';
                   const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                   const isOverdue = dueDate && dueDate < new Date() && status !== 'completed';
-                  
+
                   return (
                     <Link
                       key={assignment.assignmentId || assignment._id}
@@ -274,10 +274,9 @@ export default function StudentDrillsPage() {
                             {assignment.score !== undefined && assignment.score !== null && (
                               <div className="text-right">
                                 <p className="text-xs text-gray-500">Score</p>
-                                <p className={`text-lg font-bold ${
-                                  assignment.score >= 70 ? 'text-green-600' : 
-                                  assignment.score >= 50 ? 'text-yellow-600' : 'text-red-600'
-                                }`}>
+                                <p className={`text-lg font-bold ${assignment.score >= 70 ? 'text-green-600' :
+                                    assignment.score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                  }`}>
                                   {assignment.score}%
                                 </p>
                               </div>

@@ -133,8 +133,8 @@ function ReviewModal({
     newReviews:
       | Array<{ isCorrect: boolean | null; correctedText: string }>
       | ((
-          prev: Array<{ isCorrect: boolean | null; correctedText: string }>
-        ) => Array<{ isCorrect: boolean | null; correctedText: string }>)
+        prev: Array<{ isCorrect: boolean | null; correctedText: string }>
+      ) => Array<{ isCorrect: boolean | null; correctedText: string }>)
   ) => {
     setAllPatternReviews((prev) => ({
       ...prev,
@@ -273,15 +273,14 @@ function ReviewModal({
                   <button
                     key={idx}
                     onClick={() => setCurrentPatternIndex(idx)}
-                    className={`w-8 h-8 rounded-full text-sm font-medium transition ${
-                      idx === currentPatternIndex
+                    className={`w-8 h-8 rounded-full text-sm font-medium transition ${idx === currentPatternIndex
                         ? "bg-pink-600 text-white"
                         : Object.values(allPatternReviews[idx] || []).every(
-                            (r) => r.isCorrect !== null
-                          )
-                        ? "bg-green-100 text-green-700 hover:bg-green-200"
-                        : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                    }`}
+                          (r) => r.isCorrect !== null
+                        )
+                          ? "bg-green-100 text-green-700 hover:bg-green-200"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
                   >
                     {idx + 1}
                   </button>
@@ -307,11 +306,11 @@ function ReviewModal({
           )}
 
           {/* Pattern and Example */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+          <div className="bg-gradient-to-r from-primary-50 to-pink-50 rounded-xl p-4 border border-primary-200">
             <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-5 h-5 text-purple-600" />
+              <FileText className="w-5 h-5 text-primary-600" />
               <h3 className="text-lg font-bold text-gray-900">
-                Pattern: <span className="text-purple-600">{currentPattern?.pattern}</span>
+                Pattern: <span className="text-primary-600">{currentPattern?.pattern}</span>
               </h3>
             </div>
             <div className="bg-white rounded-lg p-3 mb-3">
@@ -338,13 +337,12 @@ function ReviewModal({
             {sentences.map((sentence, idx) => (
               <div
                 key={idx}
-                className={`border rounded-xl p-4 transition ${
-                  reviews[idx]?.isCorrect === true
+                className={`border rounded-xl p-4 transition ${reviews[idx]?.isCorrect === true
                     ? "border-green-300 bg-green-50"
                     : reviews[idx]?.isCorrect === false
-                    ? "border-red-300 bg-red-50"
-                    : "border-gray-200"
-                }`}
+                      ? "border-red-300 bg-red-50"
+                      : "border-gray-200"
+                  }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div className="flex-1">
@@ -365,13 +363,12 @@ function ReviewModal({
                       setReviews(updated);
                     }}
                     disabled={isAlreadyReviewed}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                      reviews[idx]?.isCorrect === true
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${reviews[idx]?.isCorrect === true
                         ? "bg-green-600 text-white"
                         : isAlreadyReviewed
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700"
-                    }`}
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700"
+                      }`}
                   >
                     <CheckCircle className="w-4 h-4" />
                     Correct
@@ -384,13 +381,12 @@ function ReviewModal({
                       setReviews(updated);
                     }}
                     disabled={isAlreadyReviewed}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                      reviews[idx]?.isCorrect === false
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${reviews[idx]?.isCorrect === false
                         ? "bg-red-600 text-white"
                         : isAlreadyReviewed
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700"
-                    }`}
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700"
+                      }`}
                   >
                     <XCircle className="w-4 h-4" />
                     Incorrect
@@ -618,11 +614,10 @@ export default function GrammarReviewsPage() {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
-              statusFilter === status
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition ${statusFilter === status
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-600 hover:text-gray-900"
-            }`}
+              }`}
           >
             {status === "pending" && (
               <span className="flex items-center gap-2">
@@ -738,15 +733,14 @@ export default function GrammarReviewsPage() {
                             {submission.drill.title}
                           </h4>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              submission.grammarResults.reviewStatus ===
-                              "reviewed"
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${submission.grammarResults.reviewStatus ===
+                                "reviewed"
                                 ? "bg-green-100 text-green-700"
                                 : "bg-yellow-100 text-yellow-700"
-                            }`}
+                              }`}
                           >
                             {submission.grammarResults.reviewStatus ===
-                            "reviewed"
+                              "reviewed"
                               ? "Reviewed"
                               : "Pending"}
                           </span>

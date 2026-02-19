@@ -94,8 +94,8 @@ export const emailTemplates = {
 					<div style="text-align: center; margin-bottom: 30px;">
 						<img src="${
               process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-            }/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
-						<div style="font-size: 24px; font-weight: bold; color: #22c55e;">eklan</div>
+            }/notification-logo.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+						<div style="font-size: 24px; font-weight: bold; color: #3a893e;">Eklan</div>
 					</div>
 					
 					<!-- Main Card -->
@@ -175,7 +175,7 @@ ${drillUrl}
 Good luck with your practice! 🍀
 
 ---
-This is an automated notification from Eklan Ai.
+This is an automated notification from Eklan.
 		`,
     };
   },
@@ -359,7 +359,7 @@ export const sendDrillReviewNotification = async (data: {
 				<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
 					<!-- Logo/Brand Header -->
 					<div style="text-align: center; margin-bottom: 30px;">
-						<img src="${appUrl}/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+						<img src="${appUrl}/notification-logo.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
 						<div style="font-size: 24px; font-weight: bold; color: #22c55e;">eklan</div>
 					</div>
 					
@@ -437,7 +437,7 @@ export const sendDrillReviewNotification = async (data: {
 					
 					<!-- Footer -->
 					<div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
-						<p style="margin: 0;">This is an automated notification from Eklan Ai.</p>
+						<p style="margin: 0;">This is an automated notification from Eklan.</p>
 						<p style="margin: 10px 0 0 0;">If you have questions, contact your tutor directly.</p>
 					</div>
 				</div>
@@ -464,7 +464,7 @@ ${appUrl}/account/drills
 Keep up the great work! 🌟
 
 ---
-This is an automated notification from Eklan Ai.
+This is an automated notification from Eklan.
 		`;
 
     await sendEmail({

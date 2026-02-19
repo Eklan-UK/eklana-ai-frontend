@@ -6,7 +6,6 @@ import {
   Flame,
   Clock,
   Target,
-  TrendingUp,
   Phone,
   ChevronRight,
   BookOpen,
@@ -25,6 +24,8 @@ import { RecentActivities } from "@/components/activity/RecentActivities";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { PushNotificationPrompt } from "@/components/notifications/PushNotificationPrompt";
 import { StreakBadge } from "@/components/streak/StreakBadge";
+import { HomeConfidenceCard } from "@/components/confidence/HomeConfidenceCard";
+import { HomePronunciationCard } from "@/components/pronunciation/HomePronunciationCard";
 
 // Revalidate every 30 seconds (ISR)
 export const revalidate = 30;
@@ -58,12 +59,12 @@ export default async function HomePage() {
   const missedDrills: any[] = []; // No separate missed section
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
       {/* Main Content */}
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -101,115 +102,30 @@ export default async function HomePage() {
         <TodaysFocusCard />
 
         {/* Your Progress Section */}
-        <div className="mb-6 md:mb-8">
-          <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">
+        <div className="mb-4 md:mb-6">
+          <h3 className="text-lg md:text-xl font-bold font-nunito text-gray-900 mb-4">
             Your Progress
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Confidence
-                    </p>
-                    <p className={`text-xs flex items-center gap-1 mt-1 ${
-                      progress.weeklyChange.confidence >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      <span>{progress.weeklyChange.confidence >= 0 ? '↗' : '↘'}</span> 
-                      {progress.weeklyChange.confidence >= 0 ? '+' : ''}{progress.weeklyChange.confidence}% this week
-                    </p>
-                  </div>
-                </div>
-                <div className="relative w-16 h-16">
-                  <svg
-                    className="transform -rotate-90"
-                    width="64"
-                    height="64"
-                    viewBox="0 0 64 64"
-                  >
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      stroke="#e5e7eb"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      stroke="#3b82f6"
-                      strokeWidth="4"
-                      fill="none"
-                      strokeDasharray={`${176 * (progress.confidenceScore / 100)} ${176 * (1 - progress.confidenceScore / 100)}`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">{progress.confidenceScore}%</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
 
-            <Card>
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Phone className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Pronunciation
-                    </p>
-                    <p className={`text-xs flex items-center gap-1 mt-1 ${
-                      progress.weeklyChange.pronunciation >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      <span>{progress.weeklyChange.pronunciation >= 0 ? '↗' : '↘'}</span> 
-                      {progress.weeklyChange.pronunciation >= 0 ? '+' : ''}{progress.weeklyChange.pronunciation}% this week
-                    </p>
-                  </div>
-                </div>
-                <div className="relative w-16 h-16">
-                  <svg
-                    className="transform -rotate-90"
-                    width="64"
-                    height="64"
-                    viewBox="0 0 64 64"
-                  >
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      stroke="#e5e7eb"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="28"
-                      stroke="#22c55e"
-                      strokeWidth="4"
-                      fill="none"
-                      strokeDasharray={`${176 * (progress.pronunciationScore / 100)} ${176 * (1 - progress.pronunciationScore / 100)}`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-bold text-green-600">
-                      {progress.pronunciationScore}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <HomeConfidenceCard />
+
+            <HomePronunciationCard />
           </div>
+
+          {/* Saved Drills Pill Button */}
+          <Link
+            href="/account/bookmarks"
+            className="mt-3 flex items-center justify-between w-full border border-gray-200 rounded-full px-4 py-3 hover:bg-gray-50 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+                <span className="text-base">📘</span>
+              </div>
+              <span className="text-sm font-semibold font-satoshi text-gray-900">Saved Drills</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+          </Link>
         </div>
 
         {/* Assigned Drills Section */}
@@ -295,5 +211,6 @@ export default async function HomePage() {
       {/* Bottom Navigation */}
       <BottomNav />
     </div>
+  
   );
 }

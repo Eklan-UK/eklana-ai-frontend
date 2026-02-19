@@ -6,26 +6,26 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { FCMNotificationListener } from "@/components/notifications/FCMNotificationListener";
 
 export const metadata: Metadata = {
-  title: "eklan AI - English Learning Platform",
+  title: "Eklan - English Learning Platform",
   description: "Make English speaking feel natural with AI-powered practice",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "eklan AI",
+    title: "Eklan",
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
     type: "website",
-    siteName: "eklan AI",
-    title: "eklan AI - English Learning Platform",
+    siteName: "Eklan",
+    title: "Eklan - English Learning Platform",
     description: "Make English speaking feel natural with AI-powered practice",
   },
   twitter: {
     card: "summary",
-    title: "eklan AI - English Learning Platform",
+    title: "Eklan - English Learning Platform",
     description: "Make English speaking feel natural with AI-powered practice",
   },
   icons: {
@@ -58,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`antialiased`}>
+      <body className={`antialiased font-satoshi`}>
         <QueryProvider>
           <AuthProvider>
             <ToastProvider />

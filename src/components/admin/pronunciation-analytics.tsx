@@ -146,11 +146,11 @@ export function PronunciationAnalyticsComponent({
           <p className="text-xs text-gray-500 mt-1">Overall</p>
         </div>
 
-        <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
+        <div className="p-4 bg-primary-50 rounded-lg border border-primary-100">
           <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
             Challenging
           </p>
-          <p className="text-2xl font-bold text-purple-600">
+          <p className="text-2xl font-bold text-primary-600">
             {challengingCount}
           </p>
           <p className="text-xs text-gray-500 mt-1">Words</p>
@@ -170,65 +170,65 @@ export function PronunciationAnalyticsComponent({
       {/* Problem Areas Section */}
       {(problemAreas.topIncorrectPhonemes?.length ||
         problemAreas.topIncorrectLetters?.length) > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-orange-500" />
-            Problem Areas
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Top Incorrect Phonemes */}
-            {problemAreas.topIncorrectPhonemes?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
-                  Difficult Sounds
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {problemAreas.topIncorrectPhonemes.map(
-                    (item: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="px-3 py-1.5 bg-orange-100 border border-orange-200 rounded-full text-xs font-medium text-orange-700 flex items-center gap-2"
-                      >
-                        <Volume2 className="w-3 h-3" />
-                        {item.phoneme}
-                        <span className="text-orange-600 font-bold">
-                          ×{item.count}
-                        </span>
-                      </div>
-                    ),
-                  )}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-orange-500" />
+              Problem Areas
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Top Incorrect Phonemes */}
+              {problemAreas.topIncorrectPhonemes?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
+                    Difficult Sounds
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {problemAreas.topIncorrectPhonemes.map(
+                      (item: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="px-3 py-1.5 bg-orange-100 border border-orange-200 rounded-full text-xs font-medium text-orange-700 flex items-center gap-2"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                          {item.phoneme}
+                          <span className="text-orange-600 font-bold">
+                            ×{item.count}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Top Incorrect Letters */}
-            {problemAreas.topIncorrectLetters?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
-                  Difficult Letters
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {problemAreas.topIncorrectLetters.map(
-                    (item: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-full text-xs font-medium text-red-700 flex items-center gap-2"
-                      >
-                        <span className="font-mono font-bold text-base">
-                          {item.letter}
-                        </span>
-                        <span className="text-red-600 font-bold">
-                          ×{item.count}
-                        </span>
-                      </div>
-                    ),
-                  )}
+              {/* Top Incorrect Letters */}
+              {problemAreas.topIncorrectLetters?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
+                    Difficult Letters
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {problemAreas.topIncorrectLetters.map(
+                      (item: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-full text-xs font-medium text-red-700 flex items-center gap-2"
+                        >
+                          <span className="font-mono font-bold text-base">
+                            {item.letter}
+                          </span>
+                          <span className="text-red-600 font-bold">
+                            ×{item.count}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Word-Level Progress */}
       <div className="bg-white rounded-lg border border-gray-200 p-5">
@@ -240,31 +240,28 @@ export function PronunciationAnalyticsComponent({
           <div className="flex gap-2">
             <button
               onClick={() => handleFilterChange("all")}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                filterByStatus === "all"
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${filterByStatus === "all"
                   ? "bg-blue-100 text-blue-700"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               All ({wordStats.length})
             </button>
             <button
               onClick={() => handleFilterChange("passed")}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                filterByStatus === "passed"
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${filterByStatus === "passed"
                   ? "bg-green-100 text-green-700"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               Passed ({completedWordsCount})
             </button>
             <button
               onClick={() => handleFilterChange("challenging")}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                filterByStatus === "challenging"
-                  ? "bg-purple-100 text-purple-700"
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${filterByStatus === "challenging"
+                  ? "bg-primary-100 text-primary-700"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               Challenging ({challengingCount})
             </button>
@@ -316,11 +313,10 @@ export function PronunciationAnalyticsComponent({
                     <div className="text-right">
                       <p className="text-xs text-gray-500">Best</p>
                       <p
-                        className={`text-sm font-bold ${
-                          word.bestScore >= 70
+                        className={`text-sm font-bold ${word.bestScore >= 70
                             ? "text-green-600"
                             : "text-red-600"
-                        }`}
+                          }`}
                       >
                         {word.bestScore?.toFixed(0) || 0}%
                       </p>
@@ -461,12 +457,12 @@ export function PronunciationAnalyticsComponent({
             </p>
           </div>
 
-          <div className="bg-linear-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+          <div className="bg-linear-to-br from-primary-50 to-indigo-50 border border-primary-200 rounded-lg p-4">
             <p className="text-xs font-semibold text-gray-600 mb-2 uppercase">
               Challenging Words
             </p>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold text-purple-600">
+              <p className="text-3xl font-bold text-primary-600">
                 {challengingCount}
               </p>
               <p className="text-xs text-gray-600">needs focus</p>

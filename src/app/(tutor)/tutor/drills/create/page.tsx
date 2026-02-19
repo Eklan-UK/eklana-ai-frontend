@@ -111,7 +111,7 @@ function CreateDrillPageContent() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [existingDrill, setExistingDrill] = useState<any>(null);
-  
+
   // Use React Query instead of useEffect
   const { data: studentsData } = useTutorStudents();
   const students = studentsData?.students || [];
@@ -196,85 +196,85 @@ function CreateDrillPageContent() {
 
   // Load existing drill in edit mode using React Query
   const { data: drillData } = useDrill(drillId || "");
-  
+
   // Update existingDrill when drillData is loaded
   useEffect(() => {
     if (isEditMode && drillData && !existingDrill) {
       const drill = drillData;
       setExistingDrill(drill);
 
-          const aiNames =
-            drill.ai_character_names ||
-            (drill.ai_character_name ? [drill.ai_character_name] : [""]);
+      const aiNames =
+        drill.ai_character_names ||
+        (drill.ai_character_name ? [drill.ai_character_name] : [""]);
 
-          setFormData({
-            title: drill.title || "",
-            date: drill.date
-              ? new Date(drill.date).toISOString().split("T")[0]
-              : new Date().toISOString().split("T")[0],
-            duration_days: drill.duration_days || 1,
-            type: drill.type || "vocabulary",
-            difficulty: drill.difficulty || "intermediate",
-            assigned_to: Array.isArray(drill.assigned_to)
-              ? drill.assigned_to
-              : [drill.assigned_to],
-            context: drill.context || "",
-            audio_example_url: drill.audio_example_url,
-            target_sentences:
-              drill.target_sentences || [
-                { text: "", translation: "" },
-              ],
-            student_character_name: drill.student_character_name || "",
-            ai_character_names: aiNames,
-            roleplay_scenes: drill.roleplay_scenes || [
-              {
-                scene_name: "Scene 1",
-                context: "",
-                dialogue: [
-                  { speaker: "ai_0", text: "", translation: "" },
-                  { speaker: "student", text: "", translation: "" },
-                ],
-              },
-            ],
-            roleplay_dialogue: drill.roleplay_dialogue || [
+      setFormData({
+        title: drill.title || "",
+        date: drill.date
+          ? new Date(drill.date).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        duration_days: drill.duration_days || 1,
+        type: drill.type || "vocabulary",
+        difficulty: drill.difficulty || "intermediate",
+        assigned_to: Array.isArray(drill.assigned_to)
+          ? drill.assigned_to
+          : [drill.assigned_to],
+        context: drill.context || "",
+        audio_example_url: drill.audio_example_url,
+        target_sentences:
+          drill.target_sentences || [
+            { text: "", translation: "" },
+          ],
+        student_character_name: drill.student_character_name || "",
+        ai_character_names: aiNames,
+        roleplay_scenes: drill.roleplay_scenes || [
+          {
+            scene_name: "Scene 1",
+            context: "",
+            dialogue: [
               { speaker: "ai_0", text: "", translation: "" },
               { speaker: "student", text: "", translation: "" },
             ],
-            matching_pairs: drill.matching_pairs || [
-              { left: "", right: "", leftTranslation: "", rightTranslation: "" },
-            ],
-            definition_items: drill.definition_items || [
-              { word: "", hint: "" },
-            ],
-            grammar_items: drill.grammar_items || [
-              { pattern: "", hint: "", example: "" },
-            ],
-            sentence_writing_items: drill.sentence_writing_items || [
-              { word: "", hint: "" },
-            ],
-            article_content: drill.article_content || "",
-            article_title: drill.article_title || "",
-            listening_drill_title: drill.listening_drill_title || "",
-            listening_drill_content: drill.listening_drill_content || "",
-            sentence_drill_word: drill.sentence_drill_word || "",
-            fill_blank_items: drill.fill_blank_items || [
+          },
+        ],
+        roleplay_dialogue: drill.roleplay_dialogue || [
+          { speaker: "ai_0", text: "", translation: "" },
+          { speaker: "student", text: "", translation: "" },
+        ],
+        matching_pairs: drill.matching_pairs || [
+          { left: "", right: "", leftTranslation: "", rightTranslation: "" },
+        ],
+        definition_items: drill.definition_items || [
+          { word: "", hint: "" },
+        ],
+        grammar_items: drill.grammar_items || [
+          { pattern: "", hint: "", example: "" },
+        ],
+        sentence_writing_items: drill.sentence_writing_items || [
+          { word: "", hint: "" },
+        ],
+        article_content: drill.article_content || "",
+        article_title: drill.article_title || "",
+        listening_drill_title: drill.listening_drill_title || "",
+        listening_drill_content: drill.listening_drill_content || "",
+        sentence_drill_word: drill.sentence_drill_word || "",
+        fill_blank_items: drill.fill_blank_items || [
+          {
+            sentence: "",
+            blanks: [
               {
-                sentence: "",
-                blanks: [
-                  {
-                    position: 0,
-                    correctAnswer: "",
-                    options: ["", ""],
-                    hint: "",
-                  },
-                ],
-                translation: "",
+                position: 0,
+                correctAnswer: "",
+                options: ["", ""],
+                hint: "",
               },
             ],
-          });
+            translation: "",
+          },
+        ],
+      });
     }
   }, [isEditMode, drillData, existingDrill]);
-  
+
 
   // Auto-save draft
   useEffect(() => {
@@ -541,8 +541,7 @@ function CreateDrillPageContent() {
         await drillAPI.create(submitData);
         localStorage.removeItem(DRAFT_KEY);
         alert(
-          `Drill created for ${formData.assigned_to.length} student${
-            formData.assigned_to.length !== 1 ? "s" : ""
+          `Drill created for ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""
           }!`
         );
       }
@@ -617,7 +616,7 @@ function CreateDrillPageContent() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">
-                  {isEditMode ? "Assigned to Student *" : "Assign to Students *"}
+                    {isEditMode ? "Assigned to Student *" : "Assign to Students *"}
                   </Label>
                   {!isEditMode && (
                     <Button
@@ -680,9 +679,8 @@ function CreateDrillPageContent() {
                           />
                           <label
                             htmlFor={student.email}
-                            className={`flex-1 select-none ${
-                              isEditMode ? "cursor-default" : "cursor-pointer"
-                            }`}
+                            className={`flex-1 select-none ${isEditMode ? "cursor-default" : "cursor-pointer"
+                              }`}
                           >
                             <div className="font-medium text-gray-900">
                               {student.firstName} {student.lastName}
@@ -863,13 +861,12 @@ function CreateDrillPageContent() {
                               ai_character_names: newNames,
                             });
                           }}
-                          placeholder={`e.g., ${
-                            index === 0
+                          placeholder={`e.g., ${index === 0
                               ? "Waiter"
                               : index === 1
-                              ? "Manager"
-                              : "Host"
-                          }`}
+                                ? "Manager"
+                                : "Host"
+                            }`}
                           required
                         />
                         {(formData.ai_character_names || []).length > 1 && (
@@ -899,34 +896,34 @@ function CreateDrillPageContent() {
 
               {/* Import Section - Available in both create and edit modes */}
               <div className="border-t pt-6 mt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Import Data</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Upload a file, paste from clipboard, or download a template to get started quickly
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* File Upload */}
-                    <div>
-                      <Label className="mb-2 block">Upload Document</Label>
-                      <FileUploadZone
-                        onFileSelect={handleFileSelect}
-                        disabled={isParsing}
-                      />
-                    </div>
-
-                    {/* Clipboard Paste */}
-                    <div>
-                      <Label className="mb-2 block">Or Paste from Clipboard</Label>
-                      <ClipboardPaste
-                        onParse={handleClipboardParse}
-                      />
-                    </div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Import Data</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Upload a file, paste from clipboard, or download a template to get started quickly
+                    </p>
                   </div>
                 </div>
+
+                <div className="space-y-4">
+                  {/* File Upload */}
+                  <div>
+                    <Label className="mb-2 block">Upload Document</Label>
+                    <FileUploadZone
+                      onFileSelect={handleFileSelect}
+                      disabled={isParsing}
+                    />
+                  </div>
+
+                  {/* Clipboard Paste */}
+                  <div>
+                    <Label className="mb-2 block">Or Paste from Clipboard</Label>
+                    <ClipboardPaste
+                      onParse={handleClipboardParse}
+                    />
+                  </div>
+                </div>
+              </div>
 
               {/* Context for other types */}
               {!isRoleplay && (
@@ -1082,11 +1079,10 @@ function CreateDrillPageContent() {
                         {(scene.dialogue || []).map((turn, turnIndex) => (
                           <Card
                             key={turnIndex}
-                            className={`${
-                              turn.speaker === "student"
+                            className={`${turn.speaker === "student"
                                 ? "border-green-200 bg-green-50/30"
                                 : "border-emerald-200 bg-emerald-50/30"
-                            }`}
+                              }`}
                           >
                             <div className="p-4">
                               <div className="flex items-start justify-between mb-3">
@@ -1503,7 +1499,7 @@ function CreateDrillPageContent() {
               </div>
               <div className="space-y-6">
                 {(formData.fill_blank_items || []).map((item, itemIndex) => (
-                  <Card key={itemIndex} className="border-purple-100">
+                  <Card key={itemIndex} className="border-primary-100">
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-4">
                         <h4 className="font-semibold text-gray-900">
@@ -2001,9 +1997,8 @@ function CreateDrillPageContent() {
                   <Save className="w-4 h-4 mr-2" />
                   {isEditMode
                     ? "Update Drill"
-                    : `Create Drill for ${formData.assigned_to.length} Student${
-                        formData.assigned_to.length !== 1 ? "s" : ""
-                      }`}
+                    : `Create Drill for ${formData.assigned_to.length} Student${formData.assigned_to.length !== 1 ? "s" : ""
+                    }`}
                 </>
               )}
             </Button>

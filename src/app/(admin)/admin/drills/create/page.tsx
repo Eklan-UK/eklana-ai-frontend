@@ -1185,7 +1185,7 @@ const DrillBuilder: React.FC = () => {
                   {roleplayScenes.map((scene, sceneIdx) => (
                     <div
                       key={sceneIdx}
-                      className="p-6 bg-purple-50/30 rounded-2xl border border-purple-100"
+                      className="p-6 bg-primary-50/30 rounded-2xl border border-primary-100"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <input
@@ -1241,8 +1241,8 @@ const DrillBuilder: React.FC = () => {
                             <div
                               key={turnIdx}
                               className={`p-4 rounded-xl border ${turn.speaker === "student"
-                                  ? "bg-blue-50/30 border-blue-100"
-                                  : "bg-purple-50/30 border-purple-100"
+                                ? "bg-blue-50/30 border-blue-100"
+                                : "bg-primary-50/30 border-primary-100"
                                 }`}
                             >
                               <div className="flex items-center justify-between mb-2">
@@ -2104,7 +2104,7 @@ const DrillBuilder: React.FC = () => {
                   {users.map((user) => {
                     const name =
                       `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-                      "Unknown";
+                      user.name || "Unknown";
                     const isSelected = selectedUsers.has(user._id);
                     return (
                       <div

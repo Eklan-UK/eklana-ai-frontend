@@ -53,7 +53,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   const getTypeIcon = (type: string) => {
     const icons: Record<string, React.ReactNode> = {
       vocabulary: <BookOpen className="w-6 h-6 text-blue-500" />,
-      roleplay: <MessageSquare className="w-6 h-6 text-purple-500" />,
+      roleplay: <MessageSquare className="w-6 h-6 text-primary-500" />,
       grammar: <FileText className="w-6 h-6 text-pink-500" />,
       matching: <Link2 className="w-6 h-6 text-green-500" />,
       summary: <ScrollText className="w-6 h-6 text-orange-500" />,
@@ -75,8 +75,8 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   const assignedCount = Array.isArray(drill.assigned_to)
     ? drill.assigned_to.length
     : drill.assigned_to
-    ? 1
-    : 0;
+      ? 1
+      : 0;
 
   // drill.date is now the completion/due date
   const completionDate = drill.date ? new Date(drill.date) : null;
@@ -136,11 +136,10 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                   {drill.difficulty}
                 </span>
                 <span className="text-sm text-gray-500 capitalize">{drill.type}</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  drill.is_active
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${drill.is_active
                     ? "bg-green-100 text-green-700"
                     : "bg-gray-100 text-gray-700"
-                }`}>
+                  }`}>
                   {drill.is_active ? "Active" : "Inactive"}
                 </span>
               </div>

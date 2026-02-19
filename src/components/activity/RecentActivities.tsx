@@ -22,7 +22,7 @@ const getActivityIcon = (type: string) => {
     case "pronunciation":
       return { icon: Mic, color: "bg-green-100", iconColor: "text-green-600" };
     case "roleplay":
-      return { icon: MessageSquare, color: "bg-purple-100", iconColor: "text-purple-600" };
+      return { icon: MessageSquare, color: "bg-primary-100", iconColor: "text-primary-600" };
     case "summary":
       return { icon: PenTool, color: "bg-orange-100", iconColor: "text-orange-600" };
     default:
@@ -34,11 +34,11 @@ const getActivityIcon = (type: string) => {
 const formatRelativeTime = (timestamp: number): string => {
   const now = Date.now();
   const diff = now - timestamp;
-  
+
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  
+
   if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
@@ -52,11 +52,11 @@ const formatActivityTitle = (activity: CachedActivity): string => {
   const action = activity.action;
   const type = activity.type;
   const title = activity.metadata?.title || activity.metadata?.drillTitle;
-  
+
   if (title) {
     return title;
   }
-  
+
   // Generate title from action and type
   switch (action) {
     case "started":
@@ -118,7 +118,7 @@ export function RecentActivities({ limit = 4 }: { limit?: number }) {
       {activities.map((activity, index) => {
         const { icon: Icon, color, iconColor } = getActivityIcon(activity.type);
         const score = activity.metadata?.score;
-        
+
         return (
           <Card key={`${activity.resourceId}-${activity.timestamp}-${index}`}>
             <div className="flex items-center justify-between">

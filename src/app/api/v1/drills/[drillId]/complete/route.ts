@@ -13,6 +13,8 @@ import { DrillService } from '@/domain/drills/drill.service';
 import { DrillRepository } from '@/domain/drills/drill.repository';
 import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
+import { computeConfidenceMetrics } from '@/domain/confidence/confidence.service';
+import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
 
 const completeSchema = z.object({
 	drillAssignmentId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -186,6 +188,16 @@ async function handler(
 			deviceInfo: validated.deviceInfo,
 			platform: validated.platform,
 		},
+	});
+
+
+	// Fire-and-forget: recompute confidence & pronunciation metrics in background
+	// Do not await — this must not block or throw to the user
+	setImmediate(() => {
+		Promise.all([
+			computeConfidenceMetrics(context.userId.toString()).catch(() => {}),
+			computePronunciationMetrics(context.userId.toString()).catch(() => {})
+		]);
 	});
 
 	return apiResponse.success({

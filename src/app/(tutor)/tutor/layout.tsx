@@ -4,7 +4,7 @@ import { TutorNav } from "@/components/layout/TutorNav";
 import { RoleGuard } from "@/components/guards/RoleGuard";
 
 export const metadata: Metadata = {
-  title: "Tutor Dashboard - eklan AI",
+  title: "Tutor Dashboard - Eklan",
   description: "Manage your students and create drills",
 };
 

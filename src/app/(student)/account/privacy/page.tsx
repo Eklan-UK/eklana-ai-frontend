@@ -49,7 +49,7 @@ export default function PrivacyPage() {
     {
       title: "9. Contact Us",
       content:
-        "If you have any questions about this Privacy Policy, please contact us at privacy@eklan.ai.",
+        "If you have any questions about this Privacy Policy, please contact us at eklan.ai.",
     },
   ];
 

@@ -36,8 +36,8 @@ export default async function StudentsPage() {
                 </div>
                 <div className="text-sm text-gray-600">Total Students</div>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary-600" />
               </div>
             </div>
           </Card>
@@ -62,9 +62,9 @@ export default async function StudentsPage() {
                 <div className="text-2xl font-bold text-gray-900">
                   {initialData.students?.length > 0
                     ? Math.round(
-                        initialData.students.reduce((sum: number, s: any) => sum + (s.progress || 0), 0) /
-                          initialData.students.length
-                      )
+                      initialData.students.reduce((sum: number, s: any) => sum + (s.progress || 0), 0) /
+                      initialData.students.length
+                    )
                     : 0}%
                 </div>
                 <div className="text-sm text-gray-600">Avg. Progress</div>

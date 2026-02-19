@@ -127,7 +127,7 @@ function UserProfileSection() {
           />
         </div>
       ) : (
-        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 flex items-center justify-center text-2xl md:text-3xl font-bold text-white">
+        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-pink-400 via-primary-400 to-blue-400 flex items-center justify-center text-2xl md:text-3xl font-bold text-white">
           {initials}
         </div>
       )}
@@ -156,9 +156,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
 }) => {
   const content = (
     <div
-      className={`flex items-center justify-between py-4 border-b border-gray-100 ${
-        isDanger ? "text-red-600" : ""
-      }`}
+      className={`flex items-center justify-between py-4 border-b border-gray-100 ${isDanger ? "text-red-600" : ""
+        }`}
     >
       <div className="flex items-center gap-3">
         {icon}
@@ -334,7 +333,6 @@ export default function SettingsPage() {
         <SettingsSection title="Preferences" items={PREFERENCE_SETTINGS} />
 
         <LogoutButton />
-        <VersionInfo />
       </div>
     </div>
   );

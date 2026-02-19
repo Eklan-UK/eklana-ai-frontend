@@ -93,6 +93,7 @@ export const userService = {
    * Get user's display name
    */
   getDisplayName: (user: any): string => {
+    console.log(user)
     if (user.firstName && user.lastName) {
       return `${user.firstName} ${user.lastName}`.trim();
     }

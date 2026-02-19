@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserInitials, getUserDisplayName } from "@/utils/user";
 import Image from "next/image";
+import { ConfidenceCard } from "@/components/confidence/ConfidenceCard";
+import { PronunciationCard } from "@/components/pronunciation/PronunciationCard";
 
 export default function ProfilePage() {
   const { user } = useAuthStore();
@@ -17,13 +19,13 @@ export default function ProfilePage() {
   const userEmail = user?.email || "";
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
       {/* Green Header Section */}
       <div className="bg-gradient-to-br from-green-600 to-green-700 text-white pt-4 pb-8 md:pt-8 md:pb-12">
-        <div className="max-w-md mx-auto px-4 md:max-w-4xl md:px-8">
+        <div className="max-w-md mx-auto px-4 md:max-w-2xl md:px-8">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-xl md:text-2xl font-bold">Profile</h1>
             <Link href="/account/settings">
@@ -44,7 +46,7 @@ export default function ProfilePage() {
                 />
               </div>
             ) : (
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 flex items-center justify-center text-3xl md:text-4xl font-bold text-white">
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-pink-400 via-primary-400 to-blue-400 flex items-center justify-center text-3xl md:text-4xl font-bold text-white">
                 {initials}
               </div>
             )}
@@ -64,7 +66,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8 -mt-6 md:-mt-8">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 -mt-6 md:-mt-8">
         {/* Key Metrics */}
         <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
           <Link href="/account/bookmarks">
@@ -91,6 +93,10 @@ export default function ProfilePage() {
             <p className="text-xs md:text-sm text-gray-500">Time Studied</p>
           </Card>
         </div>
+
+        {/* Confidence Score */}
+        <ConfidenceCard />
+        <PronunciationCard />
 
         {/* Current Plan */}
         <Card className="mb-6">

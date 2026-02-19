@@ -1173,8 +1173,8 @@ export const notificationTypeStyles = {
   // Existing styles...
   new_feature: {
     icon: <ZapIcon />,
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
+    bgColor: 'bg-primary-50',
+    borderColor: 'border-primary-200',
   }
 };
 ```

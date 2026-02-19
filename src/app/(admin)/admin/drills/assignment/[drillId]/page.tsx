@@ -96,7 +96,7 @@ export default function DrillAssignmentDetailPage() {
     // Calculate due date based on drill date and duration
     const dueDate = new Date(
       new Date(drill.date).getTime() +
-        drill.duration_days * 24 * 60 * 60 * 1000
+      drill.duration_days * 24 * 60 * 60 * 1000
     ).toISOString();
 
     assignMutation.mutate(
@@ -130,7 +130,7 @@ export default function DrillAssignmentDetailPage() {
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
       vocabulary: "bg-blue-100 text-blue-700",
-      roleplay: "bg-purple-100 text-purple-700",
+      roleplay: "bg-primary-100 text-primary-700",
       matching: "bg-green-100 text-green-700",
       definition: "bg-yellow-100 text-yellow-700",
       grammar: "bg-red-100 text-red-700",
@@ -339,18 +339,16 @@ export default function DrillAssignmentDetailPage() {
                     <div
                       key={user._id}
                       onClick={() => handleToggleUser(userId)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        isSelected
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${isSelected
                           ? "border-[#418b43] bg-green-50"
                           : "border-gray-100 hover:border-gray-200"
-                      }`}
+                        }`}
                     >
                       <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          isSelected
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
                             ? "bg-[#418b43] border-[#418b43]"
                             : "border-gray-300"
-                        }`}
+                          }`}
                       >
                         {isSelected && (
                           <Check className="w-3 h-3 text-white" />

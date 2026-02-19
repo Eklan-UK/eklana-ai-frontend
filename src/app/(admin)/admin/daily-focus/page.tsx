@@ -39,7 +39,7 @@ interface DailyFocus {
 }
 
 const focusTypeColors: Record<string, string> = {
-  grammar: "bg-purple-100 text-purple-700",
+  grammar: "bg-primary-100 text-primary-700",
   vocabulary: "bg-blue-100 text-blue-700",
   matching: "bg-green-100 text-green-700",
   pronunciation: "bg-orange-100 text-orange-700",
@@ -230,11 +230,10 @@ export default function DailyFocusPage() {
           {filteredEntries.map((entry) => (
             <div
               key={entry._id}
-              className={`bg-white rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${
-                isToday(entry.date)
+              className={`bg-white rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${isToday(entry.date)
                   ? "border-green-300 bg-green-50/30"
                   : "border-gray-100"
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
@@ -245,16 +244,14 @@ export default function DailyFocusPage() {
                       </span>
                     )}
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                        focusTypeColors[entry.focusType] || "bg-gray-100"
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${focusTypeColors[entry.focusType] || "bg-gray-100"
+                        }`}
                     >
                       {entry.focusType}
                     </span>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                        formatTypeColors[entry.practiceFormat] || "bg-gray-100"
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${formatTypeColors[entry.practiceFormat] || "bg-gray-100"
+                        }`}
                     >
                       {entry.practiceFormat.replace("-", " ")}
                     </span>

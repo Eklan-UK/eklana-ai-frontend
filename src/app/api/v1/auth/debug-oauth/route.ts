@@ -41,7 +41,7 @@ export async function GET() {
       instructions: {
         step1: "Copy the 'google' redirect URI above (EXACTLY as shown)",
         step2: "Go to Google Cloud Console → APIs & Services → Credentials",
-        step3: "Click your OAuth 2.0 Client ID (Eklan AI)",
+        step3: "Click your OAuth 2.0 Client ID (Eklan)",
         step4: "Under 'Authorized redirect URIs', add the exact redirect URI",
         step5: "Remove any old/incorrect redirect URIs",
         step6: "Save and wait 5 minutes to a few hours for changes to propagate",

@@ -67,7 +67,7 @@ export default function ContactPage() {
                   Email Support
                 </p>
                 <p className="text-xs text-gray-600">
-                  support@eklan.ai
+                  hello@eklan.ai.ai
                 </p>
               </div>
             </div>

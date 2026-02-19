@@ -27,7 +27,7 @@ export default function VoicePage() {
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         <div className="mb-6">
           <p className="text-base text-gray-600">
-            Choose the voice tone for eklan AI in your conversations and
+            Choose the voice tone for Eklan in your conversations and
             lessons.
           </p>
         </div>

@@ -141,9 +141,9 @@ export default function GrammarDrill({
       // Build grammar results for submission
       const grammarResults = {
         patterns: patternItems.map((item, idx) => ({
-        pattern: item.pattern,
+          pattern: item.pattern,
           example: item.example,
-        hint: item.hint || "",
+          hint: item.hint || "",
           sentences: [
             { text: answers[idx]?.sentence1.trim() || "", index: 0 },
             { text: answers[idx]?.sentence2.trim() || "", index: 1 },
@@ -217,7 +217,7 @@ export default function GrammarDrill({
         </Card>
       )}
 
-        {/* Progress */}
+      {/* Progress */}
       {totalPatterns > 1 && (
         <DrillProgress
           current={currentIndex + 1}
@@ -227,13 +227,13 @@ export default function GrammarDrill({
       )}
 
       {/* Pattern Display Card */}
-      <Card className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+      <Card className="mb-4 bg-gradient-to-r from-primary-50 to-pink-50 border-primary-200">
         <div className="text-center py-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-semibold mb-3">
             <FileText className="w-3 h-3" />
             Grammar Pattern
           </div>
-          
+
           <div className="flex items-center justify-center gap-3 mb-2">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
               {currentPattern?.pattern}
@@ -247,14 +247,14 @@ export default function GrammarDrill({
               sourceDrillId={drill._id}
             />
           </div>
-          
+
           {currentPattern?.hint && (
             <div className="flex items-center justify-center gap-2 mt-3">
               <Lightbulb className="w-4 h-4 text-amber-500" />
               <p className="text-sm text-amber-700">{currentPattern.hint}</p>
             </div>
           )}
-                    </div>
+        </div>
       </Card>
 
       {/* Example Display - Always shown as guide */}
@@ -262,7 +262,7 @@ export default function GrammarDrill({
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-green-600" />
-                    </div>
+          </div>
           <div className="flex-1">
             <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-1">
               Example (Use this as your guide)
@@ -272,44 +272,44 @@ export default function GrammarDrill({
                 "{currentPattern?.example}"
               </p>
               <TTSButton text={currentPattern?.example || ""} size="sm" />
-                </div>
-                    </div>
-                  </div>
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* Instructions */}
       <Card className="mb-4 bg-blue-50 border-blue-200">
         <div className="flex items-start gap-2">
           <PenTool className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div>
+          <div>
             <p className="text-sm font-medium text-blue-900 mb-1">Your Task</p>
             <p className="text-sm text-blue-800">
-              Write <strong>two different sentences</strong> using the pattern above. 
+              Write <strong>two different sentences</strong> using the pattern above.
               Use the example as a guide for how to structure your sentences.
             </p>
-                    </div>
-                  </div>
+          </div>
+        </div>
       </Card>
 
       {/* Sentence 1 Input */}
       <Card className="mb-4">
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xs font-bold">
+            <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
               1
             </span>
             First Sentence:
-                </label>
+          </label>
           <Textarea
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all min-h-[100px] resize-none"
+            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-h-[100px] resize-none"
             placeholder="Write your first sentence using the pattern..."
             value={currentAnswer.sentence1}
             onChange={(e) => updateCurrentAnswer("sentence1", e.target.value)}
-                />
-                <p className="text-xs text-gray-500 mt-2">
+          />
+          <p className="text-xs text-gray-500 mt-2">
             {currentAnswer.sentence1.length} characters
-                </p>
-              </div>
+          </p>
+        </div>
       </Card>
 
       {/* Sentence 2 Input */}
@@ -330,11 +330,11 @@ export default function GrammarDrill({
           <p className="text-xs text-gray-500 mt-2">
             {currentAnswer.sentence2.length} characters
           </p>
-            </div>
-        </Card>
+        </div>
+      </Card>
 
       {/* Navigation Buttons */}
-        <div className="flex gap-3">
+      <div className="flex gap-3">
         {/* Previous Button */}
         <Button
           variant="outline"
@@ -378,7 +378,7 @@ export default function GrammarDrill({
           </Button>
         )}
       </div>
-      
+
       {/* Pattern Progress Indicators */}
       {totalPatterns > 1 && (
         <div className="mt-6 flex justify-center gap-2">
@@ -394,20 +394,19 @@ export default function GrammarDrill({
               <button
                 key={idx}
                 onClick={() => setCurrentIndex(idx)}
-                className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${
-                  isCurrent
-                    ? "bg-purple-500 text-white ring-2 ring-purple-300"
+                className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${isCurrent
+                    ? "bg-primary-500 text-white ring-2 ring-primary-300"
                     : isComplete
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
+                      ? "bg-green-100 text-green-700 hover:bg-green-200"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
                 title={`Pattern ${idx + 1}: ${patternItems[idx].pattern}`}
               >
                 {idx + 1}
               </button>
             );
           })}
-    </div>
+        </div>
       )}
     </DrillLayout>
   );

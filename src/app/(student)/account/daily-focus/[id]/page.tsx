@@ -99,7 +99,7 @@ export default function DailyFocusPracticePage() {
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [startTime] = useState(Date.now());
   const [badgeUnlocked, setBadgeUnlocked] = useState<any>(null);
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -109,28 +109,28 @@ export default function DailyFocusPracticePage() {
       toast.error("Audio not available");
       return;
     }
-    
+
     // Stop current audio if playing
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    
+
     setPlayingAudio(id);
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
-    
+
     audio.onended = () => {
       setPlayingAudio(null);
       audioRef.current = null;
     };
-    
+
     audio.onerror = () => {
       setPlayingAudio(null);
       audioRef.current = null;
       toast.error("Failed to play audio");
     };
-    
+
     audio.play().catch(() => {
       setPlayingAudio(null);
       toast.error("Failed to play audio");
@@ -164,7 +164,7 @@ export default function DailyFocusPracticePage() {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
-      
+
       // Set new timeout for auto-save
       autoSaveTimeoutRef.current = setTimeout(() => {
         saveProgress();
@@ -201,19 +201,19 @@ export default function DailyFocusPracticePage() {
 
       // Build flat question list
       const questions: Array<{ type: QuestionType; data: any; index: number }> = [];
-      
+
       data.fillInBlankQuestions?.forEach((q: any, i: number) => {
         questions.push({ type: "fillInBlank", data: q, index: i });
       });
-      
+
       data.matchingQuestions?.forEach((q: any, i: number) => {
         questions.push({ type: "matching", data: q, index: i });
       });
-      
+
       data.multipleChoiceQuestions?.forEach((q: any, i: number) => {
         questions.push({ type: "multipleChoice", data: q, index: i });
       });
-      
+
       data.vocabularyQuestions?.forEach((q: any, i: number) => {
         questions.push({ type: "vocabulary", data: q, index: i });
       });
@@ -236,7 +236,7 @@ export default function DailyFocusPracticePage() {
       if (progress && !progress.isCompleted) {
         // Restore progress
         setCurrentQuestionIndex(progress.currentQuestionIndex || 0);
-        
+
         // Restore answers
         const restoredAnswers: UserAnswer[] = progress.answers
           .filter((a: any) => a.isSubmitted)
@@ -400,7 +400,7 @@ export default function DailyFocusPracticePage() {
       });
 
       const result = (response as any).data || response;
-      
+
       if (result?.streakUpdated) {
         toast.success("Daily focus completed! Your streak has been updated! 🔥");
       } else {
@@ -462,11 +462,10 @@ export default function DailyFocusPracticePage() {
                 {data.sentenceAudioUrl && (
                   <button
                     onClick={() => playAudio(data.sentenceAudioUrl, `fib-sentence-${currentQuestion.index}`)}
-                    className={`p-2 rounded-full transition-all ${
-                      playingAudio === `fib-sentence-${currentQuestion.index}`
+                    className={`p-2 rounded-full transition-all ${playingAudio === `fib-sentence-${currentQuestion.index}`
                         ? "bg-green-100 text-green-600 animate-pulse"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     <Volume2 className="w-5 h-5" />
                   </button>
@@ -482,11 +481,10 @@ export default function DailyFocusPracticePage() {
                       <button
                         key={i}
                         onClick={() => setCurrentAnswer(option)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between ${
-                          currentAnswer === option
+                        className={`p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between ${currentAnswer === option
                             ? "border-green-500 bg-green-50"
                             : "border-gray-200 hover:border-gray-300"
-                        }`}
+                          }`}
                       >
                         <span>{option}</span>
                         {data.optionsAudioUrls?.[i] && (
@@ -495,11 +493,10 @@ export default function DailyFocusPracticePage() {
                               e.stopPropagation();
                               playAudio(data.optionsAudioUrls[i], `fib-option-${currentQuestion.index}-${i}`);
                             }}
-                            className={`p-1.5 rounded-full ${
-                              playingAudio === `fib-option-${currentQuestion.index}-${i}`
+                            className={`p-1.5 rounded-full ${playingAudio === `fib-option-${currentQuestion.index}-${i}`
                                 ? "bg-green-200 text-green-700 animate-pulse"
                                 : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                            }`}
+                              }`}
                           >
                             <Volume2 className="w-4 h-4" />
                           </button>
@@ -539,11 +536,10 @@ export default function DailyFocusPracticePage() {
                 {data.questionAudioUrl && (
                   <button
                     onClick={() => playAudio(data.questionAudioUrl, `mc-question-${currentQuestion.index}`)}
-                    className={`p-2 rounded-full transition-all ${
-                      playingAudio === `mc-question-${currentQuestion.index}`
+                    className={`p-2 rounded-full transition-all ${playingAudio === `mc-question-${currentQuestion.index}`
                         ? "bg-green-100 text-green-600 animate-pulse"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     <Volume2 className="w-5 h-5" />
                   </button>
@@ -555,7 +551,7 @@ export default function DailyFocusPracticePage() {
               {data.options.map((option: string, i: number) => {
                 const isSelected = currentAnswer === String(i);
                 const isCorrectOption = i === data.correctIndex;
-                
+
                 let optionClass = "border-gray-200 hover:border-gray-300";
                 if (isSubmitted) {
                   if (isCorrectOption) {
@@ -584,11 +580,10 @@ export default function DailyFocusPracticePage() {
                           e.stopPropagation();
                           playAudio(data.optionsAudioUrls[i], `mc-option-${currentQuestion.index}-${i}`);
                         }}
-                        className={`p-1.5 rounded-full shrink-0 ${
-                          playingAudio === `mc-option-${currentQuestion.index}-${i}`
+                        className={`p-1.5 rounded-full shrink-0 ${playingAudio === `mc-option-${currentQuestion.index}-${i}`
                             ? "bg-green-200 text-green-700 animate-pulse"
                             : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                        }`}
+                          }`}
                       >
                         <Volume2 className="w-4 h-4" />
                       </button>
@@ -616,11 +611,10 @@ export default function DailyFocusPracticePage() {
                 {data.leftAudioUrl && (
                   <button
                     onClick={() => playAudio(data.leftAudioUrl, `match-left-${currentQuestion.index}`)}
-                    className={`p-2 rounded-full transition-all ${
-                      playingAudio === `match-left-${currentQuestion.index}`
+                    className={`p-2 rounded-full transition-all ${playingAudio === `match-left-${currentQuestion.index}`
                         ? "bg-blue-200 text-blue-700 animate-pulse"
                         : "bg-white/50 text-blue-600 hover:bg-white"
-                    }`}
+                      }`}
                   >
                     <Volume2 className="w-5 h-5" />
                   </button>
@@ -652,11 +646,10 @@ export default function DailyFocusPracticePage() {
                   {data.rightAudioUrl && (
                     <button
                       onClick={() => playAudio(data.rightAudioUrl, `match-right-${currentQuestion.index}`)}
-                      className={`p-2 rounded-full transition-all ${
-                        playingAudio === `match-right-${currentQuestion.index}`
+                      className={`p-2 rounded-full transition-all ${playingAudio === `match-right-${currentQuestion.index}`
                           ? "bg-green-200 text-green-700 animate-pulse"
                           : "bg-white text-gray-600 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       <Volume2 className="w-4 h-4" />
                     </button>
@@ -670,11 +663,11 @@ export default function DailyFocusPracticePage() {
       case "vocabulary":
         // Check if this is grammar focus type (hide definition)
         const isGrammarFocus = dailyFocus?.focusType === "grammar";
-        
+
         return (
           <div className="space-y-6">
-            <div className="bg-purple-50 rounded-2xl p-6 text-center">
-              <p className="text-sm text-purple-600 font-medium mb-2">
+            <div className="bg-primary-50 rounded-2xl p-6 text-center">
+              <p className="text-sm text-primary-600 font-medium mb-2">
                 {isGrammarFocus ? "Use this word correctly:" : "Define this word:"}
               </p>
               <div className="flex items-center justify-center gap-3">
@@ -682,11 +675,10 @@ export default function DailyFocusPracticePage() {
                 {data.wordAudioUrl && (
                   <button
                     onClick={() => playAudio(data.wordAudioUrl, `vocab-word-${currentQuestion.index}`)}
-                    className={`p-2 rounded-full transition-all ${
-                      playingAudio === `vocab-word-${currentQuestion.index}`
-                        ? "bg-purple-200 text-purple-700 animate-pulse"
-                        : "bg-white/50 text-purple-600 hover:bg-white"
-                    }`}
+                    className={`p-2 rounded-full transition-all ${playingAudio === `vocab-word-${currentQuestion.index}`
+                        ? "bg-primary-200 text-primary-700 animate-pulse"
+                        : "bg-white/50 text-primary-600 hover:bg-white"
+                      }`}
                   >
                     <Volume2 className="w-5 h-5" />
                   </button>
@@ -719,11 +711,10 @@ export default function DailyFocusPracticePage() {
                       {data.definitionAudioUrl && (
                         <button
                           onClick={() => playAudio(data.definitionAudioUrl, `vocab-def-${currentQuestion.index}`)}
-                          className={`p-2 rounded-full transition-all shrink-0 ${
-                            playingAudio === `vocab-def-${currentQuestion.index}`
+                          className={`p-2 rounded-full transition-all shrink-0 ${playingAudio === `vocab-def-${currentQuestion.index}`
                               ? "bg-green-200 text-green-700 animate-pulse"
                               : "bg-white text-gray-600 hover:bg-gray-100"
-                          }`}
+                            }`}
                         >
                           <Volume2 className="w-4 h-4" />
                         </button>
@@ -741,11 +732,10 @@ export default function DailyFocusPracticePage() {
                       {data.exampleAudioUrl && (
                         <button
                           onClick={() => playAudio(data.exampleAudioUrl, `vocab-example-${currentQuestion.index}`)}
-                          className={`p-2 rounded-full transition-all shrink-0 ${
-                            playingAudio === `vocab-example-${currentQuestion.index}`
+                          className={`p-2 rounded-full transition-all shrink-0 ${playingAudio === `vocab-example-${currentQuestion.index}`
                               ? "bg-gray-300 text-gray-700 animate-pulse"
                               : "bg-white text-gray-600 hover:bg-gray-200"
-                          }`}
+                            }`}
                         >
                           <Volume2 className="w-4 h-4" />
                         </button>
@@ -857,13 +847,13 @@ export default function DailyFocusPracticePage() {
                   )}
                 </Button>
               )}
-              
+
               <Link href="/account">
                 <Button variant="primary" size="lg" fullWidth>
                   Back to Dashboard
                 </Button>
               </Link>
-              
+
               <Button
                 variant="outline"
                 size="lg"

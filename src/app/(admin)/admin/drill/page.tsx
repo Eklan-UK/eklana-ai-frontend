@@ -135,13 +135,13 @@ const AdminDrillPage: React.FC = () => {
             <FileCheck className="w-4 h-4" />
             Review Sentences
           </Link>
-        <Link
-          href="/admin/drills/create"
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#418b43] text-white font-medium rounded-xl hover:bg-[#3a7c3b] transition-all shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Create New Drill
-        </Link>
+          <Link
+            href="/admin/drills/create"
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#418b43] text-white font-medium rounded-xl hover:bg-[#3a7c3b] transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Create New Drill
+          </Link>
         </div>
       </div>
 
@@ -277,7 +277,7 @@ const AdminDrillPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 capitalize">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700 capitalize">
                         {drill.difficulty}
                       </span>
                     </td>
@@ -298,11 +298,10 @@ const AdminDrillPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          drill.is_active
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${drill.is_active
                             ? "bg-emerald-100 text-emerald-700"
                             : "bg-gray-100 text-gray-700"
-                        }`}
+                          }`}
                       >
                         {drill.is_active ? "Active" : "Inactive"}
                       </span>
@@ -328,7 +327,7 @@ const AdminDrillPage: React.FC = () => {
                             setSelectedDrill(drill);
                             setShowAssignModal(true);
                           }}
-                          className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           title="Assign to Students"
                         >
                           <Users className="w-4 h-4" />

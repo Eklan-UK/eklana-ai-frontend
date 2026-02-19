@@ -16,7 +16,7 @@ This will show you the exact redirect URI format.
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Navigate to **APIs & Services** → **Credentials**
-3. Click on your OAuth 2.0 Client ID named **"Eklan AI"**
+3. Click on your OAuth 2.0 Client ID named **"Eklan"**
 4. Under **"Authorized redirect URIs"**, you currently have:
    - ❌ `https://app.eklan.ai/account`
    - ❌ `http://localhost:3000/account`

@@ -21,7 +21,7 @@ export class DrillService {
     private attemptRepo: AttemptRepository
   ) {}
 
-  /**
+  /** 
    * Assign drill to multiple users
    * Handles validation, duplicate checking, assignment creation, and notifications
    */
@@ -152,7 +152,7 @@ export class DrillService {
     // 1. Validate creator exists
     const creator = await userService.findById(
       params.creatorId,
-      'email role'
+      'email role firstName lastName name'
     );
 
     // 2. Validate assigned users
@@ -557,6 +557,7 @@ export class DrillService {
     dueDate: Date
   ): Promise<void> {
     const assignerName = userService.getDisplayName(assigner);
+    console.log('assignerName', assignerName);
 
     await Promise.all(
       assignments.map(async (assignment: any) => {

@@ -67,9 +67,9 @@ export function PronunciationScore({ textScore }: PronunciationScoreProps) {
 							{textScore.ielts_score.pronunciation}
 						</p>
 					</div>
-					<div className="p-3 bg-purple-50 rounded-lg">
+					<div className="p-3 bg-primary-50 rounded-lg">
 						<p className="text-xs text-gray-600 mb-1">PTE</p>
-						<p className="text-lg font-bold text-purple-600">
+						<p className="text-lg font-bold text-primary-600">
 							{textScore.pte_score.pronunciation}
 						</p>
 					</div>

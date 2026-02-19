@@ -28,7 +28,7 @@ export default function SettingsTermsPage() {
             </div>
           </div>
           <p className="text-base text-gray-600">
-            Please read these terms carefully before using eklan AI.
+            Please read these terms carefully before using Eklan.
           </p>
         </div>
 

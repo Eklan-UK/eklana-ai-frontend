@@ -135,7 +135,7 @@ export default function EditProfilePage() {
                   />
                 </div>
               ) : (
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-pink-400 via-purple-400 to-blue-400 flex items-center justify-center text-4xl md:text-5xl font-bold text-white border-4 border-green-500">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-pink-400 via-primary-400 to-blue-400 flex items-center justify-center text-4xl md:text-5xl font-bold text-white border-4 border-green-500">
                   {initials}
                 </div>
               )}

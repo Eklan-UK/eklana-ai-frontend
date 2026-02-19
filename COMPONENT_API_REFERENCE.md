@@ -149,7 +149,7 @@ const { data: analytics, isLoading, error } = useLearnerPronunciationAnalytics(l
 
 All Tailwind CSS with:
 - Responsive grid layouts
-- Color-coded metrics (green/yellow/purple/orange/red)
+- Color-coded metrics (green/yellow/primary/orange/red)
 - Smooth transitions and hover effects
 - Mobile-first responsive design
 

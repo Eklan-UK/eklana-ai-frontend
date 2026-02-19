@@ -26,7 +26,7 @@ export default function WelcomePage() {
         {/* Welcome Text */}
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Welcome to eklan AI
+            Welcome to Eklan
           </h1>
           <p className="text-base md:text-lg text-gray-700">
             Let&apos;s make English speaking feel natural.

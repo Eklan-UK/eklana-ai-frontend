@@ -41,6 +41,7 @@ export function LetterLevelFeedback({
   const lettersWithScores = word.split("").map((letter, index) => {
     const relevantPhoneScores = wordScore.phone_score_list.filter((phone) => {
       // Check if the letter's index falls within the phone's word_extent
+      if (!phone.word_extent) return false;
       return index >= phone.word_extent[0] && index < phone.word_extent[1];
     });
 

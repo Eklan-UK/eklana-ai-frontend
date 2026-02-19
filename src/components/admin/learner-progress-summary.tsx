@@ -77,8 +77,8 @@ export function LearnerProgressSummary({
   // Overall progress score (weighted average)
   const overallProgress = totalDrills > 0 && totalWords > 0
     ? Math.round(
-        (drillCompletionRate * 0.5 + wordCompletionRate * 0.5)
-      )
+      (drillCompletionRate * 0.5 + wordCompletionRate * 0.5)
+    )
     : totalDrills > 0
       ? drillCompletionRate
       : totalWords > 0
@@ -140,7 +140,7 @@ export function LearnerProgressSummary({
         {/* Pronunciation Stats */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Mic className="w-4 h-4 text-purple-600" />
+            <Mic className="w-4 h-4 text-primary-600" />
             <p className="text-xs font-semibold text-gray-600 uppercase">Words</p>
           </div>
           <p className="text-2xl font-bold text-gray-900">
@@ -163,13 +163,12 @@ export function LearnerProgressSummary({
             <p className="text-xs font-semibold text-gray-600 uppercase">Avg Score</p>
           </div>
           <p
-            className={`text-2xl font-bold ${
-              overallAverageScore >= 80
+            className={`text-2xl font-bold ${overallAverageScore >= 80
                 ? "text-green-600"
                 : overallAverageScore >= 70
                   ? "text-yellow-600"
                   : "text-red-600"
-            }`}
+              }`}
           >
             {overallAverageScore}%
           </p>
@@ -228,7 +227,7 @@ export function LearnerProgressSummary({
           </div>
         </div>
 
-        <div className="bg-purple-50 rounded-lg border border-purple-100 p-4">
+        <div className="bg-primary-50 rounded-lg border border-primary-100 p-4">
           <p className="text-xs font-semibold text-gray-700 mb-2 uppercase">
             Pronunciation Performance
           </p>

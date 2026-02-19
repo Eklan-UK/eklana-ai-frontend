@@ -93,18 +93,17 @@ export function StreakDisplay() {
           {streakData.weeklyActivity.map((day, index) => {
             const date = new Date(day.date);
             const dayName = dayNames[date.getUTCDay()];
-            
+
             return (
               <div key={index} className="text-center">
                 <div className="text-xs font-medium text-gray-600 mb-2">
                   {dayName}
                 </div>
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${
-                    day.completed
+                  className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${day.completed
                       ? "bg-green-600 text-white"
                       : "bg-gray-200 text-gray-400"
-                  }`}
+                    }`}
                 >
                   {day.completed ? (
                     <Check className="w-5 h-5" />
@@ -122,7 +121,7 @@ export function StreakDisplay() {
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <div className="text-center">
-            <Award className="w-6 h-6 text-purple-600 mx-auto mb-2" />
+            <Award className="w-6 h-6 text-primary-600 mx-auto mb-2" />
             <p className="text-2xl font-bold text-gray-900 mb-1">
               {streakData.longestStreak}
             </p>

@@ -9,12 +9,12 @@ export default function TermsPage() {
     {
       title: "1. Acceptance of Terms",
       content:
-        "By accessing and using eklan AI, you accept and agree to be bound by the terms and provision of this agreement.",
+        "By accessing and using Eklan, you accept and agree to be bound by the terms and provision of this agreement.",
     },
     {
       title: "2. Use License",
       content:
-        "Permission is granted to temporarily use eklan AI for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not: modify or copy the materials; use the materials for any commercial purpose; attempt to decompile or reverse engineer any software; remove any copyright or other proprietary notations from the materials.",
+        "Permission is granted to temporarily use Eklan for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not: modify or copy the materials; use the materials for any commercial purpose; attempt to decompile or reverse engineer any software; remove any copyright or other proprietary notations from the materials.",
     },
     {
       title: "3. User Account",
@@ -24,7 +24,7 @@ export default function TermsPage() {
     {
       title: "4. Privacy Policy",
       content:
-        "Your use of eklan AI is also governed by our Privacy Policy. Please review our Privacy Policy to understand our practices.",
+        "Your use of Eklan is also governed by our Privacy Policy. Please review our Privacy Policy to understand our practices.",
     },
     {
       title: "5. Subscription and Payment",
@@ -34,17 +34,17 @@ export default function TermsPage() {
     {
       title: "6. Content and Intellectual Property",
       content:
-        "All content, features, and functionality of eklan AI are owned by eklan AI and are protected by international copyright, trademark, and other intellectual property laws.",
+        "All content, features, and functionality of Eklan are owned by Eklan and are protected by international copyright, trademark, and other intellectual property laws.",
     },
     {
       title: "7. User Conduct",
       content:
-        "You agree not to use eklan AI to: violate any laws; infringe upon the rights of others; transmit any harmful code; interfere with the service; or engage in any fraudulent activity.",
+        "You agree not to use Eklan to: violate any laws; infringe upon the rights of others; transmit any harmful code; interfere with the service; or engage in any fraudulent activity.",
     },
     {
       title: "8. Limitation of Liability",
       content:
-        "eklan AI shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the service.",
+        "Eklan shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the service.",
     },
     {
       title: "9. Changes to Terms",
@@ -54,7 +54,7 @@ export default function TermsPage() {
     {
       title: "10. Contact Information",
       content:
-        "If you have any questions about these Terms of Use, please contact us at support@eklan.ai.",
+        "If you have any questions about these Terms of Use, please contact us at hello@eklan.ai.ai.",
     },
   ];
 
@@ -80,7 +80,7 @@ export default function TermsPage() {
             </div>
           </div>
           <p className="text-base text-gray-600">
-            Please read these terms carefully before using eklan AI.
+            Please read these terms carefully before using Eklan.
           </p>
         </div>
 
@@ -107,7 +107,7 @@ export default function TermsPage() {
                 Agreement to Terms
               </p>
               <p className="text-xs text-gray-600">
-                By using eklan AI, you acknowledge that you have read, understood, and agree to be bound by these Terms of Use.
+                By using Eklan, you acknowledge that you have read, understood, and agree to be bound by these Terms of Use.
               </p>
             </div>
           </div>

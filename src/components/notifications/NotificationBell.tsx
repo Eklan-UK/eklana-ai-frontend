@@ -11,7 +11,7 @@ const notificationStyles: Record<string, { icon: string; bgColor: string; textCo
   drill_assigned: { icon: '📚', bgColor: 'bg-blue-100', textColor: 'text-blue-600' },
   drill_reminder: { icon: '⏰', bgColor: 'bg-amber-100', textColor: 'text-amber-600' },
   drill_reviewed: { icon: '✅', bgColor: 'bg-green-100', textColor: 'text-green-600' },
-  drill_completed: { icon: '📝', bgColor: 'bg-purple-100', textColor: 'text-purple-600' },
+  drill_completed: { icon: '📝', bgColor: 'bg-primary-100', textColor: 'text-primary-600' },
   daily_focus: { icon: '🎯', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' },
   achievement: { icon: '🏆', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' },
   message: { icon: '💬', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600' },
@@ -120,9 +120,8 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
                       key={notification._id}
                       href={url}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${
-                        !notification.isRead ? 'bg-blue-50/50' : ''
-                      }`}
+                      className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50/50' : ''
+                        }`}
                     >
                       <div className="flex gap-3">
                         {/* Icon */}

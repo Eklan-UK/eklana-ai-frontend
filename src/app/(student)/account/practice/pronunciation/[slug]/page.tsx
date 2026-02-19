@@ -65,10 +65,10 @@ export default function PronunciationWordPracticePage() {
   }, [words, progress]);
 
   // Filter words by type
-  const filteredWords = typeFilter === "all" 
-    ? words 
+  const filteredWords = typeFilter === "all"
+    ? words
     : words.filter((w: any) => w.type === typeFilter);
-  
+
   // Ensure currentWordIndex is within bounds
   const safeIndex = Math.min(currentWordIndex, filteredWords.length - 1);
   const currentWord = filteredWords[safeIndex >= 0 ? safeIndex : 0];
@@ -276,7 +276,7 @@ export default function PronunciationWordPracticePage() {
             <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No words available</h3>
             <p className="text-gray-500 text-sm mb-4">
-              {typeFilter === "all" 
+              {typeFilter === "all"
                 ? "This problem doesn't have any words to practice yet."
                 : `This problem doesn't have any ${typeFilter} items to practice. Try selecting a different type.`}
             </p>
@@ -353,9 +353,8 @@ export default function PronunciationWordPracticePage() {
           {filteredWords.map((_, index) => (
             <div
               key={index}
-              className={`h-2 rounded-full transition-all ${
-                index <= currentWordIndex ? "bg-green-600 w-8" : "bg-gray-300 w-2"
-              }`}
+              className={`h-2 rounded-full transition-all ${index <= currentWordIndex ? "bg-green-600 w-8" : "bg-gray-300 w-2"
+                }`}
             />
           ))}
         </div>
@@ -377,45 +376,45 @@ export default function PronunciationWordPracticePage() {
               <p className="text-lg md:text-xl text-gray-600 mb-6">
                 {currentWord.ipa}
               </p>
-            <div className="flex items-center justify-center gap-4 text-sm text-gray-500 mb-4">
-              {currentWord?.type && (
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 capitalize">
-                  {currentWord.type}
-                </span>
-              )}
-              <div className="flex items-center gap-1">
-                <Volume2 className="w-4 h-4" />
-                <span className="capitalize">{currentWord?.difficulty || problem.difficulty}</span>
+              <div className="flex items-center justify-center gap-4 text-sm text-gray-500 mb-4">
+                {currentWord?.type && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700 capitalize">
+                    {currentWord.type}
+                  </span>
+                )}
+                <div className="flex items-center gap-1">
+                  <Volume2 className="w-4 h-4" />
+                  <span className="capitalize">{currentWord?.difficulty || problem.difficulty}</span>
+                </div>
+                {problem.estimatedTimeMinutes && (
+                  <>
+                    <span>•</span>
+                    <span>{problem.estimatedTimeMinutes} min</span>
+                  </>
+                )}
               </div>
-              {problem.estimatedTimeMinutes && (
-                <>
-                  <span>•</span>
-                  <span>{problem.estimatedTimeMinutes} min</span>
-                </>
+              {problem.description && (
+                <p className="text-sm text-gray-600 mb-4">{problem.description}</p>
               )}
-            </div>
-            {problem.description && (
-              <p className="text-sm text-gray-600 mb-4">{problem.description}</p>
-            )}
-            {wordProgress && wordProgress.attempts > 0 && (
-              <div className="text-sm text-gray-600 mb-4">
-                <p>
-                  Attempts: {wordProgress.attempts} | Best Score: {wordProgress.bestScore?.toFixed(0)}%
-                  {wordProgress.passed && (
-                    <span className="ml-2 text-green-600 font-semibold">✓ Passed</span>
-                  )}
-                </p>
-              </div>
-            )}
-            <label className="flex items-center justify-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={autoPlayAudio}
-                onChange={(e) => setAutoPlayAudio(e.target.checked)}
-                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-              />
-              <span>Auto-play pronunciation</span>
-            </label>
+              {wordProgress && wordProgress.attempts > 0 && (
+                <div className="text-sm text-gray-600 mb-4">
+                  <p>
+                    Attempts: {wordProgress.attempts} | Best Score: {wordProgress.bestScore?.toFixed(0)}%
+                    {wordProgress.passed && (
+                      <span className="ml-2 text-green-600 font-semibold">✓ Passed</span>
+                    )}
+                  </p>
+                </div>
+              )}
+              <label className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={autoPlayAudio}
+                  onChange={(e) => setAutoPlayAudio(e.target.checked)}
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+                <span>Auto-play pronunciation</span>
+              </label>
             </div>
           </Card>
         )}
@@ -445,53 +444,52 @@ export default function PronunciationWordPracticePage() {
         {/* Record Section */}
         {currentWord && (
           <Card className="mb-6">
-          <div className="text-center py-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Record your pronunciation
-            </h3>
-            <div className="relative">
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={isAnalyzing}
-                className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-                  isRecording
-                    ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                    : "bg-blue-500 hover:bg-blue-600"
-                }`}
-              >
-                <Mic className="w-12 h-12 text-white" />
-              </button>
-              {isRecording && (
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
-                  Recording... Tap to stop
+            <div className="text-center py-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Record your pronunciation
+              </h3>
+              <div className="relative">
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isAnalyzing}
+                  className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${isRecording
+                      ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                      : "bg-blue-500 hover:bg-blue-600"
+                    }`}
+                >
+                  <Mic className="w-12 h-12 text-white" />
+                </button>
+                {isRecording && (
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+                    Recording... Tap to stop
+                  </div>
+                )}
+              </div>
+              {!isRecording && !isAnalyzing && !pronunciationScore && (
+                <p className="text-sm text-gray-500 mt-4">
+                  Tap the microphone to start recording
+                </p>
+              )}
+              {isAnalyzing && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <p className="text-sm text-gray-600">Analyzing your pronunciation...</p>
                 </div>
               )}
+              {pronunciationScore && !isAnalyzing && (
+                <p className="text-sm text-green-600 mt-4 font-medium">
+                  ✓ Analysis complete! Scroll down to see your score.
+                </p>
+              )}
             </div>
-            {!isRecording && !isAnalyzing && !pronunciationScore && (
-              <p className="text-sm text-gray-500 mt-4">
-                Tap the microphone to start recording
-              </p>
-            )}
-            {isAnalyzing && (
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <p className="text-sm text-gray-600">Analyzing your pronunciation...</p>
-              </div>
-            )}
-            {pronunciationScore && !isAnalyzing && (
-              <p className="text-sm text-green-600 mt-4 font-medium">
-                ✓ Analysis complete! Scroll down to see your score.
-              </p>
-            )}
-          </div>
-        </Card>
+          </Card>
         )}
 
         {/* Pronunciation Score Section */}
         {pronunciationScore && currentWord && (
           <div className="mb-6 space-y-4">
             <PronunciationScore textScore={pronunciationScore} />
-            
+
             {/* Letter-level feedback */}
             {pronunciationScore.word_score_list.length > 0 && (
               <LetterLevelFeedback
@@ -525,36 +523,36 @@ export default function PronunciationWordPracticePage() {
               </Button>
             )}
             {pronunciationScore && currentWordIndex === filteredWords.length - 1 && (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => router.push("/account/practice/pronunciation/completed")}
-              disabled={isRecording || isAnalyzing}
-            >
-              Complete Practice
-            </Button>
-          )}
-          {pronunciationScore && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={() => router.push("/account/practice/pronunciation/completed")}
+                disabled={isRecording || isAnalyzing}
+              >
+                Complete Practice
+              </Button>
+            )}
+            {pronunciationScore && (
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                onClick={handleTryAgain}
+                disabled={isRecording || isAnalyzing}
+              >
+                Try Again
+              </Button>
+            )}
             <Button
               variant="outline"
               size="lg"
               fullWidth
-              onClick={handleTryAgain}
+              onClick={() => router.back()}
               disabled={isRecording || isAnalyzing}
             >
-              Try Again
+              Back to Practice
             </Button>
-          )}
-          <Button
-            variant="outline"
-            size="lg"
-            fullWidth
-            onClick={() => router.back()}
-            disabled={isRecording || isAnalyzing}
-          >
-            Back to Practice
-          </Button>
           </div>
         )}
       </div>

@@ -62,7 +62,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     const iconProps = { className: "w-6 h-6" };
     const icons: Record<string, React.ReactNode> = {
       vocabulary: <BookOpen {...iconProps} className="w-6 h-6 text-blue-500" />,
-      roleplay: <MessageSquare {...iconProps} className="w-6 h-6 text-purple-500" />,
+      roleplay: <MessageSquare {...iconProps} className="w-6 h-6 text-primary-500" />,
       grammar: <FileText {...iconProps} className="w-6 h-6 text-pink-500" />,
       matching: <Link2 {...iconProps} className="w-6 h-6 text-green-500" />,
       summary: <ScrollText {...iconProps} className="w-6 h-6 text-orange-500" />,
@@ -86,8 +86,8 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     (Array.isArray(drill.assigned_to)
       ? drill.assigned_to.length
       : drill.assigned_to
-      ? 1
-      : 0);
+        ? 1
+        : 0);
 
   const completedAssignments = assignments.filter(
     (a: any) => a.status === "completed"
@@ -294,18 +294,17 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                         {scene.dialogue.map((turn: any, turnIdx: number) => (
                           <div
                             key={turnIdx}
-                            className={`p-2 rounded ${
-                              turn.speaker === "student"
+                            className={`p-2 rounded ${turn.speaker === "student"
                                 ? "bg-blue-50"
-                                : "bg-purple-50"
-                            }`}
+                                : "bg-primary-50"
+                              }`}
                           >
                             <span className="font-semibold text-xs text-gray-500">
                               {turn.speaker === "student"
                                 ? drill.student_character_name || "Student"
                                 : drill.ai_character_names?.[
-                                    parseInt(turn.speaker.split("_")[1]) || 0
-                                  ] || turn.speaker}
+                                parseInt(turn.speaker.split("_")[1]) || 0
+                                ] || turn.speaker}
                               :
                             </span>
                             <p className="text-gray-900">{turn.text}</p>
@@ -499,8 +498,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       assignment.user ||
                       assignment.learnerId;
                     const userName = user
-                      ? `${user.firstName || ""} ${
-                          user.lastName || ""
+                      ? `${user.firstName || ""} ${user.lastName || ""
                         }`.trim() || user.email
                       : "Unknown User";
                     const userEmail = user?.email || "N/A";
@@ -562,8 +560,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       assignment.user ||
                       assignment.learnerId;
                     const userName = user
-                      ? `${user.firstName || ""} ${
-                          user.lastName || ""
+                      ? `${user.firstName || ""} ${user.lastName || ""
                         }`.trim() || user.email
                       : "Unknown User";
                     const userEmail = user?.email || "N/A";
@@ -582,11 +579,10 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                         className="block"
                       >
                         <div
-                          className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors ${
-                            isOverdue
+                          className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors ${isOverdue
                               ? "bg-red-50 border border-red-200"
                               : "bg-gray-50 border border-gray-200"
-                          }`}
+                            }`}
                         >
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">
@@ -595,11 +591,10 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                             <p className="text-sm text-gray-500">{userEmail}</p>
                             {assignment.dueDate && (
                               <p
-                                className={`text-xs mt-1 ${
-                                  isOverdue
+                                className={`text-xs mt-1 ${isOverdue
                                     ? "text-red-600 font-medium"
                                     : "text-gray-500"
-                                }`}
+                                  }`}
                               >
                                 Due:{" "}
                                 {new Date(
@@ -611,14 +606,13 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                           </div>
                           <div className="flex items-center gap-4">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                assignment.status === "in-progress" ||
-                                assignment.status === "in_progress"
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${assignment.status === "in-progress" ||
+                                  assignment.status === "in_progress"
                                   ? "bg-yellow-100 text-yellow-700"
                                   : isOverdue
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
                             >
                               {isOverdue
                                 ? "Overdue"

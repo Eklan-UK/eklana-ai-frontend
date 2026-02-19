@@ -396,7 +396,7 @@ node scripts/generate-vapid-keys.js
 The `public/manifest.json` includes Web App Manifest required for PWA support:
 ```json
 {
-  "name": "eklan AI - English Learning Platform",
+  "name": "Eklan - English Learning Platform",
   "start_url": "/",
   "display": "standalone",
   "icons": [...]

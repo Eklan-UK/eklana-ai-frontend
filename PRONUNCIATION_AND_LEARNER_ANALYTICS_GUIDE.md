@@ -672,7 +672,7 @@ To display results for new drill type:
 - **Green (success):** Score >= 70, completed status
 - **Yellow/Amber (warning):** Score 50-69, in-progress
 - **Red (alert):** Score < 50, challenging words
-- **Purple (info):** Statistics, counts
+- **primary (info):** Statistics, counts
 - **Orange (notice):** Pending review, weak areas
 
 ---

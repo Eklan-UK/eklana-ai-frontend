@@ -59,19 +59,19 @@ export default function FAQPage() {
 
   const faqs = [
     {
-      question: "How does eklan AI work?",
+      question: "How does Eklan work?",
       answer:
-        "eklan AI uses advanced speech recognition and AI technology to help you practice English speaking. You'll engage in conversations, practice pronunciation, and receive personalized feedback to improve your skills.",
+        "Eklan uses advanced speech recognition and AI technology to help you practice English speaking. You'll engage in conversations, practice pronunciation, and receive personalized feedback to improve your skills.",
     },
     {
-      question: "Is eklan AI free to use?",
+      question: "Is Eklan free to use?",
       answer:
         "Yes! We offer a free tier with access to basic features. You can upgrade to premium for advanced features, unlimited practice, and personalized learning paths.",
     },
     {
       question: "What devices are supported?",
       answer:
-        "eklan AI works on iOS and Android mobile devices, as well as web browsers. You can practice anywhere, anytime!",
+        "Eklan works on iOS and Android mobile devices, as well as web browsers. You can practice anywhere, anytime!",
     },
     {
       question: "How do I track my progress?",
@@ -100,7 +100,7 @@ export default function FAQPage() {
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         <div className="mb-6">
           <p className="text-base text-gray-600">
-            Find answers to common questions about eklan AI
+            Find answers to common questions about Eklan
           </p>
         </div>
 

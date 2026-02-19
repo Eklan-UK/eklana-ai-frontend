@@ -16,7 +16,7 @@ const notificationStyles: Record<string, { icon: string; bgColor: string }> = {
   drill_assigned: { icon: '📚', bgColor: 'bg-blue-100' },
   drill_reminder: { icon: '⏰', bgColor: 'bg-amber-100' },
   drill_reviewed: { icon: '✅', bgColor: 'bg-green-100' },
-  drill_completed: { icon: '📝', bgColor: 'bg-purple-100' },
+  drill_completed: { icon: '📝', bgColor: 'bg-primary-100' },
   daily_focus: { icon: '🎯', bgColor: 'bg-indigo-100' },
   achievement: { icon: '🏆', bgColor: 'bg-yellow-100' },
   message: { icon: '💬', bgColor: 'bg-cyan-100' },
@@ -27,10 +27,10 @@ const notificationStyles: Record<string, { icon: string; bgColor: string }> = {
 export default function NotificationsPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  
-  const { data, isLoading, isFetching } = useNotifications({ 
-    limit: 50, 
-    unreadOnly: filter === 'unread' 
+
+  const { data, isLoading, isFetching } = useNotifications({
+    limit: 50,
+    unreadOnly: filter === 'unread'
   });
   const markAsRead = useMarkAsRead();
   const markAllAsRead = useMarkAllAsRead();
@@ -43,7 +43,7 @@ export default function NotificationsPage() {
     if (!notification.isRead) {
       await markAsRead.mutateAsync(notification._id);
     }
-    
+
     if (notification.data?.url) {
       router.push(notification.data.url);
     }
@@ -64,27 +64,25 @@ export default function NotificationsPage() {
       <div className="h-6" />
       <Header title="Notifications" />
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         {/* Filter Tabs & Actions */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'all'
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all'
                   ? 'bg-green-500 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setFilter('unread')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === 'unread'
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'unread'
                   ? 'bg-green-500 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               Unread {unreadCount > 0 && `(${unreadCount})`}
             </button>
@@ -115,7 +113,7 @@ export default function NotificationsPage() {
               {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
             </h3>
             <p className="text-gray-500 text-sm">
-              {filter === 'unread' 
+              {filter === 'unread'
                 ? "You're all caught up!"
                 : "We'll notify you when something important happens"
               }
@@ -129,9 +127,8 @@ export default function NotificationsPage() {
               return (
                 <Card
                   key={notification._id}
-                  className={`p-4 cursor-pointer hover:shadow-md transition-all ${
-                    !notification.isRead ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''
-                  }`}
+                  className={`p-4 cursor-pointer hover:shadow-md transition-all ${!notification.isRead ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''
+                    }`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex gap-4">
@@ -151,7 +148,7 @@ export default function NotificationsPage() {
                             {notification.body}
                           </p>
                         </div>
-                        
+
                         {/* Delete Button */}
                         <button
                           onClick={(e) => handleDelete(e, notification._id)}

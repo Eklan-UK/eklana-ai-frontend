@@ -178,11 +178,10 @@ function ReviewStatusBadge({
     if (isSummary) {
       return (
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-            isAcceptable
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isAcceptable
               ? "bg-green-100 text-green-700"
               : "bg-amber-100 text-amber-700"
-          }`}
+            }`}
         >
           {isAcceptable ? (
             <CheckCircle className="w-4 h-4" />
@@ -200,11 +199,10 @@ function ReviewStatusBadge({
     const allCorrect = correctCount === totalCount;
     return (
       <div
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-          allCorrect
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${allCorrect
             ? "bg-green-100 text-green-700"
             : "bg-amber-100 text-amber-700"
-        }`}
+          }`}
       >
         {allCorrect ? (
           <CheckCircle className="w-4 h-4" />
@@ -243,23 +241,23 @@ export default function DrillCompletedPage() {
   } = useQuery({
     queryKey: ["drills", "assignments", assignmentId, "attempts"],
     queryFn: async () => {
-    if (!assignmentId) {
+      if (!assignmentId) {
         throw new Error("Assignment ID is required");
-    }
-        const response = await apiRequest<{
-          code: string;
-          message: string;
-          data: {
-            assignment: DrillAssignment;
-            attempts: DrillAttempt[];
-            latestAttempt: DrillAttempt | null;
-            totalAttempts: number;
-          };
-        }>(`/drills/assignments/${assignmentId}/attempts`, {
-          method: "GET",
-        });
+      }
+      const response = await apiRequest<{
+        code: string;
+        message: string;
+        data: {
+          assignment: DrillAssignment;
+          attempts: DrillAttempt[];
+          latestAttempt: DrillAttempt | null;
+          totalAttempts: number;
+        };
+      }>(`/drills/assignments/${assignmentId}/attempts`, {
+        method: "GET",
+      });
 
-        if (response.code === "Success" && response.data) {
+      if (response.code === "Success" && response.data) {
         return response.data;
       }
       throw new Error("Failed to load submission");
@@ -286,7 +284,7 @@ export default function DrillCompletedPage() {
     if (attempt.sentenceResults) {
       const { reviewStatus, sentenceReviews, sentences, words } =
         attempt.sentenceResults;
-      
+
       // Calculate total sentences (multi-word support)
       let totalCount = 0;
       if (words && words.length > 0) {
@@ -294,7 +292,7 @@ export default function DrillCompletedPage() {
       } else {
         totalCount = sentences?.length || 0;
       }
-      
+
       if (reviewStatus === "reviewed" && sentenceReviews) {
         const correctCount = sentenceReviews.filter((r) => r.isCorrect).length;
         return { status: reviewStatus, correctCount, totalCount };
@@ -561,35 +559,33 @@ export default function DrillCompletedPage() {
                     {patternItem.sentences?.map((sentence, sentenceIdx) => {
                       const review = isReviewed
                         ? patternReviews?.find(
-                            (r) =>
-                              r.patternIndex === patternIdx &&
-                              r.sentenceIndex === sentence.index
-                          )
+                          (r) =>
+                            r.patternIndex === patternIdx &&
+                            r.sentenceIndex === sentence.index
+                        )
                         : null;
                       const isCorrect = review?.isCorrect ?? null;
 
                       return (
                         <div
                           key={sentenceIdx}
-                          className={`rounded-lg border-2 ${
-                            isCorrect === true
+                          className={`rounded-lg border-2 ${isCorrect === true
                               ? "border-green-300 bg-green-50"
                               : isCorrect === false
-                              ? "border-red-200 bg-white"
-                              : "border-gray-200 bg-gray-50"
-                          }`}
+                                ? "border-red-200 bg-white"
+                                : "border-gray-200 bg-gray-50"
+                            }`}
                         >
                           <div className="p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3 flex-1">
                                 <span
-                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                                    isCorrect === true
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isCorrect === true
                                       ? "bg-green-200 text-green-700"
                                       : isCorrect === false
-                                      ? "bg-red-100 text-red-600"
-                                      : "bg-gray-200 text-gray-600"
-                                  }`}
+                                        ? "bg-red-100 text-red-600"
+                                        : "bg-gray-200 text-gray-600"
+                                    }`}
                                 >
                                   {sentence.index + 1}
                                 </span>
@@ -680,28 +676,28 @@ export default function DrillCompletedPage() {
                 </div>
               </Card>
               {attempt.grammarResults.patternScores.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">
-                      Pattern Scores
-                    </h4>
-                    <div className="space-y-2">
-                      {attempt.grammarResults.patternScores.map(
-                        (patternScore, idx) => (
-                          <Card key={idx} className="p-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-700">
-                                {patternScore.pattern}
-                              </span>
-                              <span className="text-sm font-semibold text-[#22c55e]">
-                                {patternScore.score}%
-                              </span>
-                            </div>
-                          </Card>
-                        )
-                      )}
-                    </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Pattern Scores
+                  </h4>
+                  <div className="space-y-2">
+                    {attempt.grammarResults.patternScores.map(
+                      (patternScore, idx) => (
+                        <Card key={idx} className="p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-700">
+                              {patternScore.pattern}
+                            </span>
+                            <span className="text-sm font-semibold text-[#22c55e]">
+                              {patternScore.score}%
+                            </span>
+                          </div>
+                        </Card>
+                      )
+                    )}
                   </div>
-                )}
+                </div>
+              )}
             </div>
           );
         }
@@ -737,7 +733,7 @@ export default function DrillCompletedPage() {
             </div>
           );
         }
-        // eslint-disable-next-line no-fallthrough
+      // eslint-disable-next-line no-fallthrough
 
       case "sentence":
         if (attempt.sentenceResults) {
@@ -762,7 +758,7 @@ export default function DrillCompletedPage() {
             }
             return globalIdx + sentenceIdx;
           };
-          
+
           return (
             <div className="space-y-6">
               {allWords.map((wordItem, wordIdx) => (
@@ -779,66 +775,64 @@ export default function DrillCompletedPage() {
                         Your Definition:
                       </p>
                       <p className="text-gray-900">{wordItem.definition}</p>
+                    </div>
                   </div>
-                </div>
 
-              {/* Sentences */}
-                <div className="space-y-4">
+                  {/* Sentences */}
+                  <div className="space-y-4">
                     <h4 className="font-medium text-gray-700">Your Sentences:</h4>
                     {wordItem.sentences?.map((sentence, sentenceIdx) => {
                       const globalIdx = getGlobalIndex(wordIdx, sentenceIdx);
-                    const review = isReviewed 
+                      const review = isReviewed
                         ? sentenceReviews?.find(
-                            (r: any) =>
-                              r.sentenceIndex === globalIdx ||
-                              r.sentenceIndex === sentence.index
-                          )
-                      : null;
+                          (r: any) =>
+                            r.sentenceIndex === globalIdx ||
+                            r.sentenceIndex === sentence.index
+                        )
+                        : null;
                       const isCorrect = review?.isCorrect ?? null;
-                    
-                    return (
+
+                      return (
                         <div
                           key={sentenceIdx}
-                          className={`rounded-lg border-2 ${
-                            isCorrect === true
+                          className={`rounded-lg border-2 ${isCorrect === true
                               ? "border-green-300 bg-green-50"
                               : isCorrect === false
-                              ? "border-red-200 bg-white"
-                              : "border-gray-200 bg-gray-50"
-                          }`}
+                                ? "border-red-200 bg-white"
+                                : "border-gray-200 bg-gray-50"
+                            }`}
                         >
                           <div className="p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3 flex-1">
                                 <span
-                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                                    isCorrect === true
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${isCorrect === true
                                       ? "bg-green-200 text-green-700"
                                       : isCorrect === false
-                                      ? "bg-red-100 text-red-600"
-                                      : "bg-gray-200 text-gray-600"
-                                  }`}
+                                        ? "bg-red-100 text-red-600"
+                                        : "bg-gray-200 text-gray-600"
+                                    }`}
                                 >
                                   {sentenceIdx + 1}
-                          </span>
+                                </span>
                                 <p className="text-gray-900 pt-0.5">
                                   {sentence.text}
                                 </p>
                               </div>
-                          {isReviewed && (
+                              {isReviewed && (
                                 <div className="flex-shrink-0">
                                   {isCorrect ? (
                                     <CheckCircle className="w-6 h-6 text-green-600" />
                                   ) : (
                                     <XCircle className="w-6 h-6 text-red-500" />
-                          )}
-                        </div>
+                                  )}
+                                </div>
                               )}
                             </div>
-                        </div>
+                          </div>
 
                           {/* Correction */}
-                        {isReviewed && !isCorrect && review?.correctedText && (
+                          {isReviewed && !isCorrect && review?.correctedText && (
                             <div className="border-t border-green-200 bg-green-100 p-4 rounded-b-lg">
                               <div className="flex items-start gap-2">
                                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -851,16 +845,16 @@ export default function DrillCompletedPage() {
                                   </p>
                                 </div>
                               </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </Card>
               ))}
 
-                {!isReviewed && (
+              {!isReviewed && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Clock3 className="w-5 h-5 text-amber-600" />
@@ -869,11 +863,11 @@ export default function DrillCompletedPage() {
                       <p className="text-sm text-amber-700">
                         Your submission is waiting to be reviewed. You'll be
                         notified when feedback is available.
-                    </p>
+                      </p>
                     </div>
                   </div>
-                  </div>
-                )}
+                </div>
+              )}
             </div>
           );
         }
@@ -904,22 +898,21 @@ export default function DrillCompletedPage() {
                       Passage: {articleTitle}
                     </p>
                   )}
-                    </div>
+                </div>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {summary || "No summary provided"}
                   </p>
-                    </div>
+                </div>
               </Card>
 
               {/* Review Feedback */}
               {isReviewed ? (
                 <Card
-                  className={`p-6 ${
-                    review.isAcceptable
+                  className={`p-6 ${review.isAcceptable
                       ? "bg-green-50 border-2 border-green-200"
                       : "bg-amber-50 border-2 border-amber-200"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3 mb-4">
                     {review.isAcceptable ? (
@@ -929,11 +922,10 @@ export default function DrillCompletedPage() {
                     )}
                     <div>
                       <h3
-                        className={`font-semibold ${
-                          review.isAcceptable
+                        className={`font-semibold ${review.isAcceptable
                             ? "text-green-900"
                             : "text-amber-900"
-                        }`}
+                          }`}
                       >
                         {review.isAcceptable
                           ? "Great job! Your summary is acceptable."
@@ -946,20 +938,18 @@ export default function DrillCompletedPage() {
                   {review.feedback && (
                     <div className="mb-4">
                       <h4
-                        className={`text-sm font-semibold mb-2 ${
-                          review.isAcceptable
+                        className={`text-sm font-semibold mb-2 ${review.isAcceptable
                             ? "text-green-800"
                             : "text-amber-800"
-                        }`}
+                          }`}
                       >
                         Tutor Feedback:
                       </h4>
                       <p
-                        className={`${
-                          review.isAcceptable
+                        className={`${review.isAcceptable
                             ? "text-green-700"
                             : "text-amber-700"
-                        } leading-relaxed`}
+                          } leading-relaxed`}
                       >
                         {review.feedback}
                       </p>
@@ -977,10 +967,10 @@ export default function DrillCompletedPage() {
                         <p className="text-green-900 leading-relaxed whitespace-pre-wrap">
                           {review.correctedVersion}
                         </p>
-                </div>
+                      </div>
                     </div>
                   )}
-              </Card>
+                </Card>
               ) : (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <div className="flex items-center gap-3">
@@ -1088,16 +1078,16 @@ export default function DrillCompletedPage() {
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
             <div className="flex items-center gap-3">
-            <span className="text-3xl">{typeInfo.icon}</span>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {assignment.drillId.title}
-              </h1>
-              <p className="text-sm text-gray-500 capitalize">
-                {assignment.drillId.type.replace("_", " ")} •{" "}
-                {assignment.drillId.difficulty}
-              </p>
-            </div>
+              <span className="text-3xl">{typeInfo.icon}</span>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {assignment.drillId.title}
+                </h1>
+                <p className="text-sm text-gray-500 capitalize">
+                  {assignment.drillId.type.replace("_", " ")} •{" "}
+                  {assignment.drillId.difficulty}
+                </p>
+              </div>
             </div>
             {/* Review Status Badge */}
             {reviewStats && (
@@ -1140,9 +1130,9 @@ export default function DrillCompletedPage() {
               </div>
               <p className="text-sm text-gray-600">Time Spent</p>
             </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
+            <div className="text-center p-4 bg-primary-50 rounded-lg">
               <div className="flex items-center justify-center gap-2 mb-1">
-                <Target className="w-5 h-5 text-purple-600" />
+                <Target className="w-5 h-5 text-primary-600" />
                 <p className="text-2xl font-bold text-gray-900 capitalize">
                   {assignment.drillId.difficulty}
                 </p>

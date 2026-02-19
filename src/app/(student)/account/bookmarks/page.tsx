@@ -75,11 +75,11 @@ export default function BookmarksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="h-6"></div>
       <Header title="My Bookmarks" showBack={false} />
 
-      <div className="max-w-md mx-auto px-4 py-6">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500">
             <Loader2 className="w-8 h-8 animate-spin mb-3 text-green-500" />

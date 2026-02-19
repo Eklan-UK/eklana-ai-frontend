@@ -3,7 +3,7 @@ import Layout from "@/components/admin/Layout";
 import { RoleGuard } from "@/components/guards/RoleGuard";
 
 export const metadata: Metadata = {
-  title: "Admin Dashboard - eklan AI",
+  title: "Admin Dashboard - Eklan",
   description: "Admin dashboard for managing learners, drills, and analytics",
 };
 

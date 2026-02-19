@@ -5,7 +5,7 @@
 import { Metadata } from "next";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://eklan.ai";
-const siteName = "eklan AI";
+const siteName = "Eklan";
 const defaultDescription = "Make English speaking feel natural with AI-powered practice";
 
 /**

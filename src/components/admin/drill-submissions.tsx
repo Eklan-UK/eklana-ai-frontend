@@ -36,7 +36,7 @@ export function DrillSubmissionsComponent({
     isLoading,
     error,
   } = useLearnerDrillAssignments(learnerId);
-  
+
   // Extract data with safe defaults (must be before conditional returns)
   const drills = drillData?.assignments || [];
   const [filterStatus, setFilterStatus] = useState<
@@ -87,18 +87,18 @@ export function DrillSubmissionsComponent({
   const statistics = useMemo(() => {
     const completed = categorizedDrills.completed;
     const review = categorizedDrills.review;
-    
+
     return {
       completionRate: drills.length > 0
         ? ((completed.length / drills.length) * 100).toFixed(1)
         : 0,
       averageScoreValue: completed.length > 0
         ? (
-            completed.reduce(
-              (sum: number, d: any) => sum + (d.latestAttempt?.score || 0),
-              0,
-            ) / completed.length
-          ).toFixed(1)
+          completed.reduce(
+            (sum: number, d: any) => sum + (d.latestAttempt?.score || 0),
+            0,
+          ) / completed.length
+        ).toFixed(1)
         : 0,
       pendingReviewCount: review.length,
     };
@@ -239,52 +239,47 @@ export function DrillSubmissionsComponent({
       <div className="flex gap-2 overflow-x-auto pb-2">
         <button
           onClick={() => handleFilterChange("all")}
-          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-            filterStatus === "all"
+          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${filterStatus === "all"
               ? "bg-blue-100 text-blue-700"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+            }`}
         >
           All ({drills.length})
         </button>
         <button
           onClick={() => handleFilterChange("pending")}
-          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-            filterStatus === "pending"
+          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${filterStatus === "pending"
               ? "bg-gray-100 text-gray-700"
               : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-          }`}
+            }`}
         >
           Pending ({categorizedDrills.pending.length})
         </button>
         <button
           onClick={() => handleFilterChange("in-progress")}
-          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-            filterStatus === "in-progress"
+          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${filterStatus === "in-progress"
               ? "bg-indigo-100 text-indigo-700"
               : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-          }`}
+            }`}
         >
           In Progress ({categorizedDrills.inProgress.length})
         </button>
         <button
           onClick={() => handleFilterChange("completed")}
-          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-            filterStatus === "completed"
+          className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${filterStatus === "completed"
               ? "bg-green-100 text-green-700"
               : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-          }`}
+            }`}
         >
           Completed ({categorizedDrills.completed.length})
         </button>
         {pendingReviewCount > 0 && (
           <button
             onClick={() => handleFilterChange("review")}
-            className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-              filterStatus === "review"
+            className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${filterStatus === "review"
                 ? "bg-orange-100 text-orange-700"
                 : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-            }`}
+              }`}
           >
             For Review ({pendingReviewCount})
           </button>
@@ -388,13 +383,12 @@ export function DrillSubmissionsComponent({
                     <div className="text-right shrink-0">
                       <p className="text-xs text-gray-500 mb-1">Score</p>
                       <p
-                        className={`text-xl font-bold ${
-                          (drill.latestAttempt?.score || drill.bestScore || 0) >= 70
+                        className={`text-xl font-bold ${(drill.latestAttempt?.score || drill.bestScore || 0) >= 70
                             ? "text-green-600"
                             : (drill.latestAttempt?.score || drill.bestScore || 0) >= 50
                               ? "text-yellow-600"
                               : "text-red-600"
-                        }`}
+                          }`}
                       >
                         {drill.latestAttempt?.score || drill.bestScore || 0}%
                       </p>
@@ -427,8 +421,8 @@ export function DrillSubmissionsComponent({
                         <p className="text-sm font-medium text-gray-900">
                           {drill.latestAttempt?.startedAt
                             ? new Date(
-                                drill.latestAttempt.startedAt,
-                              ).toLocaleDateString()
+                              drill.latestAttempt.startedAt,
+                            ).toLocaleDateString()
                             : "Not started"}
                         </p>
                       </div>
@@ -508,11 +502,11 @@ export function DrillSubmissionsComponent({
                     )}
 
                     {drill.latestAttempt?.matchingResults && (
-                      <div className="bg-purple-50 rounded-lg p-3 border border-purple-100">
-                        <p className="text-xs font-semibold text-purple-700 mb-2">
+                      <div className="bg-primary-50 rounded-lg p-3 border border-primary-100">
+                        <p className="text-xs font-semibold text-primary-700 mb-2">
                           Matching Results
                         </p>
-                        <p className="text-xs text-purple-600">
+                        <p className="text-xs text-primary-600">
                           {drill.latestAttempt.matchingResults.pairsMatched} of{" "}
                           {drill.latestAttempt.matchingResults.totalPairs} pairs
                           matched

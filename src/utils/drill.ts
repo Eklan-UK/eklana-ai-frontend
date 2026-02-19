@@ -108,8 +108,8 @@ export function getDrillTypeInfo(type: string): {
     roleplay: { icon: "💬", color: "blue", borderColor: "border-l-blue-500" },
     matching: {
       icon: "🔗",
-      color: "purple",
-      borderColor: "border-l-purple-500",
+      color: "primary",
+      borderColor: "border-l-primary-500",
     },
     definition: {
       icon: "📖",

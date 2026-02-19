@@ -143,7 +143,7 @@ Returns:
 - 🟢 **Green:** Success metrics, high scores (≥70%), completed status
 - 🟡 **Yellow:** Medium performance (50-69%), warnings
 - 🔴 **Red:** Low scores (<50%), challenge indicators
-- 🟣 **Purple:** Statistics, information cards
+- 🟣 **primary:** Statistics, information cards
 - 🟠 **Orange:** Alerts, pending review, weak areas
 
 ### Visual Enhancements:
@@ -303,7 +303,7 @@ Edit Tailwind classes in components:
 - Green (success): `text-green-600`, `bg-green-50`
 - Yellow (warning): `text-yellow-600`, `bg-yellow-50`
 - Red (alert): `text-red-600`, `bg-red-50`
-- Purple (info): `text-purple-600`, `bg-purple-50`
+- primary (info): `text-primary-600`, `bg-primary-50`
 - Orange (notice): `text-orange-600`, `bg-orange-50`
 
 ### Add New Metric:

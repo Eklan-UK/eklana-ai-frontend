@@ -13,6 +13,8 @@ if (config.GEMINI_API_KEY) {
 
 // Default model - using Gemini 2.5 Flash for faster responses
 const DEFAULT_MODEL = 'gemini-2.5-flash';
+// Native Audio model for audio processing
+const NATIVE_AUDIO_MODEL = 'gemini-2.5-flash-native-audio';
 
 interface ConversationMessage {
 	role: 'user' | 'model';
@@ -335,5 +337,217 @@ export async function generateScenarioGreeting(scenario: string): Promise<string
 			'Daily Life': "Oh hey! Long time no see. How've you been?",
 		};
 		return fallbackGreetings[scenario] || "Hey! How's it going?";
+	}
+}
+
+/**
+ * Process audio for pronunciation feedback using Gemini Native Audio
+ */
+export async function analyzePronunciationAudio(
+	audioBuffer: Buffer,
+	expectedText: string,
+	options?: {
+		language?: string;
+		provideFeedback?: boolean;
+	}
+): Promise<{
+	transcription: string;
+	accuracy: number;
+	feedback?: string;
+	phonemes?: any[];
+}> {
+	try {
+		if (!genAI) {
+			throw new Error('Gemini API is not configured');
+		}
+
+		const model = genAI.getGenerativeModel({
+			model: NATIVE_AUDIO_MODEL,
+			generationConfig: {
+				temperature: 0.3,
+				maxOutputTokens: 500,
+			},
+		});
+
+		// Convert buffer to base64
+		const base64Audio = audioBuffer.toString('base64');
+		const mimeType = 'audio/m4a'; // Adjust based on actual audio format
+
+		const prompt = `You are an English pronunciation coach. Analyze this audio recording of a student saying: "${expectedText}".
+
+Provide:
+1. Accurate transcription of what was said
+2. Pronunciation accuracy score (0-100)
+3. Detailed feedback on pronunciation issues
+4. Phoneme-level analysis if possible
+
+Format your response as JSON:
+{
+  "transcription": "...",
+  "accuracy": 85,
+  "feedback": "...",
+  "phonemes": []
+}`;
+
+		const result = await model.generateContent([
+			prompt,
+			{
+				inlineData: {
+					data: base64Audio,
+					mimeType: mimeType,
+				},
+			},
+		]);
+
+		const response = result.response;
+		const text = response.text();
+		
+		// Parse JSON response
+		const jsonMatch = text.match(/\{[\s\S]*\}/);
+		if (jsonMatch) {
+			return JSON.parse(jsonMatch[0]);
+		}
+
+		// Fallback parsing
+		return {
+			transcription: text,
+			accuracy: 0,
+			feedback: 'Could not parse response',
+		};
+	} catch (error: any) {
+		logger.error('Error analyzing pronunciation audio', {
+			error: error.message,
+		});
+		throw new Error(`Failed to analyze audio: ${error.message}`);
+	}
+}
+
+/**
+ * Real-time voice conversation with audio input using Gemini Native Audio
+ */
+export async function processVoiceMessage(
+	audioBuffer: Buffer,
+	conversationHistory?: ConversationMessage[],
+	context?: string
+): Promise<string> {
+	try {
+		if (!genAI) {
+			throw new Error('Gemini API is not configured');
+		}
+
+		const model = genAI.getGenerativeModel({
+			model: NATIVE_AUDIO_MODEL,
+			generationConfig: {
+				temperature: 0.9,
+				maxOutputTokens: 1000,
+			},
+		});
+
+		// Convert buffer to base64
+		const base64Audio = audioBuffer.toString('base64');
+		const mimeType = 'audio/m4a';
+
+		const systemPrompt = context || 
+			`You are a friendly English conversation partner. Listen to the user's audio message and respond naturally. 
+			Help them practice English by engaging in conversation. Be encouraging and provide gentle corrections if needed.`;
+
+		// Build conversation history
+		const history = (conversationHistory || []).map((msg) => ({
+			role: msg.role === 'user' ? 'user' : 'model',
+			parts: [{ text: msg.content }],
+		}));
+
+		const chat = model.startChat({
+			history: history.length > 0 ? history : [],
+		});
+
+		const result = await chat.sendMessage([
+			systemPrompt,
+			{
+				inlineData: {
+					data: base64Audio,
+					mimeType: mimeType,
+				},
+			},
+		]);
+
+		const response = result.response;
+		return response.text();
+	} catch (error: any) {
+		logger.error('Error processing voice message', {
+			error: error.message,
+		});
+		throw new Error(`Failed to process voice message: ${error.message}`);
+	}
+}
+
+/**
+ * Analyze listening comprehension from audio
+ */
+export async function analyzeListeningComprehension(
+	audioBuffer: Buffer,
+	questions: Array<{ question: string; correctAnswer: string }>
+): Promise<{
+	answers: Array<{ question: string; answer: string; isCorrect: boolean }>;
+	overallScore: number;
+	feedback: string;
+}> {
+	try {
+		if (!genAI) {
+			throw new Error('Gemini API is not configured');
+		}
+
+		const model = genAI.getGenerativeModel({
+			model: NATIVE_AUDIO_MODEL,
+			generationConfig: {
+				temperature: 0.2,
+				maxOutputTokens: 1000,
+			},
+		});
+
+		const base64Audio = audioBuffer.toString('base64');
+		const mimeType = 'audio/m4a';
+
+		const questionsText = questions
+			.map((q, i) => `${i + 1}. ${q.question} (Correct: ${q.correctAnswer})`)
+			.join('\n');
+
+		const prompt = `Listen to this audio and answer the following comprehension questions:
+
+${questionsText}
+
+Provide your answers in JSON format:
+{
+  "answers": [
+    {"question": "...", "answer": "...", "isCorrect": true/false}
+  ],
+  "overallScore": 85,
+  "feedback": "..."
+}`;
+
+		const result = await model.generateContent([
+			prompt,
+			{
+				inlineData: {
+					data: base64Audio,
+					mimeType: mimeType,
+				},
+			},
+		]);
+
+		const response = result.response;
+		const text = response.text();
+		
+		const jsonMatch = text.match(/\{[\s\S]*\}/);
+		if (jsonMatch) {
+			return JSON.parse(jsonMatch[0]);
+		}
+
+		throw new Error('Could not parse comprehension analysis');
+	} catch (error: any) {
+		logger.error('Error analyzing listening comprehension', {
+			error: error.message,
+		});
+		throw error;
 	}
 }

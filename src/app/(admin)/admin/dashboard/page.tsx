@@ -41,19 +41,19 @@ const Dashboard: React.FC = () => {
   // Default stats with all optional properties
   const statsWithDefaults: DashboardStats = stats
     ? {
-        totalActiveLearners: stats.totalActiveLearners || 0,
-        totalDrills: stats.totalDrills || 0,
-        newSignupsThisWeek: stats.newSignupsThisWeek || 0,
-        discoveryCallsToday: stats.discoveryCallsToday || 0,
-        videosAwaitingReview: stats.videosAwaitingReview || 0,
-      }
+      totalActiveLearners: stats.totalActiveLearners || 0,
+      totalDrills: stats.totalDrills || 0,
+      newSignupsThisWeek: stats.newSignupsThisWeek || 0,
+      discoveryCallsToday: stats.discoveryCallsToday || 0,
+      videosAwaitingReview: stats.videosAwaitingReview || 0,
+    }
     : {
-        totalActiveLearners: 0,
-        totalDrills: 0,
-        newSignupsThisWeek: 0,
-        discoveryCallsToday: 0,
-        videosAwaitingReview: 0,
-      };
+      totalActiveLearners: 0,
+      totalDrills: 0,
+      newSignupsThisWeek: 0,
+      discoveryCallsToday: 0,
+      videosAwaitingReview: 0,
+    };
 
   const displayStats = [
     {
@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
       title: "Total Drills",
       value: loading ? "..." : statsWithDefaults.totalDrills.toString(),
       change: "",
-      color: "border-purple-200 bg-purple-50/30",
+      color: "border-primary-200 bg-primary-50/30",
     },
     {
       title: "Discovery Calls Today",
@@ -330,9 +330,8 @@ const Dashboard: React.FC = () => {
               ) : (
                 learners.slice(0, 4).map((learner, idx) => {
                   const name =
-                    `${learner.firstName || ""} ${
-                      learner.lastName || ""
-                    }`.trim() || "Unknown";
+                    `${learner.firstName || ""} ${learner.lastName || ""
+                      }`.trim() || "Unknown";
                   const status =
                     learner.isActive === false ? "Inactive" : "Active";
                   const statusColor =
@@ -414,9 +413,8 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-xs font-medium text-gray-500 uppercase mb-1">Average Score</p>
-                <p className={`text-2xl font-bold ${
-                  (pronunciationAnalytics.stats?.averageScore || 0) >= 70 ? 'text-green-600' : 'text-amber-600'
-                }`}>
+                <p className={`text-2xl font-bold ${(pronunciationAnalytics.stats?.averageScore || 0) >= 70 ? 'text-green-600' : 'text-amber-600'
+                  }`}>
                   {pronunciationAnalytics.stats?.averageScore || 0}%
                 </p>
               </div>
@@ -468,35 +466,35 @@ const Dashboard: React.FC = () => {
 
             {/* Difficult Words Table */}
             <div className="lg:col-span-1 rounded-xl border border-gray-200 overflow-hidden">
-               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                 <h3 className="text-sm font-bold text-gray-900">Most Difficult Words</h3>
-               </div>
-               <div className="max-h-[300px] overflow-y-auto">
-                 {pronunciationAnalytics.difficultWords?.length > 0 ? (
-                   <table className="w-full text-sm">
-                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                       <tr>
-                         <th className="px-4 py-2 text-left font-medium">Word</th>
-                         <th className="px-4 py-2 text-right font-medium">Avg Score</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                       {pronunciationAnalytics.difficultWords.map((word: any, i: number) => (
-                         <tr key={i} className="hover:bg-gray-50">
-                           <td className="px-4 py-2 font-medium text-gray-900">{word.word}</td>
-                           <td className="px-4 py-2 text-right">
-                             <span className={`font-bold ${word.avgScore < 60 ? 'text-red-600' : 'text-amber-600'}`}>
-                               {word.avgScore}%
-                             </span>
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 ) : (
-                   <div className="p-4 text-center text-xs text-gray-500 italic">No data available</div>
-                 )}
-               </div>
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-bold text-gray-900">Most Difficult Words</h3>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {pronunciationAnalytics.difficultWords?.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium">Word</th>
+                        <th className="px-4 py-2 text-right font-medium">Avg Score</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pronunciationAnalytics.difficultWords.map((word: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 font-medium text-gray-900">{word.word}</td>
+                          <td className="px-4 py-2 text-right">
+                            <span className={`font-bold ${word.avgScore < 60 ? 'text-red-600' : 'text-amber-600'}`}>
+                              {word.avgScore}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-4 text-center text-xs text-gray-500 italic">No data available</div>
+                )}
+              </div>
             </div>
           </div>
         )}

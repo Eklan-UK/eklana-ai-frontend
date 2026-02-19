@@ -21,8 +21,8 @@ export default function PronunciationPracticePage() {
   const problems = data?.problems || [];
 
   // Filter problems by type
-  const filteredProblems = typeFilter === "all" 
-    ? problems 
+  const filteredProblems = typeFilter === "all"
+    ? problems
     : problems.filter((p: any) => p.type === typeFilter);
 
   const getDifficultyColor = (difficulty: string) => {
@@ -79,7 +79,7 @@ export default function PronunciationPracticePage() {
         </div>
 
         {/* Introduction */}
-        <Card className="mb-6 bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
+        <Card className="mb-6 bg-gradient-to-br from-blue-50 to-primary-50 border-blue-200">
           <div className="p-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -139,7 +139,7 @@ export default function PronunciationPracticePage() {
                         )}
                         <div className="flex items-center gap-3 flex-wrap">
                           {problem.type && (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 capitalize">
+                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700 capitalize">
                               {problem.type}
                             </span>
                           )}
