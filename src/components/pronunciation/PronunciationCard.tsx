@@ -37,7 +37,7 @@ function PronunciationRing({ score }: { score: number }) {
         />
       </svg>
       {/* Score text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center transform rotate-90">
+      <div className="absolute inset-0 flex flex-col items-center justify-center transform">
         <span className="text-3xl font-bold font-nunito text-gray-900 leading-none">
           {Math.round(validScore)}
         </span>
@@ -91,7 +91,7 @@ export function PronunciationCard() {
       <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10">
         
         {/* Ring */}
-        <PronunciationRing score={score} />
+        <PronunciationRing  score={score} />
 
         {/* Stats */}
         <div className="flex-1 text-center sm:text-left">
