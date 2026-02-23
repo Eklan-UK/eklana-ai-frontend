@@ -2,10 +2,37 @@
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLearnerDrills } from "@/hooks/useDrills";
+
+// Drill type display helpers
+const DRILL_TYPE_ICONS: Record<string, string> = {
+  roleplay: "🎭",
+  vocabulary: "📚",
+  grammar: "📝",
+  matching: "🔗",
+  definition: "📖",
+  sentence_writing: "✍️",
+  fill_blank: "📋",
+  summary: "📰",
+  listening: "🎧",
+  sentence: "💬",
+};
+
+const DRILL_PRACTICE_SUBTITLES: Record<string, string> = {
+  roleplay: "Practice roleplay conversations",
+  vocabulary: "Chat using your target words",
+  grammar: "Practice grammar patterns naturally",
+  matching: "Reinforce word connections",
+  definition: "Discuss word meanings",
+  sentence_writing: "Build sentences in context",
+  fill_blank: "Complete sentences in conversation",
+  summary: "Discuss the reading topic",
+  listening: "Talk about what you heard",
+  sentence: "Practice sentence patterns",
+};
 
 function PracticeCard({
   href,
@@ -59,6 +86,9 @@ export default function PracticePage() {
       <Header title="Practice" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
+        {/* ── Drill-Aware Practice Section ── */}
+        <DrillPracticeSection />
+
         {/* ── Practice Freely Section ── */}
         <div className="mb-8">
           <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Practice freely</h2>
@@ -99,6 +129,82 @@ export default function PracticePage() {
       </div>
 
       <BottomNav />
+    </div>
+  );
+}
+
+/**
+ * Drill-Aware Practice Section
+ * Shows drill-based AI practice cards when user has active assignments
+ */
+function DrillPracticeSection() {
+  const { data: drillsData, isLoading } = useLearnerDrills();
+
+  const activeDrills = (drillsData ?? []).filter(
+    (a: any) => a.status === "pending" || a.status === "in_progress"
+  );
+
+  // Don't show this section if no active drills
+  if (isLoading || activeDrills.length === 0) return null;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-1">
+        <h2 className="text-xl font-bold font-nunito text-gray-900">
+          Practice your drills
+        </h2>
+        <Sparkles className="w-5 h-5 text-yellow-500" />
+      </div>
+      <p className="text-sm font-satoshi text-gray-500 mb-4">
+        AI conversations based on your tutor&apos;s assigned drills
+      </p>
+
+      {activeDrills.slice(0, 4).map((assignment: any) => {
+        const drill = assignment.drill;
+        if (!drill) return null;
+
+        const drillId = drill._id || assignment.drillId;
+        const drillType = drill.type || "unknown";
+        const icon = DRILL_TYPE_ICONS[drillType] || "📚";
+        const subtitle =
+          DRILL_PRACTICE_SUBTITLES[drillType] || "Practice with AI";
+
+        return (
+          <Link
+            key={assignment.assignmentId || drillId}
+            href={`/account/practice/ai?drillId=${drillId}`}
+          >
+            <div className="bg-white border border-green-200 rounded-2xl p-4 mb-3 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] transition-transform hover:border-green-300">
+              {/* Icon */}
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl">
+                {icon}
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold font-nunito text-gray-900 mb-0.5 truncate">
+                  {drill.title}
+                </p>
+                <p className="text-sm font-satoshi text-gray-500 mb-1 leading-snug">
+                  {subtitle}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-xs font-satoshi text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                    <Sparkles className="w-3 h-3" />
+                    AI Practice
+                  </span>
+                  <span className="text-xs font-satoshi text-gray-400">
+                    5–10 mins
+                  </span>
+                </div>
+              </div>
+
+              {/* Chevron */}
+              <ChevronRight className="w-5 h-5 text-green-400 flex-shrink-0" />
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
