@@ -148,6 +148,10 @@ const nextConfig: NextConfig = {
   // Note: next-pwa uses webpack, so we need to use webpack mode
   // Adding empty turbopack config to silence the error since next-pwa requires webpack
   turbopack: {},
+
+  // Exclude WebSocket-related packages from serverless bundling
+  // Fixes "b.mask is not a function" error in production (Vercel)
+  serverExternalPackages: ['ws', 'bufferutil', 'utf-8-validate'],
   
   images: {
     remotePatterns: [
