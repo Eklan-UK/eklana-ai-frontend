@@ -343,7 +343,7 @@ export default function AIPracticePage() {
           setIsTranscribing(false);
           setTimeout(() => handleSendText(transcription), 200);
         } catch (err: any) {
-          toast.error("Failed to transcribe audio: " + err.message);
+          toast.error(err.message || "Failed to transcribe. Try using the keyboard instead.");
           setIsTranscribing(false);
         }
       };

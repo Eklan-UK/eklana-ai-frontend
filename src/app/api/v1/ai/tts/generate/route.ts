@@ -122,7 +122,9 @@ async function handler(
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message || 'Failed to generate audio',
+				message: error.message?.includes('429') || error.message?.includes('quota')
+					? 'Voice service is temporarily busy. Please try again in a moment.'
+					: 'Failed to generate audio. Please try again.',
 			},
 			{ status: 500 }
 		);
