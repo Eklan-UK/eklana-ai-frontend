@@ -80,7 +80,7 @@ export default function ListeningPracticePage() {
 
       <Header showBack title="Listening Practice" />
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8">
+      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Introduction */}
         <Card className="mb-6 bg-gradient-to-br from-primary-50 to-blue-50 border-primary-200">
           <div className="p-6">

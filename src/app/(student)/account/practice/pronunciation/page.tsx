@@ -41,7 +41,7 @@ export default function PronunciationPracticePage() {
 
       <Header title="Pronunciation Practice" />
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-4xl md:px-8">
+      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Type Filter */}
         <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
           <Button

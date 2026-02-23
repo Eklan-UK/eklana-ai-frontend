@@ -1036,7 +1036,7 @@ export default function DrillCompletedPage() {
   if (error || !assignment || !attempt) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
           <Link
             href="/account"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
@@ -1066,7 +1066,7 @@ export default function DrillCompletedPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
           <Link
