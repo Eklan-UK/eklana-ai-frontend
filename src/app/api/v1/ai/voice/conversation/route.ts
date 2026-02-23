@@ -47,7 +47,9 @@ async function handler(
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message || 'Failed to process voice message',
+				message: error.message?.includes('429') || error.message?.includes('quota')
+					? 'AI service is temporarily busy. Please wait a moment and try again.'
+					: 'Failed to process voice message. Please try again.',
 			},
 			{ status: 500 }
 		);

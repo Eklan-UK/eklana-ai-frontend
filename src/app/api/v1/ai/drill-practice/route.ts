@@ -109,7 +109,9 @@ async function handler(
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message || 'Failed to generate drill practice response',
+				message: error.message?.includes('429') || error.message?.includes('quota')
+					? 'AI service is temporarily busy. Please wait a moment and try again.'
+					: 'Failed to generate practice response. Please try again.',
 			},
 			{ status: 500 }
 		);
