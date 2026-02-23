@@ -287,7 +287,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       <div className="min-h-screen bg-white pb-20 md:pb-0">
         <div className="h-6"></div>
         <Header title="Drill Completed" showBack={true} />
-        <div className="max-w-md mx-auto px-4 py-6">
+        <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
           <Card className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
@@ -319,7 +319,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       <div className="h-6"></div>
       <Header title={drill.title} showBack={true} />
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Progress Bar */}
         <Card className="mb-6 bg-white/90 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-2">

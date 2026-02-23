@@ -222,7 +222,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
 
   return (
     <DrillLayout title={drill.title} showBack={true}>
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         <DrillProgress
           current={currentIndex + 1}
           total={items.length}

@@ -48,7 +48,7 @@ export function DrillLayout({
     <div className={`min-h-screen ${backgroundGradient} ${hideNavigation ? 'pb-6' : 'pb-20 md:pb-0'}`}>
       <div className="h-6"></div>
       <Header title={title} showBack={showBack} />
-      <div className={`${maxWidthClasses[maxWidth]} mx-auto px-4 py-6 ${className}`}>
+      <div className={`max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6 ${className}`}>
         {children}
       </div>
       {!hideNavigation && <BottomNav />}
