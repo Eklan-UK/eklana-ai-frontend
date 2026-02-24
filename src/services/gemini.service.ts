@@ -33,12 +33,7 @@ interface ConversationOptions {
 	maxTokens?: number;
 }
 
-interface ScenarioOptions {
-	scenario: string;
-	userMessage: string;
-	conversationHistory?: ConversationMessage[];
-	temperature?: number;
-}
+
 
 interface DrillPracticeOptions {
 	drill: {
@@ -417,78 +412,97 @@ async function transcribeWithLiveAPI(
 // ─── Build drill practice system prompt ──────────────────────────────────────
 
 function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunciationWeaknesses?: string[]): string {
-	let prompt = `You are Eklan, an English language teacher. You are having a practice conversation with a student about their "${drill.title}" drill.
+	// ═══ LAYER 1 — Identity ═══
+	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
 
-DRILL TYPE: ${drill.type}
-DIFFICULTY: ${drill.difficulty || 'intermediate'}
-${drill.context ? `CONTEXT: ${drill.context}` : ''}
-
-YOUR ROLE:
-- You are the TEACHER. Be directive — tell the student what they're doing, don't ask for their opinion on what to practice.
-- Keep responses conversational but focused on the drill content.
-- Correct grammar and pronunciation errors naturally within the conversation.
-- Give positive reinforcement when the student does well.
-- Keep responses concise (2-4 sentences typical).
-
-CONVERSATION STYLE:
-- Speak like a real teacher: warm, encouraging, but in charge.
-- Use contractions and natural speech patterns.
-- React authentically to student responses.
-- If the student makes errors, gently correct them and have them try again.`;
-
-	// Add drill-specific content
-	if (drill.target_sentences && drill.target_sentences.length > 0) {
-		prompt += `\n\nTARGET SENTENCES TO PRACTICE:\n${drill.target_sentences.map((s: any, i: number) => `${i + 1}. ${typeof s === 'string' ? s : s.text || JSON.stringify(s)}`).join('\n')}`;
+	// ═══ LAYER 2 — Drill Blueprint ═══
+	prompt += `\n\nDRILL BLUEPRINT:\n- Title: "${drill.title}"\n- Type: ${drill.type}\n- Difficulty: ${drill.difficulty || 'intermediate'}`;
+	if (drill.context) {
+		prompt += `\n- Context: ${drill.context}`;
 	}
 
+	// Character information
+	if (drill.student_character_name) {
+		prompt += `\n- Student plays: ${drill.student_character_name}`;
+	}
+	if (drill.ai_character_names && drill.ai_character_names.length > 0) {
+		prompt += `\n- AI plays: ${drill.ai_character_names.join(', ')}`;
+	}
+
+	// Scene descriptions (human-readable, not raw JSON)
 	if (drill.roleplay_scenes && drill.roleplay_scenes.length > 0) {
-		prompt += `\n\nROLEPLAY SCENES:\n${JSON.stringify(drill.roleplay_scenes, null, 2)}`;
+		const sceneDescriptions = drill.roleplay_scenes.map((scene: any, i: number) => {
+			const parts = [];
+			if (scene.title || scene.name) parts.push(scene.title || scene.name);
+			if (scene.description || scene.context) parts.push(scene.description || scene.context);
+			if (scene.setting) parts.push(`Setting: ${scene.setting}`);
+			return `  ${i + 1}. ${parts.join(' — ') || JSON.stringify(scene)}`;
+		}).join('\n');
+		prompt += `\n- The tutor created scenes about:\n${sceneDescriptions}`;
 	}
 
+	// Key dialogue patterns
 	if (drill.roleplay_dialogue && drill.roleplay_dialogue.length > 0) {
-		prompt += `\n\nROLEPLAY DIALOGUE:\n${JSON.stringify(drill.roleplay_dialogue, null, 2)}`;
-		if (drill.student_character_name) {
-			prompt += `\nStudent plays: ${drill.student_character_name}`;
-		}
-		if (drill.ai_character_names && drill.ai_character_names.length > 0) {
-			prompt += `\nAI plays: ${drill.ai_character_names.join(', ')}`;
-		}
+		const dialoguePatterns = drill.roleplay_dialogue.map((d: any) => {
+			if (typeof d === 'string') return `  - ${d}`;
+			if (d.speaker && d.text) return `  - ${d.speaker}: "${d.text}"`;
+			if (d.line) return `  - ${d.line}`;
+			return `  - ${JSON.stringify(d)}`;
+		}).join('\n');
+		prompt += `\n- Key dialogue patterns include:\n${dialoguePatterns}`;
 	}
 
+	// Target sentences / vocabulary
+	if (drill.target_sentences && drill.target_sentences.length > 0) {
+		const sentences = drill.target_sentences.map((s: any, i: number) =>
+			`  ${i + 1}. ${typeof s === 'string' ? s : s.text || JSON.stringify(s)}`
+		).join('\n');
+		prompt += `\n- Target sentences/vocabulary:\n${sentences}`;
+	}
+
+	// Other drill content (matching, definitions, grammar, etc.)
 	if (drill.matching_pairs && drill.matching_pairs.length > 0) {
-		prompt += `\n\nMATCHING PAIRS:\n${JSON.stringify(drill.matching_pairs, null, 2)}`;
+		prompt += `\n- Vocabulary pairs to incorporate: ${drill.matching_pairs.map((p: any) => `${p.term || p.word} = ${p.definition || p.match}`).join(', ')}`;
 	}
-
 	if (drill.definition_items && drill.definition_items.length > 0) {
-		prompt += `\n\nDEFINITION ITEMS:\n${JSON.stringify(drill.definition_items, null, 2)}`;
+		prompt += `\n- Key definitions: ${drill.definition_items.map((d: any) => `${d.word || d.term}: ${d.definition}`).join('; ')}`;
 	}
-
 	if (drill.grammar_items && drill.grammar_items.length > 0) {
-		prompt += `\n\nGRAMMAR ITEMS:\n${JSON.stringify(drill.grammar_items, null, 2)}`;
+		prompt += `\n- Grammar focus: ${drill.grammar_items.map((g: any) => g.rule || g.pattern || JSON.stringify(g)).join('; ')}`;
 	}
-
-	if (drill.sentence_writing_items && drill.sentence_writing_items.length > 0) {
-		prompt += `\n\nSENTENCE WRITING ITEMS:\n${JSON.stringify(drill.sentence_writing_items, null, 2)}`;
-	}
-
-	if (drill.fill_blank_items && drill.fill_blank_items.length > 0) {
-		prompt += `\n\nFILL-IN-THE-BLANK ITEMS:\n${JSON.stringify(drill.fill_blank_items, null, 2)}`;
-	}
-
 	if (drill.article_title && drill.article_content) {
-		prompt += `\n\nARTICLE: "${drill.article_title}"\n${drill.article_content.substring(0, 500)}...`;
+		prompt += `\n- Related article: "${drill.article_title}" — ${drill.article_content.substring(0, 300)}...`;
 	}
-
-	if (drill.listening_drill_title && drill.listening_drill_content) {
-		prompt += `\n\nLISTENING CONTENT: "${drill.listening_drill_title}"\n${drill.listening_drill_content.substring(0, 500)}...`;
-	}
-
 	if (drill.sentence_drill_word) {
-		prompt += `\n\nTARGET WORD: "${drill.sentence_drill_word}"`;
+		prompt += `\n- Target word: "${drill.sentence_drill_word}"`;
 	}
+
+	// ═══ LAYER 3 — Generation Instruction ═══
+	if (drill.type === 'roleplay' || drill.type === 'scenario') {
+		prompt += `\n\nGENERATION INSTRUCTION:
+Create a DIFFERENT but related roleplay scenario in the same context.
+Do NOT repeat the human tutor's exact scenes. Generate a fresh scenario that exercises the same skills.
+Use the same themes, vocabulary, and difficulty level, but create a new situation the student hasn't practiced before.
+For example, if the tutor's drill was about negotiating salary, you might create a scenario about negotiating a project deadline, discussing a promotion, or resolving a budget conflict.`;
+	} else {
+		prompt += `\n\nGENERATION INSTRUCTION:
+Use the drill content as a foundation, but create fresh practice exercises that reinforce the same skills.
+Do NOT simply repeat the exact items from the drill. Generate new examples that exercise the same patterns.
+Keep the practice engaging and conversational — weave the target language into natural dialogue.`;
+	}
+
+	// ═══ LAYER 4 — Teaching Style ═══
+	prompt += `\n\nTEACHING STYLE:
+- Use and encourage the same vocabulary from the drill
+- Give gentle inline corrections for grammar mistakes
+- Praise correct usage of target language
+- Keep it natural and conversational
+- Match the ${drill.difficulty || 'intermediate'} difficulty level
+- Keep responses concise (2-4 sentences typical)
+- Be directive — you lead the practice, don't ask the student what they want to do`;
 
 	if (pronunciationWeaknesses && pronunciationWeaknesses.length > 0) {
-		prompt += `\n\nSTUDENT'S PRONUNCIATION WEAKNESSES:\n${pronunciationWeaknesses.join(', ')}\nIncorporate words with these sounds into practice when appropriate.`;
+		prompt += `\n- The student has pronunciation weaknesses with: ${pronunciationWeaknesses.join(', ')}. Incorporate words with these sounds when appropriate.`;
 	}
 
 	return prompt;
@@ -570,231 +584,6 @@ export async function generateConversationResponse(options: ConversationOptions)
 	}
 }
 
-/**
- * Generate scenario-based conversation response (non-drill, uses text model)
- */
-export async function generateScenarioResponse(options: ScenarioOptions): Promise<string> {
-	try {
-		if (!genAI) {
-			throw new Error('Gemini API is not configured');
-		}
-
-		const { scenario, userMessage, conversationHistory = [], temperature = 0.9 } = options;
-
-		const model = genAI.getGenerativeModel({
-			model: DEFAULT_MODEL,
-			generationConfig: {
-				temperature,
-				maxOutputTokens: 600,
-			},
-		});
-
-		const scenarioPrompts: Record<string, string> = {
-			'Job Interview': `You're Jordan, an experienced hiring manager at a tech startup who's passionate about finding great talent. You've been doing this for 5 years and you genuinely enjoy getting to know candidates beyond their resumes.
-
-IMPORTANT CONVERSATION STYLE:
-- Chat naturally like you're having coffee, not conducting a formal interrogation
-- Show genuine interest and curiosity about their experiences
-- Share brief relevant stories from your own experience when appropriate
-- React authentically: "Oh interesting!", "I see what you mean", "That's actually really cool"
-- Ask follow-up questions based on what they say, don't just move to the next scripted question
-- Use contractions and casual language (I'm, you're, that's, we've)
-- If they seem nervous, put them at ease with warmth and encouragement
-- Don't be robotic - real conversations have natural flow, tangents, and personality
-
-Remember: You're helping them practice English while having a real conversation. Model natural speech patterns and keep things engaging, not stiff.`,
-
-			'Restaurant Order': `You're Sam, a friendly server who's been working at this cozy neighborhood café for about a year. You know the menu inside out and genuinely love chatting with customers - it's your favorite part of the job.
-
-IMPORTANT CONVERSATION STYLE:
-- Be warm and personable, like you're talking to a regular customer
-- Share your honest opinions: "Oh, the avocado toast is amazing today!" or "Personally, I'd go with the cappuccino"
-- Ask about preferences naturally: "Are you more of a sweet or savory person?"
-- React to their choices: "Great choice!", "Ooh, you're gonna love that"
-- Make small talk - comment on the weather, ask if they've been here before
-- Use casual, natural language with contractions
-- If they seem unsure, help them out: "You know what? Let me describe a few options..."
-- Don't just take orders mechanically - have an actual conversation
-
-Remember: You're helping them practice ordering food in English naturally. Be the kind of server people enjoy talking to.`,
-
-			Shopping: `You're Riley, working at a cool independent bookstore/gift shop while finishing your degree in creative writing. You're genuinely enthusiastic about the products and love helping people find the perfect thing.
-
-IMPORTANT CONVERSATION STYLE:
-- Be enthusiastic and genuine, not salesy or formal
-- Share personal opinions and stories: "I actually just read this one last week and couldn't put it down"
-- Ask questions to understand what they're looking for: "What kind of vibe are you going for?"
-- Make connections: "Oh, if you liked that, you'd probably also like..."
-- Use natural, casual speech patterns
-- Show excitement about products you love
-- If someone's browsing, engage naturally: "Finding everything okay?" or "That's a great section, anything in particular you're into?"
-- Don't be pushy - be helpful and conversational
-
-Remember: You're helping them practice shopping conversations in English. Be the kind of person who makes shopping enjoyable, not transactional.`,
-
-			Travel: `You're Casey, a local who's lived in this city your whole life and genuinely loves sharing it with visitors. You're not a formal tour guide - you're just someone who knows all the best spots and loves helping travelers experience the real city.
-
-IMPORTANT CONVERSATION STYLE:
-- Be enthusiastic about your city like you're showing a friend around
-- Share personal recommendations: "Oh man, you HAVE to try this little place I know..."
-- Tell brief stories about places: "This neighborhood is actually where..."
-- Ask about their interests to personalize suggestions: "What kind of stuff are you into?"
-- Be honest about tourist traps: "Yeah, everyone goes there but honestly..."
-- Use casual, conversational language
-- React to their plans: "Oh nice!", "That's gonna be awesome", "Smart thinking"
-- Offer tips and insider knowledge naturally as you chat
-
-Remember: You're helping them practice travel conversations in English. Be the friendly local everyone hopes to meet when traveling.`,
-
-			'Casual Chat': `You're Taylor, a friendly person around their age who enjoys meeting new people and having genuine conversations. You're naturally curious, easy to talk to, and enjoy discussing all sorts of topics.
-
-IMPORTANT CONVERSATION STYLE:
-- Chat like you're getting to know a potential new friend
-- Show genuine interest in what they share
-- Share your own experiences and opinions when relevant
-- Ask follow-up questions based on what they say
-- React naturally: "Really?", "No way!", "I totally get that", "That's so interesting"
-- Use very casual, natural speech with contractions
-- Let the conversation flow organically - don't force topics
-- Be warm, open, and relatable
-- Laugh, agree, relate - be a real conversation partner
-
-Remember: You're helping them practice natural English conversation. Be the kind of person they'd actually want to chat with.`,
-
-			'Daily Life': `You're Morgan, someone navigating everyday life just like they are. You could be their neighbor, gym buddy, or someone they run into regularly. You're approachable and easy to talk to about everyday stuff.
-
-IMPORTANT CONVERSATION STYLE:
-- Talk about normal, relatable everyday things
-- Share your own daily experiences: "Yeah, I had the same problem with..."
-- Be casual and conversational
-- Ask about their day, their routines, their experiences
-- Offer tips or suggestions from your own life
-- React empathetically: "Oh man, that's annoying", "I know what you mean"
-- Keep it light and relatable
-- Use very natural, everyday language
-
-Remember: You're helping them practice the kind of English they'd use in daily life. Be real, relatable, and conversational.`,
-		};
-
-		const systemPrompt =
-			scenarioPrompts[scenario] ||
-			`You're a friendly, natural conversation partner helping someone practice English through real conversation. Don't be formal or robotic - chat like a real person would. Show genuine interest, ask follow-up questions, and keep things flowing naturally. Use contractions, react authentically, and make the conversation enjoyable. You're not a teacher or assistant - you're a conversation partner who happens to speak naturally and engagingly.`;
-
-		let validHistory = conversationHistory;
-
-		if (validHistory.length > 0 && validHistory[0].role === 'model') {
-			const firstUserIndex = validHistory.findIndex((msg) => msg.role === 'user');
-			if (firstUserIndex > 0) {
-				validHistory = validHistory.slice(firstUserIndex);
-			} else if (firstUserIndex === -1) {
-				validHistory = [];
-			}
-		}
-
-		const history = validHistory.map((msg) => ({
-			role: msg.role === 'user' ? 'user' : 'model',
-			parts: [{ text: msg.content }],
-		}));
-
-		const chat = model.startChat({
-			history: [
-				{
-					role: 'user',
-					parts: [{ text: systemPrompt }],
-				},
-				{
-					role: 'model',
-					parts: [{ text: "Got it! I'll be natural and conversational. Let's chat!" }],
-				},
-				...history,
-			],
-		});
-
-		const result = await chat.sendMessage(userMessage);
-		const response = result.response;
-		const text = response.text();
-
-		logger.info('Gemini scenario response generated', {
-			scenario,
-			responseLength: text.length,
-		});
-
-		return text;
-	} catch (error: any) {
-		logger.error('Error generating Gemini scenario response', {
-			error: error.message,
-			stack: error.stack,
-			scenario: options.scenario,
-		});
-		throw new Error(`Failed to generate scenario response: ${error.message}`);
-	}
-}
-
-/**
- * Generate initial greeting for a scenario (non-drill, uses text model)
- */
-export async function generateScenarioGreeting(scenario: string): Promise<string> {
-	try {
-		if (!genAI) {
-			throw new Error('Gemini API is not configured');
-		}
-
-		const model = genAI.getGenerativeModel({
-			model: DEFAULT_MODEL,
-			generationConfig: {
-				temperature: 0.9,
-				maxOutputTokens: 150,
-			},
-		});
-
-		const scenarioGreetings: Record<string, string> = {
-			'Job Interview':
-				"You're Jordan, a friendly hiring manager. Greet the candidate warmly as they arrive for their interview. Be natural and personable - maybe comment on the weather, ask if they found the place okay, or just be genuinely welcoming. Sound like a real person, not a script. Keep it brief (2-3 sentences max).",
-
-			'Restaurant Order':
-				"You're Sam, a friendly server. Greet a customer who just sat down at your table. Be warm and natural - maybe comment on how busy/quiet it is, or just be genuinely welcoming. Sound casual and personable. Keep it brief (2-3 sentences max).",
-
-			Shopping:
-				"You're Riley, working at a bookstore/gift shop. A customer just walked in. Greet them naturally - maybe you're organizing shelves or genuinely happy to see someone. Be warm but not pushy. Sound like a real person who enjoys their job. Keep it brief (2-3 sentences max).",
-
-			Travel:
-				"You're Casey, a friendly local. Someone just approached you looking like they might need help or directions. Greet them warmly and naturally. Be the kind of approachable person travelers hope to meet. Keep it brief (2-3 sentences max).",
-
-			'Casual Chat':
-				"You're Taylor, meeting someone new in a casual setting (maybe a coffee shop, park, or event). Start a friendly, natural conversation. Be warm and approachable. Keep it brief (2-3 sentences max).",
-
-			'Daily Life':
-				"You're Morgan, running into someone in an everyday situation. Start a casual, natural conversation about something relatable. Be friendly and down-to-earth. Keep it brief (2-3 sentences max).",
-		};
-
-		const prompt =
-			scenarioGreetings[scenario] ||
-			`You're starting a natural, friendly conversation in a ${scenario} scenario. Greet the person warmly like a real person would - be genuine, not robotic. Keep it brief (2-3 sentences max). Use casual, natural language with contractions.`;
-
-		const result = await model.generateContent(prompt);
-		const response = result.response;
-		const text = response.text();
-
-		return text.trim();
-	} catch (error: any) {
-		logger.error('Error generating scenario greeting', {
-			error: error.message,
-			scenario,
-		});
-		const fallbackGreetings: Record<string, string> = {
-			'Job Interview':
-				'Hey! Thanks so much for coming in. Did you find the place okay? Come on in, have a seat!',
-			'Restaurant Order':
-				"Hey there! How's it going? Take your time looking over the menu, and let me know when you're ready!",
-			Shopping: 'Hey! Welcome in. Just browsing, or looking for something specific today?',
-			Travel:
-				"Hey! You look a bit lost - everything okay? I'm happy to help if you need directions or recommendations!",
-			'Casual Chat': "Hey! Nice day out, isn't it? Have you been here before?",
-			'Daily Life': "Oh hey! Long time no see. How've you been?",
-		};
-		return fallbackGreetings[scenario] || "Hey! How's it going?";
-	}
-}
 
 // ─── Transcription (generateContent — fast + reliable) ──────────────────────
 
@@ -1152,14 +941,16 @@ export async function generateDrillPracticeGreeting(drill: DrillPracticeOptions[
 
 		const label = typeLabel[drill.type] || 'English practice';
 
-		const systemPrompt = `You are Eklan, an English language teacher. You are starting a practice session for a student's "${drill.title}" drill (${label}, ${drill.difficulty || 'intermediate'} level).${drill.context ? ` Context: ${drill.context}` : ''}
+		const systemPrompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${label} drill by their human tutor.
+
+DRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nContext: ${drill.context}` : ''}
 
 Your opening should be brief and directive (2-3 sentences max):
 1. Tell the student what today's session is about
-2. Explain what they'll be practicing
-3. Immediately give them their FIRST task or set the scene
+2. Create a FRESH scenario related to the drill topic (don't repeat the tutor's exact scenes)
+3. Immediately set the scene and give them their FIRST task
 
-CRITICAL: Do NOT ask "What would you like to practice?" or "What aspect interests you?" — YOU are the teacher, YOU tell them what they're doing. Jump right in.
+CRITICAL: Do NOT ask "What would you like to practice?" — YOU lead the session. Jump right into a new scenario.
 Example tone: "Alright! Today we're working on office negotiation. I'm going to set up a scenario for you — you're an employee asking your manager for a deadline extension. Let's begin. I'll be your manager. Go ahead and start the conversation."`;
 
 		const turns = [
