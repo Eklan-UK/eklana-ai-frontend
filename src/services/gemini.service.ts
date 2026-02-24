@@ -17,7 +17,7 @@ if (config.GEMINI_API_KEY) {
 }
 
 // Text model (for non-drill functions — cheaper, no "thinking" overhead)
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 // Live API model — handles both text + audio in a single WebSocket session
 const LIVE_MODEL = 'gemini-2.5-flash-native-audio-latest';
