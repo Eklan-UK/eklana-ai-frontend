@@ -2,7 +2,7 @@
 // Handle drill-aware AI conversation messages
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
-import { generateDrillPracticeResponse } from '@/services/gemini.service';
+
 import { logger } from '@/lib/api/logger';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillModel from '@/models/drill';
@@ -79,27 +79,21 @@ async function handler(
 			sentence_drill_word: drill.sentence_drill_word,
 		};
 
-		const result = await generateDrillPracticeResponse({
+		const { generateDrillPracticeResponseStream } = await import('@/services/gemini.service');
+		const stream = await generateDrillPracticeResponseStream({
 			drill: drillData,
 			userMessage,
 			conversationHistory: conversationHistory || [],
 			temperature,
 		});
 
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Drill practice response generated',
-				data: {
-					response: result.text,
-					audioBase64: result.audioBase64,
-					audioMimeType: result.audioMimeType,
-					drillType: drill.type,
-					drillTitle: drill.title,
-				},
+		return new NextResponse(stream, {
+			headers: {
+				'Content-Type': 'text/event-stream',
+				'Cache-Control': 'no-cache',
+				'Connection': 'keep-alive',
 			},
-			{ status: 200 }
-		);
+		});
 	} catch (error: any) {
 		logger.error('Error in drill practice handler', {
 			error: error.message,

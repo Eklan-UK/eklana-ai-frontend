@@ -51,13 +51,14 @@ function playBase64Audio(
   }
 }
 
+import { AudioStreamPlayer } from "@/lib/audio-stream-player";
+
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
 interface ChatMessage {
   type: "ai" | "user";
   text: string;
-  audioBase64?: string | null;
-  audioMimeType?: string | null;
+  isStreaming?: boolean;
 }
 
 const DRILL_TYPE_LABELS: Record<string, string> = {
@@ -150,11 +151,11 @@ export default function AISessionPage() {
 
   const freshMessages: ChatMessage[] = isDrillPractice
     ? []
-    : [{ type: "ai", text: topicGreeting, audioBase64: null, audioMimeType: null }];
+    : [{ type: "ai", text: topicGreeting }];
 
   const [messages, setMessages] = useState<ChatMessage[]>(
     cachedSession.current
-      ? cachedSession.current.messages.map((m) => ({ ...m, audioBase64: null, audioMimeType: null }))
+      ? cachedSession.current.messages.map((m) => ({ ...m }))
       : freshMessages
   );
   const [conversationHistory, setConversationHistory] = useState<
@@ -165,7 +166,10 @@ export default function AISessionPage() {
   const [playingMessageIndex, setPlayingMessageIndex] = useState<number | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [streamingAudioActive, setStreamingAudioActive] = useState(false);
+
+  // Audio stream reference
+  const currentAudioStreamPlayerRef = useRef<AudioStreamPlayer | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -188,44 +192,19 @@ export default function AISessionPage() {
     onError: () => { setPlayingMessageIndex(null); setIsPlayingAudio(false); },
   });
 
-  const isPlaying = isPlayingAudio || isPlayingTTS;
+  const isPlaying = isPlayingAudio || isPlayingTTS || streamingAudioActive;
 
   /* ─── Audio playback ───────────────────────────────────────────────────── */
 
-  const playMessageAudio = useCallback(
-    (message: ChatMessage, messageIndex: number) => {
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
-      stopTTSAudio();
-      setPlayingMessageIndex(messageIndex);
-      setIsPlayingAudio(true);
-
-      if (message.audioBase64) {
-        const audio = playBase64Audio(
-          message.audioBase64,
-          message.audioMimeType || "audio/wav",
-          () => { setPlayingMessageIndex(null); setIsPlayingAudio(false); currentAudioRef.current = null; },
-          () => { setPlayingMessageIndex(null); setIsPlayingAudio(false); currentAudioRef.current = null; }
-        );
-        currentAudioRef.current = audio;
-      } else {
-        setIsPlayingAudio(false);
-        playTTSAudio(message.text);
-      }
-    },
-    [stopTTSAudio, playTTSAudio]
-  );
-
   const stopAllAudio = useCallback(() => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
+    if (currentAudioStreamPlayerRef.current) {
+      currentAudioStreamPlayerRef.current.stop();
+      currentAudioStreamPlayerRef.current = null;
     }
     stopTTSAudio();
     setPlayingMessageIndex(null);
     setIsPlayingAudio(false);
+    setStreamingAudioActive(false);
   }, [stopTTSAudio]);
 
   /* ─── Lifecycle ────────────────────────────────────────────────────────── */
@@ -255,14 +234,15 @@ export default function AISessionPage() {
 
   useEffect(() => {
     return () => {
+      stopAllAudio();
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
       if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach((t) => t.stop());
     };
-  }, []);
+  }, [stopAllAudio]);
 
-  // Save session to cache whenever messages change
+  // Save session to cache whenever messages change, BUT DO NOT save incomplete streaming text
   useEffect(() => {
-    if (messages.length > 0 && !showResumePrompt) {
+    if (messages.length > 0 && !showResumePrompt && !messages[messages.length - 1].isStreaming) {
       saveCachedSession(sessionKey, {
         messages: messages.map((m) => ({ type: m.type, text: m.text })),
         conversationHistory,
@@ -296,33 +276,53 @@ export default function AISessionPage() {
 
   const initializeDrillPractice = async () => {
     setIsInitializing(true);
+    setMessages([{ type: "ai", text: "", isStreaming: true }]);
+    setPlayingMessageIndex(0);
+
+    let finalGreeting = "";
+    const audioPlayer = new AudioStreamPlayer(() => {
+       setStreamingAudioActive(false);
+       setPlayingMessageIndex(null);
+    });
+    
+    currentAudioStreamPlayerRef.current = audioPlayer;
+    setStreamingAudioActive(true);
+
     try {
-      const data = await aiService.getDrillPracticeGreeting(drillId!);
-      setDrillInfo({ drillType: data.drillType, drillTitle: data.drillTitle });
+      await aiService.streamDrillPracticeGreeting(drillId!, (chunk) => {
+        setIsInitializing(false);
 
-      const greetingMessage: ChatMessage = {
-        type: "ai",
-        text: data.greeting,
-        audioBase64: data.audioBase64,
-        audioMimeType: data.audioMimeType,
-      };
-      setMessages([greetingMessage]);
-      setConversationHistory([{ role: "model", content: data.greeting }]);
-
-      if (autoPlayAudio) {
-        setTimeout(() => playMessageAudio(greetingMessage, 0), 500);
-      }
+        if (chunk.type === "metadata") {
+          setDrillInfo({ drillType: chunk.data.drillType, drillTitle: chunk.data.drillTitle });
+        } else if (chunk.type === "text") {
+          finalGreeting += chunk.data;
+          setMessages([
+            {
+              type: "ai",
+              text: finalGreeting,
+              isStreaming: true
+            }
+          ]);
+        } else if (chunk.type === "audio" && autoPlayAudio) {
+          audioPlayer.enqueueBase64Pcm(chunk.data);
+        }
+      });
+      
+      setMessages([
+        {
+          type: "ai",
+          text: finalGreeting,
+          isStreaming: false
+        }
+      ]);
+      setConversationHistory([{ role: "model", content: finalGreeting }]);
     } catch {
-      const fallback: ChatMessage = {
-        type: "ai",
-        text: "Alright! Let's get started with your practice. I've got exercises ready for you!",
-        audioBase64: null,
-        audioMimeType: null,
-      };
-      setMessages([fallback]);
-      setConversationHistory([{ role: "model", content: fallback.text }]);
-    } finally {
+      const fallback = "Alright! Let's get started with your practice. I've got exercises ready for you!";
+      setMessages([{ type: "ai", text: fallback, isStreaming: false }]);
+      setConversationHistory([{ role: "model", content: fallback }]);
       setIsInitializing(false);
+      setStreamingAudioActive(false);
+      setPlayingMessageIndex(null);
     }
   };
 
@@ -332,58 +332,76 @@ export default function AISessionPage() {
     const trimmed = text.trim();
     if (!trimmed || isThinking) return;
 
-    const userMessage: ChatMessage = { type: "user", text: trimmed, audioBase64: null, audioMimeType: null };
-    setMessages((prev) => [...prev, userMessage]);
+    const userMessage: ChatMessage = { type: "user", text: trimmed };
+    const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
+    const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
+    
+    setMessages((prev) => [...prev, userMessage, aiMessagePlaceholder]);
     setInputText("");
     setIsThinking(true);
+    stopAllAudio(); // interrupt anything currently playing
 
     try {
-      let aiMessage: ChatMessage;
-
       if (isDrillPractice && drillId) {
         const newHistory = [...conversationHistory, { role: "user" as const, content: trimmed }];
-        const data = await aiService.sendDrillPracticeMessage({
+        let finalResponse = "";
+
+        const audioPlayer = new AudioStreamPlayer(() => {
+          setStreamingAudioActive(false);
+          setPlayingMessageIndex(null);
+        });
+        
+        currentAudioStreamPlayerRef.current = audioPlayer;
+        setStreamingAudioActive(true);
+        setPlayingMessageIndex(aiMessageIndex);
+
+        await aiService.streamDrillPracticeMessage({
           drillId,
           userMessage: trimmed,
           conversationHistory: newHistory,
+        }, (chunk) => {
+          setIsThinking(false);
+
+          if (chunk.type === "text") {
+             finalResponse += chunk.data;
+             setMessages(prev => prev.map((m, i) => i === aiMessageIndex ? { ...m, text: finalResponse } : m));
+          } else if (chunk.type === "audio" && autoPlayAudio) {
+             audioPlayer.enqueueBase64Pcm(chunk.data);
+          }
         });
-        aiMessage = {
-          type: "ai",
-          text: data.response,
-          audioBase64: data.audioBase64,
-          audioMimeType: data.audioMimeType,
-        };
-        if (!drillInfo && data.drillType) {
-          setDrillInfo({ drillType: data.drillType, drillTitle: data.drillTitle });
-        }
-        setConversationHistory([...newHistory, { role: "model", content: data.response }]);
+
+        // Mark stream complete
+        setMessages(prev => prev.map((m, i) => i === aiMessageIndex ? { ...m, isStreaming: false, text: finalResponse } : m));
+        setConversationHistory([...newHistory, { role: "model", content: finalResponse }]);
       } else {
+        // Fallback for non-drill standard chat (still uses older non-streaming API + ElevenLabs TTS)
         const conversationMessages = messages.map((msg) => ({
           role: msg.type === "user" ? ("user" as const) : ("model" as const),
           content: msg.text,
         }));
         conversationMessages.push({ role: "user" as const, content: trimmed });
+        
+        setIsThinking(false);
         const aiResponseText = await aiService.sendConversationMessage({
           messages: conversationMessages,
           temperature: 0.7,
           maxTokens: 1000,
         });
-        aiMessage = { type: "ai", text: aiResponseText, audioBase64: null, audioMimeType: null };
+        
+        setMessages(prev => prev.map((m, i) => i === aiMessageIndex ? { type: "ai", text: aiResponseText, isStreaming: false } : m));
+        if (autoPlayAudio) {
+           playTTSAudio(aiResponseText);
+           setPlayingMessageIndex(aiMessageIndex);
+        }
       }
 
-      const messageToPlay = aiMessage;
-      setMessages((prev) => {
-        const newMessages = [...prev, messageToPlay];
-        if (autoPlayAudio) {
-          setTimeout(() => playMessageAudio(messageToPlay, newMessages.length - 1), 300);
-        }
-        return newMessages;
-      });
-      setIsThinking(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to get AI response");
       setIsThinking(false);
-      setMessages((prev) => prev.slice(0, -1));
+      setStreamingAudioActive(false);
+      setPlayingMessageIndex(null);
+      // Remove placeholder & user message
+      setMessages((prev) => prev.slice(0, -2));
       setInputText(trimmed);
     }
   };
@@ -593,7 +611,7 @@ export default function AISessionPage() {
             </div>
           )}
 
-          {messages.map((message, index) => {
+           {messages.map((message, index) => {
             const isAI = message.type === "ai";
             const isCurrentlyPlaying = playingMessageIndex === index && isPlaying;
 
@@ -607,27 +625,17 @@ export default function AISessionPage() {
                     <MarkdownText className="text-sm text-gray-900 leading-relaxed">
                       {message.text}
                     </MarkdownText>
+                    {message.isStreaming && (
+                      <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 ml-1">
-                    <button
-                      onClick={() => {
-                        if (isCurrentlyPlaying) stopAllAudio();
-                        else playMessageAudio(message, index);
-                      }}
-                      className="flex items-center gap-1.5 text-sm hover:opacity-70 transition-opacity"
-                    >
-                      {isCurrentlyPlaying ? (
-                        <>
-                          <Volume2 className="w-4 h-4 text-emerald-600" />
-                          <span className="text-emerald-600 text-xs font-medium">Playing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Volume2 className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-400 text-xs">Replay</span>
-                        </>
-                      )}
-                    </button>
+                    {isCurrentlyPlaying && (
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Volume2 className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-600 text-xs font-medium">Speaking...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

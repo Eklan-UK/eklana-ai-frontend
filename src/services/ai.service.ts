@@ -43,20 +43,59 @@ export const aiService = {
 
 
   /**
-   * Send a message in a drill-aware conversation
+   * Process Server-Sent Events (SSE) stream
    */
-  async sendDrillPracticeMessage(options: {
-    drillId: string;
-    userMessage: string;
-    conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
-    temperature?: number;
-  }): Promise<{
-    response: string;
-    audioBase64: string | null;
-    audioMimeType: string | null;
-    drillType: string;
-    drillTitle: string;
-  }> {
+  async _processSSEStream(
+    response: Response,
+    onChunk: (chunk: { type: string; data: any }) => void
+  ): Promise<void> {
+    if (!response.body) throw new Error("No response body");
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete SSE messages (separated by \n\n)
+        let eventEndIndex;
+        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+          const eventString = buffer.slice(0, eventEndIndex);
+          buffer = buffer.slice(eventEndIndex + 2); // remove processed event + \n\n
+
+          if (eventString.startsWith('data: ')) {
+            const dataString = eventString.slice(6); // remove 'data: '
+            try {
+              const chunk = JSON.parse(dataString);
+              onChunk(chunk);
+            } catch (err) {
+              console.error("Error parsing SSE chunk:", err, dataString);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+
+  /**
+   * Send a message in a drill-aware conversation (Streaming)
+   */
+  async streamDrillPracticeMessage(
+    options: {
+      drillId: string;
+      userMessage: string;
+      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
+      temperature?: number;
+    },
+    onChunk: (chunk: { type: string; data: any }) => void
+  ): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/ai/drill-practice`, {
       method: "POST",
       headers: {
@@ -72,28 +111,23 @@ export const aiService = {
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to get drill practice response" }));
-      throw new Error(error.message || "Failed to get drill practice response");
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get drill practice stream");
+      }
+      throw new Error(`Failed to get drill practice stream: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.data;
+    await this._processSSEStream(response, onChunk);
   },
 
   /**
-   * Get initial greeting for drill-aware conversation
+   * Get initial greeting for drill-aware conversation (Streaming)
    */
-  async getDrillPracticeGreeting(
-    drillId: string
-  ): Promise<{
-    greeting: string;
-    audioBase64: string | null;
-    audioMimeType: string | null;
-    drillType: string;
-    drillTitle: string;
-  }> {
+  async streamDrillPracticeGreeting(
+    drillId: string,
+    onChunk: (chunk: { type: string; data: any }) => void
+  ): Promise<void> {
     const response = await fetch(
       `${API_BASE_URL}/ai/drill-practice/greeting?drillId=${encodeURIComponent(
         drillId
@@ -108,16 +142,14 @@ export const aiService = {
     );
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to get drill practice greeting" }));
-      throw new Error(
-        error.message || "Failed to get drill practice greeting"
-      );
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get drill greeting stream");
+      }
+      throw new Error(`Failed to get drill greeting stream: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.data;
+    await this._processSSEStream(response, onChunk);
   },
 
   /**

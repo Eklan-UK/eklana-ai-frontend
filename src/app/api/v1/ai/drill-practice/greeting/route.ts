@@ -2,7 +2,7 @@
 // Generate a contextual greeting for drill-aware conversation
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
-import { generateDrillPracticeGreeting } from '@/services/gemini.service';
+
 import { logger } from '@/lib/api/logger';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillModel from '@/models/drill';
@@ -79,22 +79,17 @@ async function handler(
 			sentence_drill_word: drill.sentence_drill_word,
 		};
 
-		const greetingResult = await generateDrillPracticeGreeting(drillData);
+		const { generateDrillPracticeGreetingStream } = await import('@/services/gemini.service');
+		const stream = await generateDrillPracticeGreetingStream(drillData);
 
-		return NextResponse.json(
-			{
-				code: 'Success',
-				message: 'Drill practice greeting generated',
-				data: {
-					greeting: greetingResult.text,
-					audioBase64: greetingResult.audioBase64,
-					audioMimeType: greetingResult.audioMimeType,
-					drillType: drill.type,
-					drillTitle: drill.title,
-				},
+		return new NextResponse(stream, {
+			headers: {
+				'Content-Type': 'text/event-stream',
+				'Cache-Control': 'no-cache',
+				'Connection': 'keep-alive',
 			},
-			{ status: 200 }
-		);
+		});
+
 	} catch (error: any) {
 		logger.error('Error generating drill practice greeting', {
 			error: error.message,
