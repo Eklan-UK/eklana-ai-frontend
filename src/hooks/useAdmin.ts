@@ -54,7 +54,8 @@ export function useDrillById(drillId: string) {
     queryKey: queryKeys.drills.detail(drillId),
     queryFn: async () => {
       const response = await drillAPI.getById(drillId);
-      return response.drill;
+      console.log("drill fetch Successful", response)
+      return response.data?.drill;
     },
     enabled: !!drillId,
     staleTime: 1000 * 60 * 2,
@@ -169,5 +170,31 @@ export function useLearnerDrillAssignments(learnerId: string) {
     },
     enabled: !!learnerId,
     staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+// Update user subscription (admin)
+export function useUpdateUserSubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      userId: string;
+      plan: "free" | "premium";
+      months: number;
+      amount?: number;
+      paymentMethod?: string;
+      note?: string;
+    }) => {
+      return adminAPI.updateUserSubscription(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard", "stats"] });
+      toast.success("Subscription updated");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update subscription");
+    },
   });
 }

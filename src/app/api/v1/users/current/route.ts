@@ -7,6 +7,7 @@ import User from "@/models/user";
 import Tutor from "@/models/tutor";
 import Profile from "@/models/profile";
 import { logger } from "@/lib/api/logger";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
 
 async function handler(
   req: NextRequest,
@@ -32,7 +33,24 @@ async function handler(
 
     // Use role from context (already validated) or fallback to DB value
     const effectiveRole = user.role || context.userRole || "user";
-    const response: any = { user: { ...user, role: effectiveRole } };
+    const subscribed = isUserSubscribed(user as any);
+
+    const safeUser: any = {
+      ...user,
+      role: effectiveRole,
+      subscriptionPlan: user.subscriptionPlan || "free",
+      subscriptionActivatedAt: user.subscriptionActivatedAt || null,
+      subscriptionExpiresAt: user.subscriptionExpiresAt || null,
+      isSubscribed: subscribed,
+    };
+
+    delete safeUser.subscriptionMonthsPaidFor;
+    delete safeUser.subscriptionAmountPaid;
+    delete safeUser.subscriptionPaymentMethod;
+    delete safeUser.subscriptionAdminNote;
+    delete safeUser.subscriptionUpdatedBy;
+
+    const response: any = { user: safeUser };
 
     // Include tutor profile if user is a tutor
     if (effectiveRole === "tutor") {

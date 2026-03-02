@@ -1110,3 +1110,106 @@ Example tone: "Alright! Today we're working on office negotiation. I'm going to 
 		});
 	}
 }
+
+// ─── Topic practice (Live API stream for mobile app) ─────────────────────────
+
+export async function generateTopicPracticeGreetingStream(topic: string = 'daily-life'): Promise<ReadableStream> {
+	try {
+		if (!config.GEMINI_API_KEY) {
+			throw new Error('Gemini API is not configured');
+		}
+
+		const topicContexts: Record<string, string> = {
+			'daily-life': 'everyday life and casual conversations',
+			'work-school': 'professional work environments and academic scenarios',
+			'on-mind': 'whatever the student wants to talk about',
+			'surprise': 'a fun, unexpected, or creative scenario',
+		};
+
+		const contextLabel = topicContexts[topic] || topicContexts['daily-life'];
+
+		const systemPrompt = `You are Eklan, an AI English speaking practice partner. The student wants to practice English related to ${contextLabel}.
+
+Your opening should be brief, friendly, and directive (2-3 sentences max):
+1. Acknowledge what kind of conversation you'll be having based on the topic.
+2. If it's a specific topic like daily-life or work, set up a quick roleplay scenario right away.
+3. If it's "on-mind", ask an engaging open-ended question to get them talking.
+
+Example tone: "Hello! Since we're practicing work conversations today, let's pretend I'm your colleague and we're discussing a new project. What's our main goal for this week?"`;
+
+		const turns = [
+			{
+				role: 'user',
+				parts: [{ text: 'Start the practice session.' }],
+			},
+		];
+
+		logger.info('Generating topic greeting via Live API (Stream)...', { topic, model: LIVE_MODEL });
+
+		return await generateWithLiveAPIStream(systemPrompt, turns);
+	} catch (error: any) {
+		logger.error('Error generating topic practice greeting (Stream)', { error: error.message, topic });
+		throw new Error(`Failed to generate topic practice greeting: ${error.message}`);
+	}
+}
+
+export async function generateTopicPracticeResponseStream(
+	userMessage: string,
+	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
+	topic: string = 'daily-life'
+): Promise<ReadableStream> {
+	try {
+		if (!config.GEMINI_API_KEY) {
+			throw new Error('Gemini API is not configured');
+		}
+
+		const topicContexts: Record<string, string> = {
+			'daily-life': 'You are Eklan, a friendly AI English tutor. Help the student practice everyday English conversations. Be natural, encouraging, and conversational.',
+			'work-school': 'You are Eklan, a friendly AI English tutor. Help the student practice English for work and school situations. Focus on professional and academic language.',
+			'on-mind': 'You are Eklan, a friendly AI English tutor. The student wants to talk about something on their mind. Be supportive, listen actively, and help them express themselves in English.',
+			'surprise': 'You are Eklan, a friendly AI English tutor. Have a fun, engaging conversation with the student. Be creative and keep things interesting!',
+		};
+
+		const systemPrompt = topicContexts[topic] || topicContexts['daily-life'];
+
+		// Build conversation history for Live API turns
+		let validHistory = conversationHistory;
+		if (validHistory.length > 0 && validHistory[0].role === 'model') {
+			const firstUserIndex = validHistory.findIndex((msg) => msg.role === 'user');
+			if (firstUserIndex > 0) {
+				validHistory = validHistory.slice(firstUserIndex);
+			} else if (firstUserIndex === -1) {
+				validHistory = [];
+			}
+		}
+
+		const history = validHistory.map((msg) => ({
+			role: msg.role === 'user' ? 'user' : 'model',
+			parts: [{ text: msg.content }],
+		}));
+
+		const turns = [
+			...history,
+			{
+				role: 'user',
+				parts: [{ text: userMessage }],
+			},
+		];
+
+		logger.info('Generating topic practice response via Live API (Stream)...', {
+			topic,
+			model: LIVE_MODEL,
+			turnsCount: turns.length,
+		});
+
+		return await generateWithLiveAPIStream(systemPrompt, turns);
+
+	} catch (error: any) {
+		logger.error('Error generating topic practice response (Stream)', {
+			error: error.message,
+			stack: error.stack,
+			topic,
+		});
+		throw new Error(`Failed to generate topic practice response: ${error.message}`);
+	}
+}

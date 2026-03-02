@@ -626,6 +626,30 @@ export const adminAPI = {
     });
   },
 
+  // Update user subscription (admin only)
+  updateUserSubscription: (data: {
+    userId: string;
+    plan: "free" | "premium";
+    months: number;
+    amount?: number;
+    paymentMethod?: string;
+    note?: string;
+  }) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        userId: string;
+        subscriptionPlan: "free" | "premium";
+        subscriptionActivatedAt: string | null;
+        subscriptionExpiresAt: string | null;
+      };
+    }>('/admin/users/subscription', {
+      method: 'POST',
+      data,
+    });
+  },
+
   // Get drill assignments for a learner (admin/tutor)
   getLearnerDrillAssignments: (learnerId: string) => {
     return apiRequest<{
@@ -645,6 +669,26 @@ export const adminAPI = {
       };
     }>(`/admin/learners/${learnerId}/drill-assignments`, {
       method: 'GET',
+    });
+  },
+
+  // Get discovery calls (admin only)
+  getDiscoveryCalls: (params?: {
+    limit?: number;
+    offset?: number;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        calls: any[];
+        total: number;
+        limit: number;
+        offset: number;
+      };
+    }>('/admin/discovery-calls', {
+      method: 'GET',
+      params,
     });
   },
 };

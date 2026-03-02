@@ -20,6 +20,7 @@ import {
   FileText,
   BookOpen,
   CalendarDays,
+  CreditCard,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -31,6 +32,7 @@ const Sidebar: React.FC = () => {
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
     { name: "Daily Focus", icon: CalendarDays, path: "/admin/daily-focus" },
     { name: "Learners", icon: Users, path: "/admin/Learners" },
+    { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
     { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },

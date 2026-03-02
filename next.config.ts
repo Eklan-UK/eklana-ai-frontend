@@ -184,17 +184,6 @@ const nextConfig: NextConfig = {
         hostname: 'images.unsplash.com',
       },
     ],
-    // Keep domains for backward compatibility but prefer remotePatterns
-    domains: [
-      "storage.googleapis.com",
-      "example.com",
-      "api.dicebear.com",
-      "res.cloudinary.com",
-      "randomuser.me",
-      "https://api.dicebear.com",
-      "via.placeholder.com",
-      "images.unsplash.com",
-    ],
   },
 };
 

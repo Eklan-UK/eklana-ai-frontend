@@ -54,6 +54,8 @@ export default function DrillAssignmentDetailPage() {
   });
   const assignMutation = useAssignDrill();
 
+  console.log("drill fetch Successful", drill)
+
   const users = learnersData?.learners || [];
   const loading = drillLoading || learnersLoading;
 

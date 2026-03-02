@@ -26,102 +26,158 @@ interface UploadOptions {
 }
 
 /**
- * Upload file buffer to Cloudinary
+ * Single attempt to upload a buffer via Cloudinary's upload_stream.
+ */
+function uploadToCloudinarySingle(
+  buffer: Buffer,
+  uploadOptions: any,
+  resourceType: string,
+): Promise<{ url: string; publicId: string; secureUrl: string }> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (!settled) {
+        settled = true;
+        fn();
+      }
+    };
+
+    // Safety timeout: 10 min for video, 2 min for images
+    const timeout = resourceType === 'video' ? 600000 : 120000;
+    const timeoutId = setTimeout(() => {
+      settle(() => reject(new Error('Upload timeout: File upload took too long')));
+    }, timeout);
+
+    logger.info('Starting Cloudinary upload', {
+      resourceType,
+      bufferSize: buffer.length,
+      bufferSizeMB: (buffer.length / 1024 / 1024).toFixed(2),
+    });
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        ...uploadOptions,
+        // Pass timeout directly so the SDK uses it for the HTTP request
+        timeout: timeout,
+      },
+      (error, result) => {
+        clearTimeout(timeoutId);
+
+        if (error) {
+          logger.error('Cloudinary upload error', {
+            error: error.message || error,
+            http_code: (error as any).http_code,
+            name: (error as any).name,
+            resourceType,
+            bufferSize: buffer.length,
+          });
+          settle(() => reject(error));
+          return;
+        }
+
+        if (!result) {
+          settle(() => reject(new Error('Upload failed: No result from Cloudinary')));
+          return;
+        }
+
+        logger.info('File uploaded successfully to Cloudinary', {
+          publicId: result.public_id,
+          resourceType,
+        });
+
+        settle(() =>
+          resolve({
+            url: result.url,
+            publicId: result.public_id,
+            secureUrl: result.secure_url,
+          }),
+        );
+      },
+    );
+
+    // Convert buffer to stream and pipe
+    const stream = Readable.from(buffer);
+    stream.pipe(uploadStream);
+
+    // Guard against stream-level errors (settle prevents double-reject)
+    stream.on('error', (error) => {
+      clearTimeout(timeoutId);
+      logger.error('Stream error during upload', { error: error.message });
+      settle(() => reject(error));
+    });
+
+    uploadStream.on('error', (error) => {
+      clearTimeout(timeoutId);
+      logger.error('Upload stream error', { error: error.message });
+      settle(() => reject(error));
+    });
+  });
+}
+
+/**
+ * Upload file buffer to Cloudinary with automatic retry for transient failures.
  */
 export async function uploadToCloudinary(
   buffer: Buffer,
   options: UploadOptions = {}
 ): Promise<{ url: string; publicId: string; secureUrl: string }> {
-  try {
-    const {
-      folder = 'eklan/users',
-      publicId,
-      transformation,
-      resourceType = 'image',
-    } = options;
+  const {
+    folder = 'eklan/users',
+    publicId,
+    transformation,
+    resourceType = 'image',
+  } = options;
 
-    const uploadOptions: any = {
-      folder,
-      public_id: publicId,
-      resource_type: resourceType,
-      transformation: transformation || (resourceType === 'video' ? [
-        { quality: 'auto', fetch_format: 'auto' },
-      ] : [
-        { width: 500, height: 500, crop: 'fill', gravity: 'face' },
-        { quality: 'auto', fetch_format: 'auto' },
-      ]),
-    };
+  const uploadOptions: any = {
+    folder,
+    public_id: publicId,
+    resource_type: resourceType,
+    transformation: transformation || (resourceType === 'video' ? [
+      { quality: 'auto', fetch_format: 'auto' },
+    ] : [
+      { width: 500, height: 500, crop: 'fill', gravity: 'face' },
+      { quality: 'auto', fetch_format: 'auto' },
+    ]),
+  };
 
-    // Use upload_stream for all resources (including large videos), with extended timeouts for video
-    return new Promise((resolve, reject) => {
-      // Set timeout for video uploads (10 minutes), images (2 minutes)
-      const timeout = resourceType === 'video' ? 600000 : 120000;
-      const timeoutId = setTimeout(() => {
-        reject(new Error('Upload timeout: File upload took too long'));
-      }, timeout);
+  // Retry up to 3 times for video uploads (transient 499 / timeout errors)
+  const maxRetries = resourceType === 'video' ? 3 : 1;
 
-      logger.info('Starting Cloudinary upload', {
-        resourceType,
-        bufferSize: buffer.length,
-        bufferSizeMB: (buffer.length / 1024 / 1024).toFixed(2),
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await uploadToCloudinarySingle(buffer, uploadOptions, resourceType);
+    } catch (error: any) {
+      const isRetryable =
+        error.name === 'TimeoutError' ||
+        error.message?.includes('Timeout') ||
+        error.message?.includes('timeout') ||
+        (error as any).http_code === 499 ||
+        (error as any).http_code === 500 ||
+        (error as any).http_code === 502 ||
+        (error as any).http_code === 503;
+
+      if (isRetryable && attempt < maxRetries) {
+        const delay = 2000 * attempt; // 2s, 4s back-off
+        logger.warn(`Cloudinary upload attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`, {
+          error: error.message,
+          http_code: (error as any).http_code,
+          resourceType,
+        });
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      logger.error('Error uploading to Cloudinary (all retries exhausted)', {
+        error: error.message,
+        attempt,
+        maxRetries,
       });
-
-      const uploadStream = cloudinary.uploader.upload_stream(
-        uploadOptions,
-        (error, result) => {
-          clearTimeout(timeoutId);
-          
-          if (error) {
-            logger.error('Cloudinary upload error', { 
-              error: error.message || error,
-              http_code: (error as any).http_code,
-              name: (error as any).name,
-              resourceType,
-              bufferSize: buffer.length,
-            });
-            reject(error);
-            return;
-          }
-
-          if (!result) {
-            reject(new Error('Upload failed: No result from Cloudinary'));
-            return;
-          }
-
-          logger.info('File uploaded successfully to Cloudinary', {
-            publicId: result.public_id,
-            resourceType,
-          });
-
-          resolve({
-            url: result.url,
-            publicId: result.public_id,
-            secureUrl: result.secure_url,
-          });
-        }
-      );
-
-      // Convert buffer to stream
-      const stream = Readable.from(buffer);
-      stream.pipe(uploadStream);
-      
-      // Handle stream errors
-      stream.on('error', (error) => {
-        clearTimeout(timeoutId);
-        logger.error('Stream error during upload', { error: error.message });
-        reject(error);
-      });
-      
-      uploadStream.on('error', (error) => {
-        clearTimeout(timeoutId);
-        logger.error('Upload stream error', { error: error.message });
-        reject(error);
-      });
-    });
-  } catch (error: any) {
-    logger.error('Error uploading to Cloudinary', { error: error.message });
-    throw new Error(`Failed to upload file: ${error.message}`);
+      throw new Error(`Failed to upload file: ${error.message}`);
+    }
   }
+
+  // Should never reach here, but TypeScript needs it
+  throw new Error('Failed to upload file: unexpected error');
 }
 
 /**

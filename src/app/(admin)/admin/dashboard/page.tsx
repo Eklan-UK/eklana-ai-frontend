@@ -23,6 +23,8 @@ import { useOverallPronunciationAnalytics } from "@/hooks/usePronunciations";
 import { BarChart, Mic, AlertCircle, Volume2 } from "lucide-react";
 
 interface DashboardStats {
+  totalUsers: number;
+  subscribedUsers: number;
   totalActiveLearners: number;
   totalDrills: number;
   newSignupsThisWeek: number;
@@ -41,6 +43,8 @@ const Dashboard: React.FC = () => {
   // Default stats with all optional properties
   const statsWithDefaults: DashboardStats = stats
     ? {
+      totalUsers: stats.totalUsers || 0,
+      subscribedUsers: stats.subscribedUsers || 0,
       totalActiveLearners: stats.totalActiveLearners || 0,
       totalDrills: stats.totalDrills || 0,
       newSignupsThisWeek: stats.newSignupsThisWeek || 0,
@@ -48,6 +52,8 @@ const Dashboard: React.FC = () => {
       videosAwaitingReview: stats.videosAwaitingReview || 0,
     }
     : {
+      totalUsers: 0,
+      subscribedUsers: 0,
       totalActiveLearners: 0,
       totalDrills: 0,
       newSignupsThisWeek: 0,
@@ -57,28 +63,28 @@ const Dashboard: React.FC = () => {
 
   const displayStats = [
     {
-      title: "Total Active Learners",
-      value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
+      title: "Total Users",
+      value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
       color: "border-emerald-200 bg-emerald-50/30",
     },
     {
-      title: "Total Drills",
-      value: loading ? "..." : statsWithDefaults.totalDrills.toString(),
-      change: "",
-      color: "border-primary-200 bg-primary-50/30",
-    },
-    {
-      title: "Discovery Calls Today",
-      value: loading ? "..." : statsWithDefaults.discoveryCallsToday.toString(),
+      title: "Subscribed Users",
+      value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
       color: "border-blue-200 bg-blue-50/30",
     },
     {
-      title: "Videos Awaiting Review",
+      title: "Total Active Learners",
+      value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
+      change: "",
+      color: "border-primary-200 bg-primary-50/30",
+    },
+    {
+      title: "Total Drills",
       value: loading
         ? "..."
-        : statsWithDefaults.videosAwaitingReview.toString(),
+        : statsWithDefaults.totalDrills.toString(),
       change: "",
       color: "border-amber-200 bg-amber-50/30",
     },

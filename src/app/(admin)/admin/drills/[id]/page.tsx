@@ -15,6 +15,7 @@ import Link from "next/link";
 import { getDrillById } from "./get-drill";
 import { DrillDetailClient } from "./drill-detail-client";
 
+
 // Revalidate every 60 seconds (ISR)
 export const revalidate = 60;
 
@@ -24,7 +25,10 @@ export default async function AdminDrillDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  console.log("Getting Drills")
+
   const drill = await getDrillById(id);
+  console.log("drill fetch Successful", drill)
 
   if (!drill) {
     return (

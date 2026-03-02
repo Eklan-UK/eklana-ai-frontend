@@ -19,6 +19,14 @@ export const adminService = {
     return response;
   },
 
+  // Get discovery calls
+  getDiscoveryCalls: async (params?: {
+    limit?: number;
+    offset?: number;
+  }) => {
+    return adminAPI.getDiscoveryCalls(params);
+  },
+
   // Get learner by ID
   getLearnerById: async (learnerId: string) => {
     return adminAPI.getUserById(learnerId);
@@ -121,6 +129,8 @@ export const adminService = {
 
   // Get dashboard stats (we'll need to create this endpoint or calculate from existing data)
   getDashboardStats: async (): Promise<{
+    totalUsers: number;
+    subscribedUsers: number;
     totalActiveLearners: number;
     totalDrills: number;
     newSignupsThisWeek: number;
@@ -128,17 +138,27 @@ export const adminService = {
     videosAwaitingReview: number;
   }> => {
     // For now, we'll fetch data and calculate stats on the frontend
-    // In the future, we can create a dedicated endpoint
-    const [learners, drills] = await Promise.all([
-      adminService.getLearners({ limit: 1 }),
+    const [usersResponse, drills] = await Promise.all([
+      adminAPI.getAllUsers({ limit: 1000 }),
       adminService.getDrills({ limit: 1 }),
     ]);
 
-    // Get active learners count
-    const activeLearners = await adminService.getLearners({ limit: 1000 });
-    const activeCount = activeLearners.users.filter(u => u.isActive !== false).length;
+    const users = usersResponse.users || [];
+    const now = new Date();
+
+    const totalUsers = users.length;
+    const subscribedUsers = users.filter((u: any) => {
+      if (u.subscriptionPlan !== "premium") return false;
+      if (!u.subscriptionExpiresAt) return false;
+      const expiry = new Date(u.subscriptionExpiresAt);
+      return expiry.getTime() > now.getTime();
+    }).length;
+
+    const activeCount = users.filter((u: any) => u.isActive !== false).length;
 
     return {
+      totalUsers,
+      subscribedUsers,
       totalActiveLearners: activeCount,
       totalDrills: drills.total,
       newSignupsThisWeek: 0, // TODO: Calculate from user creation dates

@@ -35,6 +35,16 @@ export interface IUser extends Document {
   };
   lastLoginAt?: Date;
   hasProfile?: boolean; // Indicates if user has completed onboarding/profile setup
+  // Subscription core
+  subscriptionPlan?: "free" | "premium";
+  subscriptionActivatedAt?: Date | null;
+  subscriptionExpiresAt?: Date | null;
+  // Admin-only bookkeeping
+  subscriptionMonthsPaidFor?: number | null;
+  subscriptionAmountPaid?: number | null;
+  subscriptionPaymentMethod?: string | null;
+  subscriptionAdminNote?: string | null;
+  subscriptionUpdatedBy?: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -159,6 +169,42 @@ const userSchema = new Schema<IUser>(
       default: false,
       index: true, // Index for faster queries
     },
+    // Subscription core fields
+    subscriptionPlan: {
+      type: String,
+      enum: ["free", "premium"],
+      default: "free",
+      index: true,
+    },
+    subscriptionActivatedAt: {
+      type: Date,
+      default: null,
+    },
+    subscriptionExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    // Admin-only bookkeeping
+    subscriptionMonthsPaidFor: {
+      type: Number,
+      default: 0,
+    },
+    subscriptionAmountPaid: {
+      type: Number,
+      default: 0,
+    },
+    subscriptionPaymentMethod: {
+      type: String,
+    },
+    subscriptionAdminNote: {
+      type: String,
+      maxlength: 500,
+    },
+    subscriptionUpdatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt
@@ -168,6 +214,7 @@ const userSchema = new Schema<IUser>(
 // Indexes for performance
 // Note: email and username already have indexes from unique: true
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ subscriptionPlan: 1, subscriptionExpiresAt: 1 });
 
 // Transform Better Auth fields to User model fields after document is loaded from DB
 // This handles documents created directly by Better Auth (bypassing Mongoose)

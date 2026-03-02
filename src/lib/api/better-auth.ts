@@ -85,12 +85,12 @@ export const getAuth = async () => {
 
       emailAndPassword: {
         enabled: true,
-        requireEmailVerification: true, // Require email verification
+        requireEmailVerification: false, // Allow login without email verification; prompt later on profile screen
       },
 
       emailVerification: {
         enabled: true,
-        sendOnSignUp: true,
+        sendOnSignUp: false, // Mobile uses OTP-based verification; web can trigger manually
         async sendVerificationEmail({ user, url, token }) {
           const { sendEmailVerification } = await import("./email.service");
           await sendEmailVerification({
@@ -132,7 +132,7 @@ export const getAuth = async () => {
           firstName: { type: "string", required: true },
           lastName: { type: "string", required: true },
           username: { type: "string", required: false, unique: true },
-          role: { type: "string", required: false },
+          role: { type: "string", required: false, defaultValue: "user" },
           isActive: { type: "boolean", required: false, default: true },
           isEmailVerified: { type: "boolean", required: false, default: false },
           avatar: { type: "string", required: false },
@@ -140,6 +140,37 @@ export const getAuth = async () => {
           dateOfBirth: { type: "date", required: false },
           lastLoginAt: { type: "date", required: false },
           hasProfile: { type: "boolean", required: false, default: false },
+        },
+      },
+
+      databaseHooks: {
+        user: {
+          create: {
+            after: async (user: any) => {
+              // Belt-and-suspenders: ensure role is always set to 'user' for new signups.
+              // Better Auth's MongoDB adapter bypasses Mongoose schema defaults, so
+              // we patch the document here if role is somehow still missing.
+              if (!user.role) {
+                try {
+                  await connectToDatabase();
+                  const UserModel = (await import("@/models/user")).default;
+                  await UserModel.updateOne(
+                    { _id: user.id },
+                    { $set: { role: "user" } }
+                  );
+                  logger.info("databaseHook: set default role for new user", {
+                    userId: user.id,
+                    email: user.email,
+                  });
+                } catch (err: any) {
+                  logger.error("databaseHook: failed to set default role", {
+                    error: err.message,
+                    userId: user.id,
+                  });
+                }
+              }
+            },
+          },
         },
       },
     });

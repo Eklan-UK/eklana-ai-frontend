@@ -1,15 +1,44 @@
 "use client";
 
-import React from 'react';
-import { Calendar, Filter, Clock, Phone, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Calendar, Filter, Clock, Phone, ChevronRight, Loader2 } from 'lucide-react';
+import { adminService } from '@/services/admin.service';
 
 const DiscoveryCalls: React.FC = () => {
-  const calls = [
-    { name: 'Alex Chen', email: 'alex@email.com', purpose: 'Working holiday / planning to travel', date: 'Dec 3, 2024', time: '10:00 AM', status: 'Completed' },
-    { name: 'Maria Garcia', email: 'maria@email.com', purpose: 'Preparing for future opportunities', date: 'Dec 6, 2024', time: '11:30 AM', status: 'Completed' },
-    { name: 'Yuki Tanaka', email: 'yuki@email.com', purpose: 'Working holiday / planning to travel', date: 'Dec 3, 2024', time: '10:00 AM', status: 'Up coming' },
-    { name: 'David Lee', email: 'david@email.com', purpose: 'Working holiday / planning to travel', date: 'Dec 3, 2024', time: '10:00 AM', status: 'No-show' },
-  ];
+  const [calls, setCalls] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCalls = async () => {
+      try {
+        const response = await adminService.getDiscoveryCalls();
+        if (response.data?.calls) {
+          setCalls(response.data.calls);
+        }
+      } catch (error) {
+        console.error('Failed to fetch discovery calls', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCalls();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -37,7 +66,16 @@ const DiscoveryCalls: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          {calls.map((call, i) => (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+          ) : calls.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No discovery calls found.
+            </div>
+          ) : (
+            calls.map((call, i) => (
             <div key={i} className="flex flex-col md:flex-row items-center justify-between p-6 bg-white border border-gray-50 rounded-2xl hover:border-emerald-100 hover:shadow-md hover:shadow-emerald-500/5 transition-all group">
               <div className="flex items-center gap-4 w-full md:w-auto">
                 <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-lg">
@@ -50,14 +88,14 @@ const DiscoveryCalls: React.FC = () => {
               </div>
 
               <div className="flex-1 px-8 py-4 md:py-0">
-                <p className="text-sm text-gray-600">{call.purpose}</p>
+                <p className="text-sm text-gray-600">{call.message || 'No message provided'}</p>
               </div>
 
               <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end">
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">{call.date}</p>
+                  <p className="text-sm font-bold text-gray-900">{formatDate(call.createdAt)}</p>
                   <p className="flex items-center gap-1.5 text-xs text-gray-500 justify-end">
-                    <Clock className="w-3 h-3" /> {call.time}
+                    <Clock className="w-3 h-3" /> {formatTime(call.createdAt)}
                   </p>
                 </div>
 
@@ -79,7 +117,7 @@ const DiscoveryCalls: React.FC = () => {
                 </button>
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </div>
     </div>

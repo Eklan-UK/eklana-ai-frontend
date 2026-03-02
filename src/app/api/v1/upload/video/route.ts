@@ -79,21 +79,25 @@ async function uploadVideo(req: NextRequest, context: { userId: Types.ObjectId; 
       publicId: result.publicId,
     });
   } catch (error: any) {
-    logger.error('❌ Error uploading video:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
+    // Normalise – Cloudinary SDK sometimes throws plain objects like { error: { message, http_code } }
+    const errMsg =
+      error?.message ||
+      error?.error?.message ||
+      (typeof error === 'object' ? JSON.stringify(error) : String(error));
+
+    logger.error('❌ Error uploading video: ' + errMsg, {
+      name: error?.name,
       userId: context.userId.toString(),
       errorType: typeof error,
-      errorKeys: Object.keys(error),
+      errorKeys: error ? Object.keys(error) : [],
     });
     
     // Return detailed error information
     return NextResponse.json(
       { 
         code: 'UploadError',
-        message: error.message || 'Failed to upload video',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        message: errMsg || 'Failed to upload video',
+        error: process.env.NODE_ENV === 'development' ? errMsg : undefined,
       },
       { status: 500 }
     );
