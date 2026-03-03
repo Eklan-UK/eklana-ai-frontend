@@ -38,7 +38,7 @@ export class ElevenLabsDirectService {
 			throw new Error('ElevenLabs API key not configured. Please set NEXT_PUBLIC_ELEVEN_LABS_API_KEY');
 		}
 
-		const voiceId = options.voiceId || '21m00Tcm4TlvDq8ikWAM';
+		const voiceId = options.voiceId || 'UgBBYS2sOqTuMpoF3BR0';
 		const response = await fetch(`${this.apiEndpoint}/v1/text-to-speech/${voiceId}`, {
 			method: 'POST',
 			headers: {
