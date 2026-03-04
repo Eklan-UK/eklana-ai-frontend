@@ -35,6 +35,9 @@ export interface IUser extends Document {
   };
   lastLoginAt?: Date;
   hasProfile?: boolean; // Indicates if user has completed onboarding/profile setup
+  // Soft delete
+  isDeleted?: boolean;
+  deletedAt?: Date | null;
   // Subscription core
   subscriptionPlan?: "free" | "premium";
   subscriptionActivatedAt?: Date | null;
@@ -168,6 +171,16 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
       index: true, // Index for faster queries
+    },
+    // Soft delete flags
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
     // Subscription core fields
     subscriptionPlan: {
