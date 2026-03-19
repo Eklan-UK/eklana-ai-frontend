@@ -2,8 +2,10 @@
 // Process voice message using Gemini Native Audio
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
-import { processVoiceMessage } from '@/services/gemini.service';
+import { generateVoiceConversationSSEStream } from '@/services/gemini.service';
 import { logger } from '@/lib/api/logger';
+import { connectToDatabase } from '@/lib/api/db';
+import User from '@/models/user';
 
 async function handler(
 	req: NextRequest,
@@ -27,20 +29,31 @@ async function handler(
 			);
 		}
 
+		const mimeType = audioFile.type || 'audio/m4a';
+
 		// Convert file to buffer
 		const arrayBuffer = await audioFile.arrayBuffer();
 		const audioBuffer = Buffer.from(arrayBuffer);
 
-		const response = await processVoiceMessage(
+		await connectToDatabase();
+		const user = await User.findById(context.userId).select('firstName name').lean();
+		const userName = user?.firstName || user?.name || undefined;
+
+		const stream = await generateVoiceConversationSSEStream(
 			audioBuffer,
 			conversationHistory,
-			contextPrompt
+			contextPrompt,
+			mimeType,
+			'Kore', // voiceName
+			userName
 		);
 
-		return NextResponse.json({
-			code: 'Success',
-			message: 'Voice message processed successfully',
-			data: { response },
+		return new NextResponse(stream, {
+			headers: {
+				'Content-Type': 'text/event-stream',
+				'Cache-Control': 'no-cache',
+				'Connection': 'keep-alive',
+			},
 		});
 	} catch (error: any) {
 		logger.error('Error processing voice message:', error);
@@ -57,6 +70,9 @@ async function handler(
 }
 
 export const POST = withAuth(handler);
+
+// Allow enough time for native audio generation.
+export const maxDuration = 60;
 
 
 

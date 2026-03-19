@@ -1,5 +1,4 @@
-// Direct frontend ElevenLabs API client (no backend proxying)
-// This makes direct API calls from the browser to reduce latency
+// Compatibility wrapper. Provider calls are server-only now.
 
 interface TTSOptions {
 	text: string;
@@ -12,21 +11,11 @@ interface TTSOptions {
 }
 
 /**
- * Direct ElevenLabs API client for frontend use
- * Makes direct API calls to reduce latency
- * 
- * Note: API key must be exposed via NEXT_PUBLIC_ELEVEN_LABS_API_KEY
- * For production, consider using a serverless function or edge function
- * that doesn't add significant latency
+ * Backward-compatible API wrapper used by older call sites.
+ * Routes requests through authenticated backend endpoints.
  */
 export class ElevenLabsDirectService {
-	private readonly apiKey: string;
-	private readonly apiEndpoint: string;
-
-	constructor() {
-		this.apiKey = process.env.NEXT_PUBLIC_ELEVEN_LABS_API_KEY || '';
-		this.apiEndpoint = 'https://api.elevenlabs.io';
-	}
+	constructor() {}
 
 	/**
 	 * Generate TTS audio directly from frontend
@@ -34,27 +23,13 @@ export class ElevenLabsDirectService {
 	 * @returns Audio blob
 	 */
 	async generateTTS(options: TTSOptions): Promise<Blob> {
-		if (!this.apiKey) {
-			throw new Error('ElevenLabs API key not configured. Please set NEXT_PUBLIC_ELEVEN_LABS_API_KEY');
-		}
-
-		const voiceId = options.voiceId || 'UgBBYS2sOqTuMpoF3BR0';
-		const response = await fetch(`${this.apiEndpoint}/v1/text-to-speech/${voiceId}`, {
+		const response = await fetch('/api/v1/ai/tts/generate', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'xi-api-key': this.apiKey,
 			},
-			body: JSON.stringify({
-				text: options.text,
-				model_id: options.modelId || 'eleven_multilingual_v2',
-				voice_settings: {
-					stability: options.stability ?? 0.5,
-					similarity_boost: options.similarityBoost ?? 0.75,
-					style: options.style ?? 0.0,
-					use_speaker_boost: options.useSpeakerBoost !== undefined ? options.useSpeakerBoost : true,
-				},
-			}),
+			credentials: 'include',
+			body: JSON.stringify(options),
 		});
 
 		if (!response.ok) {
@@ -77,22 +52,15 @@ export class ElevenLabsDirectService {
 	 * Get available voices
 	 */
 	async getVoices() {
-		if (!this.apiKey) {
-			throw new Error('ElevenLabs API key not configured');
-		}
-
-		const response = await fetch(`${this.apiEndpoint}/v1/voices`, {
-			headers: {
-				'xi-api-key': this.apiKey,
-			},
+		const response = await fetch('/api/v1/ai/tts/voices', {
+			credentials: 'include',
 		});
 
 		if (!response.ok) {
 			throw new Error('Failed to fetch voices');
 		}
-
 		const data = await response.json();
-		return data.voices || [];
+		return data.data?.voices || [];
 	}
 }
 

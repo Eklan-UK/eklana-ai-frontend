@@ -1,33 +1,45 @@
-// GET /api/v1/ai/drill-practice/greeting
-// Generate a contextual greeting for drill-aware conversation
+// POST /api/v1/ai/drill-practice/voice
+// Voice drill practice: use Gemini Live built-in transcription + audio streaming.
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
-
 import { logger } from '@/lib/api/logger';
 import { connectToDatabase } from '@/lib/api/db';
+import User from '@/models/user';
 import DrillModel from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
-import User from '@/models/user';
+import { generateDrillPracticeVoiceResponseStream } from '@/services/gemini.service';
 
 async function handler(
 	req: NextRequest,
 	context: { userId: any; userRole: string }
 ): Promise<NextResponse> {
 	try {
-		const { searchParams } = new URL(req.url);
-		const drillId = searchParams.get('drillId');
+		const formData = await req.formData();
+		const drillId = formData.get('drillId') as string | null;
+		const conversationHistoryRaw = formData.get('conversationHistory') as string | null;
+		const audioFile = formData.get('audio') as File | null;
 
-		if (!drillId) {
+		if (!drillId || !audioFile) {
 			return NextResponse.json(
 				{
 					code: 'ValidationError',
-					message: 'drillId query parameter is required',
+					message: 'drillId and audio file are required',
 				},
 				{ status: 400 }
 			);
 		}
 
+		let conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [];
+		try {
+			conversationHistory = JSON.parse(conversationHistoryRaw || '[]');
+		} catch {
+			conversationHistory = [];
+		}
+
 		await connectToDatabase();
+
+		const user = await User.findById(context.userId).select('firstName name').lean();
+		const userName = user?.firstName || user?.name || undefined;
 
 		// Verify user has an assignment for this drill
 		const assignment = await DrillAssignment.findOne({
@@ -57,7 +69,6 @@ async function handler(
 			);
 		}
 
-		// Build drill data for greeting
 		const drillData = {
 			type: drill.type,
 			title: drill.title,
@@ -80,12 +91,17 @@ async function handler(
 			sentence_drill_word: drill.sentence_drill_word,
 		};
 
-		const { generateDrillPracticeGreetingStream } = await import('@/services/gemini.service');
+		const arrayBuffer = await audioFile.arrayBuffer();
+		const audioBuffer = Buffer.from(arrayBuffer);
+		const mimeType = audioFile.type || 'audio/m4a';
 
-		const user = await User.findById(context.userId).select('firstName name').lean();
-		const userName = user?.firstName || user?.name || undefined;
-
-		const stream = await generateDrillPracticeGreetingStream(drillData, userName);
+		const stream = await generateDrillPracticeVoiceResponseStream({
+			drill: drillData,
+			audioBuffer,
+			conversationHistory,
+			mimeType,
+			userName,
+		});
 
 		return new NextResponse(stream, {
 			headers: {
@@ -94,27 +110,27 @@ async function handler(
 				'Connection': 'keep-alive',
 			},
 		});
-
 	} catch (error: any) {
-		logger.error('Error generating drill practice greeting', {
-			error: error.message,
-			stack: error.stack,
+		logger.error('Error in drill voice handler', {
+			error: error?.message,
+			stack: error?.stack,
 		});
 
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message?.includes('429') || error.message?.includes('quota')
-					? 'AI service is temporarily busy. Please wait a moment and try again.'
-					: 'Failed to start practice session. Please try again.',
+				message:
+					error?.message?.includes('429') || error?.message?.includes('quota')
+						? 'AI service is temporarily busy. Please wait a moment and try again.'
+						: 'Failed to generate drill voice response. Please try again.',
 			},
 			{ status: 500 }
 		);
 	}
 }
 
-export const GET = withAuth(handler);
+export const POST = withAuth(handler);
 
-// Allow up to 60 seconds for greeting text + native audio generation
+// Allow enough time for native audio generation.
 export const maxDuration = 60;
 

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
-import config from '@/lib/api/config';
+import { generateElevenLabsAudio, TTSProviderError } from '@/services/tts-provider.service';
 
 const generateTTSSchema = z.object({
 	text: z.string().min(1).max(5000),
@@ -21,88 +21,40 @@ async function handler(
 	context: { userId: any; userRole: string }
 ): Promise<NextResponse> {
 	try {
+		const startedAt = Date.now();
 		const body = await req.json();
 		const validated = generateTTSSchema.parse(body);
-
-		// Check if API key is configured
-		const apiKey = config.ELEVEN_LABS_API_KEY || process.env.ELEVEN_LABS_API_KEY;
-		if (!apiKey) {
-			logger.error('Eleven Labs API key not configured');
-			return NextResponse.json(
-				{
-					code: 'ConfigurationError',
-					message: 'Eleven Labs API key is not configured. Please set ELEVEN_LABS_API_KEY environment variable.',
-				},
-				{ status: 500 }
-			);
-		}
-
-		// Create a streaming response
-		const stream = new ReadableStream({
-			async start(controller) {
-				try {
-					const voiceId = validated.voiceId || '21m00Tcm4TlvDq8ikWAM';
-					const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
-					
-					const response = await fetch(url, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							'xi-api-key': apiKey,
-						},
-						body: JSON.stringify({
-							text: validated.text,
-							model_id: validated.modelId || 'eleven_multilingual_v2',
-							voice_settings: {
-								stability: validated.stability || 0.5,
-								similarity_boost: validated.similarityBoost || 0.75,
-								style: validated.style || 0.0,
-								use_speaker_boost: validated.useSpeakerBoost !== undefined ? validated.useSpeakerBoost : true,
-							},
-						}),
-					});
-
-					if (!response.ok) {
-						const errorText = await response.text().catch(() => response.statusText);
-						logger.error('Eleven Labs API error', {
-							status: response.status,
-							statusText: response.statusText,
-							error: errorText,
-						});
-						
-						if (response.status === 401) {
-							throw new Error('Eleven Labs API key is invalid or expired. Please check your ELEVEN_LABS_API_KEY environment variable.');
-						}
-						
-						throw new Error(`Eleven Labs API error (${response.status}): ${errorText || response.statusText}`);
-					}
-
-					// Stream the audio
-					const reader = response.body?.getReader();
-					if (!reader) {
-						throw new Error('No response body');
-					}
-
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
-						controller.enqueue(value);
-					}
-
-					controller.close();
-				} catch (error: any) {
-					controller.error(error);
-				}
-			},
+		const audioBuffer = await generateElevenLabsAudio({
+			text: validated.text,
+			voiceId: validated.voiceId,
+			modelId: validated.modelId,
+			stability: validated.stability,
+			similarityBoost: validated.similarityBoost,
+			style: validated.style,
+			useSpeakerBoost: validated.useSpeakerBoost,
 		});
 
-		return new NextResponse(stream, {
+		return new NextResponse(audioBuffer, {
 			headers: {
 				'Content-Type': 'audio/mpeg',
 				'Cache-Control': 'no-cache',
+				'X-TTS-Telemetry': JSON.stringify({
+					route: '/api/v1/ai/tts/generate',
+					provider_status: 200,
+					cache_hit: false,
+					voice_id: validated.voiceId || 'default',
+					text_len: validated.text.length,
+					latency_ms: Date.now() - startedAt,
+				}),
 			},
 		});
 	} catch (error: any) {
+		if (error instanceof TTSProviderError) {
+			return NextResponse.json(
+				{ code: error.code, message: error.message },
+				{ status: error.status }
+			);
+		}
 		if (error instanceof z.ZodError) {
 			return NextResponse.json(
 				{

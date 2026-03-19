@@ -28,6 +28,7 @@ interface SentenceDrillProps {
 interface WordItem {
   word: string;
   hint?: string;
+  audioUrl?: string;
 }
 
 interface WordAnswer {
@@ -43,12 +44,19 @@ function getWordItems(drill: any): WordItem[] {
     return drill.sentence_writing_items.map((item: any) => ({
       word: item.word || "",
       hint: item.hint || undefined,
+      audioUrl: item.audioUrl || undefined,
     }));
   }
 
   // For 'sentence' type drills - use sentence_drill_word (single word)
   if (drill.sentence_drill_word) {
-    return [{ word: drill.sentence_drill_word, hint: undefined }];
+    return [
+      {
+        word: drill.sentence_drill_word,
+        hint: undefined,
+        audioUrl: drill.sentence_drill_audio_url || undefined,
+      },
+    ];
   }
 
   // Fallback: check target_sentences
@@ -266,7 +274,7 @@ export default function SentenceDrill({
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
                   {currentWord.word}
                 </h1>
-                <TTSButton text={currentWord.word} size="lg" />
+                <TTSButton text={currentWord.word} size="lg" audioUrl={currentWord.audioUrl} />
                 <BookmarkButton
                   itemId={currentWord.word}
                   itemType="word"

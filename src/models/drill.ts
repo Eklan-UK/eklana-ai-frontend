@@ -142,6 +142,11 @@ const DefinitionItemSchema = new Schema(
       default: "",
       description: "Optional hint for the word",
     },
+    audioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the definition word",
+    },
   },
   { _id: false }
 );
@@ -163,6 +168,16 @@ const GrammarItemSchema = new Schema(
       required: true,
       description: "Example sentence using the pattern",
     },
+    patternAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for grammar pattern",
+    },
+    exampleAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for grammar example",
+    },
   },
   { _id: false }
 );
@@ -178,6 +193,11 @@ const SentenceWritingItemSchema = new Schema(
       type: String,
       default: "",
       description: "Optional hint for the word",
+    },
+    audioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for sentence-writing word",
     },
   },
   { _id: false }
@@ -307,6 +327,7 @@ export interface IDrill extends Document {
   definition_items: Array<{
     word: string;
     hint?: string;
+    audioUrl?: string;
   }>;
 
   // Grammar Drill Fields
@@ -314,16 +335,20 @@ export interface IDrill extends Document {
     pattern: string;
     hint?: string;
     example: string;
+    patternAudioUrl?: string;
+    exampleAudioUrl?: string;
   }>;
 
   // Sentence Writing Drill Fields
   sentence_writing_items: Array<{
     word: string;
     hint?: string;
+    audioUrl?: string;
   }>;
 
   // Sentence Drill Fields (single word, definition + 2 sentences)
   sentence_drill_word?: string; // Target word for the drill
+  sentence_drill_audio_url?: string; // Pre-generated TTS audio URL for sentence drill word
 
   // Listening Drill Fields
   listening_drill_title?: string; // Title for the listening content
@@ -520,6 +545,11 @@ const drillSchema = new Schema<IDrill>(
       default: "",
       description:
         "Target word for sentence drill (user provides definition + 2 sentences)",
+    },
+    sentence_drill_audio_url: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for sentence drill word",
     },
 
     // Listening Drill Fields

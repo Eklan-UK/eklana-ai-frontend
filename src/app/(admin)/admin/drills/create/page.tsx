@@ -24,10 +24,7 @@ import { ParsedContent } from "@/services/document-parser.service";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import {
   generateDrillAudio,
-  extractVocabularyTexts,
-  extractRoleplayTexts,
-  extractMatchingTexts,
-  extractContentText,
+  extractTextsForDrillType,
   applyAudioUrls,
 } from "@/services/drill-audio.service";
 
@@ -860,20 +857,8 @@ const DrillBuilder: React.FC = () => {
         setAudioProgress("Extracting texts for audio generation...");
 
         try {
-          // Extract texts based on drill type
-          let textsToGenerate: Array<{ id: string; text: string }> = [];
-
-          if (drillType === "vocabulary" && drillData.target_sentences) {
-            textsToGenerate = extractVocabularyTexts(drillData.target_sentences);
-          } else if (drillType === "roleplay" && drillData.roleplay_scenes) {
-            textsToGenerate = extractRoleplayTexts(drillData.roleplay_scenes);
-          } else if (drillType === "matching" && drillData.matching_pairs) {
-            textsToGenerate = extractMatchingTexts(drillData.matching_pairs);
-          } else if (drillType === "summary" && drillData.article_content) {
-            textsToGenerate = extractContentText(drillData.article_content, "summary");
-          } else if (drillType === "listening" && drillData.listening_drill_content) {
-            textsToGenerate = extractContentText(drillData.listening_drill_content, "listening");
-          }
+          // Extract texts for all supported drill types
+          const textsToGenerate = extractTextsForDrillType(drillData, drillType);
 
           if (textsToGenerate.length > 0) {
             setAudioProgress(`Generating ${textsToGenerate.length} audio files...`);

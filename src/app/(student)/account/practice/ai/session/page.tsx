@@ -442,19 +442,190 @@ export default function AISessionPage() {
 
         setIsTranscribing(true);
         setIsRecording(false);
+
+        // Add placeholder user + streaming AI message immediately.
+        const userMessageIndex = messages.length;
+        const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
+
+        const userMessage: ChatMessage = { type: "user", text: "🎤 [Voice message]" };
+        const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
+
+        setMessages((prev) => [...prev, userMessage, aiMessagePlaceholder]);
+        stopAllAudio(); // interrupt anything currently playing
+
+        const historyBeforeTurn = messages.map((m) => ({
+          role: m.type === "user" ? ("user" as const) : ("model" as const),
+          content: m.text,
+        }));
+
+        const drillHistoryBeforeTurn = conversationHistory;
+
+        let finalResponse = "";
+        let fullTextMeta = "";
+        let inputTextMeta = "";
+
+        let didReceiveFirstChunk = false;
+        setIsThinking(true);
+        setStreamingAudioActive(true);
+        setPlayingMessageIndex(aiMessageIndex);
+
+        const audioPlayer = new AudioStreamPlayer(() => {
+          setStreamingAudioActive(false);
+          setPlayingMessageIndex(null);
+        });
+        currentAudioStreamPlayerRef.current = audioPlayer;
+
         try {
-          const transcription = await aiService.transcribeAudio(audioBlob);
-          if (!transcription.trim()) {
-            toast.error("Couldn't hear anything. Please speak louder and try again.");
-            setIsTranscribing(false);
-            return;
+          if (isDrillPractice && drillId) {
+            await aiService.streamDrillPracticeVoiceMessage(
+              {
+                drillId,
+                audioBlob,
+                conversationHistory: drillHistoryBeforeTurn,
+              },
+              (chunk) => {
+                if (!didReceiveFirstChunk) {
+                  didReceiveFirstChunk = true;
+                  setIsThinking(false);
+                  setIsTranscribing(false);
+                }
+
+                if (chunk.type === "text") {
+                  finalResponse += chunk.data;
+                  setMessages((prev) =>
+                    prev.map((m, i) =>
+                      i === aiMessageIndex ? { ...m, text: finalResponse } : m
+                    )
+                  );
+                } else if (chunk.type === "audio" && autoPlayAudio) {
+                  audioPlayer.enqueueBase64Pcm(chunk.data);
+                } else if (chunk.type === "metadata") {
+                  inputTextMeta =
+                    typeof chunk.data?.inputText === "string"
+                      ? chunk.data.inputText
+                      : "";
+                  fullTextMeta =
+                    typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
+
+                  setMessages((prev) =>
+                    prev.map((m, i) => {
+                      if (i === userMessageIndex) {
+                        return {
+                          ...m,
+                          text: inputTextMeta
+                            ? `🎤 [Voice] ${inputTextMeta}`
+                            : "🎤 [Voice message]",
+                        };
+                      }
+                      if (i === aiMessageIndex && fullTextMeta) {
+                        return { ...m, text: fullTextMeta };
+                      }
+                      return m;
+                    })
+                  );
+                }
+              }
+            );
+
+            setMessages((prev) =>
+              prev.map((m, i) =>
+                i === aiMessageIndex
+                  ? {
+                      ...m,
+                      isStreaming: false,
+                      text: fullTextMeta || finalResponse,
+                    }
+                  : m
+              )
+            );
+
+            setConversationHistory([
+              ...drillHistoryBeforeTurn,
+              { role: "user", content: inputTextMeta || "[Voice message]" },
+              { role: "model", content: fullTextMeta || finalResponse },
+            ]);
+          } else {
+            // Free talk voice: use Live API + built-in transcription.
+            const contextPrompt = topic
+              ? `Practice English in a ${topic.replace(/-/g, " ")} conversation. Be natural, encouraging, and conversational.`
+              : "Practice English conversation. Be natural, encouraging, and conversational.";
+
+            await aiService.streamVoiceConversationMessage(
+              {
+                audioBlob,
+                conversationHistory: historyBeforeTurn,
+                context: contextPrompt,
+              },
+              (chunk) => {
+                if (!didReceiveFirstChunk) {
+                  didReceiveFirstChunk = true;
+                  setIsThinking(false);
+                  setIsTranscribing(false);
+                }
+
+                if (chunk.type === "text") {
+                  finalResponse += chunk.data;
+                  setMessages((prev) =>
+                    prev.map((m, i) =>
+                      i === aiMessageIndex ? { ...m, text: finalResponse } : m
+                    )
+                  );
+                } else if (chunk.type === "audio" && autoPlayAudio) {
+                  audioPlayer.enqueueBase64Pcm(chunk.data);
+                } else if (chunk.type === "metadata") {
+                  inputTextMeta =
+                    typeof chunk.data?.inputText === "string"
+                      ? chunk.data.inputText
+                      : "";
+                  fullTextMeta =
+                    typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
+
+                  setMessages((prev) =>
+                    prev.map((m, i) => {
+                      if (i === userMessageIndex) {
+                        return {
+                          ...m,
+                          text: inputTextMeta
+                            ? `🎤 [Voice] ${inputTextMeta}`
+                            : "🎤 [Voice message]",
+                        };
+                      }
+                      if (i === aiMessageIndex && fullTextMeta) {
+                        return { ...m, text: fullTextMeta };
+                      }
+                      return m;
+                    })
+                  );
+                }
+              }
+            );
+
+            setMessages((prev) =>
+              prev.map((m, i) =>
+                i === aiMessageIndex
+                  ? {
+                      ...m,
+                      isStreaming: false,
+                      text: fullTextMeta || finalResponse,
+                    }
+                  : m
+              )
+            );
+
+            setConversationHistory([
+              ...historyBeforeTurn,
+              { role: "user", content: inputTextMeta || "[Voice message]" },
+              { role: "model", content: fullTextMeta || finalResponse },
+            ]);
           }
-          setInputText(transcription);
-          setIsTranscribing(false);
-          setTimeout(() => handleSendText(transcription), 200);
         } catch (err: any) {
-          toast.error(err.message || "Failed to transcribe. Try using the keyboard instead.");
+          toast.error(err.message || "Failed to process voice. Try using the keyboard instead.");
+          setIsThinking(false);
           setIsTranscribing(false);
+          setStreamingAudioActive(false);
+          setPlayingMessageIndex(null);
+          // Remove placeholder user + AI message
+          setMessages((prev) => prev.slice(0, -2));
         }
       };
 
@@ -490,7 +661,7 @@ export default function AISessionPage() {
     const cachedMsgCount = cachedSession.current?.messages.length ?? 0;
 
     return (
-      <div className="flex flex-col h-[100dvh] bg-gray-50 items-center justify-center px-6">
+      <div className="flex flex-col h-[100vh] bg-gray-50 items-center justify-center px-6">
         <div className="bg-white rounded-3xl shadow-lg p-6 max-w-sm w-full text-center">
           {/* Icon */}
           <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">

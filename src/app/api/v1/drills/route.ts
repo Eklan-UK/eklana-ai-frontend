@@ -50,17 +50,21 @@ const matchingPairSchema = z.object({
 const definitionItemSchema = z.object({
 	word: z.string().min(1),
 	hint: z.string().optional(),
+	audioUrl: z.string().optional(),
 });
 
 const grammarItemSchema = z.object({
 	pattern: z.string().min(1),
 	hint: z.string().optional(),
 	example: z.string().min(1),
+	patternAudioUrl: z.string().optional(),
+	exampleAudioUrl: z.string().optional(),
 });
 
 const sentenceWritingItemSchema = z.object({
 	word: z.string().min(1),
 	hint: z.string().optional(),
+	audioUrl: z.string().optional(),
 });
 
 const fillBlankItemSchema = z.object({
@@ -108,6 +112,7 @@ const createDrillSchema = z.object({
 	grammar_items: z.array(grammarItemSchema).optional(),
 	sentence_writing_items: z.array(sentenceWritingItemSchema).optional(),
 	sentence_drill_word: z.string().optional(),
+	sentence_drill_audio_url: z.string().optional(),
 	listening_drill_title: z.string().optional(),
 	listening_drill_content: z.string().optional(),
 	listening_drill_audio_url: z.string().optional(),
@@ -197,6 +202,7 @@ async function postHandler(
 	if (validated.grammar_items !== undefined) drillData.grammar_items = validated.grammar_items;
 	if (validated.sentence_writing_items !== undefined) drillData.sentence_writing_items = validated.sentence_writing_items;
 	if (validated.sentence_drill_word !== undefined) drillData.sentence_drill_word = validated.sentence_drill_word;
+	if (validated.sentence_drill_audio_url !== undefined) drillData.sentence_drill_audio_url = validated.sentence_drill_audio_url;
 	if (validated.listening_drill_title !== undefined) drillData.listening_drill_title = validated.listening_drill_title;
 	if (validated.listening_drill_content !== undefined) drillData.listening_drill_content = validated.listening_drill_content;
 	if (validated.listening_drill_audio_url !== undefined) drillData.listening_drill_audio_url = validated.listening_drill_audio_url;

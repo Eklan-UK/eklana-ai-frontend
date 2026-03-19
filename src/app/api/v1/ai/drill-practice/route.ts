@@ -7,6 +7,7 @@ import { logger } from '@/lib/api/logger';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillModel from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
+import User from '@/models/user';
 
 async function handler(
 	req: NextRequest,
@@ -80,11 +81,16 @@ async function handler(
 		};
 
 		const { generateDrillPracticeResponseStream } = await import('@/services/gemini.service');
+		
+		const user = await User.findById(context.userId).select('firstName name').lean();
+		const userName = user?.firstName || user?.name || undefined;
+
 		const stream = await generateDrillPracticeResponseStream({
 			drill: drillData,
 			userMessage,
 			conversationHistory: conversationHistory || [],
 			temperature,
+			userName,
 		});
 
 		return new NextResponse(stream, {

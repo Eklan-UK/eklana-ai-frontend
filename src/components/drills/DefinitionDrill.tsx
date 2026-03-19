@@ -185,7 +185,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                         {item.word}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <TTSButton text={item.word} />
+                        <TTSButton text={item.word} audioUrl={item.audioUrl} />
                         <BookmarkButton
                           itemId={item.word}
                           itemType="word"
@@ -291,7 +291,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <TTSButton text={currentItem.word} />
+                    <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} />
                     <BookmarkButton
                       itemId={currentItem.word}
                       itemType="word"

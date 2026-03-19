@@ -78,6 +78,13 @@ export function useTTS(options: UseTTSOptions = {}) {
           toast.error("Failed to play audio");
         };
 
+        let hasStartedPlayback = false;
+        const playOnce = async () => {
+          if (hasStartedPlayback) return;
+          hasStartedPlayback = true;
+          await playAudioNow();
+        };
+
         // Function to play audio
         const playAudioNow = async () => {
           try {
@@ -95,11 +102,11 @@ export function useTTS(options: UseTTSOptions = {}) {
         const attemptPlay = () => {
           if (audio.readyState >= 2) {
             // HAVE_CURRENT_DATA or higher - can play
-            playAudioNow();
+            playOnce();
           } else {
             // Wait for audio to be ready, then play
             const playWhenReady = () => {
-              playAudioNow();
+              playOnce();
             };
 
             // Use multiple events to ensure we catch when audio is ready
@@ -114,18 +121,19 @@ export function useTTS(options: UseTTSOptions = {}) {
             // Fallback: try after a short delay if still not ready
             setTimeout(() => {
               if (audio.readyState >= 2) {
-                playAudioNow();
+                playOnce();
               }
             }, 100);
           }
         };
 
-        // Start loading and attempt to play
+        // Start loading and play only when requested by autoPlay.
         audio.load(); // Explicitly start loading
-
-        // Always attempt to play when playAudio is called
-        // The autoPlay option is for controlling automatic playback in other contexts
-        attemptPlay();
+        if (autoPlay) {
+          attemptPlay();
+        } else {
+          setIsGenerating(false);
+        }
       } catch (error: any) {
         setIsGenerating(false);
         setIsPlaying(false);

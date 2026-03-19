@@ -69,17 +69,22 @@ const updateDrillSchema = z.object({
 	definition_items: z.array(z.object({
 		word: z.string(),
 		hint: z.string().optional(),
+		audioUrl: z.string().optional(),
 	})).optional(),
 	grammar_items: z.array(z.object({
 		pattern: z.string(),
 		hint: z.string().optional(),
 		example: z.string(),
+		patternAudioUrl: z.string().optional(),
+		exampleAudioUrl: z.string().optional(),
 	})).optional(),
 	sentence_writing_items: z.array(z.object({
 		word: z.string(),
 		hint: z.string().optional(),
+		audioUrl: z.string().optional(),
 	})).optional(),
 	sentence_drill_word: z.string().optional(),
+	sentence_drill_audio_url: z.string().optional(),
 	listening_drill_title: z.string().optional(),
 	listening_drill_content: z.string().optional(),
 	listening_drill_audio_url: z.string().optional(),
@@ -171,12 +176,14 @@ async function putHandler(
 	if (validated.grammar_items !== undefined) updateData.grammar_items = validated.grammar_items;
 	if (validated.sentence_writing_items !== undefined) updateData.sentence_writing_items = validated.sentence_writing_items;
 	if (validated.sentence_drill_word !== undefined) updateData.sentence_drill_word = validated.sentence_drill_word;
+	if (validated.sentence_drill_audio_url !== undefined) updateData.sentence_drill_audio_url = validated.sentence_drill_audio_url;
 	if (validated.listening_drill_title !== undefined) updateData.listening_drill_title = validated.listening_drill_title;
 	if (validated.listening_drill_content !== undefined) updateData.listening_drill_content = validated.listening_drill_content;
 	if (validated.listening_drill_audio_url !== undefined) updateData.listening_drill_audio_url = validated.listening_drill_audio_url;
 	if (validated.article_title !== undefined) updateData.article_title = validated.article_title;
 	if (validated.article_content !== undefined) updateData.article_content = validated.article_content;
 	if (validated.article_audio_url !== undefined) updateData.article_audio_url = validated.article_audio_url;
+	if (validated.fill_blank_items !== undefined) updateData.fill_blank_items = validated.fill_blank_items;
 
 	// Update drill
 	const result = await drillService.updateDrill(

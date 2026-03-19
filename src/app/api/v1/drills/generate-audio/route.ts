@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToCloudinary } from "@/services/cloudinary.service";
-import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
-
-const ELEVEN_LABS_API_KEY = process.env.ELEVEN_LABS_API_KEY;
-const ELEVEN_LABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";
+import { withRole } from "@/lib/api/middleware";
+import { generateElevenLabsAudio } from "@/services/tts-provider.service";
+import { resolveVoiceId } from "@/services/tts-config";
 
 interface GenerateAudioRequest {
   texts: Array<{
@@ -29,48 +28,18 @@ interface AudioResult {
  */
 async function generateTTSAudio(
   text: string,
-  voiceId: string = "21m00Tcm4TlvDq8ikWAM" // Rachel voice
+  voiceId?: string
 ): Promise<Buffer> {
-  if (!ELEVEN_LABS_API_KEY) {
-    throw new Error("ElevenLabs API key not configured");
-  }
-
-  const response = await fetch(`${ELEVEN_LABS_API_URL}/${voiceId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": ELEVEN_LABS_API_KEY,
-    },
-    body: JSON.stringify({
-      text,
-      model_id: "eleven_multilingual_v2",
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.0,
-        use_speaker_boost: true,
-      },
-    }),
+  const arrayBuffer = await generateElevenLabsAudio({
+    text,
+    voiceId: resolveVoiceId(voiceId),
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorMessage = "Failed to generate audio";
-    try {
-      const error = JSON.parse(errorText);
-      errorMessage = error.detail?.message || error.message || errorMessage;
-    } catch {
-      errorMessage = response.statusText || errorMessage;
-    }
-    throw new Error(errorMessage);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
+    const startedAt = Date.now();
     const body: GenerateAudioRequest = await request.json();
     const { texts, drillType, drillId } = body;
 
@@ -154,6 +123,14 @@ export async function POST(request: NextRequest) {
           success: successCount,
           failed: failCount,
         },
+        telemetry: {
+          route: "/api/v1/drills/generate-audio",
+          provider_status: "mixed",
+          cache_hit: false,
+          voice_id: "mixed",
+          text_len: texts.reduce((sum, item) => sum + (item.text?.length || 0), 0),
+          latency_ms: Date.now() - startedAt,
+        },
       },
     });
   } catch (error: any) {
@@ -164,4 +141,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withRole(["admin", "tutor"], postHandler);
 

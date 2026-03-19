@@ -2,7 +2,7 @@
 // Get available TTS voices
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
-import { getAvailableVoices } from '@/services/tts.service';
+import { getElevenLabsVoices, TTSProviderError } from '@/services/tts-provider.service';
 import { logger } from '@/lib/api/logger';
 
 async function handler(
@@ -10,7 +10,7 @@ async function handler(
 	context: { userId: any; userRole: string }
 ): Promise<NextResponse> {
 	try {
-		const voices = await getAvailableVoices();
+		const voices = await getElevenLabsVoices();
 
 		return NextResponse.json(
 			{
@@ -23,6 +23,15 @@ async function handler(
 			{ status: 200 }
 		);
 	} catch (error: any) {
+		if (error instanceof TTSProviderError) {
+			return NextResponse.json(
+				{
+					code: error.code,
+					message: error.message,
+				},
+				{ status: error.status }
+			);
+		}
 		logger.error('Error fetching voices', {
 			error: error.message,
 		});

@@ -61,6 +61,7 @@ interface DrillPracticeOptions {
 	conversationHistory?: ConversationMessage[];
 	temperature?: number;
 	pronunciationWeaknesses?: string[];
+	userName?: string;
 }
 
 // ─── PCM to WAV conversion ───────────────────────────────────────────────────
@@ -500,16 +501,11 @@ async function transcribeWithLiveAPI(
 				},
 			});
 
-			// Send audio via sendRealtimeInput
-			session.sendRealtimeInput({
-				audio: {
-					data: audioBase64,
-					mimeType,
-				},
+			// Send audio as clientContent (required for non-PCM formats like m4a)
+			session.sendClientContent({
+				turns: [{ role: 'user', parts: [{ inlineData: { data: audioBase64, mimeType } }] }],
+				turnComplete: true,
 			});
-
-			// Signal end of audio input
-			session.sendClientContent({ turnComplete: true });
 
 			logger.info('Live API: audio sent for transcription');
 		} catch (err: any) {
@@ -524,9 +520,12 @@ async function transcribeWithLiveAPI(
 
 // ─── Build drill practice system prompt ──────────────────────────────────────
 
-function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunciationWeaknesses?: string[]): string {
+function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunciationWeaknesses?: string[], userName?: string): string {
 	// ═══ LAYER 1 — Identity ═══
 	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
+	if (userName) {
+		prompt += `\n\nThe student's name is ${userName}. You should address them by their name occasionally to keep the conversation natural and friendly.`;
+	}
 
 	// ═══ LAYER 2 — Drill Blueprint ═══
 	prompt += `\n\nDRILL BLUEPRINT:\n- Title: "${drill.title}"\n- Type: ${drill.type}\n- Difficulty: ${drill.difficulty || 'intermediate'}`;
@@ -885,6 +884,377 @@ Listen to the audio and respond in this JSON format:
 	}
 }
 
+// ─── Voice conversation (Live API + built-in transcription, SSE) ──────────
+// This endpoint is used to eliminate the separate transcription request.
+export async function generateVoiceConversationSSEStream(
+	audioBuffer: Buffer,
+	conversationHistory: ConversationMessage[] = [],
+	contextPrompt?: string,
+	mimeType: string = 'audio/m4a',
+	voiceName: string = 'Kore',
+	userName?: string,
+): Promise<ReadableStream> {
+	if (!genAINew) {
+		throw new Error('Gemini Live API is not configured');
+	}
+
+	const systemPromptBase =
+		contextPrompt ||
+		'You are a helpful English conversation partner. Listen to the audio message and respond naturally.';
+
+	const historyText =
+		conversationHistory.length > 0
+			? '\n\nConversation so far:\n' +
+			  conversationHistory
+					.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+					.join('\n')
+			: '';
+
+	let systemInstruction = `${systemPromptBase}${historyText}\n\nRespond with natural spoken English (do not output JSON).`;
+	if (userName) {
+		systemInstruction += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
+	}
+
+	const audioBase64 = audioBuffer.toString('base64');
+	let session: any;
+	let sessionClosed = false;
+	let timeoutHandle: NodeJS.Timeout;
+
+	return new ReadableStream({
+		start(controller) {
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
+				const chunk = JSON.stringify({ type, data });
+				controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+			};
+
+			const fullAssistantText: string[] = [];
+			let fullUserText = '';
+			let metadataSent = false;
+
+			const closeOnce = (reason?: string) => {
+				if (sessionClosed) return;
+				sessionClosed = true;
+				clearTimeout(timeoutHandle);
+				try {
+					session?.close?.();
+				} catch {
+					/* ignore */
+				}
+				controller.close();
+
+				if (reason) {
+					logger.info('Voice conversation stream closed', { reason });
+				}
+			};
+
+			timeoutHandle = setTimeout(() => {
+				if (!sessionClosed) {
+					logger.warn('Voice conversation stream timed out');
+					sendChunk('metadata', {
+						fullText: fullAssistantText.join('').trim(),
+						inputText: fullUserText.trim(),
+						error: 'timeout',
+					});
+					closeOnce('timeout');
+				}
+			}, 45000);
+
+			(async () => {
+				try {
+					const sessionStart = Date.now();
+					session = await genAINew!.live.connect({
+						model: LIVE_MODEL,
+						config: {
+							responseModalities: [Modality.AUDIO],
+							speechConfig: {
+								voiceConfig: {
+									prebuiltVoiceConfig: { voiceName },
+								},
+							},
+							systemInstruction: {
+								parts: [{ text: systemInstruction }],
+							},
+							// Transcribe the user's audio input automatically.
+							inputAudioTranscription: {},
+							// Transcribe the assistant's spoken output.
+							outputAudioTranscription: {},
+						},
+						callbacks: {
+							onopen: () => {
+								logger.info('Voice conversation Live API connected', {
+									elapsed: `${Date.now() - sessionStart}ms`,
+								});
+							},
+							onmessage: (message: LiveServerMessage) => {
+								const data = message.data;
+								if (data) {
+									sendChunk('audio', data);
+								}
+
+								const inputTextPiece = (message.serverContent as any)?.inputTranscription?.text;
+								if (inputTextPiece) {
+									fullUserText += inputTextPiece;
+								}
+
+								const outputTextPiece = message.serverContent?.outputTranscription?.text;
+								if (outputTextPiece) {
+									fullAssistantText.push(outputTextPiece);
+									sendChunk('text', outputTextPiece);
+								}
+
+								if (message.serverContent?.turnComplete) {
+									// Give a short grace period for the final input/output transcription fragments.
+									if (!metadataSent) {
+										metadataSent = true;
+										setTimeout(() => {
+											if (sessionClosed) return;
+											sendChunk('metadata', {
+												fullText: fullAssistantText.join('').trim(),
+												inputText: fullUserText.trim(),
+											});
+											closeOnce('turnComplete');
+										}, 250);
+									}
+								}
+							},
+							onerror: (e: ErrorEvent) => {
+								logger.error('Voice conversation Live API error', { error: e?.message || 'unknown' });
+								sendChunk('metadata', {
+									fullText: fullAssistantText.join('').trim(),
+									inputText: fullUserText.trim(),
+									error: e?.message || 'unknown',
+								});
+								closeOnce('error');
+							},
+							onclose: (e: CloseEvent) => {
+								logger.info('Voice conversation Live API closed', {
+									code: e?.code,
+									reason: e?.reason,
+								});
+								if (!sessionClosed) closeOnce('onclose');
+							},
+						},
+					});
+
+					// Provide the user's audio as a regular client turn (required for m4a transcription).
+					session.sendClientContent({
+						turns: [
+							{
+								role: 'user',
+								parts: [
+									{
+										inlineData: {
+											data: audioBase64,
+											mimeType,
+										},
+									},
+								],
+							},
+						],
+						turnComplete: true,
+					});
+				} catch (err: any) {
+					if (sessionClosed) return;
+					logger.error('Failed to start Live voice conversation stream', { error: err?.message || err });
+					sendChunk('metadata', {
+						fullText: '',
+						inputText: '',
+						error: err?.message || 'unknown',
+					});
+					closeOnce('start_error');
+					throw err;
+				}
+			})();
+		},
+	});
+}
+
+// ─── Drill voice conversation (Live API + built-in transcription, SSE) ─
+export async function generateDrillPracticeVoiceResponseStream(
+	options: {
+		drill: DrillPracticeOptions['drill'];
+		audioBuffer: Buffer;
+		conversationHistory?: ConversationMessage[];
+		pronunciationWeaknesses?: string[];
+		mimeType?: string;
+		voiceName?: string;
+		userName?: string;
+	}
+): Promise<ReadableStream> {
+	const {
+		drill,
+		audioBuffer,
+		conversationHistory = [],
+		pronunciationWeaknesses,
+		mimeType = 'audio/m4a',
+		voiceName = 'Kore',
+		userName,
+	} = options;
+
+	if (!genAINew) {
+		throw new Error('Gemini Live API is not configured');
+	}
+
+	// Base drill system prompt (includes drill blueprint + instructions).
+	let systemInstruction = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName);
+
+	// Add lightweight conversation history for continuity.
+	if (conversationHistory.length > 0) {
+		systemInstruction +=
+			`\n\nConversation so far:\n` +
+			conversationHistory
+				.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+				.join('\n');
+	}
+
+	systemInstruction +=
+		`\n\nImportant:\n` +
+		`- Listen to the user's spoken audio.\n` +
+		`- Respond as the tutor in spoken English.\n` +
+		`- Keep the response aligned with the drill instructions above.\n`;
+
+	const audioBase64 = audioBuffer.toString('base64');
+	let session: any;
+	let sessionClosed = false;
+	let timeoutHandle: NodeJS.Timeout;
+
+	return new ReadableStream({
+		start(controller) {
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
+				const chunk = JSON.stringify({ type, data });
+				controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+			};
+
+			const fullAssistantText: string[] = [];
+			let fullUserText = '';
+			let metadataSent = false;
+
+			const closeOnce = (reason?: string) => {
+				if (sessionClosed) return;
+				sessionClosed = true;
+				clearTimeout(timeoutHandle);
+				try {
+					session?.close?.();
+				} catch {
+					/* ignore */
+				}
+				controller.close();
+
+				if (reason) {
+					logger.info('Drill voice stream closed', { reason });
+				}
+			};
+
+			timeoutHandle = setTimeout(() => {
+				if (!sessionClosed) {
+					logger.warn('Drill voice stream timed out');
+					sendChunk('metadata', {
+						fullText: fullAssistantText.join('').trim(),
+						inputText: fullUserText.trim(),
+						error: 'timeout',
+					});
+					closeOnce('timeout');
+				}
+			}, 60000);
+
+			(async () => {
+				try {
+					session = await genAINew!.live.connect({
+						model: LIVE_MODEL,
+						config: {
+							responseModalities: [Modality.AUDIO],
+							speechConfig: {
+								voiceConfig: {
+									prebuiltVoiceConfig: { voiceName },
+								},
+							},
+							systemInstruction: {
+								parts: [{ text: systemInstruction }],
+							},
+							// Enable built-in transcription so we can avoid `/ai/transcribe`.
+							inputAudioTranscription: {},
+							outputAudioTranscription: {},
+						},
+						callbacks: {
+							onopen: () => {
+								logger.info('Drill voice Live API connected');
+							},
+							onmessage: (message: LiveServerMessage) => {
+								const data = message.data;
+								if (data) sendChunk('audio', data);
+
+								const inputTextPiece = (message.serverContent as any)?.inputTranscription?.text;
+								if (inputTextPiece) fullUserText += inputTextPiece;
+
+								const outputTextPiece = message.serverContent?.outputTranscription?.text;
+								if (outputTextPiece) {
+									fullAssistantText.push(outputTextPiece);
+									sendChunk('text', outputTextPiece);
+								}
+
+								if (message.serverContent?.turnComplete) {
+									if (!metadataSent) {
+										metadataSent = true;
+										setTimeout(() => {
+											if (sessionClosed) return;
+											sendChunk('metadata', {
+												fullText: fullAssistantText.join('').trim(),
+												inputText: fullUserText.trim(),
+												drillType: drill.type,
+												drillTitle: drill.title,
+											});
+											closeOnce('turnComplete');
+										}, 250);
+									}
+								}
+							},
+							onerror: (e: ErrorEvent) => {
+								logger.error('Drill voice Live API error', { error: e?.message || 'unknown' });
+								sendChunk('metadata', {
+									fullText: fullAssistantText.join('').trim(),
+									inputText: fullUserText.trim(),
+									error: e?.message || 'unknown',
+								});
+								closeOnce('error');
+							},
+							onclose: (e: CloseEvent) => {
+								logger.info('Drill voice Live API closed', { code: e?.code, reason: e?.reason });
+								if (!sessionClosed) closeOnce('onclose');
+							},
+						},
+					});
+
+					// Send audio as clientContent for reliable transcription of m4a/mp3 files
+					session.sendClientContent({
+						turns: [
+							{
+								role: 'user',
+								parts: [
+									{
+										inlineData: {
+											data: audioBase64,
+											mimeType,
+										},
+									},
+								],
+							},
+						],
+						turnComplete: true,
+					});
+				} catch (err: any) {
+					logger.error('Failed to start Drill voice stream', { error: err?.message || err });
+					sendChunk('metadata', {
+						fullText: fullAssistantText.join('').trim(),
+						inputText: fullUserText.trim(),
+						error: err?.message || 'unknown',
+					});
+					closeOnce('start_error');
+				}
+			})();
+		},
+	});
+}
+
 // ─── Listening comprehension (uses text model) ──────────────────────────────
 
 /**
@@ -963,9 +1333,9 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 			throw new Error('Gemini API is not configured');
 		}
 
-		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses } = options;
+		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName } = options;
 
-		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses);
+		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName);
 
 		// Build conversation history for Live API turns
 		let validHistory = conversationHistory;
@@ -1025,7 +1395,7 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 	}
 }
 
-export async function generateDrillPracticeGreetingStream(drill: DrillPracticeOptions['drill']): Promise<ReadableStream> {
+export async function generateDrillPracticeGreetingStream(drill: DrillPracticeOptions['drill'], userName?: string): Promise<ReadableStream> {
 	try {
 		if (!config.GEMINI_API_KEY) {
 			throw new Error('Gemini API is not configured');
@@ -1046,9 +1416,12 @@ export async function generateDrillPracticeGreetingStream(drill: DrillPracticeOp
 
 		const label = typeLabel[drill.type] || 'English practice';
 
-		const systemPrompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${label} drill by their human tutor.
+		let systemPrompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${label} drill by their human tutor.`;
+		if (userName) {
+			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
+		}
 
-DRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nContext: ${drill.context}` : ''}
+		systemPrompt += `\n\nDRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nContext: ${drill.context}` : ''}
 
 Your opening should be brief and directive (2-3 sentences max):
 1. Tell the student what today's session is about
@@ -1113,7 +1486,7 @@ Example tone: "Alright! Today we're working on office negotiation. I'm going to 
 
 // ─── Topic practice (Live API stream for mobile app) ─────────────────────────
 
-export async function generateTopicPracticeGreetingStream(topic: string = 'daily-life'): Promise<ReadableStream> {
+export async function generateTopicPracticeGreetingStream(topic: string = 'daily-life', userName?: string): Promise<ReadableStream> {
 	try {
 		if (!config.GEMINI_API_KEY) {
 			throw new Error('Gemini API is not configured');
@@ -1128,9 +1501,12 @@ export async function generateTopicPracticeGreetingStream(topic: string = 'daily
 
 		const contextLabel = topicContexts[topic] || topicContexts['daily-life'];
 
-		const systemPrompt = `You are Eklan, an AI English speaking practice partner. The student wants to practice English related to ${contextLabel}.
+		let systemPrompt = `You are Eklan, an AI English speaking practice partner. The student wants to practice English related to ${contextLabel}.`;
+		if (userName) {
+			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
+		}
 
-Your opening should be brief, friendly, and directive (2-3 sentences max):
+		systemPrompt += `\n\nYour opening should be brief, friendly, and directive (2-3 sentences max):
 1. Acknowledge what kind of conversation you'll be having based on the topic.
 2. If it's a specific topic like daily-life or work, set up a quick roleplay scenario right away.
 3. If it's "on-mind", ask an engaging open-ended question to get them talking.
@@ -1156,7 +1532,8 @@ Example tone: "Hello! Since we're practicing work conversations today, let's pre
 export async function generateTopicPracticeResponseStream(
 	userMessage: string,
 	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
-	topic: string = 'daily-life'
+	topic: string = 'daily-life',
+	userName?: string
 ): Promise<ReadableStream> {
 	try {
 		if (!config.GEMINI_API_KEY) {
@@ -1170,7 +1547,10 @@ export async function generateTopicPracticeResponseStream(
 			'surprise': 'You are Eklan, a friendly AI English tutor. Have a fun, engaging conversation with the student. Be creative and keep things interesting!',
 		};
 
-		const systemPrompt = topicContexts[topic] || topicContexts['daily-life'];
+		let systemPrompt = topicContexts[topic] || topicContexts['daily-life'];
+		if (userName) {
+			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally to be friendly.`;
+		}
 
 		// Build conversation history for Live API turns
 		let validHistory = conversationHistory;

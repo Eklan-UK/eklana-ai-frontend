@@ -32,6 +32,11 @@ import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
 import { ParsedContent } from "@/services/document-parser.service";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { toast } from "sonner";
+import {
+  applyAudioUrls,
+  extractTextsForDrillType,
+  generateDrillAudio,
+} from "@/services/drill-audio.service";
 
 const DRAFT_KEY = "drill_draft";
 
@@ -529,6 +534,25 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
         delete submitData.fill_blank_items;
+      }
+
+      // Pre-generate drill audio URLs for all supported drill types before save.
+      const textsToGenerate = extractTextsForDrillType(submitData, formData.type);
+      if (textsToGenerate.length > 0) {
+        const audioResponse = await generateDrillAudio(
+          textsToGenerate,
+          formData.type,
+          isEditMode ? drillId || undefined : undefined
+        );
+        if (audioResponse.success && audioResponse.data) {
+          Object.assign(submitData, applyAudioUrls(submitData, audioResponse.data.results));
+          const { success, failed } = audioResponse.data.summary;
+          if (failed > 0) {
+            toast.warning(`Generated ${success}/${success + failed} audio files. Some failed.`);
+          }
+        } else {
+          toast.warning("Audio generation failed. Saving drill without pre-generated audio.");
+        }
       }
 
       // Convert date to ISO string

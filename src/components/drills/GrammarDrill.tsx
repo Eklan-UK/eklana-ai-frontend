@@ -31,6 +31,8 @@ interface PatternItem {
   pattern: string;
   example: string;
   hint?: string;
+  patternAudioUrl?: string;
+  exampleAudioUrl?: string;
 }
 
 interface PatternAnswer {
@@ -48,6 +50,8 @@ export default function GrammarDrill({
       pattern: item.pattern || "",
       example: item.example || "",
       hint: item.hint || undefined,
+      patternAudioUrl: item.patternAudioUrl || undefined,
+      exampleAudioUrl: item.exampleAudioUrl || undefined,
     }));
   }, [drill.grammar_items]);
 
@@ -238,7 +242,11 @@ export default function GrammarDrill({
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
               {currentPattern?.pattern}
             </h1>
-            <TTSButton text={currentPattern?.pattern || ""} size="md" />
+            <TTSButton
+              text={currentPattern?.pattern || ""}
+              size="md"
+              audioUrl={currentPattern?.patternAudioUrl}
+            />
             <BookmarkButton
               itemId={currentPattern?.pattern || ""}
               itemType="sentence"
@@ -271,7 +279,11 @@ export default function GrammarDrill({
               <p className="text-lg text-green-900 font-medium">
                 "{currentPattern?.example}"
               </p>
-              <TTSButton text={currentPattern?.example || ""} size="sm" />
+              <TTSButton
+                text={currentPattern?.example || ""}
+                size="sm"
+                audioUrl={currentPattern?.exampleAudioUrl}
+              />
             </div>
           </div>
         </div>

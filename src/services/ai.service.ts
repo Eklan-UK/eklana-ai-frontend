@@ -153,6 +153,82 @@ export const aiService = {
   },
 
   /**
+   * Voice conversation via Gemini Live: built-in transcription + audio streaming.
+   */
+  async streamVoiceConversationMessage(
+    options: {
+      audioBlob: Blob;
+      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
+      context?: string;
+    },
+    onChunk: (chunk: { type: string; data: any }) => void
+  ): Promise<void> {
+    const formData = new FormData();
+    formData.append("audio", options.audioBlob, "recording.webm");
+    formData.append(
+      "conversationHistory",
+      JSON.stringify(options.conversationHistory || [])
+    );
+    if (options.context) formData.append("context", options.context);
+
+    const response = await fetch(`${API_BASE_URL}/ai/voice/conversation`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get voice conversation stream");
+      }
+      throw new Error(`Failed to get voice conversation stream: ${response.status}`);
+    }
+
+    await this._processSSEStream(response, onChunk);
+  },
+
+  /**
+   * Drill practice voice via Gemini Live: built-in transcription + audio streaming.
+   */
+  async streamDrillPracticeVoiceMessage(
+    options: {
+      drillId: string;
+      audioBlob: Blob;
+      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
+      temperature?: number;
+    },
+    onChunk: (chunk: { type: string; data: any }) => void
+  ): Promise<void> {
+    const formData = new FormData();
+    formData.append("drillId", options.drillId);
+    formData.append("audio", options.audioBlob, "recording.webm");
+    formData.append(
+      "conversationHistory",
+      JSON.stringify(options.conversationHistory || [])
+    );
+    if (options.temperature !== undefined) {
+      formData.append("temperature", String(options.temperature));
+    }
+
+    const response = await fetch(`${API_BASE_URL}/ai/drill-practice/voice`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to get drill voice stream");
+      }
+      throw new Error(`Failed to get drill voice stream: ${response.status}`);
+    }
+
+    await this._processSSEStream(response, onChunk);
+  },
+
+  /**
    * Transcribe audio to text using Gemini
    */
   async transcribeAudio(audioBlob: Blob): Promise<string> {
