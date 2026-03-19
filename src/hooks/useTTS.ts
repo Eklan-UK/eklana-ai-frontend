@@ -10,7 +10,10 @@ interface UseTTSOptions {
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
-  const { autoPlay = true, onPlayStart, onPlayEnd, onError } = options;
+  // Note: this hook's `playAudio()` method is always an explicit "play now"
+  // action from the caller. We therefore always attempt playback after
+  // generating the audio Blob.
+  const { onPlayStart, onPlayEnd, onError } = options;
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
@@ -45,8 +48,10 @@ export function useTTS(options: UseTTSOptions = {}) {
         objectUrlRef.current = audioObjectUrl;
         setCurrentAudioUrl(audioObjectUrl);
 
-        // Always create audio element, but only play if autoPlay is true
+        // Always create the audio element and prepare playback.
         const audio = new Audio(audioObjectUrl);
+        audio.muted = false;
+        audio.volume = 1;
         audioRef.current = audio;
 
         // Preload the audio to start loading immediately
@@ -127,13 +132,10 @@ export function useTTS(options: UseTTSOptions = {}) {
           }
         };
 
-        // Start loading and play only when requested by autoPlay.
+        // Start loading and attempt playback immediately.
         audio.load(); // Explicitly start loading
-        if (autoPlay) {
-          attemptPlay();
-        } else {
-          setIsGenerating(false);
-        }
+        // Always attempt playback for an explicit `playAudio()` call.
+        attemptPlay();
       } catch (error: any) {
         setIsGenerating(false);
         setIsPlaying(false);
@@ -141,7 +143,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         toast.error(error.message || "Failed to generate speech");
       }
     },
-    [autoPlay, onPlayStart, onPlayEnd, onError]
+    [onPlayStart, onPlayEnd, onError]
   );
 
   const stopAudio = useCallback(() => {
