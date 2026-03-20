@@ -3,6 +3,9 @@ import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
 import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
+// Bundled static binary — works in serverless environments where ffmpeg is not on PATH.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ffmpegBin: string = require('ffmpeg-static');
 
 // Initialize old SDK (for non-drill functions that still use generateContent)
 let genAI: GoogleGenerativeAI | null = null;
@@ -129,7 +132,7 @@ function combineBase64Chunks(chunks: string[]): string {
  */
 async function convertAudioToRawPcm16k(audioBuffer: Buffer): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
-		const ffmpeg = spawn('ffmpeg', [
+		const ffmpeg = spawn(ffmpegBin, [
 			'-hide_banner', '-loglevel', 'error', '-y',
 			'-i', 'pipe:0',   // stdin input
 			'-ac', '1',        // mono
