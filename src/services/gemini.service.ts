@@ -122,15 +122,54 @@ function combineBase64Chunks(chunks: string[]): string {
 }
 
 /**
+ * Returns true if buf is a PCM WAV file already in the exact format
+ * Gemini Live expects (16 kHz, 16-bit, mono, little-endian).
+ * Checking this lets us skip ffmpeg for iOS recordings (LinearPCM preset).
+ */
+function isWav16kHz16BitMono(buf: Buffer): boolean {
+	if (buf.length < 44) return false;
+	if (buf.toString('ascii', 0, 4) !== 'RIFF') return false;
+	if (buf.toString('ascii', 8, 12) !== 'WAVE') return false;
+	if (buf.toString('ascii', 12, 16) !== 'fmt ') return false;
+	const audioFormat = buf.readUInt16LE(20); // 1 = PCM
+	const channels    = buf.readUInt16LE(22);
+	const sampleRate  = buf.readUInt32LE(24);
+	const bitDepth    = buf.readUInt16LE(34);
+	return audioFormat === 1 && channels === 1 && sampleRate === 16000 && bitDepth === 16;
+}
+
+/** Extract raw PCM payload from a WAV file by locating the 'data' chunk. */
+function extractPcmFromWav(buf: Buffer): Buffer {
+	let offset = 12;
+	while (offset + 8 <= buf.length) {
+		const id   = buf.toString('ascii', offset, offset + 4);
+		const size = buf.readUInt32LE(offset + 4);
+		if (id === 'data') return buf.subarray(offset + 8, offset + 8 + size);
+		offset += 8 + size;
+	}
+	return buf.subarray(44); // fallback: assume standard 44-byte header
+}
+
+/**
  * Convert any audio format (m4a, webm, ogg, mp3, etc.) to raw PCM signed-16-bit
  * little-endian at 16 kHz mono — the exact format Gemini Live API expects for
  * `sendRealtimeInput`.  The output contains NO container header; it is raw
  * sample data.  Caller must use mimeType `audio/pcm;rate=16000`.
  *
+ * Fast path: if the buffer is already a 16kHz/16-bit/mono WAV (produced by
+ * iOS LinearPCM recording), we skip ffmpeg and just strip the RIFF header.
+ *
  * Gemini Live docs: https://ai.google.dev/gemini-api/docs/live-guide#sending-audio
  * "Audio needs to be sent as raw PCM data (raw 16-bit PCM audio, 16kHz, little-endian)."
  */
 async function convertAudioToRawPcm16k(audioBuffer: Buffer): Promise<Buffer> {
+	// Fast path — no ffmpeg needed for iOS LinearPCM recordings.
+	if (isWav16kHz16BitMono(audioBuffer)) {
+		logger.info('Audio is already 16kHz PCM WAV — skipping ffmpeg');
+		return extractPcmFromWav(audioBuffer);
+	}
+
+	// Slow path — ffmpeg for m4a / aac / other formats (Android).
 	return new Promise((resolve, reject) => {
 		const ffmpeg = spawn(ffmpegBin, [
 			'-hide_banner', '-loglevel', 'error', '-y',

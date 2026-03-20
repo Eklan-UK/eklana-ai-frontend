@@ -149,9 +149,20 @@ const nextConfig: NextConfig = {
   // Adding empty turbopack config to silence the error since next-pwa requires webpack
   turbopack: {},
 
-  // Exclude WebSocket-related packages from serverless bundling
-  // Fixes "b.mask is not a function" error in production (Vercel)
-  serverExternalPackages: ['ws', 'bufferutil', 'utf-8-validate'],
+  // Exclude native/binary packages from webpack bundling so they are resolved
+  // from node_modules at runtime (not inlined as a bundle chunk).
+  // ffmpeg-static: binary path mangled when bundled → ENOENT on Vercel.
+  // ws / bufferutil / utf-8-validate: "b.mask is not a function" in production.
+  serverExternalPackages: ['ws', 'bufferutil', 'utf-8-validate', 'ffmpeg-static'],
+
+  // Force Vercel's output-file-tracing to include the ffmpeg binary that
+  // ffmpeg-static resolves to at runtime — it is a plain executable file
+  // that the tracer normally ignores.
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/v1/ai/**': ['./node_modules/ffmpeg-static/ffmpeg'],
+    },
+  },
   
   images: {
     remotePatterns: [

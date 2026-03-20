@@ -29,30 +29,23 @@ async function handler(
 
 		await connectToDatabase();
 
-		// Verify user has an assignment for this drill
-		const assignment = await DrillAssignment.findOne({
-			learnerId: context.userId,
-			drillId: drillId,
-		}).lean();
+		// Run all three DB lookups in parallel to save ~100-200 ms.
+		const [assignment, drill, user] = await Promise.all([
+			DrillAssignment.findOne({ learnerId: context.userId, drillId }).lean(),
+			DrillModel.findById(drillId).lean(),
+			User.findById(context.userId).select('firstName').lean(),
+		]);
 
 		if (!assignment) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill not found in your assignments',
-				},
+				{ code: 'NotFound', message: 'Drill not found in your assignments' },
 				{ status: 404 }
 			);
 		}
 
-		// Fetch full drill data
-		const drill = await DrillModel.findById(drillId).lean();
 		if (!drill) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill data not available',
-				},
+				{ code: 'NotFound', message: 'Drill data not available' },
 				{ status: 404 }
 			);
 		}
@@ -82,7 +75,6 @@ async function handler(
 
 		const { generateDrillPracticeGreetingStream } = await import('@/services/gemini.service');
 
-		const user = await User.findById(context.userId).select('firstName').lean();
 		const userName = (user?.firstName as string | undefined) || undefined;
 
 		const stream = await generateDrillPracticeGreetingStream(drillData, userName);
