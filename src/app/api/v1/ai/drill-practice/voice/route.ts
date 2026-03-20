@@ -38,8 +38,8 @@ async function handler(
 
 		await connectToDatabase();
 
-		const user = await User.findById(context.userId).select('firstName name').lean();
-		const userName = user?.firstName || user?.name || undefined;
+		const user = await User.findById(context.userId).select('firstName').lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		// Verify user has an assignment for this drill
 		const assignment = await DrillAssignment.findOne({
@@ -101,6 +101,8 @@ async function handler(
 			conversationHistory,
 			mimeType,
 			userName,
+			userId:  String(context.userId),  // enables session reuse
+			drillId: drillId,
 		});
 
 		return new NextResponse(stream, {

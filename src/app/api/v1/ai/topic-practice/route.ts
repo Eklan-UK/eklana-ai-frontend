@@ -21,8 +21,8 @@ async function handler(
 		}
 
 		await connectToDatabase();
-		const user = await User.findById(context.userId).select('firstName name').lean();
-		const userName = user?.firstName || user?.name || undefined;
+		const user = await User.findById(context.userId).select('firstName').lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		const stream = await generateTopicPracticeResponseStream(
             userMessage,

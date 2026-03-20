@@ -36,16 +36,17 @@ async function handler(
 		const audioBuffer = Buffer.from(arrayBuffer);
 
 		await connectToDatabase();
-		const user = await User.findById(context.userId).select('firstName name').lean();
-		const userName = user?.firstName || user?.name || undefined;
+		const user = await User.findById(context.userId).select('firstName').lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		const stream = await generateVoiceConversationSSEStream(
 			audioBuffer,
 			conversationHistory,
 			contextPrompt,
 			mimeType,
-			'Kore', // voiceName
-			userName
+			'Kore',                         // voiceName
+			userName,
+			String(context.userId),         // userId — enables session reuse
 		);
 
 		return new NextResponse(stream, {

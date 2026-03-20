@@ -82,8 +82,8 @@ async function handler(
 
 		const { generateDrillPracticeGreetingStream } = await import('@/services/gemini.service');
 
-		const user = await User.findById(context.userId).select('firstName name').lean();
-		const userName = user?.firstName || user?.name || undefined;
+		const user = await User.findById(context.userId).select('firstName').lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		const stream = await generateDrillPracticeGreetingStream(drillData, userName);
 

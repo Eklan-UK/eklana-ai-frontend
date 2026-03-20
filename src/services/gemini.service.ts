@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
+import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 
@@ -115,6 +116,41 @@ function combineBase64Chunks(chunks: string[]): string {
 		offset += buf.length;
 	}
 	return combined.toString('base64');
+}
+
+/**
+ * Convert any audio format (m4a, webm, ogg, mp3, etc.) to raw PCM signed-16-bit
+ * little-endian at 16 kHz mono — the exact format Gemini Live API expects for
+ * `sendRealtimeInput`.  The output contains NO container header; it is raw
+ * sample data.  Caller must use mimeType `audio/pcm;rate=16000`.
+ *
+ * Gemini Live docs: https://ai.google.dev/gemini-api/docs/live-guide#sending-audio
+ * "Audio needs to be sent as raw PCM data (raw 16-bit PCM audio, 16kHz, little-endian)."
+ */
+async function convertAudioToRawPcm16k(audioBuffer: Buffer): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const ffmpeg = spawn('ffmpeg', [
+			'-hide_banner', '-loglevel', 'error', '-y',
+			'-i', 'pipe:0',   // stdin input
+			'-ac', '1',        // mono
+			'-ar', '16000',    // 16 kHz — Gemini Live input requirement
+			'-f', 's16le',     // raw signed-16-bit little-endian PCM, NO header/container
+			'pipe:1',          // stdout output
+		]);
+
+		const chunks: Buffer[] = [];
+		let stderr = '';
+
+		ffmpeg.stdout.on('data', (d: Buffer) => chunks.push(Buffer.from(d)));
+		ffmpeg.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+		ffmpeg.on('error', reject);
+		ffmpeg.on('close', (code: number) => {
+			if (code === 0) return resolve(Buffer.concat(chunks));
+			reject(new Error(`ffmpeg audio conversion failed (exit ${code}): ${stderr || 'no stderr'}`));
+		});
+
+		ffmpeg.stdin.end(audioBuffer);
+	});
 }
 
 async function generateWithLiveAPI(
@@ -524,7 +560,8 @@ function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunci
 	// ═══ LAYER 1 — Identity ═══
 	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
 	if (userName) {
-		prompt += `\n\nThe student's name is ${userName}. You should address them by their name occasionally to keep the conversation natural and friendly.`;
+		// Place name rule at the very top of the prompt so the model prioritises it.
+		prompt = `STUDENT NAME: The real student speaking to you is named "${userName}". Always address them as "${userName}" — never use a roleplay character name when directly speaking to the real person.\n\n` + prompt;
 	}
 
 	// ═══ LAYER 2 — Drill Blueprint ═══
@@ -884,201 +921,273 @@ Listen to the audio and respond in this JSON format:
 	}
 }
 
+// ─── Live Session Cache ─────────────────────────────────────────────────────
+// Keeps Gemini Live WebSocket connections alive between voice turns so each
+// turn only pays the FFmpeg + model-inference cost, not the ~1-2s reconnect.
+//
+// Cache key: `freetalk_<userId>` or `drill_<userId>_<drillId>`.
+// Sessions are evicted 3 minutes after their last turn completes.
+// On WS error/close the entry is removed; the next request opens a fresh one.
+
+interface LiveSessionEntry {
+	session: any;
+	status: 'connecting' | 'ready' | 'busy' | 'closed';
+	idleTimer: ReturnType<typeof setTimeout> | null;
+	// Mutable per-turn handlers — swapped in at the start of each turn and
+	// cleared the moment the turn's SSE stream closes so the socket stays silent.
+	onTurnMessage: ((msg: LiveServerMessage) => void) | null;
+	onTurnError: ((e: ErrorEvent) => void) | null;
+	onTurnClose: ((e: CloseEvent) => void) | null;
+}
+
+const LIVE_SESSION_IDLE_MS = 3 * 60 * 1000;
+const liveSessionCache = new Map<string, LiveSessionEntry>();
+
+function resetSessionIdleTimer(key: string, entry: LiveSessionEntry) {
+	if (entry.idleTimer) clearTimeout(entry.idleTimer);
+	entry.idleTimer = setTimeout(() => {
+		logger.info('[SessionCache] idle evict', { key });
+		try { entry.session?.close?.(); } catch { /* ignore */ }
+		liveSessionCache.delete(key);
+	}, LIVE_SESSION_IDLE_MS);
+}
+
+async function getOrCreateLiveSession(
+	key: string,
+	model: string,
+	sessionConfig: any,
+): Promise<LiveSessionEntry> {
+	const existing = liveSessionCache.get(key);
+	if (existing) {
+		if (existing.status === 'closed') {
+			liveSessionCache.delete(key);
+		} else if (existing.status === 'connecting') {
+			// Another request is mid-connect — wait up to 15 s then reuse.
+			const deadline = Date.now() + 15_000;
+			while (existing.status === 'connecting' && Date.now() < deadline) {
+				await new Promise(r => setTimeout(r, 100));
+			}
+			const afterWait = (existing as LiveSessionEntry).status;
+			if (afterWait === 'ready' || afterWait === 'busy') {
+				resetSessionIdleTimer(key, existing);
+				return existing;
+			}
+			liveSessionCache.delete(key);
+		} else {
+			// 'ready' or 'busy' — reuse the live socket
+			resetSessionIdleTimer(key, existing);
+			logger.info('[SessionCache] ♻ reusing session', { key, status: existing.status });
+			return existing;
+		}
+	}
+
+	// No usable entry — create a new WebSocket session.
+	const entry: LiveSessionEntry = {
+		session: null,
+		status: 'connecting',
+		idleTimer: null,
+		onTurnMessage: null,
+		onTurnError: null,
+		onTurnClose: null,
+	};
+	liveSessionCache.set(key, entry);
+
+	const tConnect = Date.now();
+	try {
+		entry.session = await genAINew!.live.connect({
+			model,
+			config: sessionConfig,
+			callbacks: {
+				onopen: () => {
+					logger.info('[SessionCache] 🔌 WS open (new session)', { key, ms: Date.now() - tConnect });
+					entry.status = 'ready';
+				},
+				onmessage: (msg: LiveServerMessage) => {
+					entry.onTurnMessage?.(msg);
+				},
+				onerror: (e: ErrorEvent) => {
+					logger.error('[SessionCache] WS error', { key, error: e?.message });
+					entry.status = 'closed';
+					liveSessionCache.delete(key);
+					entry.onTurnError?.(e);
+				},
+				onclose: (e: CloseEvent) => {
+					logger.info('[SessionCache] WS closed', { key, code: e?.code });
+					entry.status = 'closed';
+					liveSessionCache.delete(key);
+					entry.onTurnClose?.(e);
+				},
+			},
+		});
+		entry.status = 'ready';
+	} catch (err) {
+		entry.status = 'closed';
+		liveSessionCache.delete(key);
+		throw err;
+	}
+
+	resetSessionIdleTimer(key, entry);
+	return entry;
+}
+
 // ─── Voice conversation (Live API + built-in transcription, SSE) ──────────
-// This endpoint is used to eliminate the separate transcription request.
+// Persistent-socket voice pipeline: mic audio → reused Gemini Live socket
+// → audio + text SSE.  Each turn reuses the cached WS, saving ~1-2 s per turn.
+//
+// Key design decisions (per Google Live API docs):
+//   1. Audio input MUST be raw PCM 16-bit, 16 kHz, little-endian mono.
+//   2. Use sendRealtimeInput({ audio }) — enables automatic VAD + transcription.
+//   3. Disable thinking (thinkingBudget: 0) for lowest latency.
+//   4. Conversation context is maintained naturally by the live session.
 export async function generateVoiceConversationSSEStream(
 	audioBuffer: Buffer,
 	conversationHistory: ConversationMessage[] = [],
 	contextPrompt?: string,
-	mimeType: string = 'audio/m4a',
+	_mimeType: string = 'audio/m4a',  // kept for API compat, format handled internally
 	voiceName: string = 'Kore',
 	userName?: string,
+	userId?: string,               // used as the session cache key
 ): Promise<ReadableStream> {
-	if (!genAINew) {
-		throw new Error('Gemini Live API is not configured');
+	if (!genAINew) throw new Error('Gemini Live API is not configured');
+
+	const t0 = Date.now();
+
+	// ① FFmpeg — convert to raw PCM 16 kHz (the only format Live API accepts).
+	let pcmBuffer: Buffer;
+	try {
+		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
+		logger.info('[FreeTalk] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
+	} catch (e: any) {
+		throw new Error(`Audio conversion failed: ${e?.message || 'ffmpeg error'}`);
 	}
+	const pcmBase64 = pcmBuffer.toString('base64');
+	const pcmBytes  = pcmBuffer.length;
 
-	const systemPromptBase =
-		contextPrompt ||
-		'You are a helpful English conversation partner. Listen to the audio message and respond naturally.';
-
-	const historyText =
-		conversationHistory.length > 0
-			? '\n\nConversation so far:\n' +
-			  conversationHistory
-					.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-					.join('\n')
-			: '';
-
-	let systemInstruction = `${systemPromptBase}${historyText}\n\nRespond with natural spoken English (do not output JSON).`;
+	// Build system instruction — only used when a NEW session is opened.
+	// On reused sessions the model already holds conversation context.
+	const persona = contextPrompt ||
+		'You are Eklan, a friendly AI English speaking practice partner. Your role is to have natural, encouraging conversations to help the student improve their English.';
+	let systemInstruction = persona;
 	if (userName) {
-		systemInstruction += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
+		systemInstruction += `\n\nThe student's real name is "${userName}". Always address them as "${userName}". This is their real name, not a roleplay character.`;
+	}
+	systemInstruction += '\n\nRespond naturally in spoken English. Keep replies concise (2-4 sentences). Be warm and encouraging.';
+	if (conversationHistory.length > 0) {
+		// Only relevant for the first turn of a fresh session.
+		const recent = conversationHistory.slice(-6);
+		systemInstruction += '\n\nRecent conversation:\n' +
+			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 
-	const audioBase64 = audioBuffer.toString('base64');
-	let session: any;
-	let sessionClosed = false;
-	let timeoutHandle: NodeJS.Timeout;
+	// ② Get or create a cached WebSocket session (saves ~1-2 s per turn after the first).
+	const cacheKey = userId ? `freetalk_${userId}` : `freetalk_anon_${Date.now()}`;
+	const tSession = Date.now();
+	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+		responseModalities: [Modality.AUDIO],
+		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+		systemInstruction: { parts: [{ text: systemInstruction }] },
+		inputAudioTranscription: {},
+		outputAudioTranscription: {},
+		thinkingConfig: { thinkingBudget: 0 },
+	});
+	logger.info('[FreeTalk] ② session ready', { ms: Date.now() - tSession });
 
+	// ③ Create the SSE stream — session is already connected; just route messages.
 	return new ReadableStream({
 		start(controller) {
-			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
-				const chunk = JSON.stringify({ type, data });
-				controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
-			};
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) =>
+				controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
 
 			const fullAssistantText: string[] = [];
 			let fullUserText = '';
 			let metadataSent = false;
+			let streamClosed  = false;
+			let tFirstChunk   = 0;
+			let timeoutHandle: ReturnType<typeof setTimeout>;
 
-			const closeOnce = (reason?: string) => {
-				if (sessionClosed) return;
-				sessionClosed = true;
+			const closeStream = (reason?: string) => {
+				if (streamClosed) return;
+				streamClosed = true;
 				clearTimeout(timeoutHandle);
-				try {
-					session?.close?.();
-				} catch {
-					/* ignore */
-				}
+				// Release the session back to the pool — do NOT close the WebSocket.
+				entry.onTurnMessage = null;
+				entry.onTurnError   = null;
+				entry.onTurnClose   = null;
+				if (entry.status === 'busy') entry.status = 'ready';
+				if (reason) logger.info('[FreeTalk] stream closed', { reason });
 				controller.close();
+			};
 
-				if (reason) {
-					logger.info('Voice conversation stream closed', { reason });
+			// Per-turn message handler
+			entry.onTurnMessage = (message: LiveServerMessage) => {
+				if (message.data) {
+					if (!tFirstChunk) {
+						tFirstChunk = Date.now();
+						logger.info('[FreeTalk] ③ first audio chunk', { ms: tFirstChunk - tSession });
+					}
+					sendChunk('audio', message.data);
+				}
+				const inputText = (message.serverContent as any)?.inputTranscription?.text;
+				if (inputText) fullUserText += inputText;
+
+				const outputText = message.serverContent?.outputTranscription?.text;
+				if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+
+				if (message.serverContent?.turnComplete && !metadataSent) {
+					metadataSent = true;
+					setTimeout(() => {
+						if (streamClosed) return;
+						logger.info('[FreeTalk] ④ turn complete', {
+							totalMs:      Date.now() - t0,
+							ffmpegMs:     tSession - t0,
+							sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
+							firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+						});
+						sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
+						closeStream('turnComplete');
+					}, 800);
 				}
 			};
 
+			entry.onTurnError = (e: ErrorEvent) => {
+				logger.error('[FreeTalk] WS error on turn', { error: e?.message });
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
+				closeStream('error');
+			};
+
+			entry.onTurnClose = (e: CloseEvent) => {
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
+				closeStream('onclose');
+			};
+
 			timeoutHandle = setTimeout(() => {
-				if (!sessionClosed) {
-					logger.warn('Voice conversation stream timed out');
-					sendChunk('metadata', {
-						fullText: fullAssistantText.join('').trim(),
-						inputText: fullUserText.trim(),
-						error: 'timeout',
-					});
-					closeOnce('timeout');
-				}
-			}, 45000);
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
+				closeStream('timeout');
+			}, 55000);
 
-			(async () => {
-				try {
-					const sessionStart = Date.now();
-					session = await genAINew!.live.connect({
-						model: LIVE_MODEL,
-						config: {
-							responseModalities: [Modality.AUDIO],
-							speechConfig: {
-								voiceConfig: {
-									prebuiltVoiceConfig: { voiceName },
-								},
-							},
-							systemInstruction: {
-								parts: [{ text: systemInstruction }],
-							},
-							// Transcribe the user's audio input automatically.
-							inputAudioTranscription: {},
-							// Transcribe the assistant's spoken output.
-							outputAudioTranscription: {},
-						},
-						callbacks: {
-							onopen: () => {
-								logger.info('Voice conversation Live API connected', {
-									elapsed: `${Date.now() - sessionStart}ms`,
-								});
-							},
-							onmessage: (message: LiveServerMessage) => {
-								const data = message.data;
-								if (data) {
-									sendChunk('audio', data);
-								}
-
-								const inputTextPiece = (message.serverContent as any)?.inputTranscription?.text;
-								if (inputTextPiece) {
-									fullUserText += inputTextPiece;
-								}
-
-								const outputTextPiece = message.serverContent?.outputTranscription?.text;
-								if (outputTextPiece) {
-									fullAssistantText.push(outputTextPiece);
-									sendChunk('text', outputTextPiece);
-								}
-
-								if (message.serverContent?.turnComplete) {
-									// Give a short grace period for the final input/output transcription fragments.
-									if (!metadataSent) {
-										metadataSent = true;
-										setTimeout(() => {
-											if (sessionClosed) return;
-											sendChunk('metadata', {
-												fullText: fullAssistantText.join('').trim(),
-												inputText: fullUserText.trim(),
-											});
-											closeOnce('turnComplete');
-										}, 250);
-									}
-								}
-							},
-							onerror: (e: ErrorEvent) => {
-								logger.error('Voice conversation Live API error', { error: e?.message || 'unknown' });
-								sendChunk('metadata', {
-									fullText: fullAssistantText.join('').trim(),
-									inputText: fullUserText.trim(),
-									error: e?.message || 'unknown',
-								});
-								closeOnce('error');
-							},
-							onclose: (e: CloseEvent) => {
-								logger.info('Voice conversation Live API closed', {
-									code: e?.code,
-									reason: e?.reason,
-								});
-								if (!sessionClosed) closeOnce('onclose');
-							},
-						},
-					});
-
-					// Provide the user's audio as a regular client turn (required for m4a transcription).
-					session.sendClientContent({
-						turns: [
-							{
-								role: 'user',
-								parts: [
-									{
-										inlineData: {
-											data: audioBase64,
-											mimeType,
-										},
-									},
-								],
-							},
-						],
-						turnComplete: true,
-					});
-				} catch (err: any) {
-					if (sessionClosed) return;
-					logger.error('Failed to start Live voice conversation stream', { error: err?.message || err });
-					sendChunk('metadata', {
-						fullText: '',
-						inputText: '',
-						error: err?.message || 'unknown',
-					});
-					closeOnce('start_error');
-					throw err;
-				}
-			})();
+			// Send audio — session is already open
+			entry.status = 'busy';
+			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
+			entry.session.sendRealtimeInput({ audioStreamEnd: true });
+			logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
 		},
 	});
 }
 
 // ─── Drill voice conversation (Live API + built-in transcription, SSE) ─
+// Same pipeline as generateVoiceConversationSSEStream but with drill-aware
+// system prompt. Converts audio to raw PCM 16kHz before sending.
 export async function generateDrillPracticeVoiceResponseStream(
 	options: {
 		drill: DrillPracticeOptions['drill'];
 		audioBuffer: Buffer;
 		conversationHistory?: ConversationMessage[];
 		pronunciationWeaknesses?: string[];
-		mimeType?: string;
+		mimeType?: string;   // kept for API compat, format handled internally
 		voiceName?: string;
 		userName?: string;
+		userId?: string;     // used as part of the session cache key
+		drillId?: string;    // used as part of the session cache key
 	}
 ): Promise<ReadableStream> {
 	const {
@@ -1086,171 +1195,131 @@ export async function generateDrillPracticeVoiceResponseStream(
 		audioBuffer,
 		conversationHistory = [],
 		pronunciationWeaknesses,
-		mimeType = 'audio/m4a',
 		voiceName = 'Kore',
 		userName,
+		userId,
+		drillId,
 	} = options;
 
-	if (!genAINew) {
-		throw new Error('Gemini Live API is not configured');
-	}
+	if (!genAINew) throw new Error('Gemini Live API is not configured');
 
-	// Base drill system prompt (includes drill blueprint + instructions).
+	const t0 = Date.now();
+
+	// ① FFmpeg — convert to raw PCM 16 kHz.
+	let pcmBuffer: Buffer;
+	try {
+		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
+		logger.info('[Drill] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
+	} catch (e: any) {
+		throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
+	}
+	const pcmBase64 = pcmBuffer.toString('base64');
+	const pcmBytes  = pcmBuffer.length;
+
+	// Build system instruction — only used when a NEW session is opened.
 	let systemInstruction = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName);
-
-	// Add lightweight conversation history for continuity.
 	if (conversationHistory.length > 0) {
-		systemInstruction +=
-			`\n\nConversation so far:\n` +
-			conversationHistory
-				.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-				.join('\n');
+		const recent = conversationHistory.slice(-6);
+		systemInstruction += '\n\nRecent conversation:\n' +
+			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
+	systemInstruction += '\n\nIMPORTANT: The user is speaking via voice. Listen carefully, respond in spoken English. Keep responses concise (2-4 sentences). No JSON or markdown.';
 
-	systemInstruction +=
-		`\n\nImportant:\n` +
-		`- Listen to the user's spoken audio.\n` +
-		`- Respond as the tutor in spoken English.\n` +
-		`- Keep the response aligned with the drill instructions above.\n`;
+	// ② Get or create a cached WebSocket session per user+drill.
+	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}` : `drill_anon_${Date.now()}`;
+	const tSession = Date.now();
+	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+		responseModalities: [Modality.AUDIO],
+		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+		systemInstruction: { parts: [{ text: systemInstruction }] },
+		inputAudioTranscription: {},
+		outputAudioTranscription: {},
+		thinkingConfig: { thinkingBudget: 0 },
+	});
+	logger.info('[Drill] ② session ready', { ms: Date.now() - tSession });
 
-	const audioBase64 = audioBuffer.toString('base64');
-	let session: any;
-	let sessionClosed = false;
-	let timeoutHandle: NodeJS.Timeout;
-
+	// ③ Create the SSE stream — session is already connected; just route messages.
 	return new ReadableStream({
 		start(controller) {
-			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
-				const chunk = JSON.stringify({ type, data });
-				controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
-			};
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) =>
+				controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
 
 			const fullAssistantText: string[] = [];
 			let fullUserText = '';
 			let metadataSent = false;
+			let streamClosed  = false;
+			let tFirstChunk   = 0;
+			let timeoutHandle: ReturnType<typeof setTimeout>;
 
-			const closeOnce = (reason?: string) => {
-				if (sessionClosed) return;
-				sessionClosed = true;
+			const closeStream = (reason?: string) => {
+				if (streamClosed) return;
+				streamClosed = true;
 				clearTimeout(timeoutHandle);
-				try {
-					session?.close?.();
-				} catch {
-					/* ignore */
-				}
+				// Release the session back to the pool — do NOT close the WebSocket.
+				entry.onTurnMessage = null;
+				entry.onTurnError   = null;
+				entry.onTurnClose   = null;
+				if (entry.status === 'busy') entry.status = 'ready';
+				if (reason) logger.info('[Drill] stream closed', { reason });
 				controller.close();
+			};
 
-				if (reason) {
-					logger.info('Drill voice stream closed', { reason });
+			entry.onTurnMessage = (message: LiveServerMessage) => {
+				if (message.data) {
+					if (!tFirstChunk) {
+						tFirstChunk = Date.now();
+						logger.info('[Drill] ③ first audio chunk', { ms: tFirstChunk - tSession });
+					}
+					sendChunk('audio', message.data);
+				}
+				const inputText = (message.serverContent as any)?.inputTranscription?.text;
+				if (inputText) fullUserText += inputText;
+
+				const outputText = message.serverContent?.outputTranscription?.text;
+				if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+
+				if (message.serverContent?.turnComplete && !metadataSent) {
+					metadataSent = true;
+					setTimeout(() => {
+						if (streamClosed) return;
+						logger.info('[Drill] ④ turn complete', {
+							totalMs:      Date.now() - t0,
+							ffmpegMs:     tSession - t0,
+							sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
+							firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+						});
+						sendChunk('metadata', {
+							fullText:   fullAssistantText.join('').trim(),
+							inputText:  fullUserText.trim(),
+							drillType:  drill.type,
+							drillTitle: drill.title,
+						});
+						closeStream('turnComplete');
+					}, 800);
 				}
 			};
 
+			entry.onTurnError = (e: ErrorEvent) => {
+				logger.error('[Drill] WS error on turn', { error: e?.message });
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
+				closeStream('error');
+			};
+
+			entry.onTurnClose = (e: CloseEvent) => {
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
+				closeStream('onclose');
+			};
+
 			timeoutHandle = setTimeout(() => {
-				if (!sessionClosed) {
-					logger.warn('Drill voice stream timed out');
-					sendChunk('metadata', {
-						fullText: fullAssistantText.join('').trim(),
-						inputText: fullUserText.trim(),
-						error: 'timeout',
-					});
-					closeOnce('timeout');
-				}
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
+				closeStream('timeout');
 			}, 60000);
 
-			(async () => {
-				try {
-					session = await genAINew!.live.connect({
-						model: LIVE_MODEL,
-						config: {
-							responseModalities: [Modality.AUDIO],
-							speechConfig: {
-								voiceConfig: {
-									prebuiltVoiceConfig: { voiceName },
-								},
-							},
-							systemInstruction: {
-								parts: [{ text: systemInstruction }],
-							},
-							// Enable built-in transcription so we can avoid `/ai/transcribe`.
-							inputAudioTranscription: {},
-							outputAudioTranscription: {},
-						},
-						callbacks: {
-							onopen: () => {
-								logger.info('Drill voice Live API connected');
-							},
-							onmessage: (message: LiveServerMessage) => {
-								const data = message.data;
-								if (data) sendChunk('audio', data);
-
-								const inputTextPiece = (message.serverContent as any)?.inputTranscription?.text;
-								if (inputTextPiece) fullUserText += inputTextPiece;
-
-								const outputTextPiece = message.serverContent?.outputTranscription?.text;
-								if (outputTextPiece) {
-									fullAssistantText.push(outputTextPiece);
-									sendChunk('text', outputTextPiece);
-								}
-
-								if (message.serverContent?.turnComplete) {
-									if (!metadataSent) {
-										metadataSent = true;
-										setTimeout(() => {
-											if (sessionClosed) return;
-											sendChunk('metadata', {
-												fullText: fullAssistantText.join('').trim(),
-												inputText: fullUserText.trim(),
-												drillType: drill.type,
-												drillTitle: drill.title,
-											});
-											closeOnce('turnComplete');
-										}, 250);
-									}
-								}
-							},
-							onerror: (e: ErrorEvent) => {
-								logger.error('Drill voice Live API error', { error: e?.message || 'unknown' });
-								sendChunk('metadata', {
-									fullText: fullAssistantText.join('').trim(),
-									inputText: fullUserText.trim(),
-									error: e?.message || 'unknown',
-								});
-								closeOnce('error');
-							},
-							onclose: (e: CloseEvent) => {
-								logger.info('Drill voice Live API closed', { code: e?.code, reason: e?.reason });
-								if (!sessionClosed) closeOnce('onclose');
-							},
-						},
-					});
-
-					// Send audio as clientContent for reliable transcription of m4a/mp3 files
-					session.sendClientContent({
-						turns: [
-							{
-								role: 'user',
-								parts: [
-									{
-										inlineData: {
-											data: audioBase64,
-											mimeType,
-										},
-									},
-								],
-							},
-						],
-						turnComplete: true,
-					});
-				} catch (err: any) {
-					logger.error('Failed to start Drill voice stream', { error: err?.message || err });
-					sendChunk('metadata', {
-						fullText: fullAssistantText.join('').trim(),
-						inputText: fullUserText.trim(),
-						error: err?.message || 'unknown',
-					});
-					closeOnce('start_error');
-				}
-			})();
+			// Send audio — session is already open
+			entry.status = 'busy';
+			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
+			entry.session.sendRealtimeInput({ audioStreamEnd: true });
+			logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
 		},
 	});
 }
