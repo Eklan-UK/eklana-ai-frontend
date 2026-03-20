@@ -158,10 +158,9 @@ const nextConfig: NextConfig = {
   // Force Vercel's output-file-tracing to include the ffmpeg binary that
   // ffmpeg-static resolves to at runtime — it is a plain executable file
   // that the tracer normally ignores.
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/v1/ai/**': ['./node_modules/ffmpeg-static/ffmpeg'],
-    },
+  // NOTE: In Next.js 16 this is a top-level key, not inside `experimental`.
+  outputFileTracingIncludes: {
+    '/api/v1/ai/**': ['./node_modules/ffmpeg-static/ffmpeg'],
   },
   
   images: {

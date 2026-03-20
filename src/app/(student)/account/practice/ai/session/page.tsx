@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Mic,
-  MicOff,
   Send,
   Loader2,
   Volume2,
@@ -11,6 +10,7 @@ import {
   MoreVertical,
   X,
   RotateCcw,
+  Keyboard,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -167,6 +167,10 @@ export default function AISessionPage() {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [streamingAudioActive, setStreamingAudioActive] = useState(false);
+  // Text input toggle (default: mic mode, like mobile)
+  const [showTextInput, setShowTextInput] = useState(false);
+  // Real-time mic amplitude for button animation (0–1)
+  const [micAmplitude, setMicAmplitude] = useState(0);
 
   // Audio stream reference
   const currentAudioStreamPlayerRef = useRef<AudioStreamPlayer | null>(null);
@@ -178,6 +182,57 @@ export default function AISessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+
+  // VAD
+  const analyserRef       = useRef<AnalyserNode | null>(null);
+  const audioCtxRef       = useRef<AudioContext | null>(null);
+  const vadIntervalRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastVoiceTsRef    = useRef<number>(0);
+  const recStartTsRef     = useRef<number>(0);
+
+  const SILENCE_THRESHOLD = 0.018; // RMS amplitude 0-1
+  const SILENCE_MS        = 1800;
+  const MIN_REC_MS        = 1200;
+
+  const startVAD = (stream: MediaStream) => {
+    const ctx      = new AudioContext();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    audioCtxRef.current  = ctx;
+    analyserRef.current  = analyser;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const now  = Date.now();
+    lastVoiceTsRef.current = now;
+    recStartTsRef.current  = now;
+
+    vadIntervalRef.current = setInterval(() => {
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const s = (data[i] - 128) / 128;
+        sum += s * s;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      setMicAmplitude(rms);
+      if (rms > SILENCE_THRESHOLD) lastVoiceTsRef.current = Date.now();
+
+      const elapsed = Date.now() - recStartTsRef.current;
+      if (elapsed > MIN_REC_MS && Date.now() - lastVoiceTsRef.current > SILENCE_MS) {
+        stopVAD();
+        if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      }
+    }, 100);
+  };
+
+  const stopVAD = () => {
+    if (vadIntervalRef.current) { clearInterval(vadIntervalRef.current); vadIntervalRef.current = null; }
+    setMicAmplitude(0);
+    try { audioCtxRef.current?.close(); } catch { /* ignore */ }
+    audioCtxRef.current = null;
+    analyserRef.current = null;
+  };
 
   // ElevenLabs TTS (fallback for non-drill mode)
   const {
@@ -235,6 +290,7 @@ export default function AISessionPage() {
   useEffect(() => {
     return () => {
       stopAllAudio();
+      stopVAD();
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
       if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach((t) => t.stop());
     };
@@ -423,6 +479,7 @@ export default function AISessionPage() {
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
+      startVAD(stream);
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
@@ -641,6 +698,7 @@ export default function AISessionPage() {
   }, [stopAllAudio, handleSendText]);
 
   const stopVoiceRecording = useCallback(() => {
+    stopVAD();
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
   }, []);
 
@@ -698,7 +756,7 @@ export default function AISessionPage() {
   /* ─── Render ───────────────────────────────────────────────────────────── */
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-gray-50">
+    <div className="relative flex flex-col h-[100dvh] bg-gray-50">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
         <div className="flex items-center px-4 py-3 max-w-2xl mx-auto">
@@ -762,6 +820,32 @@ export default function AISessionPage() {
         </div>
       </header>
 
+      {/* ── Initialization overlay (matches mobile) ────────────────────── */}
+      {isInitializing && (
+        <div className="absolute inset-0 z-30 bg-white flex flex-col items-center justify-center px-8">
+          {/* Logo bubble */}
+          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mb-6 shadow-lg">
+            <Image src="/logo2.svg" alt="Eklan" width={52} height={52} />
+          </div>
+
+          <h2 className="text-xl font-bold text-gray-900 mb-2 font-nunito">Getting ready…</h2>
+          <p className="text-sm text-gray-400 text-center max-w-xs mb-10">
+            Eklan is personalising your session. This only takes a moment.
+          </p>
+
+          {/* Bouncing dots — mirrors mobile Loader */}
+          <div className="flex gap-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-3 h-3 rounded-full bg-emerald-500 animate-bounce"
+                style={{ animationDelay: `${i * 0.18}s` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Messages ───────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
@@ -771,16 +855,6 @@ export default function AISessionPage() {
               Today
             </span>
           </div>
-
-          {/* Loading state */}
-          {isInitializing && (
-            <div className="flex justify-center py-8">
-              <div className="flex items-center gap-2 text-gray-400">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Setting up your session...</span>
-              </div>
-            </div>
-          )}
 
            {messages.map((message, index) => {
             const isAI = message.type === "ai";
@@ -845,82 +919,115 @@ export default function AISessionPage() {
         </div>
       </main>
 
-      {/* ── Recording overlay ──────────────────────────────────────────── */}
-      {isRecording && (
-        <div className="bg-red-50 border-t border-red-100 px-4 py-2">
-          <div className="max-w-2xl mx-auto flex items-center justify-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-sm font-medium text-red-600">Recording...</span>
-            <div className="flex gap-0.5 ml-2">
-              {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-0.5 bg-red-400 rounded-full animate-pulse"
-                  style={{ height: `${8 + Math.random() * 12}px`, animationDelay: `${i * 0.1}s` }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isTranscribing && (
-        <div className="bg-blue-50 border-t border-blue-100 px-4 py-2">
-          <div className="max-w-2xl mx-auto flex items-center justify-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-            <span className="text-sm font-medium text-blue-600">Transcribing...</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Input bar ──────────────────────────────────────────────────── */}
+      {/* ── Bottom controls — mirrors mobile layout ─────────────────────── */}
       <footer className="sticky bottom-0 bg-white border-t border-gray-100">
-        <div className="max-w-2xl mx-auto px-3 py-2.5 flex items-end gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder={
-              isRecording
-                ? "Recording..."
-                : isTranscribing
-                  ? "Transcribing..."
-                  : "Type a message..."
-            }
-            disabled={isInitializing || isRecording || isTranscribing}
-            className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white transition-all disabled:opacity-50"
-          />
 
-          {inputText.trim() ? (
+        {/* Processing status strip */}
+        {isTranscribing && (
+          <div className="flex items-center justify-center gap-2 py-1.5 bg-blue-50 border-b border-blue-100">
+            <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+            <span className="text-xs font-medium text-blue-600">Processing…</span>
+          </div>
+        )}
+
+        {showTextInput ? (
+          /* ── Text input mode ── */
+          <div className="max-w-2xl mx-auto px-3 py-2.5 flex items-end gap-2">
+            {/* Back to mic */}
+            <button
+              onClick={() => setShowTextInput(false)}
+              className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center flex-shrink-0 hover:bg-slate-100 transition-colors"
+            >
+              <Mic className="w-5 h-5 text-slate-500" />
+            </button>
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              placeholder="Type a message…"
+              disabled={isInitializing || isThinking}
+              autoFocus
+              className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white transition-all disabled:opacity-50"
+            />
+
             <button
               onClick={handleSend}
-              disabled={isThinking || isInitializing}
-              className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+              disabled={!inputText.trim() || isThinking || isInitializing}
+              className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
             >
-              <Send className="w-4.5 h-4.5 text-white ml-0.5" />
+              <Send className="w-5 h-5 text-white ml-0.5" />
             </button>
-          ) : (
-            <button
-              onClick={toggleVoiceRecording}
-              disabled={isThinking || isInitializing || isTranscribing}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
-                isRecording
-                  ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                  : "bg-emerald-600 hover:bg-emerald-700"
-              }`}
-            >
-              {isRecording ? (
-                <MicOff className="w-4.5 h-4.5 text-white" />
-              ) : (
-                <Mic className="w-4.5 h-4.5 text-white" />
-              )}
-            </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* ── Mic mode (default) ── */
+          <div className="max-w-2xl mx-auto pt-3 pb-2">
+            <div className="flex items-end justify-center gap-0">
 
-        {/* Safe area for mobile */}
+              {/* Keyboard toggle (left) */}
+              <button
+                onClick={() => setShowTextInput(true)}
+                disabled={isThinking || isInitializing}
+                className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mr-10 hover:bg-slate-100 transition-colors disabled:opacity-40"
+              >
+                <Keyboard className="w-5 h-5 text-slate-500" />
+              </button>
+
+              {/* Large mic button with pulse rings */}
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                {/* Expanding pulse ring */}
+                {isRecording && (
+                  <div
+                    className="absolute inset-0 rounded-full bg-red-400 animate-ping"
+                    style={{ opacity: 0.35 }}
+                  />
+                )}
+                {/* Amplitude scale ring */}
+                {isRecording && micAmplitude > 0.01 && (
+                  <div
+                    className="absolute inset-0 rounded-full bg-red-300 transition-transform duration-75"
+                    style={{
+                      transform: `scale(${1 + micAmplitude * 1.8})`,
+                      opacity: Math.min(0.5, micAmplitude * 3),
+                    }}
+                  />
+                )}
+                <button
+                  onClick={toggleVoiceRecording}
+                  disabled={isThinking || isInitializing || isTranscribing}
+                  style={{
+                    transform: isRecording ? `scale(${1 + micAmplitude * 0.25})` : "scale(1)",
+                    transition: "transform 80ms ease-out",
+                  }}
+                  className={`relative w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isRecording
+                      ? "bg-red-500 hover:bg-red-600"
+                      : isThinking || isInitializing
+                      ? "bg-gray-300"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                >
+                  <Mic className="w-8 h-8 text-white" />
+                </button>
+              </div>
+
+              {/* Symmetry spacer */}
+              <div className="w-12 h-12 ml-10" />
+            </div>
+
+            {/* Hint text */}
+            <p className="text-center text-xs text-gray-400 mt-2 mb-1">
+              {isRecording
+                ? "Tap to stop · silence auto-stops"
+                : isThinking
+                ? "Eklan is thinking…"
+                : "Tap to speak"}
+            </p>
+          </div>
+        )}
+
         <div className="h-[env(safe-area-inset-bottom)]" />
       </footer>
     </div>
