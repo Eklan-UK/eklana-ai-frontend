@@ -77,6 +77,22 @@ export const queryKeys = {
     recent: (filters?: Record<string, any>) =>
       [...queryKeys.activities.all, "recent", filters] as const,
   },
+  classes: {
+    all: ["admin", "classes"] as const,
+    list: (filters?: { bucket?: string; limit?: number }) =>
+      [...queryKeys.classes.all, "list", filters] as const,
+    detail: (id: string) => [...queryKeys.classes.all, "detail", id] as const,
+    tutorList: (filters?: { bucket?: string; limit?: number }) =>
+      ["tutor", "classes", "list", filters] as const,
+    learnerList: (filters?: { bucket?: string; limit?: number }) =>
+      ["learner", "classes", "list", filters] as const,
+    learnerSession: (sessionId: string) =>
+      ["learner", "classes", "session", sessionId] as const,
+    tutorSessionAttendance: (sessionId: string) =>
+      ["tutor", "sessions", sessionId, "attendance"] as const,
+    learnerRescheduleOptions: (sessionId: string) =>
+      ["learner", "sessions", sessionId, "reschedule-options"] as const,
+  },
 };
 
 

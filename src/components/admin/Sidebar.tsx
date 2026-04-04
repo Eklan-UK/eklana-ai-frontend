@@ -20,6 +20,8 @@ import {
   FileText,
   BookOpen,
   CalendarDays,
+  Video,
+  UserPlus,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
@@ -33,6 +35,8 @@ const Sidebar: React.FC = () => {
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Classes", icon: Video, path: "/admin/classes" },
+    { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
     { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
     { name: "Grammar Reviews", icon: FileText, path: "/admin/drills/grammar-reviews" },
     { name: "Summary Reviews", icon: BookOpen, path: "/admin/drills/summary-reviews" },
@@ -72,13 +76,30 @@ const Sidebar: React.FC = () => {
             <Link
               key={item.path}
               href={item.path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              className={`group flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
                 isActive
-                  ? "bg-emerald-50 text-[#3d8c40]"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  ? "bg-emerald-50 font-bold text-[#3d8c40]"
+                  : "font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800"
               }`}
             >
-              <item.icon className="w-5 h-5" />
+              {item.name === "Classes" && isActive ? (
+                <img
+                  src="/images/classes_icon.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="h-5 w-5 shrink-0"
+                  aria-hidden
+                />
+              ) : (
+                <item.icon
+                  className={`h-5 w-5 shrink-0 ${
+                    isActive
+                      ? "text-[#3d8c40]"
+                      : "text-gray-500 group-hover:text-gray-800"
+                  }`}
+                />
+              )}
               {item.name}
             </Link>
           );
