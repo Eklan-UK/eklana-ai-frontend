@@ -1,6 +1,6 @@
 # Classes feature — implementation summary
 
-Single reference for what shipped per phase, what the old verify scripts checked, and how Classes code touches MongoDB.
+Single reference for what shipped per phase, what the old verify scripts checked, and how Classes code touches MongoDB. Includes **tutor teaching hours** (weekly availability + reschedule filtering).
 
 ---
 
@@ -61,7 +61,7 @@ Single reference for what shipped per phase, what the old verify scripts checked
 
 **What was implemented**
 
-- `GET /api/v1/learner/classes`, `GET /api/v1/learner/sessions/:sessionId` (`findLearnerList`, `findSessionForLearner`).
+- `GET /api/v1/learner/classes`, `GET /api/v1/learner/sessions/:sessionId` (`findLearnerList`, `findSessionForLearner`). Session payload includes **`tutorId`** for downstream learner APIs (e.g. tutor hours).
 - Student UI: `/account/classes` and bottom nav entry.
 
 **What `verify-phase-3-classes.sh` did**
@@ -90,10 +90,48 @@ Single reference for what shipped per phase, what the old verify scripts checked
 
 - `src/lib/classes/utc-week.ts`, `RescheduleService` (validates enrollment + same-week rule, updates session `startUtc`/`endUtc`).
 - `GET /api/v1/learner/sessions/:sessionId/reschedule-options`, `POST .../reschedule`.
+- **Tutor availability (follow-on):** same-week offset candidates are **filtered** so each slot must fall inside the tutor’s **weekly windows** (IANA `timezone` on the tutor’s availability record), respect **block/open day exceptions**, and avoid overlapping the tutor’s **other sessions** (with optional **buffer minutes** between sessions). See **Tutor availability** below.
 
 **What `verify-phase-5-classes.sh` did**
 
 - File presence, reschedule hooks and API client, `tsc`.
+
+---
+
+## Tutor availability (teaching hours)
+
+**Purpose**
+
+- Tutors define **when they can teach**; learners only get reschedule options inside those windows, and learners with an active enrollment can **read** a summary of those hours on the session screen.
+
+**Data model**
+
+- Collection `tutor_availabilities` — Mongoose model `src/models/tutor-availability.ts`: `tutorId` (unique), `timezone` (IANA), `weeklyRules` (`weekday` 0–6 Sun–Sat, `startMin` / `endMin` minutes local), `exceptions` (`date` `YYYY-MM-DD`, `kind` `block` | `open`), `bufferMinutes`.
+
+**Timezone rules**
+
+- Weekly rules and exception **dates** are interpreted in **`TutorAvailability.timezone`**. This is separate from `ClassSeries.timezone` (still used for list buckets / same-week UTC policy elsewhere). Document both when debugging “why isn’t this slot offered?”.
+
+**Backward compatibility**
+
+- **No** `TutorAvailability` document for a tutor → reschedule options are **not** filtered by teaching hours (same as offset-only behavior). Conflict checks still apply with buffer **0**.
+- Document exists with **empty** `weeklyRules` → tutor has explicitly saved “no windows”; learners get **no** reschedule slots until they add windows.
+
+**APIs**
+
+- `GET` / `PATCH` `/api/v1/tutor/availability` — authenticated **tutor** reads/updates their own record (`src/app/api/v1/tutor/availability/route.ts`).
+- `GET` `/api/v1/learner/tutors/:tutorId/availability` — **learner** only if they have an **active enrollment** in any **active** series taught by that tutor (`src/app/api/v1/learner/tutors/[tutorId]/availability/route.ts`).
+
+**Domain helpers**
+
+- `src/domain/tutor-availability/availability-window.ts` — fits interval in weekly rules + exceptions.
+- `src/domain/tutor-availability/session-conflict.ts` — overlap with buffer vs other `ClassSession` rows for the same tutor.
+- `RescheduleService.getLearnerRescheduleSlots` and `rescheduleSession` apply both filters (`src/domain/classes/reschedule.service.ts`).
+
+**UI**
+
+- Tutor: `/tutor/availability` — weekly windows, timezone, exceptions, buffer; linked from **Hours** in `src/components/layout/TutorNav.tsx`.
+- Learner: session detail `src/app/(student)/account/classes/[sessionId]/learner-session-client.tsx` shows teaching hours when rules exist; `GET /api/v1/learner/sessions/:sessionId` includes **`tutorId`** for fetching that summary.
 
 ---
 
@@ -125,7 +163,7 @@ Single reference for what shipped per phase, what the old verify scripts checked
 
 ## Database read / write map (Classes)
 
-Collections align with Mongoose models: `ClassSeries`, `ClassEnrollment`, `ClassSession`, `SessionAttendance`, `SessionReminderDispatch`. `User` and `FCMToken` are read for validation, display, or push.
+Collections align with Mongoose models: `ClassSeries`, `ClassEnrollment`, `ClassSession`, `SessionAttendance`, `SessionReminderDispatch`, **`TutorAvailability`**. `User` and `FCMToken` are read for validation, display, or push.
 
 | Action | HTTP | Route | DB |
 |--------|------|-------|-----|
@@ -134,19 +172,22 @@ Collections align with Mongoose models: `ClassSeries`, `ClassEnrollment`, `Class
 | Admin class detail | `GET` | `/api/v1/admin/classes/:id` | **Read** — `ClassSeries`, `ClassSession`, `ClassEnrollment`, `User` |
 | Soft-delete class | `DELETE` | `/api/v1/admin/classes/:id` | **Write** — `ClassSeries` (`isActive: false`) |
 | Tutor list + join data | `GET` | `/api/v1/tutor/classes` | **Read** — `ClassSeries`, `ClassSession`, `ClassEnrollment` |
+| Tutor availability (own) | `GET` / `PATCH` | `/api/v1/tutor/availability` | **Read** / **Write** — `TutorAvailability` |
+| Learner tutor hours | `GET` | `/api/v1/learner/tutors/:tutorId/availability` | **Read** — `TutorAvailability`, `ClassSeries`, `ClassEnrollment` (enrollment gate) |
 | Learner list | `GET` | `/api/v1/learner/classes` | **Read** — same family of collections, scoped to learner |
 | Learner session detail | `GET` | `/api/v1/learner/sessions/:sessionId` | **Read** — `ClassSession`, `ClassSeries`, `ClassEnrollment`, `User` |
 | Record attendance | `POST` | `/api/v1/learner/sessions/:sessionId/attendance` | **Read** session/series/enrollment; **Write** `SessionAttendance` |
 | Tutor view attendance | `GET` | `/api/v1/tutor/sessions/:sessionId/attendance` | **Read** — `ClassSession`, `ClassSeries`, `ClassEnrollment`, `SessionAttendance` |
-| Reschedule options | `GET` | `.../reschedule-options` | **Read** — `ClassSession`, `ClassSeries`, `ClassEnrollment` |
-| Reschedule | `POST` | `.../reschedule` | **Read** then **Write** — `ClassSession` (`updateOne` on times) |
+| Reschedule options | `GET` | `.../reschedule-options` | **Read** — `ClassSession`, `ClassSeries`, `ClassEnrollment`; optional **`TutorAvailability`**; **Read** other tutor `ClassSession` rows for overlap + buffer |
+| Reschedule | `POST` | `.../reschedule` | **Read** then **Write** — `ClassSession` (`updateOne` on times); validates **`TutorAvailability`** + conflicts |
 | Reminder cron | `GET` | `/api/v1/cron/class-session-reminders` | **Read** — `ClassSession`, `ClassSeries`, `ClassEnrollment`, `SessionReminderDispatch`, `FCMToken`; **Write** — `SessionReminderDispatch` after send/skip logic |
 
 **Notes**
 
 - `RescheduleRequest` exists in domain types for optional workflow; reschedule here updates `ClassSession` directly via service.
 - No route should expose another user’s `meetingUrl` without enrollment checks (handled in repository/services).
+- Learner **tutor availability** route returns 404 if the learner is not enrolled with that tutor (no calendar enumeration).
 
 ---
 
-*Last consolidated from phased docs and verify scripts (2026).*
+*Last consolidated from phased docs and verify scripts (2026); tutor availability section added to match current code.*

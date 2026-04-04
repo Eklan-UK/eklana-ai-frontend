@@ -8,11 +8,23 @@ import {
   useRecordLearnerAttendance,
   useLearnerRescheduleOptions,
   useLearnerRescheduleSession,
+  useLearnerTutorAvailability,
 } from "@/hooks/useClasses";
 import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
 
+const WD_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatMin(m: number) {
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  const ap = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(min).padStart(2, "0")} ${ap}`;
+}
+
 export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
   const { data, isLoading, error } = useLearnerSession(sessionId);
+  const { data: tutorHours } = useLearnerTutorAvailability(data?.tutorId ?? null);
   const recordAttendance = useRecordLearnerAttendance();
   const canReschedule =
     !!data &&
@@ -53,6 +65,28 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{data.classTitle}</h1>
             <p className="mt-1 text-sm text-gray-600">Tutor: {data.tutorName}</p>
+            {tutorHours && tutorHours.weeklyRules.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+                <p className="font-semibold text-emerald-900">Tutor teaching hours</p>
+                <p className="mt-1 text-xs text-emerald-800/90">
+                  Shown in their timezone: <span className="font-mono">{tutorHours.timezone}</span>
+                  {tutorHours.bufferMinutes > 0
+                    ? ` · ${tutorHours.bufferMinutes} min buffer between sessions`
+                    : null}
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-emerald-900">
+                  {tutorHours.weeklyRules.map((r, i) => (
+                    <li key={`${r.weekday}-${r.startMin}-${i}`}>
+                      {WD_SHORT[r.weekday] ?? "Day"} {formatMin(r.startMin)} – {formatMin(r.endMin)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : tutorHours ? (
+              <p className="mt-2 text-xs text-amber-800">
+                Your tutor has not published weekly hours yet. Reschedule options may be limited.
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">

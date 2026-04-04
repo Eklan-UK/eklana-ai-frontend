@@ -28,7 +28,7 @@ async function getHandler(
     throw new NotFoundError('Session');
   }
 
-  const { session, seriesTitle, tutorName } = row;
+  const { session, seriesTitle, tutorName, tutorId } = row;
   const allowUrl = tutorMeetingUrlAllowed(session, new Date());
   const meetingUrl =
     allowUrl && session.meetingUrl ? session.meetingUrl : undefined;
@@ -44,6 +44,7 @@ async function getHandler(
     },
     classTitle: seriesTitle,
     tutorName,
+    tutorId: tutorId.toString(),
   });
 }
 

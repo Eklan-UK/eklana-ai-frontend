@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock } from "lucide-react";
 
 export function TutorNav() {
   const pathname = usePathname();
@@ -17,6 +17,11 @@ export function TutorNav() {
       href: "/tutor/classes",
       label: "Classes",
       icon: CalendarDays,
+    },
+    {
+      href: "/tutor/availability",
+      label: "Hours",
+      icon: Clock,
     },
     {
       href: "/tutor/drills",
@@ -37,8 +42,8 @@ export function TutorNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:relative md:h-screen md:w-64 md:border-r md:border-t-0 md:border-gray-200">
-      {/* Mobile: 5-column grid so Dashboard, Classes, Drills, Students, Settings all show without scrolling */}
-      <div className="grid grid-cols-5 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
+      {/* Mobile: 6-column grid — Dashboard, Classes, Hours, Drills, Students, Settings */}
+      <div className="grid grid-cols-6 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname?.startsWith(item.href);

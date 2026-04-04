@@ -92,6 +92,9 @@ export const queryKeys = {
       ["tutor", "sessions", sessionId, "attendance"] as const,
     learnerRescheduleOptions: (sessionId: string) =>
       ["learner", "sessions", sessionId, "reschedule-options"] as const,
+    tutorAvailability: ["tutor", "availability"] as const,
+    learnerTutorAvailability: (tutorId: string) =>
+      ["learner", "tutor", tutorId, "availability"] as const,
   },
 };
 
