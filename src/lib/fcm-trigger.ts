@@ -12,6 +12,7 @@ import {
 } from "./fcm-admin";
 
 export enum NotificationType {
+  CLASS_SESSION_REMINDER = "class_session_reminder",
   LESSON_REMINDER = "lesson_reminder",
   ASSIGNMENT_DUE = "assignment_due",
   ASSIGNMENT_SUBMITTED = "assignment_submitted",
@@ -411,6 +412,10 @@ export const getNotificationTemplate = (
   type: NotificationType,
 ): Partial<FCMNotificationPayload> => {
   const templates: Record<NotificationType, Partial<FCMNotificationPayload>> = {
+    [NotificationType.CLASS_SESSION_REMINDER]: {
+      title: "Class reminder",
+      body: "Your live class is coming up soon",
+    },
     [NotificationType.LESSON_REMINDER]: {
       title: "Lesson Reminder",
       body: "Your lesson starts in 10 minutes",

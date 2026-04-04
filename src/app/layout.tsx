@@ -58,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`antialiased font-satoshi`}>
+      <body className="antialiased font-satoshi" suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider>
             <ToastProvider />

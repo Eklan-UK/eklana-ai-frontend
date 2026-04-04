@@ -32,6 +32,12 @@ const navItems: NavItem[] = [
     iconInactive: '/icons/target-arrow.svg',
   },
   {
+    name: 'Classes',
+    href: '/account/classes',
+    iconActive: '/icons/file-video.svg',
+    iconInactive: '/icons/file-video.svg',
+  },
+  {
     name: 'Profile',
     href: '/account/profile',
     iconActive: '/icons/user-fill.svg',
@@ -44,7 +50,7 @@ export const BottomNav: React.FC = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="max-w-md mx-auto px-2 py-1 flex justify-around items-center">
+      <div className="max-w-md mx-auto px-1 py-1 grid grid-cols-5 items-center gap-0">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -54,7 +60,7 @@ export const BottomNav: React.FC = () => {
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-1 py-2 px-3 relative min-w-[56px]"
+              className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0"
             >
               {/* Active pill indicator */}
               {isActive && (
@@ -76,7 +82,7 @@ export const BottomNav: React.FC = () => {
 
               {/* Label */}
               <span
-                className={`text-[10px] font-medium font-satoshi transition-colors duration-200 ${
+                className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
                   isActive ? 'text-[#3B883E]' : 'text-gray-400'
                 }`}
               >

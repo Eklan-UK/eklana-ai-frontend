@@ -649,6 +649,189 @@ export const adminAPI = {
   },
 };
 
+// Classes (admin teaching sessions)
+export const classesAPI = {
+  list: (params?: {
+    bucket?: 'today' | 'upcoming';
+    limit?: number;
+    offset?: number;
+  }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        classes: import('@/domain/classes/class.api.types').AdminClassListItemDTO[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore?: boolean;
+        };
+      };
+    }>('/admin/classes', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  create: (data: import('@/domain/classes/class.api.types').CreateAdminClassBody) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        classSeriesId: string;
+        sessionIds: string[];
+        class: import('@/domain/classes/class.api.types').AdminClassListItemDTO;
+      };
+    }>('/admin/classes', {
+      method: 'POST',
+      data,
+    });
+  },
+
+  getById: (classSeriesId: string) => {
+    return apiRequest<{
+      code: string;
+      data: import('@/domain/classes/class.api.types').AdminClassDetailDTO;
+    }>(`/admin/classes/${classSeriesId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  delete: (classSeriesId: string) => {
+    return apiRequest<{
+      code: string;
+      data: { deleted: boolean };
+    }>(`/admin/classes/${classSeriesId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** Tutor-scoped list; meetingUrl only within join window (Phase 2). */
+  tutorList: (params?: {
+    bucket?: 'today' | 'upcoming';
+    limit?: number;
+    offset?: number;
+  }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        classes: import('@/domain/classes/class.api.types').AdminClassListItemDTO[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore?: boolean;
+        };
+      };
+    }>('/tutor/classes', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Learner: enrolled classes (Phase 3). */
+  learnerList: (params?: {
+    bucket?: 'today' | 'upcoming';
+    limit?: number;
+    offset?: number;
+  }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        classes: import('@/domain/classes/class.api.types').AdminClassListItemDTO[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore?: boolean;
+        };
+      };
+    }>('/learner/classes', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  learnerSession: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        session: {
+          id: string;
+          classSeriesId: string;
+          startUtc: string;
+          endUtc: string;
+          status: string;
+          meetingUrl?: string;
+        };
+        classTitle: string;
+        tutorName: string;
+      };
+    }>(`/learner/sessions/${sessionId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  /** Learner: record attendance after joining (Phase 4). */
+  recordLearnerAttendance: (
+    sessionId: string,
+    data?: { status?: 'present' | 'late' },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { recorded: boolean; status: string };
+    }>(`/learner/sessions/${sessionId}/attendance`, {
+      method: 'POST',
+      data: data ?? {},
+    });
+  },
+
+  /** Tutor: attendance roster for a session (Phase 4). */
+  getTutorSessionAttendance: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        sessionId: string;
+        attendance: import('@/domain/classes/class.api.types').SessionAttendanceItemDTO[];
+      };
+    }>(`/tutor/sessions/${sessionId}/attendance`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  /** Learner: same-week reschedule alternatives (Phase 5). */
+  learnerRescheduleOptions: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        slots: { startUtc: string; endUtc: string }[];
+        weekPolicy?: string;
+      };
+    }>(`/learner/sessions/${sessionId}/reschedule-options`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  learnerReschedule: (
+    sessionId: string,
+    body: { newStartUtc: string; newEndUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { updated: boolean };
+    }>(`/learner/sessions/${sessionId}/reschedule`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+};
+
 // Daily Focus API
 export const dailyFocusAPI = {
   // Get today's daily focus
