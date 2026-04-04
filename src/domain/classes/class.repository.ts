@@ -495,6 +495,7 @@ export class ClassRepository {
     session: IClassSession;
     seriesTitle: string;
     tutorName: string;
+    tutorId: Types.ObjectId;
   } | null> {
     if (!Types.ObjectId.isValid(sessionId)) {
       return null;
@@ -524,6 +525,7 @@ export class ClassRepository {
       session: session as unknown as IClassSession,
       seriesTitle: series.title || 'Class',
       tutorName,
+      tutorId: series.tutorId as Types.ObjectId,
     };
   }
 

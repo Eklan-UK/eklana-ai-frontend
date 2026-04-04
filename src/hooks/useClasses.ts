@@ -158,6 +158,48 @@ export function useLearnerRescheduleOptions(
   });
 }
 
+/** Tutor: weekly availability editor. */
+export function useTutorAvailability() {
+  return useQuery({
+    queryKey: queryKeys.classes.tutorAvailability,
+    queryFn: async () => {
+      const res = await classesAPI.getTutorAvailability();
+      return res.data;
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useUpdateTutorAvailability() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      body: import('@/domain/tutor-availability/tutor-availability.api.types').TutorAvailabilityResponse,
+    ) => classesAPI.updateTutorAvailability(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.tutorAvailability });
+      queryClient.invalidateQueries({ queryKey: ['learner'] });
+      toast.success('Availability saved');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Could not save availability');
+    },
+  });
+}
+
+/** Learner: tutor hours when enrolled (read-only). */
+export function useLearnerTutorAvailability(tutorId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.classes.learnerTutorAvailability(tutorId ?? ''),
+    queryFn: async () => {
+      const res = await classesAPI.getLearnerTutorAvailability(tutorId!);
+      return res.data;
+    },
+    enabled: !!tutorId,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useLearnerRescheduleSession(sessionId: string) {
   const queryClient = useQueryClient();
   return useMutation({

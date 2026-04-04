@@ -769,6 +769,7 @@ export const classesAPI = {
         };
         classTitle: string;
         tutorName: string;
+        tutorId: string;
       };
     }>(`/learner/sessions/${sessionId}`, {
       method: 'GET',
@@ -828,6 +829,40 @@ export const classesAPI = {
     }>(`/learner/sessions/${sessionId}/reschedule`, {
       method: 'POST',
       data: body,
+    });
+  },
+
+  /** Tutor: weekly availability (timezone, rules, exceptions, buffer). */
+  getTutorAvailability: () => {
+    return apiRequest<{
+      code: string;
+      data: import('@/domain/tutor-availability/tutor-availability.api.types').TutorAvailabilityResponse;
+    }>('/tutor/availability', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  updateTutorAvailability: (
+    body: import('@/domain/tutor-availability/tutor-availability.api.types').TutorAvailabilityResponse,
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: import('@/domain/tutor-availability/tutor-availability.api.types').TutorAvailabilityResponse;
+    }>('/tutor/availability', {
+      method: 'PATCH',
+      data: body,
+    });
+  },
+
+  /** Learner: read tutor availability when enrolled with that tutor. */
+  getLearnerTutorAvailability: (tutorId: string) => {
+    return apiRequest<{
+      code: string;
+      data: import('@/domain/tutor-availability/tutor-availability.api.types').TutorAvailabilityResponse;
+    }>(`/learner/tutors/${tutorId}/availability`, {
+      method: 'GET',
+      cache: false,
     });
   },
 };

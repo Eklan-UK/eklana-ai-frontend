@@ -15,19 +15,14 @@ async function getHandler(
 ) {
   await connectToDatabase();
   const svc = new RescheduleService();
-  const { session } = await svc.assertLearnerMayAccessSession(
+  const { slots, weekPolicy } = await svc.getLearnerRescheduleSlots(
     params.sessionId,
     context.userId,
   );
 
-  const start = new Date(session.startUtc);
-  const end = new Date(session.endUtc);
-  const slots = svc.buildRescheduleOptions(start, end);
-
   return apiResponse.success({
     slots,
-    weekPolicy:
-      'UTC Monday–Sunday week containing the original session start (MVP). TZ-aware weeks may replace this.',
+    weekPolicy,
   });
 }
 

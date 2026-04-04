@@ -8,6 +8,12 @@ import {
   isUtcInstantInSameWeekAs,
   isUtcRangeWithinWeek,
 } from '@/lib/classes/utc-week';
+import {
+  filterSlotsByAvailability,
+  utcIntervalFitsWeeklyAvailability,
+} from '@/domain/tutor-availability/availability-window';
+import { findTutorSessionConflict } from '@/domain/tutor-availability/session-conflict';
+import { TutorAvailabilityRepository } from '@/domain/tutor-availability/tutor-availability.repository';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -84,6 +90,63 @@ export class RescheduleService {
     return out;
   }
 
+  /**
+   * Same-week offset slots, filtered by tutor weekly availability (if configured)
+   * and by conflicts with the tutor’s other sessions (respecting buffer minutes).
+   */
+  async getLearnerRescheduleSlots(
+    sessionId: string,
+    learnerId: Types.ObjectId,
+    now: Date = new Date(),
+  ): Promise<{
+    slots: { startUtc: string; endUtc: string }[];
+    weekPolicy: string;
+  }> {
+    const { session } = await this.assertLearnerMayAccessSession(sessionId, learnerId);
+    const start = new Date(session.startUtc);
+    const end = new Date(session.endUtc);
+    let slots = this.buildRescheduleOptions(start, end, now);
+
+    const avRepo = new TutorAvailabilityRepository();
+    const avDoc = await avRepo.findByTutorId(session.tutorId as Types.ObjectId);
+
+    const bufferMs = (avDoc?.bufferMinutes ?? 0) * 60 * 1000;
+
+    if (avDoc) {
+      const rules = avDoc.weeklyRules ?? [];
+      if (rules.length === 0) {
+        slots = [];
+      } else {
+        slots = filterSlotsByAvailability(
+          slots,
+          rules,
+          avDoc.exceptions ?? [],
+          avDoc.timezone,
+        );
+      }
+    }
+
+    const filtered: { startUtc: string; endUtc: string }[] = [];
+    for (const s of slots) {
+      const ns = new Date(s.startUtc);
+      const ne = new Date(s.endUtc);
+      const conflict = await findTutorSessionConflict(
+        session.tutorId as Types.ObjectId,
+        session._id as Types.ObjectId,
+        ns,
+        ne,
+        bufferMs,
+      );
+      if (!conflict) filtered.push(s);
+    }
+
+    return {
+      slots: filtered,
+      weekPolicy:
+        'UTC Monday–Sunday week containing the original session start (MVP). Slots also respect tutor availability and session buffer.',
+    };
+  }
+
   async rescheduleSession(params: {
     sessionId: string;
     learnerId: Types.ObjectId;
@@ -113,6 +176,39 @@ export class RescheduleService {
       !isUtcRangeWithinWeek(params.newStartUtc, params.newEndUtc, weekStartUtc, weekEndUtc)
     ) {
       throw new ValidationError('Session must fall within the same calendar week (UTC)');
+    }
+
+    const avRepo = new TutorAvailabilityRepository();
+    const avDoc = await avRepo.findByTutorId(session.tutorId as Types.ObjectId);
+
+    if (avDoc) {
+      const rules = avDoc.weeklyRules ?? [];
+      if (rules.length === 0) {
+        throw new ValidationError('Tutor has no availability windows configured');
+      }
+      if (
+        !utcIntervalFitsWeeklyAvailability(
+          params.newStartUtc,
+          params.newEndUtc,
+          rules,
+          avDoc.exceptions ?? [],
+          avDoc.timezone,
+        )
+      ) {
+        throw new ValidationError('Selected time is outside tutor availability');
+      }
+    }
+
+    const bufferMs = (avDoc?.bufferMinutes ?? 0) * 60 * 1000;
+    const conflicts = await findTutorSessionConflict(
+      session.tutorId as Types.ObjectId,
+      session._id as Types.ObjectId,
+      params.newStartUtc,
+      params.newEndUtc,
+      bufferMs,
+    );
+    if (conflicts) {
+      throw new ValidationError('Time conflicts with another session or buffer');
     }
 
     await ClassSession.updateOne(
