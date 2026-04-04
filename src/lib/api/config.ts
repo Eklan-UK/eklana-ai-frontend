@@ -36,16 +36,16 @@ export const parseWhitelistOrigins = (): string[] => {
 		}
 	}
 
-	// When nothing configured yet, allow local + production app + staging (Better Auth CORS)
-	if (origins.length === 0) {
-		origins.push(
-			'http://localhost:3000',
-			'https://app.eklan.ai',
-			'https://staging.eklan.ai',
-		);
-	} else {
-		if (!origins.includes('http://localhost:3000')) {
-			origins.push('http://localhost:3000');
+	// Better Auth CORS (trustedOrigins): always merge canonical origins so
+	// WHITELIST_ORIGINS / Vercel-only lists cannot omit staging (staging UI → app API).
+	const canonicalOrigins = [
+		'http://localhost:3000',
+		'https://app.eklan.ai',
+		'https://staging.eklan.ai',
+	];
+	for (const o of canonicalOrigins) {
+		if (!origins.includes(o)) {
+			origins.push(o);
 		}
 	}
 
