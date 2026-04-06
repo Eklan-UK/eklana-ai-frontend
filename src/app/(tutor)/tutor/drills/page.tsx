@@ -15,8 +15,8 @@ import {
 import Link from "next/link";
 import { DrillsListClient } from "./drills-list-client";
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60;
+// Uses cookies() via authenticatedFetch — must be dynamic
+export const dynamic = "force-dynamic";
 
 import { authenticatedFetch } from '@/lib/api/server-helpers';
 

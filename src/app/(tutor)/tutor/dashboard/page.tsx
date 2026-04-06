@@ -16,8 +16,8 @@ import Link from "next/link";
 import { getTutorDashboardData } from "./get-dashboard-data";
 import { TutorDashboardClient } from "./dashboard-client";
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60;
+// Uses cookies() via getTutorDashboardData — must be dynamic
+export const dynamic = "force-dynamic";
 
 export default async function TutorDashboard() {
   const dashboardData = await getTutorDashboardData();
