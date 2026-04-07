@@ -15,8 +15,8 @@ import Link from "next/link";
 import { getDrillById } from "./get-drill";
 import { DrillDetailClient } from "./drill-detail-client";
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60;
+// Uses cookies() via getDrillById — must be dynamic
+export const dynamic = "force-dynamic";
 
 export default async function DrillDetailPage({
   params,
