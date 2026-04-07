@@ -1,8 +1,16 @@
 // Next.js Middleware for route protection
-// Note: This runs on Edge Runtime, so we can't use Mongoose or Better Auth directly
+// Note: This runs on Edge Runtime, so we can't use Mongoose or Better Auth directly.
+// Do not add Better Auth getSession here — session validation belongs in Node API routes
+// and client guards. Misconfigured NEXT_PUBLIC_API_URL / cookies is fixed via env alignment,
+// not Edge session fetch.
 // Authentication is handled by client-side guards (AuthGuard, RoleGuard) and API routes
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+
+/** Hostnames where we skip the server-side `/` → `/account` redirect (avoids an extra redirect hop during staging debugging; `/` still client-redirects in app/page.tsx). */
+const STAGING_ROOT_REDIRECT_BYPASS_HOSTS = new Set([
+  'staging.eklan.ai',
+]);
 
 // Public routes that don't require authentication
 const publicRoutes = [
@@ -21,10 +29,14 @@ const publicRoutes = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get('host')?.split(':')[0] ?? '';
 
-  // Redirect root path to /account
+  // Redirect root path to /account (non-staging); staging bypass per deployment plan
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/account', request.url));
+    if (!STAGING_ROOT_REDIRECT_BYPASS_HOSTS.has(host)) {
+      return NextResponse.redirect(new URL('/account', request.url));
+    }
+    return NextResponse.next();
   }
 
   // Allow public routes
