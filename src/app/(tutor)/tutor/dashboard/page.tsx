@@ -10,13 +10,14 @@ import {
   Clock,
   CheckCircle,
   ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { getTutorDashboardData } from "./get-dashboard-data";
 import { TutorDashboardClient } from "./dashboard-client";
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60;
+// Uses cookies() via getTutorDashboardData — must be dynamic
+export const dynamic = "force-dynamic";
 
 export default async function TutorDashboard() {
   const dashboardData = await getTutorDashboardData();
@@ -84,9 +85,15 @@ export default async function TutorDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mb-6">
+        <div className="mb-6 space-y-3">
+          <Link href="/tutor/classes">
+            <Button variant="outline" size="lg" fullWidth className="border-green-200 text-green-800 hover:bg-green-50">
+              <CalendarDays className="w-5 h-5 mr-2" />
+              View teaching classes
+            </Button>
+          </Link>
           <Link href="/tutor/drills/create">
-            <Button variant="primary" size="lg" fullWidth className="mb-4">
+            <Button variant="primary" size="lg" fullWidth>
               <Plus className="w-5 h-5 mr-2" />
               Create New Drill
             </Button>

@@ -1,7 +1,7 @@
 // lib/api/better-auth.ts
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import config from "./config";
+import config, { parseWhitelistOrigins } from "./config";
 import { logger } from "./logger";
 import { connectToDatabase } from "./db";
 
@@ -31,7 +31,8 @@ export const getAuth = async () => {
         : undefined) ||
       "http://localhost:3000";
 
-    const trustedOrigins = [...config.WHITELIST_ORIGINS];
+    // Better Auth CORS / CSRF: origins from WHITELIST_ORIGINS (comma-separated) via parseWhitelistOrigins()
+    const trustedOrigins = [...parseWhitelistOrigins()];
     if (baseURL && !trustedOrigins.includes(baseURL)) {
       trustedOrigins.push(baseURL);
     }

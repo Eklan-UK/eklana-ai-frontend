@@ -1,12 +1,19 @@
 // Configuration for Next.js API routes
-const parseWhitelistOrigins = (): string[] => {
+
+/** Comma-separated `WHITELIST_ORIGINS` env → list (trimmed, empty segments dropped). */
+export const parseWhitelistOrigins = (): string[] => {
 	const origins: string[] = [];
-	
-	// Add origins from environment variable
-	if (process.env.WHITELIST_ORIGINS) {
-		origins.push(...process.env.WHITELIST_ORIGINS.split(',').map((origin) => origin.trim()));
+
+	const raw = process.env.WHITELIST_ORIGINS?.trim();
+	if (raw) {
+		origins.push(
+			...raw
+				.split(',')
+				.map((origin) => origin.trim())
+				.filter(Boolean),
+		);
 	}
-	
+
 	// Automatically add Vercel URLs in production
 	if (process.env.VERCEL_URL) {
 		const vercelUrl = `https://${process.env.VERCEL_URL}`;
@@ -14,31 +21,34 @@ const parseWhitelistOrigins = (): string[] => {
 			origins.push(vercelUrl);
 		}
 	}
-	
+
 	// Add NEXT_PUBLIC_VERCEL_URL if set
 	if (process.env.NEXT_PUBLIC_VERCEL_URL) {
 		if (!origins.includes(process.env.NEXT_PUBLIC_VERCEL_URL)) {
 			origins.push(process.env.NEXT_PUBLIC_VERCEL_URL);
 		}
 	}
-	
+
 	// Add NEXT_PUBLIC_API_URL if set
 	if (process.env.NEXT_PUBLIC_API_URL) {
 		if (!origins.includes(process.env.NEXT_PUBLIC_API_URL)) {
 			origins.push(process.env.NEXT_PUBLIC_API_URL);
 		}
 	}
-	
-	// Default origins for development
-	if (origins.length === 0) {
-		origins.push('http://localhost:3000', 'https://example.com');
-	} else {
-		// Always include localhost for development
-		if (!origins.includes('http://localhost:3000')) {
-			origins.push('http://localhost:3000');
+
+	// Better Auth CORS (trustedOrigins): always merge canonical origins so
+	// WHITELIST_ORIGINS / Vercel-only lists cannot omit staging (staging UI → app API).
+	const canonicalOrigins = [
+		'http://localhost:3000',
+		'https://app.eklan.ai',
+		'https://staging.eklan.ai',
+	];
+	for (const o of canonicalOrigins) {
+		if (!origins.includes(o)) {
+			origins.push(o);
 		}
 	}
-	
+
 	return origins;
 };
 

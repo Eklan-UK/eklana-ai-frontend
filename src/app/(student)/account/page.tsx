@@ -9,7 +9,7 @@ import {
   Phone,
   ChevronRight,
   BookOpen,
-  Calendar,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import { getUserFirstName } from "@/utils/user";
@@ -100,6 +100,20 @@ export default async function HomePage() {
 
         {/* Today's Focus Card */}
         <TodaysFocusCard />
+
+        <div className="mb-4 md:mb-6">
+          <Link href="/account/classes">
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              className="border-green-200 text-green-800 hover:bg-green-50"
+            >
+              <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
+              View your classes
+            </Button>
+          </Link>
+        </div>
 
         {/* Your Progress Section */}
         <div className="mb-4 md:mb-6">

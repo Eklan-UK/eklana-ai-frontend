@@ -13,8 +13,8 @@ import Link from "next/link";
 import { StudentsListClient } from "./students-list-client";
 import { getTutorStudents } from "./get-students";
 
-// Revalidate every 60 seconds (ISR)
-export const revalidate = 60;
+// Uses cookies() in getTutorStudents — must be dynamic, not statically generated
+export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
   const initialData = await getTutorStudents();

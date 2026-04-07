@@ -1,6 +1,10 @@
 // app/api/v1/auth/[...all]/route.ts
 import { toNextJsHandler } from "better-auth/next-js";
 import { getAuth } from "@/lib/api/better-auth";
+import {
+  handleAuthCorsPreflight,
+  mergeAuthCorsHeaders,
+} from "@/lib/api/auth-cors";
 import { logger } from "@/lib/api/logger";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
@@ -44,6 +48,10 @@ async function getHandlers() {
 }
 }
 
+export function OPTIONS(req: Request) {
+  return handleAuthCorsPreflight(req);
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -71,9 +79,12 @@ export async function GET(req: Request) {
     const handlers = await getHandlers();
     if (!handlers || !handlers.GET) {
       logger.error("Handlers not available", { handlers: !!handlers });
-      return Response.json(
-        { error: "Authentication handlers not initialized" },
-        { status: 503 }
+      return mergeAuthCorsHeaders(
+        req,
+        Response.json(
+          { error: "Authentication handlers not initialized" },
+          { status: 503 }
+        )
       );
     }
     
@@ -96,16 +107,19 @@ export async function GET(req: Request) {
       });
     }
     
-    return response;
+    return mergeAuthCorsHeaders(req, response);
   } catch (error: any) {
     logger.error("GET request failed", { 
       error: error.message, 
       stack: error.stack,
       url: req.url
     });
-    return Response.json(
-      { error: "Authentication service temporarily unavailable", details: error.message },
-      { status: 503 }
+    return mergeAuthCorsHeaders(
+      req,
+      Response.json(
+        { error: "Authentication service temporarily unavailable", details: error.message },
+        { status: 503 }
+      )
     );
   }
 }
@@ -194,12 +208,15 @@ export async function POST(req: Request) {
       });
     }
     
-    return response;
+    return mergeAuthCorsHeaders(req, response);
   } catch (error: any) {
     logger.error("POST request failed", { error: error.message });
-    return Response.json(
-      { error: "Authentication service temporarily unavailable" },
-      { status: 503 }
+    return mergeAuthCorsHeaders(
+      req,
+      Response.json(
+        { error: "Authentication service temporarily unavailable" },
+        { status: 503 }
+      )
     );
   }
 }
@@ -207,12 +224,15 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const handlers = await getHandlers();
-    return handlers.PUT(req);
+    return mergeAuthCorsHeaders(req, await handlers.PUT(req));
   } catch (error: any) {
     logger.error("PUT request failed", { error: error.message });
-    return Response.json(
-      { error: "Authentication service temporarily unavailable" },
-      { status: 503 }
+    return mergeAuthCorsHeaders(
+      req,
+      Response.json(
+        { error: "Authentication service temporarily unavailable" },
+        { status: 503 }
+      )
     );
   }
 }
@@ -220,12 +240,15 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const handlers = await getHandlers();
-    return handlers.DELETE(req);
+    return mergeAuthCorsHeaders(req, await handlers.DELETE(req));
   } catch (error: any) {
     logger.error("DELETE request failed", { error: error.message });
-    return Response.json(
-      { error: "Authentication service temporarily unavailable" },
-      { status: 503 }
+    return mergeAuthCorsHeaders(
+      req,
+      Response.json(
+        { error: "Authentication service temporarily unavailable" },
+        { status: 503 }
+      )
     );
   }
 }
@@ -233,12 +256,15 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const handlers = await getHandlers();
-    return handlers.PATCH(req);
+    return mergeAuthCorsHeaders(req, await handlers.PATCH(req));
   } catch (error: any) {
     logger.error("PATCH request failed", { error: error.message });
-    return Response.json(
-      { error: "Authentication service temporarily unavailable" },
-      { status: 503 }
+    return mergeAuthCorsHeaders(
+      req,
+      Response.json(
+        { error: "Authentication service temporarily unavailable" },
+        { status: 503 }
+      )
     );
   }
 }
