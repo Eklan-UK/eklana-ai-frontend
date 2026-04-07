@@ -28,7 +28,9 @@ apiClient.interceptors.response.use(
 		return response;
 	},
 	async (error: AxiosError) => {
-		// Handle 401 Unauthorized - session expired
+		// 401 → full redirect to login. If you see redirect loops on staging, capture this
+		// request in DevTools (same host as the page? cookie sent?) and align
+		// NEXT_PUBLIC_API_URL / BETTER_AUTH_URL per .env.example — not middleware.
 		if (error.response?.status === 401) {
 			// Clear auth state and redirect to login
 			if (typeof window !== 'undefined') {
