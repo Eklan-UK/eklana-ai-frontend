@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   useTutorAvailability,
+  useTutorGoogleCalendarStatus,
   useUpdateTutorAvailability,
 } from "@/hooks/useClasses";
 import type { TutorAvailabilityResponse } from "@/domain/tutor-availability/tutor-availability.api.types";
@@ -24,6 +25,7 @@ function timeToMin(s: string) {
 
 export function TutorAvailabilityClient() {
   const { data, isLoading, error } = useTutorAvailability();
+  const { data: googleStatus } = useTutorGoogleCalendarStatus();
   const update = useUpdateTutorAvailability();
   const [form, setForm] = useState<TutorAvailabilityResponse>({
     timezone: "UTC",
@@ -87,6 +89,12 @@ export function TutorAvailabilityClient() {
         hours. Times use your chosen timezone. Add at least one weekly window so learners can
         reschedule.
       </p>
+      {!googleStatus?.connected ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Google Calendar is not connected yet. Admins cannot schedule classes for your account
+          until you connect it from Settings.
+        </p>
+      ) : null}
 
       {isLoading ? (
         <p className="text-sm text-gray-500">Loading…</p>

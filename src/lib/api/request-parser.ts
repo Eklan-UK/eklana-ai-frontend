@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { ValidationError } from './response';
+import { ValidationError, isValidationError } from './response';
 import { logger } from './logger';
 
 /**
@@ -22,7 +22,7 @@ export const parseRequestBody = async (req: NextRequest) => {
     
     return body;
   } catch (error: any) {
-    if (error instanceof ValidationError) {
+    if (isValidationError(error)) {
       throw error;
     }
     

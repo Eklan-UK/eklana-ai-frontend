@@ -6,6 +6,11 @@ import User, { type IUser } from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { ValidationError } from '@/lib/api/response';
 import {
+  getGoogleCalendarConnectionStatusForUser,
+  getGoogleCalendarRefreshTokenForUser,
+} from '@/lib/api/google-calendar-connection';
+import { createGoogleCalendarEventWithMeetLink } from '@/lib/api/google-calendar-events';
+import {
   applyTutorJoinPolicy,
   getNextSessionForList,
   mapSeriesToListItem,
@@ -15,6 +20,44 @@ import type {
   ClassBucket,
   CreateAdminClassBody,
 } from './class.api.types';
+
+function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
+  const m = rawMessage.toLowerCase();
+  if (
+    m.includes('socket disconnected') ||
+    m.includes('tls connection') ||
+    m.includes('econnreset') ||
+    m.includes('etimedout') ||
+    m.includes('enotfound') ||
+    m.includes('network error') ||
+    m.includes('fetch failed')
+  ) {
+    return (
+      'Could not reach Google Calendar (network error). Wait a moment and try again. ' +
+      'If this keeps happening, ask the tutor to reconnect Google Calendar in Tutor Settings.'
+    );
+  }
+  if (
+    m.includes('invalid_grant') ||
+    m.includes('invalid authentication') ||
+    m.includes('account has been deleted') ||
+    m.includes('token has been expired') ||
+    m.includes('token expired') ||
+    m.includes('revoked') ||
+    m.includes('invalid credentials') ||
+    m.includes('reauth related error') ||
+    m.includes('user needs to reconnect')
+  ) {
+    return (
+      "This tutor's Google Calendar connection is no longer valid. Ask them to open " +
+      'Tutor Settings and disconnect and reconnect Google Calendar, then try scheduling again.'
+    );
+  }
+  return (
+    'Could not create a Google Meet link for this class. If this keeps happening, ask ' +
+    'the tutor to reconnect Google Calendar in Tutor Settings.'
+  );
+}
 
 export class ClassRepository {
   async create(
@@ -39,9 +82,18 @@ export class ClassRepository {
       throw new ValidationError('Session end must be after start');
     }
 
-    const tutor = await User.findById(body.tutorId).select('role').lean();
+    const tutor = await User.findById(body.tutorId).select('role email').lean();
     if (!tutor || tutor.role !== 'tutor') {
       throw new ValidationError('Tutor not found or user is not a tutor');
+    }
+
+    const googleStatus = await getGoogleCalendarConnectionStatusForUser(
+      body.tutorId,
+    );
+    if (!googleStatus.connected) {
+      throw new ValidationError(
+        'Tutor must connect Google Calendar before scheduling classes',
+      );
     }
 
     for (const lid of body.learnerIds) {
@@ -62,6 +114,46 @@ export class ClassRepository {
       (body.learnerIds.length
         ? `Class (${body.learnerIds.length} learner${body.learnerIds.length > 1 ? 's' : ''})`
         : 'Class');
+
+    const refreshToken = await getGoogleCalendarRefreshTokenForUser(body.tutorId);
+    if (!refreshToken) {
+      throw new ValidationError(
+        'Tutor must reconnect Google Calendar before scheduling classes',
+      );
+    }
+
+    const learnerEmails = await User.find({
+      _id: { $in: body.learnerIds.map((id) => new Types.ObjectId(id)) },
+      role: 'user',
+    })
+      .select('email')
+      .lean();
+
+    let meetingUrl: string;
+    try {
+      const createdCalendarEvent = await createGoogleCalendarEventWithMeetLink({
+        refreshToken,
+        summary: title,
+        description: `Eklana class scheduled by admin.`,
+        startIsoUtc: start.toISOString(),
+        endIsoUtc: end.toISOString(),
+        timezone: body.timezone,
+        attendees: [
+          tutor.email ?? '',
+          ...learnerEmails.map((u) => (typeof u.email === 'string' ? u.email : '')),
+        ].filter(Boolean),
+      });
+      meetingUrl = createdCalendarEvent.meetingUrl;
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error('ClassRepository.create.googleCalendarEvent', {
+        tutorId: body.tutorId,
+        message: err.message,
+      });
+      throw new ValidationError(
+        validationMessageForGoogleCalendarEventFailure(err.message ?? ''),
+      );
+    }
 
     const mongoSession = await mongoose.startSession();
     mongoSession.startTransaction();
@@ -97,7 +189,6 @@ export class ClassRepository {
       );
 
       const sessionDocId = new Types.ObjectId();
-      const meetingUrl = `https://meet.eklan.ai/session-${sessionDocId.toString()}`;
 
       await ClassSession.create(
         [
