@@ -1,4 +1,4 @@
-// GET /api/v1/tutor/classes — classes for the authenticated tutor (join URL per policy)
+// GET /api/v1/tutor/teaching-classes — tutor-scoped class list (scheduling is admin-only)
 import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
 import { withRole } from '@/lib/api/middleware';

@@ -27,6 +27,7 @@
     "firebase": "^12.8.0",
     "firebase-admin": "^13.6.0",
     "google-auth-library": "^10.5.0",
+    "googleapis": "^171.4.0",
     "isomorphic-dompurify": "^2.35.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.562.0",

@@ -110,6 +110,7 @@ export const getAuth = async () => {
         google: {
           clientId: config.GOOGLE_CLIENT_ID || "",
           clientSecret: config.GOOGLE_CLIENT_SECRET || "",
+          scope: ["openid", "profile", "email"],
           enabled: !!config.GOOGLE_CLIENT_ID && !!config.GOOGLE_CLIENT_SECRET,
         },
         apple: {

@@ -17,6 +17,15 @@ export class ValidationError extends Error {
   }
 }
 
+/**
+ * True for API ValidationError. Uses `name` as fallback because `instanceof` can fail
+ * when this module is bundled more than once (e.g. Next.js server chunks).
+ */
+export function isValidationError(error: unknown): error is ValidationError {
+  if (error instanceof ValidationError) return true;
+  return error instanceof Error && error.name === 'ValidationError';
+}
+
 export class ForbiddenError extends Error {
   constructor(message = "You don't have permission") {
     super(message);

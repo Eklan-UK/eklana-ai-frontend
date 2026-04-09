@@ -103,6 +103,7 @@ interface TutorOption {
   initials: string;
   specialty: string;
   capacityPct: number;
+  googleCalendarConnected: boolean;
   recommended?: boolean;
 }
 
@@ -111,6 +112,7 @@ function userToTutorOption(u: {
   firstName?: string;
   lastName?: string;
   email?: string;
+  googleCalendarConnected?: boolean;
 }): TutorOption {
   const id = u._id != null ? String(u._id) : "";
   const name =
@@ -126,6 +128,7 @@ function userToTutorOption(u: {
     initials,
     specialty: "Tutor",
     capacityPct: 50,
+    googleCalendarConnected: !!u.googleCalendarConnected,
   };
 }
 
@@ -310,7 +313,7 @@ export function ScheduleClassModal({
 
   const primaryLabelStep1 = tutorId
     ? "Continue to type"
-    : "Select a tutor to continue";
+  : "Select a connected tutor to continue";
 
   const primaryLabelStep2 = classType
     ? "Continue to schedule"
@@ -442,6 +445,10 @@ export function ScheduleClassModal({
   const selectedStudents = apiLearners.filter((s) => selectedIds.has(s.id));
   const tutor = apiTutors.find((t) => t.id === tutorId);
   const studentCount = selectedIds.size;
+  /** Defense in depth: block confirm if tutor row is missing or not Google-connected */
+  const scheduleBlockedNoGoogleCalendar =
+    !!tutorId && (!tutor || !tutor.googleCalendarConnected);
+  const reviewStepIndex = STEP_LABELS.length - 1;
 
   return (
     <>
@@ -681,12 +688,25 @@ export function ScheduleClassModal({
                 <ul className="mt-4 max-h-[340px] space-y-3 overflow-y-auto pr-1">
                   {filteredTutors.map((t) => {
                     const sel = tutorId === t.id;
+                    const disabled = !t.googleCalendarConnected;
                     return (
                       <li key={t.id}>
                         <button
                           type="button"
-                          onClick={() => setTutorId(t.id)}
+                          disabled={disabled}
+                          title={
+                            disabled
+                              ? "Tutor must connect Google Calendar before scheduling"
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (!disabled) setTutorId(t.id);
+                          }}
                           className={`flex w-full gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                            disabled
+                              ? "cursor-not-allowed border-amber-200 bg-amber-50/50 opacity-70"
+                              : ""
+                          } ${
                             sel
                               ? "border-[#3d8c40]/60 bg-emerald-50/40"
                               : "border-gray-200 bg-white hover:border-gray-300"
@@ -698,12 +718,29 @@ export function ScheduleClassModal({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
                               <div className="min-w-0">
-                                <p className="font-bold text-slate-900">
-                                  {t.name}
-                                </p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-bold text-slate-900">
+                                    {t.name}
+                                  </p>
+                                  {t.googleCalendarConnected ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                      <Check
+                                        className="h-3 w-3"
+                                        strokeWidth={2.5}
+                                        aria-hidden
+                                      />
+                                      Meet ready
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <p className="text-sm text-gray-500">
                                   {t.specialty}
                                 </p>
+                                {!t.googleCalendarConnected ? (
+                                  <p className="mt-1 text-xs font-semibold text-amber-700">
+                                    Connect Google Calendar required
+                                  </p>
+                                ) : null}
                               </div>
                               <div className="flex shrink-0 flex-col items-end gap-2">
                                 {t.recommended ? (
@@ -1095,6 +1132,16 @@ export function ScheduleClassModal({
 
             {step === 4 ? (
               <div className="space-y-4">
+                {scheduleBlockedNoGoogleCalendar ? (
+                  <div
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                    role="status"
+                  >
+                    This tutor has not connected their Google Calendar. They must
+                    do this in their Tutor Settings before you can schedule a
+                    class with a Google Meet link.
+                  </div>
+                ) : null}
                 <div className="flex gap-3 rounded-xl border border-emerald-200/90 bg-[#F1FBF3] px-4 py-3.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#388E3C]">
                     <Check
@@ -1237,10 +1284,14 @@ export function ScheduleClassModal({
             </button>
             <button
               type="button"
-              disabled={!canContinue()}
+              disabled={
+                !canContinue() ||
+                (step === reviewStepIndex && scheduleBlockedNoGoogleCalendar)
+              }
               onClick={handlePrimary}
               className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-colors ${
-                canContinue()
+                canContinue() &&
+                !(step === reviewStepIndex && scheduleBlockedNoGoogleCalendar)
                   ? step === STEP_LABELS.length - 1
                     ? "bg-[#388E3C] text-white hover:bg-[#2E7D32]"
                     : "bg-[#2d6a32] text-white hover:bg-[#245528]"

@@ -1,6 +1,59 @@
 // Axios instance for API requests
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
+/** Parse JSON API error bodies into a user-visible string (handles non-standard shapes). */
+function messageFromResponseData(data: unknown): string | undefined {
+	if (data == null) return undefined;
+	if (typeof data === 'string') {
+		const t = data.trim();
+		if (t.startsWith('{') && t.endsWith('}')) {
+			try {
+				const parsed = JSON.parse(t) as Record<string, unknown>;
+				if (typeof parsed.message === 'string' && parsed.message.trim()) {
+					return parsed.message.trim();
+				}
+				if (typeof parsed.error === 'string' && parsed.error.trim()) {
+					return parsed.error.trim();
+				}
+			} catch {
+				return undefined;
+			}
+		}
+		return undefined;
+	}
+	if (typeof data === 'object' && !Array.isArray(data)) {
+		const o = data as Record<string, unknown>;
+		if (typeof o.message === 'string' && o.message.trim()) return o.message.trim();
+		if (typeof o.error === 'string' && o.error.trim()) return o.error.trim();
+		if (typeof o.detail === 'string' && o.detail.trim()) return o.detail.trim();
+		if (Array.isArray(o.errors) && o.errors.length > 0) {
+			const first = o.errors[0];
+			if (typeof first === 'string' && first.trim()) return first.trim();
+			if (
+				first &&
+				typeof first === 'object' &&
+				'message' in first &&
+				typeof (first as { message: unknown }).message === 'string'
+			) {
+				const m = (first as { message: string }).message;
+				if (m.trim()) return m.trim();
+			}
+		}
+	}
+	return undefined;
+}
+
+function rejectWithApiError(error: AxiosError): Promise<never> {
+	const status = error.response?.status;
+	const fromBody = messageFromResponseData(error.response?.data);
+	const fallback =
+		status != null
+			? `Something went wrong (HTTP ${status}). Please try again.`
+			: 'Network error. Please check your connection and try again.';
+	const errorMessage = fromBody || fallback;
+	return Promise.reject(new Error(errorMessage));
+}
+
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
 	baseURL: '/api/v1',
@@ -40,13 +93,7 @@ apiClient.interceptors.response.use(
 			}
 		}
 
-		// Extract error message
-		const errorMessage =
-			(error.response?.data as any)?.message ||
-			error.message ||
-			`HTTP error! status: ${error.response?.status}`;
-
-		return Promise.reject(new Error(errorMessage));
+		return rejectWithApiError(error);
 	}
 );
 

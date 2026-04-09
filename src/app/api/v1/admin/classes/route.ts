@@ -10,6 +10,8 @@ import { apiResponse } from '@/lib/api/response';
 import { ClassRepository } from '@/domain/classes/class.repository';
 import { mapSeriesToListItem } from '@/domain/classes/class.mapper';
 import type { ClassBucket } from '@/domain/classes/class.api.types';
+import { getGoogleCalendarConnectionStatusForUser } from '@/lib/api/google-calendar-connection';
+import User, { type IUser } from '@/models/user';
 import '@/models/class-series';
 import '@/models/class-enrollment';
 import '@/models/class-session';
@@ -75,24 +77,64 @@ async function postHandler(
     return apiResponse.error('ValidationError', parsed.error.message, 400);
   }
 
+  const googleStatus = await getGoogleCalendarConnectionStatusForUser(
+    parsed.data.tutorId,
+  );
+  if (!googleStatus.connected) {
+    return apiResponse.error(
+      'ValidationError',
+      'Selected tutor must connect Google Calendar before scheduling classes',
+      400,
+      { tutorId: parsed.data.tutorId },
+    );
+  }
+
   const repo = new ClassRepository();
-  const { series } = await repo.create(parsed.data, context.userId);
-  const full = await repo.findById(series._id.toString());
-  if (!full) {
-    return apiResponse.error('ServerError', 'Class created but could not be loaded', 500);
+  const { series, session } = await repo.create(parsed.data, context.userId);
+
+  const learnerObjectIds = parsed.data.learnerIds.map(
+    (id) => new Types.ObjectId(id),
+  );
+  const [tutor, learnerRows] = await Promise.all([
+    User.findById(series.tutorId).select('-password').lean().exec(),
+    User.find({ _id: { $in: learnerObjectIds } }).select('-password').lean().exec(),
+  ]);
+
+  if (!tutor) {
+    return apiResponse.error(
+      'ServerError',
+      'Class was created but the tutor profile could not be loaded. Refresh the class list or contact support.',
+      500,
+    );
+  }
+
+  const byId = new Map(
+    learnerRows.map((u) => [u._id.toString(), u] as const),
+  );
+  const learners: IUser[] = [];
+  for (const id of parsed.data.learnerIds) {
+    const row = byId.get(id);
+    if (!row) {
+      return apiResponse.error(
+        'ServerError',
+        'Class was created but a learner profile could not be loaded. Refresh the class list or contact support.',
+        500,
+      );
+    }
+    learners.push(row as unknown as IUser);
   }
 
   const listItem = mapSeriesToListItem(
-    full.series,
-    full.sessions,
-    full.learners,
-    full.tutor,
+    series,
+    [session],
+    learners,
+    tutor as unknown as IUser,
   );
 
   return apiResponse.success(
     {
       classSeriesId: series._id.toString(),
-      sessionIds: full.sessions.map((s) => s._id.toString()),
+      sessionIds: [session._id.toString()],
       class: listItem,
     },
     201,

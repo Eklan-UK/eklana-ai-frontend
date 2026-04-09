@@ -70,7 +70,7 @@ export interface AdminClassesResponse {
   };
 }
 
-/** GET /api/v1/tutor/classes — same row shape as admin list; scoped to the tutor; `meetingUrl` only inside join window. */
+/** GET /api/v1/tutor/teaching-classes — same row shape as admin list; scoped to the tutor; `meetingUrl` only inside join window. */
 
 /** GET /api/v1/learner/classes — enrolled series only; join window applies to `meetingUrl`. */
 
@@ -139,11 +139,6 @@ export interface AdminClassDetailResponse {
   code?: string;
   message?: string;
   data?: AdminClassDetailDTO;
-}
-
-/** --- GET /api/v1/tutor/classes (Phase 2) --- */
-export interface TutorClassesResponse {
-  data?: { classes: AdminClassListItemDTO[] };
 }
 
 /** --- GET /api/v1/learner/classes (Phase 3) --- */

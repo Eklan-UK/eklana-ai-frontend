@@ -7,6 +7,7 @@ import User from '@/models/user';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import { getGoogleCalendarConnectionMapForUsers } from '@/lib/api/google-calendar-connection';
 
 async function handler(
 	req: NextRequest,
@@ -47,6 +48,22 @@ async function handler(
 			.lean()
 			.exec();
 
+		const tutorIds = users
+			.filter((u: any) => u.role === 'tutor')
+			.map((u: any) => String(u._id));
+		const googleConnectionByTutorId =
+			tutorIds.length > 0
+				? await getGoogleCalendarConnectionMapForUsers(tutorIds)
+				: new Map();
+		const usersWithGoogleStatus = users.map((u: any) => {
+			if (u.role !== 'tutor') return u;
+			const status = googleConnectionByTutorId.get(String(u._id));
+			return {
+				...u,
+				googleCalendarConnected: status?.connected === true,
+			};
+		});
+
 		logger.info('Users fetched successfully', {
 			total,
 			limit,
@@ -56,7 +73,7 @@ async function handler(
 
 		return NextResponse.json(
 			{
-				users,
+				users: usersWithGoogleStatus,
 				total,
 				limit,
 				offset,
