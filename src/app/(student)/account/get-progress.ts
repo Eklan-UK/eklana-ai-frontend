@@ -1,5 +1,6 @@
 // Server-side function to get user progress from completed drills
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export interface UserProgress {
   drillsCompleted: number;
@@ -17,12 +18,12 @@ export interface UserProgress {
 
 export async function getUserProgress(): Promise<UserProgress> {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
     // Fetch user's drills to calculate progress
-    const response = await fetch(`${baseURL}/api/v1/drills/learner/my-drills?limit=100`, {
+    const response = await fetch(`${origin}/api/v1/drills/learner/my-drills?limit=100`, {
       credentials: 'include',
       headers: {
         Cookie: cookieHeader,

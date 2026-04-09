@@ -1,13 +1,14 @@
 // Server-side function to get current user
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getCurrentUser() {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
-    const response = await fetch(`${baseURL}/api/v1/users/current`, {
+    const response = await fetch(`${origin}/api/v1/users/current`, {
       credentials: 'include',
       headers: {
         Cookie: cookieHeader,

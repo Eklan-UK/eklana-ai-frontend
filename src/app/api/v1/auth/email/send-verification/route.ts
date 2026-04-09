@@ -5,7 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import config from '@/lib/api/config';
+import {
+  getPublicBaseUrlFallback,
+  resolvePublicBaseUrlFromHeaders,
+} from '@/lib/public-base-url';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
@@ -121,9 +124,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       expiresAt,
     });
     
-    // Build verification URL
-    const baseURL = config.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const verificationUrl = `${baseURL}/auth/verify-email/confirm?token=${token}`;
+    // Build verification URL (match Host the user requested from)
+    const origin = (
+      resolvePublicBaseUrlFromHeaders(req.headers) ?? getPublicBaseUrlFallback()
+    ).replace(/\/$/, '');
+    const verificationUrl = `${origin}/auth/verify-email/confirm?token=${token}`;
     
     // Send verification email
     const { sendEmailVerification } = await import('@/lib/api/email.service');

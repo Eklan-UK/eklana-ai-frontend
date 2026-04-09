@@ -1,13 +1,14 @@
 // Server-side function to get drill by ID
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getDrillById(drillId: string) {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
-    const response = await fetch(`${baseURL}/api/v1/drills/${drillId}`, {
+    const response = await fetch(`${origin}/api/v1/drills/${drillId}`, {
       credentials: 'include',
       headers: {
         Cookie: cookieHeader,

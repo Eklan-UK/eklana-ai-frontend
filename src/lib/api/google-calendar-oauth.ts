@@ -1,5 +1,9 @@
 import crypto from "crypto";
 import config from "./config";
+import {
+  getPublicBaseUrlFallback,
+  resolvePublicBaseUrlFromHeaders,
+} from "@/lib/public-base-url";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -13,20 +17,18 @@ function signingSecret(): string {
   return s;
 }
 
-/** Public URL of this API (same basis as Better Auth). */
-export function getGoogleCalendarOAuthBaseUrl(): string {
-  const base =
-    config.BETTER_AUTH_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
-    process.env.NEXT_PUBLIC_VERCEL_URL ||
-    "http://localhost:3000";
-  return base.replace(/\/$/, "");
+/** Public URL of this API (prefer request Host when available for one build / multi-host). */
+export function getGoogleCalendarOAuthBaseUrl(reqHeaders?: Headers): string {
+  if (reqHeaders) {
+    const r = resolvePublicBaseUrlFromHeaders(reqHeaders);
+    if (r) return r.replace(/\/$/, "");
+  }
+  return getPublicBaseUrlFallback().replace(/\/$/, "");
 }
 
 /** Redirect URI registered on the Calendar OAuth client in Google Cloud Console. */
-export function getGoogleCalendarOAuthRedirectUri(): string {
-  return `${getGoogleCalendarOAuthBaseUrl()}/api/v1/tutor/google-calendar/callback`;
+export function getGoogleCalendarOAuthRedirectUri(reqHeaders?: Headers): string {
+  return `${getGoogleCalendarOAuthBaseUrl(reqHeaders)}/api/v1/tutor/google-calendar/callback`;
 }
 
 export function signCalendarConnectState(userId: string): string {

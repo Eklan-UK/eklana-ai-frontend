@@ -54,9 +54,14 @@ function rejectWithApiError(error: AxiosError): Promise<never> {
 	return Promise.reject(new Error(errorMessage));
 }
 
-// Create axios instance
+// Client: absolute URL on current origin (one build, staging vs prod). SSR: relative.
+const apiDefaultBaseURL =
+	typeof window !== "undefined"
+		? `${window.location.origin}/api/v1`
+		: "/api/v1";
+
 const apiClient: AxiosInstance = axios.create({
-	baseURL: '/api/v1',
+	baseURL: apiDefaultBaseURL,
 	timeout: 30000, // 30 seconds
 	headers: {
 		'Content-Type': 'application/json',
@@ -85,8 +90,11 @@ apiClient.interceptors.response.use(
 		// request in DevTools (same host as the page? cookie sent?) and align
 		// NEXT_PUBLIC_API_URL / BETTER_AUTH_URL per .env.example — not middleware.
 		if (error.response?.status === 401) {
-			// Clear auth state and redirect to login
 			if (typeof window !== 'undefined') {
+				// Avoid redirect churn if already on login; primary fix is session cookies.
+				if (window.location.pathname.startsWith('/auth/login')) {
+					return rejectWithApiError(error);
+				}
 				const authStore = (await import('@/store/auth-store')).useAuthStore.getState();
 				authStore.logout();
 				window.location.href = '/auth/login';
