@@ -1,13 +1,14 @@
 // Server-side function to get tutor's students
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url';
 
 export async function getTutorStudents() {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
-    const response = await fetch(`${baseURL}/api/v1/tutor/students`, {
+    const response = await fetch(`${origin}/api/v1/tutor/students`, {
       credentials: 'include',
       headers: {
         Cookie: cookieHeader,

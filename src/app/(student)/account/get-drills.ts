@@ -1,14 +1,15 @@
 // Server-side function to get drills assigned to current user via DrillAssignment
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url';
 
 export async function getAssignedDrills() {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
     // Use the learner drills endpoint which returns drills from DrillAssignment records
-    const response = await fetch(`${baseURL}/api/v1/drills/learner/my-drills?limit=50`, {
+    const response = await fetch(`${origin}/api/v1/drills/learner/my-drills?limit=50`, {
       credentials: 'include',
       headers: {
         Cookie: cookieHeader,

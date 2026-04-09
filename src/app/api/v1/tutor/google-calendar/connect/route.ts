@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function getHandler(
-  _req: NextRequest,
+  req: NextRequest,
   context: { userId: Types.ObjectId },
 ) {
   const clientId = config.GOOGLE_CALENDAR_CLIENT_ID;
@@ -24,7 +24,7 @@ async function getHandler(
     );
   }
 
-  const redirectUri = getGoogleCalendarOAuthRedirectUri();
+  const redirectUri = getGoogleCalendarOAuthRedirectUri(req.headers);
   const state = signCalendarConnectState(context.userId.toString());
 
   const params = new URLSearchParams({
