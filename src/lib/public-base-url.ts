@@ -1,4 +1,7 @@
-import { headers } from "next/headers";
+/**
+ * Shared URL helpers safe for client and server bundles.
+ * Do not import `next/headers` here — that breaks client imports (e.g. auth-client).
+ */
 
 /**
  * Resolve the public origin from proxy / browser headers (no build-time host baked in).
@@ -20,7 +23,7 @@ export function resolvePublicBaseUrlFromHeaders(h: Headers): string | null {
 }
 
 /**
- * Runtime fallback for server-only code when request headers are unavailable.
+ * Runtime fallback when request headers are unavailable.
  * Prefer BETTER_AUTH_URL per deployment (not baked into the client bundle).
  */
 export function getPublicBaseUrlFallback(): string {
@@ -34,18 +37,10 @@ export function getPublicBaseUrlFallback(): string {
 	);
 }
 
-/** Same host as the current document (client bundles only). */
+/** Same host as the current document (browser); SSR fallback uses env chain. */
 export function getBrowserPublicBaseUrl(): string {
 	if (typeof window === "undefined") {
 		return getPublicBaseUrlFallback();
 	}
 	return window.location.origin;
-}
-
-/**
- * Public base URL for server components / route handlers (RSC, fetch to own API).
- */
-export async function getServerPublicBaseUrl(): Promise<string> {
-	const h = await headers();
-	return resolvePublicBaseUrlFromHeaders(h) ?? getPublicBaseUrlFallback();
 }

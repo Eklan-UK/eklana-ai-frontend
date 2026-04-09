@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import DrillPracticeInterface from "@/components/drills/DrillPracticeInterface";
-import { getServerPublicBaseUrl } from "@/lib/public-base-url";
+import { getServerPublicBaseUrl } from "@/lib/public-base-url.server";
 
 async function getDrill(drillId: string, assignmentId?: string) {
   try {

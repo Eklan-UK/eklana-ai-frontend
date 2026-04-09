@@ -1,6 +1,6 @@
 // Server-side function to get user progress from completed drills
 import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export interface UserProgress {
   drillsCompleted: number;

@@ -1,6 +1,6 @@
 // Server-side function to get tutor's students
 import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getTutorStudents() {
   try {

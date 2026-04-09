@@ -1,6 +1,6 @@
 // Server-side function to get tutor dashboard data
 import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getTutorDashboardData() {
   try {

@@ -1,7 +1,7 @@
 // Server-side helpers for fetching data with authentication
 import { cookies } from 'next/headers';
 import { getServerSession } from './session';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 /**
  * Fetch with authentication for server components

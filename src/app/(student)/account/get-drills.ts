@@ -1,6 +1,6 @@
 // Server-side function to get drills assigned to current user via DrillAssignment
 import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getAssignedDrills() {
   try {
