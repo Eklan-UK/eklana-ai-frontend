@@ -4,6 +4,7 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import config, { parseWhitelistOrigins } from "./config";
 import { logger } from "./logger";
 import { connectToDatabase } from "./db";
+import { getPublicBaseUrlFallback } from "@/lib/public-base-url";
 
 // Cache auth instance globally
 let authInstance: any = null;
@@ -23,13 +24,19 @@ export const getAuth = async () => {
       throw new Error("MongoDB database instance not available");
     }
 
-    const baseURL =
-      config.BETTER_AUTH_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : undefined) ||
-      "http://localhost:3000";
+    // Runtime per deployment (BETTER_AUTH_URL first in getPublicBaseUrlFallback); do not
+    // assume a single NEXT_PUBLIC_* host baked at build time.
+    const baseURL = getPublicBaseUrlFallback();
+
+    // Session cookies: never tie Secure solely to NODE_ENV (staging/prod builds are always
+    // "production" even over HTTP). Use HTTPS from baseURL or explicit COOKIE_SECURE.
+    const cookieSecureRaw = process.env.COOKIE_SECURE?.trim().toLowerCase();
+    let secureCookies = baseURL.startsWith("https://");
+    if (cookieSecureRaw === "true") secureCookies = true;
+    if (cookieSecureRaw === "false") secureCookies = false;
+
+    // Same-origin app: Lax + Secure on HTTPS is enough; None is for cross-site embeds.
+    const sessionSameSite: "lax" | "none" = "lax";
 
     // Better Auth CORS / CSRF: origins from WHITELIST_ORIGINS (comma-separated) via parseWhitelistOrigins()
     const trustedOrigins = [...parseWhitelistOrigins()];
@@ -52,11 +59,12 @@ export const getAuth = async () => {
     // Calculate the OAuth redirect URI for logging/debugging
     const oauthRedirectURI = `${baseURL}/api/v1/auth/callback/google`;
     
-    logger.info("Initializing Better Auth", { 
-      baseURL, 
+    logger.info("Initializing Better Auth", {
+      baseURL,
       trustedOrigins,
       oauthRedirectURI: "Google OAuth redirect URI: " + oauthRedirectURI,
-      note: "Make sure this exact URI is registered in Google Cloud Console"
+      note: "Make sure this exact URI is registered in Google Cloud Console",
+      sessionCookie: { secure: secureCookies, sameSite: sessionSameSite },
     });
 
     // Create and cache Better Auth instance
@@ -78,8 +86,8 @@ export const getAuth = async () => {
       },
 
       cookies: {
-        sameSite: config.NODE_ENV === "production" ? "none" : "lax",
-        secure: config.NODE_ENV === "production",
+        sameSite: sessionSameSite,
+        secure: secureCookies,
         httpOnly: true,
         path: "/",
       },
@@ -110,6 +118,7 @@ export const getAuth = async () => {
         google: {
           clientId: config.GOOGLE_CLIENT_ID || "",
           clientSecret: config.GOOGLE_CLIENT_SECRET || "",
+          scope: ["openid", "profile", "email"],
           enabled: !!config.GOOGLE_CLIENT_ID && !!config.GOOGLE_CLIENT_SECRET,
         },
         apple: {

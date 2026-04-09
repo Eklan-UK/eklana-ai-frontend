@@ -1,21 +1,22 @@
 // Server-side function to get tutor dashboard data
 import { cookies } from 'next/headers';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 export async function getTutorDashboardData() {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
     const [drillsResponse, studentsResponse] = await Promise.all([
-      fetch(`${baseURL}/api/v1/tutor/drills?limit=5`, {
+      fetch(`${origin}/api/v1/tutor/drills?limit=5`, {
         credentials: 'include',
         headers: {
           Cookie: cookieHeader,
         },
         cache: 'no-store',
       }),
-      fetch(`${baseURL}/api/v1/tutor/students?limit=5`, {
+      fetch(`${origin}/api/v1/tutor/students?limit=5`, {
         credentials: 'include',
         headers: {
           Cookie: cookieHeader,

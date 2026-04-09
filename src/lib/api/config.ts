@@ -75,9 +75,12 @@ export const config = {
 		process.env.NEXT_PUBLIC_VERCEL_URL || 
 		'http://localhost:3000',
 	BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || process.env.JWT_ACCESS_SECRET,
-	// OAuth Credentials
+	// OAuth: Better Auth sign-in (Google login only — no Calendar scopes)
 	GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
 	GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+	// OAuth: Tutor Google Calendar connect (separate Google Cloud OAuth client)
+	GOOGLE_CALENDAR_CLIENT_ID: process.env.GOOGLE_CALENDAR_CLIENT_ID,
+	GOOGLE_CALENDAR_CLIENT_SECRET: process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
 	APPLE_CLIENT_ID: process.env.APPLE_CLIENT_ID,
 	APPLE_CLIENT_SECRET: process.env.APPLE_CLIENT_SECRET,
 	APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,

@@ -7,7 +7,10 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
 import { Types } from 'mongoose';
-import config from '@/lib/api/config';
+import {
+	getPublicBaseUrlFallback,
+	resolvePublicBaseUrlFromHeaders,
+} from '@/lib/public-base-url';
 
 async function handler(
 	req: NextRequest,
@@ -52,7 +55,9 @@ async function handler(
 
 		// Use Better Auth's internal API to generate verification token and send email
 		try {
-			const baseURL = config.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+			const origin = (
+				resolvePublicBaseUrlFromHeaders(req.headers) ?? getPublicBaseUrlFallback()
+			).replace(/\/$/, '');
 			const { sendEmailVerification } = await import('@/lib/api/email.service');
 			
 			// Generate a verification token (Better Auth format)
@@ -93,7 +98,7 @@ async function handler(
 				expiresAt,
 			});
 			
-			const verificationUrl = `${baseURL}/auth/verify-email/confirm?token=${token}`;
+			const verificationUrl = `${origin}/auth/verify-email/confirm?token=${token}`;
 			
 			await sendEmailVerification({
 				email: user.email,

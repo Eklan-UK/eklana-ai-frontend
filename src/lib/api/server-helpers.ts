@@ -1,6 +1,7 @@
 // Server-side helpers for fetching data with authentication
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { getServerSession } from './session';
+import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
 
 /**
  * Fetch with authentication for server components
@@ -13,8 +14,9 @@ export async function authenticatedFetch(
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+  const baseURL = await getServerPublicBaseUrl();
+  const origin = baseURL.replace(/\/$/, '');
+  const fullUrl = url.startsWith('http') ? url : `${origin}${url}`;
 
   return fetch(fullUrl, {
     ...options,

@@ -1,21 +1,19 @@
 // Debug endpoint to show the exact OAuth redirect URI being used
 import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getPublicBaseUrlFallback,
+  resolvePublicBaseUrlFromHeaders,
+} from "@/lib/public-base-url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Use the same baseURL logic as better-auth.ts
     const baseURL =
-      config.BETTER_AUTH_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : undefined) ||
-      "http://localhost:3000";
+      resolvePublicBaseUrlFromHeaders(req.headers) ?? getPublicBaseUrlFallback();
 
     const basePath = "/api/v1/auth";
     

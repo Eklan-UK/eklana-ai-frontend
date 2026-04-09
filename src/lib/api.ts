@@ -487,6 +487,25 @@ export const tutorAPI = {
       }
     );
   },
+
+  getGoogleCalendarStatus: () => {
+    return apiRequest<{
+      code: string;
+      data: { connected: boolean };
+    }>('/tutor/google-calendar/status', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  disconnectGoogleCalendar: () => {
+    return apiRequest<{
+      code: string;
+      data: { disconnected: boolean };
+    }>('/tutor/google-calendar/disconnect', {
+      method: 'DELETE',
+    });
+  },
 };
 
 // User API
@@ -768,7 +787,7 @@ export const classesAPI = {
           hasMore?: boolean;
         };
       };
-    }>('/tutor/classes', {
+    }>('/tutor/teaching-classes', {
       method: 'GET',
       params,
       cache: false,

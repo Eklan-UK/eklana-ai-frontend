@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger';
-import { apiResponse, NotFoundError, ValidationError, ForbiddenError, UnauthorizedError } from './response';
+import {
+  apiResponse,
+  NotFoundError,
+  ValidationError,
+  ForbiddenError,
+  UnauthorizedError,
+  isValidationError,
+} from './response';
 
 /**
  * Error handler wrapper for API routes
@@ -25,8 +32,9 @@ export const withErrorHandler = (
         return apiResponse.notFound(error.resource);
       }
       
-      if (error instanceof ValidationError) {
-        return apiResponse.validationError(error.message, error.errors);
+      if (isValidationError(error)) {
+        const ve = error as ValidationError;
+        return apiResponse.validationError(ve.message, ve.errors);
       }
       
       if (error instanceof ForbiddenError) {

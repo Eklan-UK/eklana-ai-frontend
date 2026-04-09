@@ -95,13 +95,11 @@ export function TutorClassesClient() {
 
   return (
     <div className="relative space-y-6 pb-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Your teaching sessions — join from here when it&apos;s time
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Your teaching sessions — join from here when it&apos;s time
+        </p>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

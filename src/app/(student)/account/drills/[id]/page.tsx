@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import DrillPracticeInterface from "@/components/drills/DrillPracticeInterface";
+import { getServerPublicBaseUrl } from "@/lib/public-base-url.server";
 
 async function getDrill(drillId: string, assignmentId?: string) {
   try {
@@ -10,14 +11,14 @@ async function getDrill(drillId: string, assignmentId?: string) {
       return null;
     }
 
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, "");
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
     // Build URL with optional assignmentId query parameter
     const url = assignmentId
-      ? `${baseURL}/api/v1/drills/${drillId}?assignmentId=${assignmentId}`
-      : `${baseURL}/api/v1/drills/${drillId}`;
+      ? `${origin}/api/v1/drills/${drillId}?assignmentId=${assignmentId}`
+      : `${origin}/api/v1/drills/${drillId}`;
 
     console.log(
       `Fetching drill: ${drillId}${

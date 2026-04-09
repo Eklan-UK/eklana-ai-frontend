@@ -32,6 +32,15 @@ interface FCMNotification {
   actionUrl?: string;
 }
 
+interface FCMPayload {
+  notification?: {
+    title?: string;
+    body?: string;
+    image?: string;
+  };
+  data?: Record<string, string>;
+}
+
 export const useFCM = () => {
   const { data: session } = useSession();
   const [state, setState] = useState<FCMState>({
@@ -68,7 +77,7 @@ export const useFCM = () => {
           });
 
           // Register foreground message listener
-          await registerMessageListener((payload: any) => {
+          await registerMessageListener((payload: FCMPayload) => {
             console.log("=== FCM Message Received ===");
             console.log("Full payload:", payload);
             console.log("Notification object:", payload.notification);
@@ -122,6 +131,15 @@ export const useFCM = () => {
             window.dispatchEvent(
               new CustomEvent("fcm-message", { detail: notification }),
             );
+          });
+        } else if (result.error === "Notification permission not granted") {
+          // Permission denial is an expected user choice, not a runtime failure.
+          console.info("FCM skipped: notification permission not granted");
+          setState({
+            isInitialized: false,
+            isLoading: false,
+            error: null,
+            token: null,
           });
         } else {
           throw new Error(result.error || "Failed to initialize FCM");

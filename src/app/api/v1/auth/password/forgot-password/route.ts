@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import config from '@/lib/api/config';
+import {
+  getPublicBaseUrlFallback,
+  resolvePublicBaseUrlFromHeaders,
+} from '@/lib/public-base-url';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
@@ -106,9 +109,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       expiresAt,
     });
     
-    // Build reset URL
-    const baseURL = config.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const resetUrl = `${baseURL}/auth/reset-password?token=${token}`;
+    // Build reset URL (match Host user hit so one build works on staging + prod)
+    const origin = (
+      resolvePublicBaseUrlFromHeaders(req.headers) ?? getPublicBaseUrlFallback()
+    ).replace(/\/$/, '');
+    const resetUrl = `${origin}/auth/reset-password?token=${token}`;
     
     // Send reset email
     const { sendEmail } = await import('@/lib/api/email.service');
@@ -126,7 +131,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6;">
           <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <img src="${baseURL}/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+              <img src="${origin}/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
               <div style="font-size: 24px; font-weight: bold; color: #22c55e;">eklan</div>
             </div>
             

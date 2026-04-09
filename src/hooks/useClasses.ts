@@ -2,7 +2,7 @@
  * React Query hooks for admin Classes (Phase 1).
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { classesAPI } from '@/lib/api';
+import { classesAPI, tutorAPI } from '@/lib/api';
 import { queryKeys } from '@/lib/react-query';
 import { toast } from 'sonner';
 import type { CreateAdminClassBody } from '@/domain/classes/class.api.types';
@@ -167,6 +167,33 @@ export function useTutorAvailability() {
       return res.data;
     },
     staleTime: 1000 * 60,
+  });
+}
+
+export function useTutorGoogleCalendarStatus() {
+  return useQuery({
+    queryKey: ['tutor', 'google-calendar-status'],
+    queryFn: async () => {
+      const res = await tutorAPI.getGoogleCalendarStatus();
+      return res.data;
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useDisconnectTutorGoogleCalendar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => tutorAPI.disconnectGoogleCalendar(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['tutor', 'google-calendar-status'],
+      });
+      toast.success('Google Calendar disconnected');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Could not disconnect Google Calendar');
+    },
   });
 }
 
