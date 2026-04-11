@@ -77,7 +77,7 @@ export default function BookmarksPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       <div className="h-6"></div>
-      <Header title="My Bookmarks" showBack={false} />
+      <Header showBack title="My Bookmarks" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         {loading ? (

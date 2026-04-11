@@ -1,19 +1,19 @@
 {
-  "name": "Eklan - English Learning Platform",
+  "name": "Eklan - Create Your Future",
   "short_name": "Eklan",
   "description": "Make English speaking feel natural with AI-powered practice",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#22c55e",
+  "theme_color": "#ffffff",
   "orientation": "portrait",
   "scope": "/",
   "icons": [
     {
-      "src": "/logo2.png",
+      "src": "/icon.svg",
       "sizes": "any",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-192x192.png",
@@ -38,8 +38,10 @@
       "url": "/account/practice",
       "icons": [
         {
-          "src": "/logo2.png",
-          "sizes": "any"
+          "src": "/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any maskable"
         }
       ]
     }

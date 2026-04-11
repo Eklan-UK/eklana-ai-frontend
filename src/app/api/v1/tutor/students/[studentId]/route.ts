@@ -1,5 +1,5 @@
-// GET /api/v1/tutor/students/[studentId]
-// Get a single student's details with drill assignment counts and review status
+// GET /api/v1/tutor/students/[studentId] — student details
+// PATCH /api/v1/tutor/students/[studentId] — update learner first/last name (assigned tutor only)
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
@@ -9,6 +9,12 @@ import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import { z } from 'zod';
+
+const updateStudentNameSchema = z.object({
+	firstName: z.string().min(1).max(50),
+	lastName: z.string().min(1).max(50),
+});
 
 async function handler(
 	req: NextRequest,
@@ -236,6 +242,109 @@ async function handler(
 	}
 }
 
+async function patchHandler(
+	req: NextRequest,
+	context: { userId: Types.ObjectId; userRole: string },
+	params: { studentId: string },
+): Promise<NextResponse> {
+	try {
+		await connectToDatabase();
+
+		const { studentId } = params;
+
+		if (!studentId || !Types.ObjectId.isValid(studentId)) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Invalid student ID',
+				},
+				{ status: 400 },
+			);
+		}
+
+		const studentObjectId = new Types.ObjectId(studentId);
+
+		const profile = await Profile.findOne({
+			userId: studentObjectId,
+			tutorId: context.userId,
+		}).exec();
+
+		if (!profile) {
+			return NextResponse.json(
+				{
+					code: 'NotFoundError',
+					message: 'Student not found or not assigned to you',
+				},
+				{ status: 404 },
+			);
+		}
+
+		const body = await req.json();
+		const validated = updateStudentNameSchema.parse(body);
+
+		const user = await User.findById(studentObjectId);
+		if (!user) {
+			return NextResponse.json(
+				{
+					code: 'NotFoundError',
+					message: 'User not found',
+				},
+				{ status: 404 },
+			);
+		}
+
+		user.firstName = validated.firstName.trim();
+		user.lastName = validated.lastName.trim();
+		user.name = `${user.firstName} ${user.lastName}`.trim();
+		await user.save();
+
+		const displayName =
+			`${user.firstName} ${user.lastName}`.trim() || user.name || 'Unknown';
+
+		logger.info('Tutor updated student name', {
+			tutorId: context.userId.toString(),
+			studentId,
+		});
+
+		return NextResponse.json(
+			{
+				code: 'Success',
+				data: {
+					student: {
+						id: user._id,
+						firstName: user.firstName,
+						lastName: user.lastName,
+						name: displayName,
+					},
+				},
+			},
+			{ status: 200 },
+		);
+	} catch (error: any) {
+		if (error instanceof z.ZodError) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Validation failed',
+					errors: error.issues,
+				},
+				{ status: 400 },
+			);
+		}
+		logger.error('Error updating student name', {
+			error: error.message,
+			stack: error.stack,
+		});
+		return NextResponse.json(
+			{
+				code: 'ServerError',
+				message: error.message || 'Internal Server Error',
+			},
+			{ status: 500 },
+		);
+	}
+}
+
 export async function GET(
 	req: NextRequest,
 	{ params }: { params: Promise<{ studentId: string }> }
@@ -243,6 +352,16 @@ export async function GET(
 	const resolvedParams = await params;
 	return withRole(['tutor'], (req, context) =>
 		handler(req, context, resolvedParams)
+	)(req);
+}
+
+export async function PATCH(
+	req: NextRequest,
+	{ params }: { params: Promise<{ studentId: string }> }
+) {
+	const resolvedParams = await params;
+	return withRole(['tutor'], (req, context) =>
+		patchHandler(req, context, resolvedParams)
 	)(req);
 }
 
