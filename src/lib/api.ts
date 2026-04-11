@@ -488,6 +488,22 @@ export const tutorAPI = {
     );
   },
 
+  /** Update assigned learner's name (tutor only). */
+  updateStudentName: (
+    studentId: string,
+    data: { firstName: string; lastName: string }
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        student: { id: string; firstName: string; lastName: string; name: string };
+      };
+    }>(`/tutor/students/${studentId}`, {
+      method: 'PATCH',
+      data,
+    });
+  },
+
   getGoogleCalendarStatus: () => {
     return apiRequest<{
       code: string;

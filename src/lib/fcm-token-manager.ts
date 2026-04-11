@@ -81,7 +81,7 @@ export const refreshFCMToken = async (
 
     // Only send to backend if token changed
     if (newToken !== storedToken) {
-      const response = await axios.put("/fcm/tokens/refresh", {
+      const response = await axios.put("/fcm/tokens", {
         oldToken: storedToken,
         newToken,
         userId,

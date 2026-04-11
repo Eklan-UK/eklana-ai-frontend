@@ -11,6 +11,7 @@ import {
   X,
   RotateCcw,
   Keyboard,
+  Home,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -121,6 +122,43 @@ function clearCachedSession(key: string) {
   }
 }
 
+/** Set when user leaves via "Exit to Home" so remounts in the same tab skip the resume modal. */
+function setResumeDismissed(sessionKey: string) {
+  try {
+    sessionStorage.setItem(`ai-session-exit-${sessionKey}`, "1");
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * Decide whether to show resume prompt. Clears trivial or dismissed cache from storage.
+ */
+function prepareResumePrompt(sessionKey: string): {
+  cached: CachedSession | null;
+  showResume: boolean;
+} {
+  const raw = getCachedSession(sessionKey);
+  if (!raw) return { cached: null, showResume: false };
+  try {
+    if (
+      typeof sessionStorage !== "undefined" &&
+      sessionStorage.getItem(`ai-session-exit-${sessionKey}`) === "1"
+    ) {
+      clearCachedSession(sessionKey);
+      return { cached: null, showResume: false };
+    }
+  } catch {
+    /* ignore */
+  }
+  const userTurns = raw.messages.filter((m) => m.type === "user").length;
+  if (userTurns === 0 && raw.messages.length <= 1) {
+    clearCachedSession(sessionKey);
+    return { cached: null, showResume: false };
+  }
+  return { cached: raw, showResume: true };
+}
+
 /* ─── Page ─────────────────────────────────────────────────────────────────── */
 
 export default function AISessionPage() {
@@ -133,16 +171,20 @@ export default function AISessionPage() {
   const initials = getUserInitials(user);
 
   const sessionKey = getSessionKey(drillId, topic);
-  const cachedSession = useRef(getCachedSession(sessionKey));
+  const { cached: preparedCache, showResume: initialShowResume } =
+    prepareResumePrompt(sessionKey);
+  const cachedSession = useRef(preparedCache);
+
+  const isExiting = useRef(false);
 
   // --- Resume prompt state ---
-  const [showResumePrompt, setShowResumePrompt] = useState(!!cachedSession.current);
+  const [showResumePrompt, setShowResumePrompt] = useState(initialShowResume);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [drillInfo, setDrillInfo] = useState<{ drillType: string; drillTitle: string } | null>(
-    cachedSession.current?.drillInfo ?? null
+    preparedCache?.drillInfo ?? null
   );
 
   const topicGreeting = topic
@@ -154,13 +196,13 @@ export default function AISessionPage() {
     : [{ type: "ai", text: topicGreeting }];
 
   const [messages, setMessages] = useState<ChatMessage[]>(
-    cachedSession.current
-      ? cachedSession.current.messages.map((m) => ({ ...m }))
+    preparedCache
+      ? preparedCache.messages.map((m) => ({ ...m }))
       : freshMessages
   );
   const [conversationHistory, setConversationHistory] = useState<
     Array<{ role: "user" | "model"; content: string }>
-  >(cachedSession.current?.conversationHistory ?? []);
+  >(preparedCache?.conversationHistory ?? []);
   const [inputText, setInputText] = useState("");
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [playingMessageIndex, setPlayingMessageIndex] = useState<number | null>(null);
@@ -327,6 +369,15 @@ export default function AISessionPage() {
       initializeDrillPractice();
     }
   };
+
+  const handleFinalExit = useCallback(() => {
+    isExiting.current = true;
+    setResumeDismissed(sessionKey);
+    clearCachedSession(sessionKey);
+    cachedSession.current = null;
+    setShowResumePrompt(false);
+    router.push("/home");
+  }, [sessionKey, router]);
 
   /* ─── Drill init ───────────────────────────────────────────────────────── */
 
@@ -715,7 +766,7 @@ export default function AISessionPage() {
 
   /* ─── Resume Prompt ────────────────────────────────────────────────────── */
 
-  if (showResumePrompt) {
+  if (showResumePrompt && !isExiting.current) {
     const cachedMsgCount = cachedSession.current?.messages.length ?? 0;
 
     return (
@@ -735,17 +786,27 @@ export default function AISessionPage() {
 
           <div className="space-y-3">
             <button
+              type="button"
               onClick={handleResumeSession}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-2xl transition-colors"
             >
               Continue session
             </button>
             <button
+              type="button"
               onClick={handleNewSession}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
               Start fresh
+            </button>
+            <button
+              type="button"
+              onClick={handleFinalExit}
+              className="w-full border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
+            >
+              <Home className="w-4 h-4" />
+              Exit to Home
             </button>
           </div>
         </div>
@@ -804,6 +865,7 @@ export default function AISessionPage() {
                   <div className="h-px bg-gray-100 mx-2" />
                   <button
                     onClick={() => {
+                      setResumeDismissed(sessionKey);
                       clearCachedSession(sessionKey);
                       router.push("/account/practice/ai");
                       setShowMenu(false);

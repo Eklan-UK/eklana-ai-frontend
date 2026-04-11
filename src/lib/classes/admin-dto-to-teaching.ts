@@ -17,6 +17,7 @@ export function adminDtoToTeachingClass(d: AdminClassListItemDTO): TeachingClass
     totalSessions: d.totalSessions,
     nextSessionLabel: d.nextSessionLabel,
     nextSessionId: d.nextSessionId,
+    nextSessionStartUtc: d.nextSessionStartUtc,
     status: d.status,
     bucket: d.bucket,
     meetingUrl: d.meetingUrl ?? d.drawer?.meetingUrl,
