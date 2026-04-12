@@ -6,6 +6,7 @@ export class AudioStreamPlayer {
   private audioContext: AudioContext | null = null;
   private nextPlayTime: number = 0;
   private isPlaying: boolean = false;
+  private stopped = false;
   private onEndedCallback: (() => void) | null = null;
 
   constructor(onEnded?: () => void) {
@@ -43,6 +44,7 @@ export class AudioStreamPlayer {
    * Queues a base64 PCM chunk to play immediately following the previous chunk
    */
   public enqueueBase64Pcm(base64Data: string) {
+    if (this.stopped) return;
     this.initContext();
     if (!this.audioContext) return;
 
@@ -73,6 +75,7 @@ export class AudioStreamPlayer {
   }
 
   public stop() {
+    this.stopped = true;
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         this.audioContext.close();

@@ -10,6 +10,7 @@ interface ConversationOptions {
   messages: ConversationMessage[];
   temperature?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 
@@ -41,46 +42,118 @@ export const aiService = {
     return data.data.response;
   },
 
+  /**
+   * Stream a message in a non-drill text conversation (SSE).
+   */
+  async streamConversationMessage(
+    options: ConversationOptions,
+    onChunk: (chunk: { type: string; data: unknown }) => void
+  ): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      signal: options.signal,
+      body: JSON.stringify({
+        messages: options.messages,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof error.message === "string" ? error.message : "Failed to get chat stream"
+        );
+      }
+      throw new Error(`Failed to get chat stream: ${response.status}`);
+    }
+
+    await this._processSSEStream(response, onChunk, options.signal);
+  },
 
   /**
    * Process Server-Sent Events (SSE) stream
    */
   async _processSSEStream(
     response: Response,
-    onChunk: (chunk: { type: string; data: any }) => void
+    onChunk: (chunk: { type: string; data: any }) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     if (!response.body) throw new Error("No response body");
-    
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
+    const onAbort = () => {
+      void reader.cancel();
+    };
+    if (signal) {
+      signal.addEventListener("abort", onAbort);
+    }
+
     try {
       while (true) {
-        const { value, done } = await reader.read();
+        if (signal?.aborted) break;
+
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (e) {
+          if (signal?.aborted) break;
+          throw e;
+        }
+
+        const { value, done } = readResult;
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         // Process complete SSE messages (separated by \n\n)
         let eventEndIndex;
-        while ((eventEndIndex = buffer.indexOf('\n\n')) !== -1) {
+        while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
           const eventString = buffer.slice(0, eventEndIndex);
           buffer = buffer.slice(eventEndIndex + 2); // remove processed event + \n\n
 
-          if (eventString.startsWith('data: ')) {
+          if (eventString.startsWith("data: ")) {
             const dataString = eventString.slice(6); // remove 'data: '
             try {
-              const chunk = JSON.parse(dataString);
+              const chunk = JSON.parse(dataString) as { type: string; data: unknown };
+              if (chunk.type === "error") {
+                const msg =
+                  typeof chunk.data === "object" &&
+                  chunk.data !== null &&
+                  "message" in chunk.data &&
+                  typeof (chunk.data as { message?: string }).message === "string"
+                    ? (chunk.data as { message: string }).message
+                    : "Stream error";
+                throw new Error(msg);
+              }
               onChunk(chunk);
             } catch (err) {
-              console.error("Error parsing SSE chunk:", err, dataString);
+              if (err instanceof SyntaxError) {
+                console.error("Error parsing SSE chunk:", err, dataString);
+              } else {
+                throw err;
+              }
             }
           }
         }
       }
     } finally {
-      reader.releaseLock();
+      if (signal) {
+        signal.removeEventListener("abort", onAbort);
+      }
+      try {
+        reader.releaseLock();
+      } catch {
+        /* ignore */
+      }
     }
   },
 
@@ -93,6 +166,7 @@ export const aiService = {
       userMessage: string;
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
+      signal?: AbortSignal;
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -102,6 +176,7 @@ export const aiService = {
         "Content-Type": "application/json",
       },
       credentials: "include",
+      signal: options.signal,
       body: JSON.stringify({
         drillId: options.drillId,
         userMessage: options.userMessage,
@@ -118,7 +193,7 @@ export const aiService = {
       throw new Error(`Failed to get drill practice stream: ${response.status}`);
     }
 
-    await this._processSSEStream(response, onChunk);
+    await this._processSSEStream(response, onChunk, options.signal);
   },
 
   /**
@@ -126,7 +201,8 @@ export const aiService = {
    */
   async streamDrillPracticeGreeting(
     drillId: string,
-    onChunk: (chunk: { type: string; data: any }) => void
+    onChunk: (chunk: { type: string; data: any }) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     const response = await fetch(
       `${API_BASE_URL}/ai/drill-practice/greeting?drillId=${encodeURIComponent(
@@ -138,6 +214,7 @@ export const aiService = {
           "Content-Type": "application/json",
         },
         credentials: "include",
+        signal,
       }
     );
 
@@ -149,7 +226,7 @@ export const aiService = {
       throw new Error(`Failed to get drill greeting stream: ${response.status}`);
     }
 
-    await this._processSSEStream(response, onChunk);
+    await this._processSSEStream(response, onChunk, signal);
   },
 
   /**
@@ -160,6 +237,7 @@ export const aiService = {
       audioBlob: Blob;
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       context?: string;
+      signal?: AbortSignal;
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -175,6 +253,7 @@ export const aiService = {
       method: "POST",
       credentials: "include",
       body: formData,
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -185,7 +264,7 @@ export const aiService = {
       throw new Error(`Failed to get voice conversation stream: ${response.status}`);
     }
 
-    await this._processSSEStream(response, onChunk);
+    await this._processSSEStream(response, onChunk, options.signal);
   },
 
   /**
@@ -197,6 +276,7 @@ export const aiService = {
       audioBlob: Blob;
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
+      signal?: AbortSignal;
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -215,6 +295,7 @@ export const aiService = {
       method: "POST",
       credentials: "include",
       body: formData,
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -225,7 +306,7 @@ export const aiService = {
       throw new Error(`Failed to get drill voice stream: ${response.status}`);
     }
 
-    await this._processSSEStream(response, onChunk);
+    await this._processSSEStream(response, onChunk, options.signal);
   },
 
   /**

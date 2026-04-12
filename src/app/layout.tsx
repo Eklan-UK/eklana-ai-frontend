@@ -30,17 +30,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
       { url: "/favicon.png", type: "image/png" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/logo2.png", type: "image/png" },
     ],
-    shortcut: "/icon.svg",
+    shortcut: "/icon.png",
   },
 };
 

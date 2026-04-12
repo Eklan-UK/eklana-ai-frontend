@@ -94,6 +94,9 @@ export const config = {
 	CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
 	// Google Gemini AI
 	GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+	/** Low-latency model for text chat + streaming (default gemini-2.0-flash). */
+	GEMINI_CHAT_MODEL:
+		process.env.GEMINI_CHAT_MODEL?.trim() || 'gemini-2.0-flash',
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||

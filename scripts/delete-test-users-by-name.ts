@@ -60,8 +60,7 @@ function escapeRegex(s: string): string {
 
 function protectedEmails(): Set<string> {
 	const raw =
-		process.env.DELETE_TEST_USERS_PROTECT_EMAILS ||
-		"vandulinus@gmail.com";
+		process.env.DELETE_TEST_USERS_PROTECT_EMAILS || "";
 	return new Set(
 		raw
 			.split(",")

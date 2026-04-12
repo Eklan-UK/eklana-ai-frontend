@@ -148,8 +148,16 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      const el = audioRef.current;
+      el.pause();
+      el.currentTime = 0;
+      try {
+        el.removeAttribute("src");
+        el.load();
+      } catch {
+        /* ignore */
+      }
+      audioRef.current = null;
       setIsPlaying(false);
     }
     // Clean up object URL when stopping
@@ -157,6 +165,7 @@ export function useTTS(options: UseTTSOptions = {}) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+    setIsGenerating(false);
   }, []);
 
   const pauseAudio = useCallback(() => {

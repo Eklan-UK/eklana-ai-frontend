@@ -685,6 +685,17 @@ export const adminAPI = {
     });
   },
 
+  // Update a learner's name (admin only)
+  updateLearnerName: (learnerId: string, data: { firstName: string; lastName: string }) => {
+    return apiRequest<{
+      code: string;
+      data: { learner: { id: string; firstName: string; lastName: string; name: string } };
+    }>(`/admin/learners/${learnerId}`, {
+      method: 'PATCH',
+      data,
+    });
+  },
+
   // Get drill assignments for a learner (admin/tutor)
   getLearnerDrillAssignments: (learnerId: string) => {
     return apiRequest<{

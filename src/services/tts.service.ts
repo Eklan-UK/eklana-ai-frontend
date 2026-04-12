@@ -8,70 +8,21 @@ interface TTSOptions {
   useSpeakerBoost?: boolean;
 }
 
-// In-memory cache for audio URLs and fetched blobs to avoid repeated network requests.
-const sessionUrlCache = new Map<string, string>();
+// In-memory blob cache — avoids any network call when the same phrase is replayed in-session.
 const sessionBlobCache = new Map<string, Blob>();
 
 /**
- * Check if TTS audio is cached on server
- */
-async function checkCache(text: string, voice: string = 'default'): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `/api/v1/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`,
-      { method: 'GET', credentials: 'include' }
-    );
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.data?.cached && data.data?.audioUrl) {
-        return data.data.audioUrl;
-      }
-    }
-  } catch (error) {
-    console.warn('Cache check failed:', error);
-  }
-  return null;
-}
-
-/**
- * Generate TTS with caching - checks server cache first
- * Returns a Blob that can be used to create an audio object URL
+ * Generate TTS with in-session caching.
+ * The backend POST endpoint already checks its own server-side cache, so we skip
+ * the redundant pre-flight GET that used to add an extra round-trip before every generation.
  */
 async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
   const cacheKey = `${options.text}:${options.voiceId || 'default'}`;
-  
-  // Blob cache first (avoids any network call for same-session replay)
-  const sessionBlob = sessionBlobCache.get(cacheKey);
-  if (sessionBlob) {
-    return sessionBlob;
-  }
 
-  // URL cache second
-  const sessionCachedUrl = sessionUrlCache.get(cacheKey);
-  if (sessionCachedUrl) {
-    const response = await fetch(sessionCachedUrl);
-    if (response.ok) {
-      const blob = await response.blob();
-      sessionBlobCache.set(cacheKey, blob);
-      return blob;
-    }
-    sessionUrlCache.delete(cacheKey);
-  }
-  
-  // Check server cache
-  const cachedUrl = await checkCache(options.text, options.voiceId);
-  if (cachedUrl) {
-    sessionUrlCache.set(cacheKey, cachedUrl);
-    const response = await fetch(cachedUrl);
-    if (response.ok) {
-      const blob = await response.blob();
-      sessionBlobCache.set(cacheKey, blob);
-      return blob;
-    }
-  }
-  
-  // No cache hit - use backend TTS endpoint which will generate and cache
+  // Return immediately from in-memory blob cache (same-session replay).
+  const cached = sessionBlobCache.get(cacheKey);
+  if (cached) return cached;
+
   const response = await fetch('/api/v1/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -81,18 +32,17 @@ async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
       voice: options.voiceId || 'default',
     }),
   });
-  
+
   if (!response.ok) {
     throw new Error('Backend TTS failed');
   }
-  
+
   const contentType = response.headers.get('content-type');
-  
-  // If response is JSON, it contains the cached URL
+
+  // Some backend configs return JSON with a CDN/cache URL rather than a direct audio body.
   if (contentType?.includes('application/json')) {
     const data = await response.json();
     if (data.data?.audioUrl) {
-      sessionUrlCache.set(cacheKey, data.data.audioUrl);
       const audioResponse = await fetch(data.data.audioUrl);
       if (audioResponse.ok) {
         const blob = await audioResponse.blob();
@@ -100,10 +50,10 @@ async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
         return blob;
       }
     }
-    throw new Error('No audio URL in response');
+    throw new Error('No audio URL in TTS response');
   }
-  
-  // Direct audio response
+
+  // Direct audio body (most common path).
   const blob = await response.blob();
   sessionBlobCache.set(cacheKey, blob);
   return blob;
