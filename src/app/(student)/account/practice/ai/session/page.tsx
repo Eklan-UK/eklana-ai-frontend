@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import {
   Mic,
   Send,
@@ -21,6 +21,11 @@ import { MarkdownText } from "@/components/ui/MarkdownText";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserInitials } from "@/utils/user";
 import Image from "next/image";
+import {
+  SessionReviewModal,
+  type SessionReviewPhase,
+} from "@/components/ai/SessionReviewModal";
+import type { SessionSummaryPayload } from "@/types/ai-session-summary";
 
 /* ─── Gemini native audio playback ─────────────────────────────────────────── */
 
@@ -53,6 +58,9 @@ function playBase64Audio(
 }
 
 import { AudioStreamPlayer } from "@/lib/audio-stream-player";
+import { Mp3QueuePlayer } from "@/lib/mp3-queue-player";
+import { tryTakeSpeakableChunk } from "@/lib/tts-chunk-utils";
+import { generateTTS } from "@/services/tts.service";
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
@@ -161,7 +169,7 @@ function prepareResumePrompt(sessionKey: string): {
 
 /* ─── Page ─────────────────────────────────────────────────────────────────── */
 
-export default function AISessionPage() {
+function AISessionPage() {
   const searchParams = useSearchParams();
   const drillId = searchParams.get("drillId");
   const topic = searchParams.get("topic");
@@ -176,6 +184,12 @@ export default function AISessionPage() {
   const cachedSession = useRef(preparedCache);
 
   const isExiting = useRef(false);
+  /** Prevents double navigation if the exit CTA is clicked twice quickly. */
+  const finalizeExitOnceRef = useRef(false);
+  /** Aborts in-flight session summary when user chooses "Stay in session". */
+  const exitSummaryAbortRef = useRef<AbortController | null>(null);
+  /** Aborts in-flight AI SSE streams (chat, drill greeting, voice). */
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   // --- Resume prompt state ---
   const [showResumePrompt, setShowResumePrompt] = useState(initialShowResume);
@@ -214,8 +228,16 @@ export default function AISessionPage() {
   // Real-time mic amplitude for button animation (0–1)
   const [micAmplitude, setMicAmplitude] = useState(0);
 
+  /** Post-session AI summary (modal) before leaving */
+  const [showExitReview, setShowExitReview] = useState(false);
+  const [reviewPhase, setReviewPhase] = useState<SessionReviewPhase>("loading");
+  const [reviewSummary, setReviewSummary] = useState<SessionSummaryPayload | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [exitNavigatePath, setExitNavigatePath] = useState("/home");
+
   // Audio stream reference
   const currentAudioStreamPlayerRef = useRef<AudioStreamPlayer | null>(null);
+  const currentMp3QueueRef = useRef<Mp3QueuePlayer | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -224,6 +246,8 @@ export default function AISessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  /** True from mic stop until first model chunk (voice) — “Listening…” wave. */
+  const [isListeningAfterSilence, setIsListeningAfterSilence] = useState(false);
 
   // VAD
   const analyserRef       = useRef<AnalyserNode | null>(null);
@@ -294,15 +318,28 @@ export default function AISessionPage() {
   /* ─── Audio playback ───────────────────────────────────────────────────── */
 
   const stopAllAudio = useCallback(() => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
     if (currentAudioStreamPlayerRef.current) {
       currentAudioStreamPlayerRef.current.stop();
       currentAudioStreamPlayerRef.current = null;
+    }
+    if (currentMp3QueueRef.current) {
+      currentMp3QueueRef.current.stop();
+      currentMp3QueueRef.current = null;
     }
     stopTTSAudio();
     setPlayingMessageIndex(null);
     setIsPlayingAudio(false);
     setStreamingAudioActive(false);
   }, [stopTTSAudio]);
+
+  const beginNewStream = useCallback(() => {
+    streamAbortRef.current?.abort();
+    const ac = new AbortController();
+    streamAbortRef.current = ac;
+    return ac.signal;
+  }, []);
 
   /* ─── Lifecycle ────────────────────────────────────────────────────────── */
 
@@ -370,14 +407,115 @@ export default function AISessionPage() {
     }
   };
 
+  const finalizeExitToPath = useCallback(
+    (path: string) => {
+      if (finalizeExitOnceRef.current) return;
+      finalizeExitOnceRef.current = true;
+      isExiting.current = true;
+      stopAllAudio();
+      exitSummaryAbortRef.current?.abort();
+      exitSummaryAbortRef.current = null;
+      setResumeDismissed(sessionKey);
+      clearCachedSession(sessionKey);
+      cachedSession.current = null;
+      setShowResumePrompt(false);
+      setShowExitReview(false);
+      setReviewPhase("loading");
+      setReviewSummary(null);
+      setReviewError(null);
+      router.replace(path);
+    },
+    [sessionKey, router, stopAllAudio],
+  );
+
+  const handleFinalizeExit = useCallback(() => {
+    finalizeExitToPath(exitNavigatePath);
+  }, [finalizeExitToPath, exitNavigatePath]);
+
+  const handleStayInSession = useCallback(() => {
+    exitSummaryAbortRef.current?.abort();
+    exitSummaryAbortRef.current = null;
+    isExiting.current = false;
+    setShowExitReview(false);
+    setReviewPhase("loading");
+    setReviewSummary(null);
+    setReviewError(null);
+  }, []);
+
+  /**
+   * Request linguistic summary, show modal, then user confirms navigation.
+   * Skips AI when the student never spoke (no user turns) — see reviewPhase "skipped".
+   */
+  const beginExitFlow = useCallback(
+    async (targetPath: string) => {
+      exitSummaryAbortRef.current?.abort();
+      const ac = new AbortController();
+      exitSummaryAbortRef.current = ac;
+
+      isExiting.current = true;
+      stopAllAudio();
+      setShowMenu(false);
+      setExitNavigatePath(targetPath);
+      setShowResumePrompt(false);
+      setReviewError(null);
+      setReviewSummary(null);
+
+      const snapshot = [...conversationHistory];
+      const userTurns = snapshot.filter((m) => m.role === "user").length;
+
+      setShowExitReview(true);
+
+      if (userTurns === 0) {
+        setReviewPhase("skipped");
+        exitSummaryAbortRef.current = null;
+        return;
+      }
+
+      setReviewPhase("loading");
+      try {
+        const mode = isDrillPractice ? "drill" : topic ? "topic" : "free";
+        const res = await fetch("/api/v1/ai/session/summary", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          signal: ac.signal,
+          body: JSON.stringify({
+            messages: snapshot,
+            mode,
+            ...(topic ? { topic } : {}),
+            ...(drillId ? { drillId } : {}),
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (ac.signal.aborted) return;
+        if (!res.ok) {
+          throw new Error(
+            typeof json?.message === "string" ? json.message : "Summary failed",
+          );
+        }
+        const summary = json?.data?.summary as SessionSummaryPayload | undefined;
+        setReviewSummary(summary ?? null);
+        setReviewPhase("done");
+        setResumeDismissed(sessionKey);
+        clearCachedSession(sessionKey);
+        cachedSession.current = null;
+      } catch (e: unknown) {
+        if (ac.signal.aborted) return;
+        setReviewPhase("error");
+        setReviewError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        if (exitSummaryAbortRef.current === ac) {
+          exitSummaryAbortRef.current = null;
+        }
+      }
+    },
+    [conversationHistory, sessionKey, drillId, topic, isDrillPractice, stopAllAudio],
+  );
+
+  /** Resume prompt: one tap → home (replace), no review modal. */
   const handleFinalExit = useCallback(() => {
-    isExiting.current = true;
-    setResumeDismissed(sessionKey);
-    clearCachedSession(sessionKey);
-    cachedSession.current = null;
-    setShowResumePrompt(false);
-    router.push("/home");
-  }, [sessionKey, router]);
+    finalizeExitToPath("/home");
+  }, [finalizeExitToPath]);
 
   /* ─── Drill init ───────────────────────────────────────────────────────── */
 
@@ -396,6 +534,7 @@ export default function AISessionPage() {
     setStreamingAudioActive(true);
 
     try {
+      const signal = beginNewStream();
       await aiService.streamDrillPracticeGreeting(drillId!, (chunk) => {
         setIsInitializing(false);
 
@@ -413,7 +552,7 @@ export default function AISessionPage() {
         } else if (chunk.type === "audio" && autoPlayAudio) {
           audioPlayer.enqueueBase64Pcm(chunk.data);
         }
-      });
+      }, signal);
       
       setMessages([
         {
@@ -423,7 +562,8 @@ export default function AISessionPage() {
         }
       ]);
       setConversationHistory([{ role: "model", content: finalGreeting }]);
-    } catch {
+    } catch (e: unknown) {
+      if ((e as { name?: string })?.name === "AbortError") return;
       const fallback = "Alright! Let's get started with your practice. I've got exercises ready for you!";
       setMessages([{ type: "ai", text: fallback, isStreaming: false }]);
       setConversationHistory([{ role: "model", content: fallback }]);
@@ -447,6 +587,7 @@ export default function AISessionPage() {
     setInputText("");
     setIsThinking(true);
     stopAllAudio(); // interrupt anything currently playing
+    const streamSignal = beginNewStream();
 
     try {
       if (isDrillPractice && drillId) {
@@ -466,6 +607,7 @@ export default function AISessionPage() {
           drillId,
           userMessage: trimmed,
           conversationHistory: newHistory,
+          signal: streamSignal,
         }, (chunk) => {
           setIsThinking(false);
 
@@ -481,32 +623,110 @@ export default function AISessionPage() {
         setMessages(prev => prev.map((m, i) => i === aiMessageIndex ? { ...m, isStreaming: false, text: finalResponse } : m));
         setConversationHistory([...newHistory, { role: "model", content: finalResponse }]);
       } else {
-        // Fallback for non-drill standard chat (still uses older non-streaming API + ElevenLabs TTS)
+        // Free Talk typed: SSE chat + chunked ElevenLabs (low-latency model on server)
         const conversationMessages = messages.map((msg) => ({
           role: msg.type === "user" ? ("user" as const) : ("model" as const),
           content: msg.text,
         }));
         conversationMessages.push({ role: "user" as const, content: trimmed });
-        
-        setIsThinking(false);
-        const aiResponseText = await aiService.sendConversationMessage({
-          messages: conversationMessages,
-          temperature: 0.7,
-          maxTokens: 1000,
-        });
-        
-        setMessages(prev => prev.map((m, i) => i === aiMessageIndex ? { type: "ai", text: aiResponseText, isStreaming: false } : m));
-        if (autoPlayAudio) {
-           playTTSAudio(aiResponseText);
-           setPlayingMessageIndex(aiMessageIndex);
+        const newHistory = [
+          ...conversationHistory,
+          { role: "user" as const, content: trimmed },
+        ];
+
+        let finalResponse = "";
+        let pendingTts = "";
+
+        const mp3 =
+          autoPlayAudio
+            ? new Mp3QueuePlayer(() => {
+                setStreamingAudioActive(false);
+                setPlayingMessageIndex(null);
+                currentMp3QueueRef.current = null;
+              })
+            : null;
+        if (mp3) {
+          currentMp3QueueRef.current = mp3;
+          setStreamingAudioActive(true);
+          setPlayingMessageIndex(aiMessageIndex);
         }
+
+        /** Serialize TTS fetches so audio chunks play in order even if responses arrive late. */
+        let ttsChain: Promise<void> = Promise.resolve();
+        const enqueueTts = (text: string) => {
+          if (!mp3 || !text.trim()) return;
+          const phrase = text.trim();
+          ttsChain = ttsChain
+            .then(() => generateTTS({ text: phrase }))
+            .then((blob) => {
+              mp3.enqueue(blob);
+            })
+            .catch(() => {
+              toast.error("Failed to generate speech for a phrase");
+            });
+        };
+
+        await aiService.streamConversationMessage(
+          {
+            messages: conversationMessages,
+            temperature: 0.7,
+            maxTokens: 1000,
+            signal: streamSignal,
+          },
+          (chunk) => {
+            if (chunk.type === "text" && typeof chunk.data === "string") {
+              const piece = chunk.data;
+              finalResponse += piece;
+              setIsThinking(false);
+              setMessages((prev) =>
+                prev.map((m, i) =>
+                  i === aiMessageIndex ? { ...m, text: finalResponse } : m
+                )
+              );
+              pendingTts += piece;
+              while (autoPlayAudio && mp3) {
+                const taken = tryTakeSpeakableChunk(pendingTts);
+                if (!taken) break;
+                pendingTts = taken.rest;
+                enqueueTts(taken.spoken);
+              }
+            } else if (chunk.type === "done") {
+              let p = pendingTts;
+              while (autoPlayAudio && mp3) {
+                const t = tryTakeSpeakableChunk(p);
+                if (!t) break;
+                p = t.rest;
+                enqueueTts(t.spoken);
+              }
+              const tail = p.trim();
+              if (tail && autoPlayAudio && mp3) enqueueTts(tail);
+            }
+          }
+        );
+
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === aiMessageIndex
+              ? { type: "ai", text: finalResponse, isStreaming: false }
+              : m
+          )
+        );
+        setConversationHistory([
+          ...newHistory,
+          { role: "model", content: finalResponse },
+        ]);
       }
 
-    } catch (error: any) {
-      toast.error(error.message || "Failed to get AI response");
+    } catch (error: unknown) {
+      if ((error as { name?: string })?.name === "AbortError") return;
+      const message =
+        error instanceof Error ? error.message : "Failed to get AI response";
+      toast.error(message || "Failed to get AI response");
       setIsThinking(false);
       setStreamingAudioActive(false);
       setPlayingMessageIndex(null);
+      currentMp3QueueRef.current?.stop();
+      currentMp3QueueRef.current = null;
       // Remove placeholder & user message
       setMessages((prev) => prev.slice(0, -2));
       setInputText(trimmed);
@@ -548,6 +768,7 @@ export default function AISessionPage() {
           return;
         }
 
+        setIsListeningAfterSilence(true);
         setIsTranscribing(true);
         setIsRecording(false);
 
@@ -560,6 +781,7 @@ export default function AISessionPage() {
 
         setMessages((prev) => [...prev, userMessage, aiMessagePlaceholder]);
         stopAllAudio(); // interrupt anything currently playing
+        const streamSignal = beginNewStream();
 
         const historyBeforeTurn = messages.map((m) => ({
           role: m.type === "user" ? ("user" as const) : ("model" as const),
@@ -590,11 +812,13 @@ export default function AISessionPage() {
                 drillId,
                 audioBlob,
                 conversationHistory: drillHistoryBeforeTurn,
+                signal: streamSignal,
               },
               (chunk) => {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
+                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -663,11 +887,13 @@ export default function AISessionPage() {
                 audioBlob,
                 conversationHistory: historyBeforeTurn,
                 context: contextPrompt,
+                signal: streamSignal,
               },
               (chunk) => {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
+                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -726,9 +952,15 @@ export default function AISessionPage() {
               { role: "model", content: fullTextMeta || finalResponse },
             ]);
           }
-        } catch (err: any) {
-          toast.error(err.message || "Failed to process voice. Try using the keyboard instead.");
+        } catch (err: unknown) {
+          if ((err as { name?: string })?.name === "AbortError") return;
+          const message =
+            err instanceof Error ? err.message : "Failed to process voice.";
+          toast.error(
+            message || "Failed to process voice. Try using the keyboard instead.",
+          );
           setIsThinking(false);
+          setIsListeningAfterSilence(false);
           setIsTranscribing(false);
           setStreamingAudioActive(false);
           setPlayingMessageIndex(null);
@@ -746,7 +978,7 @@ export default function AISessionPage() {
         toast.error("Failed to access microphone: " + error.message);
       }
     }
-  }, [stopAllAudio, handleSendText]);
+  }, [stopAllAudio, handleSendText, beginNewStream]);
 
   const stopVoiceRecording = useCallback(() => {
     stopVAD();
@@ -822,8 +1054,12 @@ export default function AISessionPage() {
       <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
         <div className="flex items-center px-4 py-3 max-w-2xl mx-auto">
           <button
-            onClick={() => router.push("/account/practice/ai")}
+            type="button"
+            onClick={() => {
+              finalizeExitToPath("/account/practice/ai");
+            }}
             className="p-1.5 -ml-1.5 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Leave session"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
@@ -865,10 +1101,8 @@ export default function AISessionPage() {
                   <div className="h-px bg-gray-100 mx-2" />
                   <button
                     onClick={() => {
-                      setResumeDismissed(sessionKey);
-                      clearCachedSession(sessionKey);
-                      router.push("/account/practice/ai");
                       setShowMenu(false);
+                      void beginExitFlow("/account/practice/ai");
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
@@ -984,8 +1218,26 @@ export default function AISessionPage() {
       {/* ── Bottom controls — mirrors mobile layout ─────────────────────── */}
       <footer className="sticky bottom-0 bg-white border-t border-gray-100">
 
-        {/* Processing status strip */}
-        {isTranscribing && (
+        {/* Post–voice-stop feedback: listening (immediate) vs processing (after first chunk) */}
+        {isListeningAfterSilence && (
+          <div className="flex items-center justify-center gap-2 py-1.5 bg-emerald-50 border-b border-emerald-100">
+            <span className="flex items-end gap-0.5 h-4" aria-hidden>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className="w-0.5 rounded-full bg-emerald-500/80 animate-pulse"
+                  style={{
+                    height: `${10 + (i % 3) * 4}px`,
+                    animationDuration: "0.9s",
+                    animationDelay: `${i * 90}ms`,
+                  }}
+                />
+              ))}
+            </span>
+            <span className="text-xs font-medium text-emerald-800">Listening…</span>
+          </div>
+        )}
+        {isTranscribing && !isListeningAfterSilence && (
           <div className="flex items-center justify-center gap-2 py-1.5 bg-blue-50 border-b border-blue-100">
             <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
             <span className="text-xs font-medium text-blue-600">Processing…</span>
@@ -1092,6 +1344,30 @@ export default function AISessionPage() {
 
         <div className="h-[env(safe-area-inset-bottom)]" />
       </footer>
+
+      <SessionReviewModal
+        open={showExitReview}
+        phase={reviewPhase}
+        summary={reviewSummary}
+        errorMessage={reviewError ?? undefined}
+        primaryCtaLabel={
+          exitNavigatePath === "/home" ? "Back to Home" : "Back to Free Talk"
+        }
+        onBackToHome={handleFinalizeExit}
+        onStayInSession={handleStayInSession}
+      />
     </div>
+  );
+}
+
+export default function AISessionPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-[100dvh] items-center justify-center bg-gray-50">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse" />
+      </div>
+    }>
+      <AISessionPage />
+    </Suspense>
   );
 }

@@ -173,6 +173,26 @@ export function useLearnerDrillAssignments(learnerId: string) {
   });
 }
 
+// Update a learner's name (admin)
+export function useUpdateLearnerName(learnerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { firstName: string; lastName: string }) => {
+      const res = await adminAPI.updateLearnerName(learnerId, data);
+      return res.data.learner;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["learners", "detail", learnerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
+      toast.success("Learner name updated");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update name");
+    },
+  });
+}
+
 // Update user subscription (admin)
 export function useUpdateUserSubscription() {
   const queryClient = useQueryClient();
