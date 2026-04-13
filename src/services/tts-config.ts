@@ -7,7 +7,9 @@ export interface TTSVoiceSettings {
   use_speaker_boost: boolean;
 }
 
-export const DEFAULT_TTS_MODEL_ID = 'eleven_multilingual_v2';
+/** Sub-second latency; override with ELEVEN_LABS_TTS_MODEL_ID if needed. */
+export const DEFAULT_TTS_MODEL_ID =
+	process.env.ELEVEN_LABS_TTS_MODEL_ID?.trim() || 'eleven_flash_v2_5';
 export const DEFAULT_TTS_VOICE_SETTINGS: TTSVoiceSettings = {
   stability: 0.5,
   similarity_boost: 0.75,

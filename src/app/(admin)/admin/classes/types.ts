@@ -37,6 +37,8 @@ export interface TeachingClass {
   nextSessionLabel: string;
   /** Present when the list API includes the next session id (e.g. learner links). */
   nextSessionId?: string;
+  /** ISO UTC for next session start (learner list); used for relative "Starts in …" labels. */
+  nextSessionStartUtc?: string;
   status: ClassStatus;
   bucket: "today" | "upcoming";
   /** Set when API allows join (e.g. tutor list within join window). */

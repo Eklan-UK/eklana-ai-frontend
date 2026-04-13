@@ -148,6 +148,12 @@ export default function DailyFocusPage() {
           <p className="text-gray-500 text-sm">
             Manage daily practice content for learners
           </p>
+          <p className="text-gray-600 text-sm mt-2 max-w-2xl">
+            For the same calendar day, you can publish{" "}
+            <strong>multiple</strong> active focuses with different focus types.
+            The app picks the best match per learner using their profile goals and
+            recent practice data.
+          </p>
         </div>
         <Link
           href="/admin/daily-focus/create"

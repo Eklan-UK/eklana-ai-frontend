@@ -23,6 +23,9 @@ if (config.GEMINI_API_KEY) {
 // Text model (for non-drill functions — cheaper, no "thinking" overhead)
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
+/** Low-latency chat + streaming (see config.GEMINI_CHAT_MODEL). */
+const CHAT_MODEL = config.GEMINI_CHAT_MODEL;
+
 // Live API model — handles both text + audio in a single WebSocket session
 const LIVE_MODEL = 'gemini-2.5-flash-native-audio-latest';
 
@@ -713,7 +716,7 @@ export async function generateConversationResponse(options: ConversationOptions)
 		const { messages, temperature = 0.9, maxTokens = 1000 } = options;
 
 		const model = genAI.getGenerativeModel({
-			model: DEFAULT_MODEL,
+			model: CHAT_MODEL,
 			generationConfig: {
 				temperature,
 				maxOutputTokens: maxTokens,
@@ -773,6 +776,95 @@ export async function generateConversationResponse(options: ConversationOptions)
 		});
 		throw new Error(`Failed to generate AI response: ${error.message}`);
 	}
+}
+
+/**
+ * Stream AI conversation response as SSE-compatible lines:
+ * `data: {"type":"text","data":"..."}\n\n` and final `data: {"type":"done","data":null}\n\n`
+ */
+export async function generateConversationResponseStream(
+	options: ConversationOptions
+): Promise<ReadableStream<Uint8Array>> {
+	if (!genAI) {
+		throw new Error('Gemini API is not configured');
+	}
+
+	const { messages, temperature = 0.9, maxTokens = 1000 } = options;
+
+	const historyMessages = messages.slice(0, -1);
+	let firstUserIndex = -1;
+	for (let i = 0; i < historyMessages.length; i++) {
+		if (historyMessages[i].role === 'user') {
+			firstUserIndex = i;
+			break;
+		}
+	}
+
+	let validHistory: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+	if (firstUserIndex >= 0) {
+		validHistory = historyMessages.slice(firstUserIndex).map((msg) => ({
+			role: msg.role === 'user' ? 'user' : 'model',
+			parts: [{ text: msg.content }],
+		}));
+
+		if (validHistory.length > 0 && validHistory[0].role !== 'user') {
+			validHistory = [];
+		}
+	}
+
+	const lastMessage = messages[messages.length - 1];
+	if (lastMessage.role !== 'user') {
+		throw new Error('Last message must be from user');
+	}
+
+	const model = genAI.getGenerativeModel({
+		model: CHAT_MODEL,
+		generationConfig: {
+			temperature,
+			maxOutputTokens: maxTokens,
+		},
+	});
+
+	const chat = model.startChat({
+		history: validHistory.length > 0 ? validHistory : [],
+	});
+
+	const encoder = new TextEncoder();
+
+	logger.info('Gemini conversation stream starting', {
+		model: CHAT_MODEL,
+		messageCount: messages.length,
+	});
+
+	return new ReadableStream({
+		async start(controller) {
+			const send = (obj: { type: string; data: unknown }) => {
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+			};
+
+			try {
+				const streamResult = await chat.sendMessageStream(lastMessage.content);
+				for await (const chunk of streamResult.stream) {
+					const piece = chunk.text();
+					if (piece) {
+						send({ type: 'text', data: piece });
+					}
+				}
+				send({ type: 'done', data: null });
+				controller.close();
+			} catch (error: any) {
+				logger.error('Error in Gemini conversation stream', {
+					error: error.message,
+					stack: error.stack,
+				});
+				send({
+					type: 'error',
+					data: { message: error.message || 'Stream failed' },
+				});
+				controller.close();
+			}
+		},
+	});
 }
 
 
@@ -1135,29 +1227,60 @@ export async function generateVoiceConversationSSEStream(
 	logger.info('[FreeTalk] ② session ready', { ms: Date.now() - tSession });
 
 	// ③ Create the SSE stream — session is already connected; just route messages.
+	// Shared state for start + cancel (client disconnect aborts the reader; timers must still clear).
+	const sseCtx = {
+		streamClosed: false,
+		timeoutHandle: undefined as ReturnType<typeof setTimeout> | undefined,
+		turnCompleteHandle: undefined as ReturnType<typeof setTimeout> | undefined,
+	};
+
 	return new ReadableStream({
 		start(controller) {
-			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) =>
-				controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
+				if (sseCtx.streamClosed) return;
+				try {
+					controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+				} catch (e: unknown) {
+					const err = e as { code?: string };
+					if (err?.code !== 'ERR_INVALID_STATE') throw e;
+				}
+			};
 
 			const fullAssistantText: string[] = [];
 			let fullUserText = '';
 			let metadataSent = false;
-			let streamClosed  = false;
 			let tFirstChunk   = 0;
-			let timeoutHandle: ReturnType<typeof setTimeout>;
 
-			const closeStream = (reason?: string) => {
-				if (streamClosed) return;
-				streamClosed = true;
-				clearTimeout(timeoutHandle);
-				// Release the session back to the pool — do NOT close the WebSocket.
+			const releaseSession = () => {
 				entry.onTurnMessage = null;
 				entry.onTurnError   = null;
 				entry.onTurnClose   = null;
 				if (entry.status === 'busy') entry.status = 'ready';
+			};
+
+			const clearTimers = () => {
+				if (sseCtx.timeoutHandle !== undefined) {
+					clearTimeout(sseCtx.timeoutHandle);
+					sseCtx.timeoutHandle = undefined;
+				}
+				if (sseCtx.turnCompleteHandle !== undefined) {
+					clearTimeout(sseCtx.turnCompleteHandle);
+					sseCtx.turnCompleteHandle = undefined;
+				}
+			};
+
+			const closeStream = (reason?: string) => {
+				if (sseCtx.streamClosed) return;
+				sseCtx.streamClosed = true;
+				clearTimers();
+				releaseSession();
 				if (reason) logger.info('[FreeTalk] stream closed', { reason });
-				controller.close();
+				try {
+					controller.close();
+				} catch (e: unknown) {
+					const err = e as { code?: string };
+					if (err?.code !== 'ERR_INVALID_STATE') throw e;
+				}
 			};
 
 			// Per-turn message handler
@@ -1177,8 +1300,9 @@ export async function generateVoiceConversationSSEStream(
 
 				if (message.serverContent?.turnComplete && !metadataSent) {
 					metadataSent = true;
-					setTimeout(() => {
-						if (streamClosed) return;
+					sseCtx.turnCompleteHandle = setTimeout(() => {
+						sseCtx.turnCompleteHandle = undefined;
+						if (sseCtx.streamClosed) return;
 						logger.info('[FreeTalk] ④ turn complete', {
 							totalMs:      Date.now() - t0,
 							ffmpegMs:     tSession - t0,
@@ -1202,7 +1326,8 @@ export async function generateVoiceConversationSSEStream(
 				closeStream('onclose');
 			};
 
-			timeoutHandle = setTimeout(() => {
+			sseCtx.timeoutHandle = setTimeout(() => {
+				sseCtx.timeoutHandle = undefined;
 				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
 				closeStream('timeout');
 			}, 55000);
@@ -1212,6 +1337,23 @@ export async function generateVoiceConversationSSEStream(
 			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
 			entry.session.sendRealtimeInput({ audioStreamEnd: true });
 			logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		},
+		cancel(reason) {
+			if (sseCtx.streamClosed) return;
+			sseCtx.streamClosed = true;
+			if (sseCtx.timeoutHandle !== undefined) {
+				clearTimeout(sseCtx.timeoutHandle);
+				sseCtx.timeoutHandle = undefined;
+			}
+			if (sseCtx.turnCompleteHandle !== undefined) {
+				clearTimeout(sseCtx.turnCompleteHandle);
+				sseCtx.turnCompleteHandle = undefined;
+			}
+			entry.onTurnMessage = null;
+			entry.onTurnError   = null;
+			entry.onTurnClose   = null;
+			if (entry.status === 'busy') entry.status = 'ready';
+			logger.info('[FreeTalk] stream cancelled', { reason: String(reason) });
 		},
 	});
 }
@@ -1281,29 +1423,59 @@ export async function generateDrillPracticeVoiceResponseStream(
 	logger.info('[Drill] ② session ready', { ms: Date.now() - tSession });
 
 	// ③ Create the SSE stream — session is already connected; just route messages.
+	const sseCtx = {
+		streamClosed: false,
+		timeoutHandle: undefined as ReturnType<typeof setTimeout> | undefined,
+		turnCompleteHandle: undefined as ReturnType<typeof setTimeout> | undefined,
+	};
+
 	return new ReadableStream({
 		start(controller) {
-			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) =>
-				controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
+				if (sseCtx.streamClosed) return;
+				try {
+					controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
+				} catch (e: unknown) {
+					const err = e as { code?: string };
+					if (err?.code !== 'ERR_INVALID_STATE') throw e;
+				}
+			};
 
 			const fullAssistantText: string[] = [];
 			let fullUserText = '';
 			let metadataSent = false;
-			let streamClosed  = false;
 			let tFirstChunk   = 0;
-			let timeoutHandle: ReturnType<typeof setTimeout>;
 
-			const closeStream = (reason?: string) => {
-				if (streamClosed) return;
-				streamClosed = true;
-				clearTimeout(timeoutHandle);
-				// Release the session back to the pool — do NOT close the WebSocket.
+			const releaseSession = () => {
 				entry.onTurnMessage = null;
 				entry.onTurnError   = null;
 				entry.onTurnClose   = null;
 				if (entry.status === 'busy') entry.status = 'ready';
+			};
+
+			const clearTimers = () => {
+				if (sseCtx.timeoutHandle !== undefined) {
+					clearTimeout(sseCtx.timeoutHandle);
+					sseCtx.timeoutHandle = undefined;
+				}
+				if (sseCtx.turnCompleteHandle !== undefined) {
+					clearTimeout(sseCtx.turnCompleteHandle);
+					sseCtx.turnCompleteHandle = undefined;
+				}
+			};
+
+			const closeStream = (reason?: string) => {
+				if (sseCtx.streamClosed) return;
+				sseCtx.streamClosed = true;
+				clearTimers();
+				releaseSession();
 				if (reason) logger.info('[Drill] stream closed', { reason });
-				controller.close();
+				try {
+					controller.close();
+				} catch (e: unknown) {
+					const err = e as { code?: string };
+					if (err?.code !== 'ERR_INVALID_STATE') throw e;
+				}
 			};
 
 			entry.onTurnMessage = (message: LiveServerMessage) => {
@@ -1322,8 +1494,9 @@ export async function generateDrillPracticeVoiceResponseStream(
 
 				if (message.serverContent?.turnComplete && !metadataSent) {
 					metadataSent = true;
-					setTimeout(() => {
-						if (streamClosed) return;
+					sseCtx.turnCompleteHandle = setTimeout(() => {
+						sseCtx.turnCompleteHandle = undefined;
+						if (sseCtx.streamClosed) return;
 						logger.info('[Drill] ④ turn complete', {
 							totalMs:      Date.now() - t0,
 							ffmpegMs:     tSession - t0,
@@ -1352,7 +1525,8 @@ export async function generateDrillPracticeVoiceResponseStream(
 				closeStream('onclose');
 			};
 
-			timeoutHandle = setTimeout(() => {
+			sseCtx.timeoutHandle = setTimeout(() => {
+				sseCtx.timeoutHandle = undefined;
 				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
 				closeStream('timeout');
 			}, 60000);
@@ -1362,6 +1536,23 @@ export async function generateDrillPracticeVoiceResponseStream(
 			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
 			entry.session.sendRealtimeInput({ audioStreamEnd: true });
 			logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		},
+		cancel(reason) {
+			if (sseCtx.streamClosed) return;
+			sseCtx.streamClosed = true;
+			if (sseCtx.timeoutHandle !== undefined) {
+				clearTimeout(sseCtx.timeoutHandle);
+				sseCtx.timeoutHandle = undefined;
+			}
+			if (sseCtx.turnCompleteHandle !== undefined) {
+				clearTimeout(sseCtx.turnCompleteHandle);
+				sseCtx.turnCompleteHandle = undefined;
+			}
+			entry.onTurnMessage = null;
+			entry.onTurnError   = null;
+			entry.onTurnClose   = null;
+			if (entry.status === 'busy') entry.status = 'ready';
+			logger.info('[Drill] stream cancelled', { reason: String(reason) });
 		},
 	});
 }

@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Flame, Clock, Target, Loader2, Calendar, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import { streakAPI } from "@/lib/api";
 
 interface DailyFocus {
   _id: string;
@@ -19,6 +18,12 @@ interface DailyFocus {
   totalQuestions: number;
 }
 
+interface PersonalizationPayload {
+  summary: string;
+  signalsUsed: string[];
+  candidateCount?: number;
+}
+
 const focusTypeLabels: Record<string, string> = {
   grammar: "Grammar",
   vocabulary: "Vocabulary",
@@ -29,6 +34,8 @@ const focusTypeLabels: Record<string, string> = {
 
 export function TodaysFocusCard() {
   const [dailyFocus, setDailyFocus] = useState<DailyFocus | null>(null);
+  const [personalization, setPersonalization] =
+    useState<PersonalizationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [todayCompleted, setTodayCompleted] = useState(false);
@@ -55,7 +62,9 @@ export function TodaysFocusCard() {
       }
 
       const data = await response.json();
+      setError(null);
       setDailyFocus(data.dailyFocus);
+      setPersonalization(data.personalization ?? null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,17 +82,25 @@ export function TodaysFocusCard() {
     );
   }
 
+  if (error) {
+    return (
+      <Card className="border border-amber-200 bg-amber-50 text-amber-950 mb-6 md:mb-8 p-4 text-sm">
+        {error}
+      </Card>
+    );
+  }
+
   if (!dailyFocus) {
     return (
       <Card className="bg-gradient-to-br from-gray-600 to-gray-700 text-white mb-6 md:mb-8">
         <div className="flex items-center gap-2 mb-4">
           <span className="bg-gray-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-            <Calendar className="w-3 h-3" /> TODAY&apos;S FOCUS
+            <Calendar className="w-3 h-3" /> FOCUS TODAY
           </span>
         </div>
-        <h2 className="text-2xl font-bold mb-2">No Focus Today</h2>
+        <h2 className="text-2xl font-bold mb-2">No focus today</h2>
         <p className="text-gray-200 mb-4">
-          Check back later for today&apos;s practice content.
+          Check back later—your coach hasn&apos;t published today&apos;s practice yet.
         </p>
       </Card>
     );
@@ -91,9 +108,9 @@ export function TodaysFocusCard() {
 
   return (
     <Card className="bg-gradient-to-br from-green-600 to-green-700 text-white mb-6 md:mb-8">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <span className="bg-green-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-          <Flame className="w-3 h-3" /> TODAY&apos;S FOCUS
+          <Flame className="w-3 h-3" /> FOCUS TODAY
         </span>
         <span className="bg-green-500/50 px-3 py-1 rounded-full text-xs font-semibold capitalize">
           {focusTypeLabels[dailyFocus.focusType] || dailyFocus.focusType}
@@ -101,6 +118,12 @@ export function TodaysFocusCard() {
       </div>
       
       <h2 className="text-3xl md:text-4xl font-bold mb-2">{dailyFocus.title}</h2>
+
+      {personalization?.summary ? (
+        <p className="text-green-50/95 text-sm md:text-base leading-relaxed mb-3 border-l-2 border-green-300/80 pl-3">
+          {personalization.summary}
+        </p>
+      ) : null}
       
       {dailyFocus.description && (
         <p className="text-green-100 mb-4">{dailyFocus.description}</p>

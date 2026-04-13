@@ -144,6 +144,11 @@ const withPWA = require('next-pwa')({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  /** Student "Home" alias: URL bar shows /home, same page as /account */
+  async rewrites() {
+    return [{ source: '/home', destination: '/account' }];
+  },
   // swcMinify is enabled by default in Next.js 16, no need to specify
   // Note: next-pwa uses webpack, so we need to use webpack mode
   // Adding empty turbopack config to silence the error since next-pwa requires webpack

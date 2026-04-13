@@ -5,7 +5,7 @@ import { OnboardingGuard } from "@/components/guards/OnboardingGuard";
 import { RoleGuard } from "@/components/guards/RoleGuard";
 
 export const metadata: Metadata = {
-  title: "Eklan - English Learning Platform",
+  title: "Eklan - Create Your Future",
   description: "Make English speaking feel natural with AI-powered practice",
 };
 

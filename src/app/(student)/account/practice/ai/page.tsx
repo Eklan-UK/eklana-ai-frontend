@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Clock } from "lucide-react";
 import Image from "next/image";
@@ -63,9 +64,17 @@ export default function FreeTalkSelectionPage() {
         <h1 className="text-2xl font-bold font-nunito text-gray-900 mb-1">
           Start a Free Talk
         </h1>
-        <p className="text-base font-satoshi text-gray-500 mb-6">
+        <p className="text-base font-satoshi text-gray-500 mb-4">
           Choose how you'd like to practice today.
         </p>
+
+        <Link
+          href="/account/practice/ai/summaries"
+          className="inline-flex items-center gap-2 mb-6 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+        >
+          View past session summaries
+          <ChevronRight className="w-4 h-4" />
+        </Link>
 
         {/* ── Based on Your Drills ── */}
         {isLoading ? (

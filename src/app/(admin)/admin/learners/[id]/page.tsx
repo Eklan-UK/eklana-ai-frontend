@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -8,14 +8,14 @@ import {
   Mail,
   Calendar,
   BookOpen,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
   Mic,
   BarChart3,
   AlertCircle,
+  Pencil,
+  X,
+  Check,
 } from "lucide-react";
-import { useLearnerById, useLearnerDrills } from "@/hooks/useAdmin";
+import { useLearnerById, useLearnerDrills, useUpdateLearnerName } from "@/hooks/useAdmin";
 import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
 import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciation-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
@@ -30,12 +30,19 @@ export default function LearnerProfilePage() {
   const router = useRouter();
   const learnerId = params.id as string;
 
+  // Inline name edit state
+  const [editingName, setEditingName] = useState(false);
+  const [editFirst, setEditFirst] = useState("");
+  const [editLast, setEditLast] = useState("");
+
   // React Query hooks for learner data
   const {
     data: learner,
     isLoading: learnerLoading,
     error: learnerError,
   } = useLearnerById(learnerId);
+
+  const updateNameMutation = useUpdateLearnerName(learnerId);
 
   // Fetch drills assigned to this learner
   const { data: drills = [], isLoading: drillsLoading } = useLearnerDrills(
@@ -48,6 +55,32 @@ export default function LearnerProfilePage() {
     useLearnerPronunciationAnalytics(learnerId);
 
   const loading = learnerLoading;
+
+  const startEditName = () => {
+    if (!learner) return;
+    setEditFirst(learner.firstName ?? "");
+    setEditLast(learner.lastName ?? "");
+    setEditingName(true);
+  };
+
+  const cancelEditName = () => {
+    setEditingName(false);
+    setEditFirst("");
+    setEditLast("");
+  };
+
+  const saveName = async () => {
+    const first = editFirst.trim();
+    const last = editLast.trim();
+    if (!first || !last) {
+      toast.error("First and last name are required");
+      return;
+    }
+    updateNameMutation.mutate(
+      { firstName: first, lastName: last },
+      { onSuccess: () => setEditingName(false) },
+    );
+  };
 
   // Handle error
   useEffect(() => {
@@ -106,7 +139,7 @@ export default function LearnerProfilePage() {
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
         </Link>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
           <p className="text-gray-500 text-sm">Learner Profile</p>
         </div>
@@ -114,15 +147,75 @@ export default function LearnerProfilePage() {
 
       {/* Profile Info */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6">
-          Profile Information
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-gray-900">Profile Information</h2>
+          {!editingName && (
+            <button
+              type="button"
+              onClick={startEditName}
+              className="flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 font-medium"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit name
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">
               Name
             </label>
-            <p className="text-base font-semibold text-gray-900">{name}</p>
+            {editingName ? (
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={editFirst}
+                    onChange={(e) => setEditFirst(e.target.value)}
+                    placeholder="First name"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    disabled={updateNameMutation.isPending}
+                    autoComplete="given-name"
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    value={editLast}
+                    onChange={(e) => setEditLast(e.target.value)}
+                    placeholder="Last name"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    disabled={updateNameMutation.isPending}
+                    autoComplete="family-name"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={saveName}
+                    disabled={updateNameMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    {updateNameMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditName}
+                    disabled={updateNameMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-base font-semibold text-gray-900">{name}</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-2">

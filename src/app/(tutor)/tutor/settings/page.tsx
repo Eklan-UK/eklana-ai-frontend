@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
+import { useAuthStore } from "@/store/auth-store";
+import { toast } from "sonner";
 import {
   User,
   Bell,
@@ -21,6 +24,9 @@ import {
 } from "@/hooks/useClasses";
 
 export default function TutorSettingsPage() {
+  const router = useRouter();
+  const logout = useAuthStore((s) => s.logout);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [calendarBanner, setCalendarBanner] = useState<{
     kind: "success" | "error";
     message: string;
@@ -72,6 +78,23 @@ export default function TutorSettingsPage() {
 
   const handleConnectGoogle = () => {
     window.location.href = `${window.location.origin}/api/v1/tutor/google-calendar/connect`;
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      toast.success("Logged out successfully");
+      router.push("/auth/login");
+    } catch (error: unknown) {
+      const msg =
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message?: string }).message)
+          : "Failed to logout";
+      toast.error(msg);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const settingsSections = [
@@ -235,13 +258,20 @@ export default function TutorSettingsPage() {
         {/* Logout */}
         <div className="mt-8">
           <Card className="border-red-200">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-red-50 transition">
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="w-full flex items-center justify-between p-4 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                   <LogOut className="w-5 h-5 text-red-600" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-red-600">Logout</h3>
+                <div className="text-left">
+                  <h3 className="font-semibold text-red-600">
+                    {loggingOut ? "Logging out…" : "Logout"}
+                  </h3>
                   <p className="text-sm text-gray-600">Sign out of your account</p>
                 </div>
               </div>

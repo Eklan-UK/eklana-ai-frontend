@@ -1,14 +1,14 @@
 import { LearnerClassesClient } from "./learner-classes-client";
 
 export const metadata = {
-  title: "Classes | Eklan",
-  description: "Your scheduled classes and join links",
+  title: "My Sessions | Eklan",
+  description: "Your scheduled sessions, join links, and recordings",
 };
 
 export default function LearnerClassesPage() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 pt-6">
-      <div className="mx-auto max-w-2xl px-4 md:px-8">
+    <div className="min-h-screen bg-white pb-24 pt-6">
+      <div className="mx-auto max-w-md px-4 md:max-w-2xl md:px-8">
         <LearnerClassesClient />
       </div>
     </div>

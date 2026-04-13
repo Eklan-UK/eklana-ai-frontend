@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -13,13 +12,18 @@ import {
   CheckCircle,
   AlertCircle,
   FileCheck,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { tutorAPI } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Student {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   progress: number;
   drillsCompleted: number;
@@ -132,6 +136,10 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [editFirst, setEditFirst] = useState("");
+  const [editLast, setEditLast] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     async function fetchStudent() {
@@ -157,6 +165,62 @@ export default function StudentDetailPage() {
       fetchStudent();
     }
   }, [studentId]);
+
+  const startEditName = () => {
+    if (!student) return;
+    if (student.firstName != null || student.lastName != null) {
+      setEditFirst(student.firstName ?? "");
+      setEditLast(student.lastName ?? "");
+    } else {
+      const parts = student.name.trim().split(/\s+/).filter(Boolean);
+      setEditFirst(parts[0] ?? "");
+      setEditLast(parts.length > 1 ? parts.slice(1).join(" ") : "");
+    }
+    setEditingName(true);
+  };
+
+  const cancelEditName = () => {
+    setEditingName(false);
+    setEditFirst("");
+    setEditLast("");
+  };
+
+  const saveName = async () => {
+    const first = editFirst.trim();
+    const last = editLast.trim();
+    if (!first || !last) {
+      toast.error("First and last name are required");
+      return;
+    }
+    setSavingName(true);
+    try {
+      const res = await tutorAPI.updateStudentName(studentId, {
+        firstName: first,
+        lastName: last,
+      });
+      const updated = res.data.student;
+      setStudent((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updated.name,
+              firstName: updated.firstName,
+              lastName: updated.lastName,
+            }
+          : null,
+      );
+      setEditingName(false);
+      toast.success("Student name updated");
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? String((e as { message?: string }).message)
+          : "Could not update name";
+      toast.error(msg);
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -198,12 +262,80 @@ export default function StudentDetailPage() {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
           </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-900">{student.name}</h1>
-            <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-              <Mail className="w-4 h-4" />
-              <span>{student.email}</span>
-            </div>
+          <div className="flex-1 min-w-0">
+            {editingName ? (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={editFirst}
+                    onChange={(e) => setEditFirst(e.target.value)}
+                    placeholder="First name"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={savingName}
+                    autoComplete="given-name"
+                  />
+                  <input
+                    type="text"
+                    value={editLast}
+                    onChange={(e) => setEditLast(e.target.value)}
+                    placeholder="Last name"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={savingName}
+                    autoComplete="family-name"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={saveName}
+                    disabled={savingName}
+                  >
+                    {savingName ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={cancelEditName}
+                    disabled={savingName}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 pt-1">
+                  <Mail className="w-4 h-4 shrink-0" />
+                  <span className="break-all">{student.email}</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-2">
+                  <h1 className="text-2xl font-bold text-gray-900 truncate">
+                    {student.name}
+                  </h1>
+                  <button
+                    type="button"
+                    onClick={startEditName}
+                    className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 shrink-0"
+                    title="Edit name"
+                    aria-label="Edit student name"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                  <Mail className="w-4 h-4 shrink-0" />
+                  <span className="break-all">{student.email}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
