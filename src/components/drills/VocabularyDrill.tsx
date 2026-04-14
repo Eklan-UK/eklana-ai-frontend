@@ -34,6 +34,8 @@ interface WordProgress {
   sentenceScore: number | null;
 }
 
+const MAX_RECORDING_SECONDS = 45;
+
 // Recording Button Component
 function RecordButton({
   isRecording,
@@ -41,29 +43,51 @@ function RecordButton({
   disabled,
   onStart,
   onStop,
+  recordingSeconds = 0,
 }: {
   isRecording: boolean;
   isAnalyzing: boolean;
   disabled: boolean;
   onStart: () => void;
   onStop: () => void;
+  recordingSeconds?: number;
 }) {
   return (
-    <div className="relative">
-      <button
-        onClick={isRecording ? onStop : onStart}
-        disabled={isAnalyzing || disabled}
-        className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-          isRecording
-            ? "bg-red-500 hover:bg-red-600 animate-pulse"
-            : "bg-blue-500 hover:bg-blue-600"
-        }`}
-      >
-        <Mic className="w-12 h-12 text-white" />
-      </button>
+    <div className="flex flex-col items-center">
+      <div className="relative w-24 h-24">
+        {isRecording && (
+          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+            <circle
+              cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
+              strokeDasharray={2 * Math.PI * 44}
+              strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
+              strokeLinecap="round"
+              className="transition-[stroke-dashoffset] duration-1000 linear"
+            />
+          </svg>
+        )}
+        <button
+          onClick={isRecording ? onStop : onStart}
+          disabled={isAnalyzing || disabled}
+          className={`absolute inset-0 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+            isRecording
+              ? "bg-red-500 hover:bg-red-600"
+              : isAnalyzing
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          }`}
+        >
+          {isAnalyzing ? (
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+          ) : (
+            <Mic className="w-12 h-12 text-white" />
+          )}
+        </button>
+      </div>
       {isRecording && (
-        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
-          Recording... Tap to stop
+        <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
+          {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
         </div>
       )}
     </div>
@@ -166,6 +190,9 @@ export default function VocabularyDrill({
     useState<TextScore | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -192,6 +219,11 @@ export default function VocabularyDrill({
     });
     setWordProgress(initialProgress);
   }, [targetSentences.length]);
+
+  const clearRecordingTimers = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
+  };
 
   // Recording functions
   const startRecording = async () => {
@@ -220,13 +252,24 @@ export default function VocabularyDrill({
 
       mediaRecorder.start();
       setIsRecording(true);
+      setRecordingSeconds(0);
       setPronunciationScore(null);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      autoStopTimerRef.current = setTimeout(() => {
+        stopRecording();
+        toast.info("Recording stopped — 45 second limit reached.");
+      }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);
     }
   };
 
   const stopRecording = () => {
+    clearRecordingTimers();
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -589,6 +632,7 @@ export default function VocabularyDrill({
               disabled={currentScreen === "sentence" && !isWordPassed}
               onStart={startRecording}
               onStop={stopRecording}
+              recordingSeconds={recordingSeconds}
             />
             {!isRecording && !isAnalyzing && !pronunciationScore && (
               <p className="text-sm text-gray-500 mt-4">
