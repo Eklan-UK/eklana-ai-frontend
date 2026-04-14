@@ -79,7 +79,7 @@ async function postHandler(request: NextRequest) {
         const uploadResult = await uploadToCloudinary(audioBuffer, {
           folder: `eklan/drills/${drillType}/${drillId || "temp"}`,
           publicId: `audio_${item.id}_${Date.now()}`,
-          resourceType: "raw", // For audio files
+          resourceType: "video", // Cloudinary uses "video" resource type for audio files
           transformation: undefined, // No transformation for audio
         });
 

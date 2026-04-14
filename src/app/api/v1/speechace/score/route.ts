@@ -36,11 +36,11 @@ async function handler(
 		}
 
 		// Validate text length
-		if (text.length > 500) {
+		if (text.length > 1500) {
 			return NextResponse.json(
 				{
 					code: 'ValidationError',
-					message: 'Text must be less than 500 characters',
+					message: 'Text must be less than 1500 characters',
 				},
 				{ status: 400 }
 			);

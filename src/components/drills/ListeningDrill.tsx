@@ -82,15 +82,16 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       audio.onended = () => setIsPlayingPreGen(false);
       audio.onerror = () => {
         setIsPlayingPreGen(false);
-        // Fallback to TTS
         console.warn("Pre-generated audio failed, falling back to TTS");
         playWithTTS();
       };
       
       try {
         await audio.play();
-      } catch (err) {
-        console.error("Error playing pre-generated audio:", err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error("Error playing pre-generated audio:", err);
+        }
         playWithTTS();
       }
     } else {

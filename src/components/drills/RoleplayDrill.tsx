@@ -222,11 +222,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         setTimeout(moveToNextTurn, 300);
       };
       audio.onerror = async () => {
-        // Fallback to TTS
         console.warn("Pre-generated audio failed, falling back to TTS");
         try {
           await playTTSAudio(turn.text);
-          // TTS plays async, wait a bit then move on
           setTimeout(moveToNextTurn, 500);
         } catch {
           moveToNextTurn();
@@ -235,9 +233,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
       try {
         await audio.play();
-      } catch (err) {
-        console.error("Error playing pre-generated audio:", err);
-        // Fallback to TTS
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error("Error playing pre-generated audio:", err);
+        }
         try {
           await playTTSAudio(turn.text);
           setTimeout(moveToNextTurn, 500);

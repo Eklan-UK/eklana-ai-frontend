@@ -39,7 +39,7 @@ const pronunciationSchema = new Schema<IPronunciation>(
 			type: String,
 			required: [true, 'Text to practice is required'],
 			trim: true,
-			maxlength: [1000, 'Text cannot exceed 1000 characters'],
+			maxlength: [1500, 'Text cannot exceed 1500 characters'],
 		},
 		phonetic: {
 			type: String,
