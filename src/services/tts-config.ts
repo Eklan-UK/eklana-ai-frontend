@@ -17,10 +17,19 @@ export const DEFAULT_TTS_VOICE_SETTINGS: TTSVoiceSettings = {
   use_speaker_boost: true,
 };
 
-export const DEFAULT_TTS_VOICE_ID =
-  process.env.ELEVEN_LABS_DEFAULT_VOICE_ID ||
-  process.env.ELEVENLABS_DEFAULT_VOICE_ID ||
-  '21m00Tcm4TlvDq8ikWAM';
+// Falls back to ElevenLabs "Rachel" (21m00Tcm4TlvDq8ikWAM) to prevent crashes when env var is unset.
+// Set ELEVEN_LABS_DEFAULT_VOICE_ID in .env to control the AI voice used across the app.
+const _envVoiceId =
+  process.env.ELEVEN_LABS_DEFAULT_VOICE_ID?.trim() ||
+  process.env.ELEVENLABS_DEFAULT_VOICE_ID?.trim();
+
+if (!_envVoiceId && typeof window === 'undefined') {
+  console.warn(
+    '[TTS] ELEVEN_LABS_DEFAULT_VOICE_ID is not set — using hardcoded fallback voice. Set it in .env to control the AI voice.'
+  );
+}
+
+export const DEFAULT_TTS_VOICE_ID = _envVoiceId || '21m00Tcm4TlvDq8ikWAM';
 
 export function resolveElevenLabsApiKey(): string {
   return (
