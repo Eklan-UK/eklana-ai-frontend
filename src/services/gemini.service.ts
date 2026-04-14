@@ -386,20 +386,32 @@ export async function generateWithLiveAPIStream(
 	let session: any;
 	let sessionClosed = false;
 
+	let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
 	return new ReadableStream({
 		async start(controller) {
-			// Helper to enqueue properly formatted JSON strings for SSE
 			const sendChunk = (type: 'audio' | 'text', data: string) => {
-				const chunk = JSON.stringify({ type, data });
-				controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+				if (sessionClosed) return;
+				try {
+					const chunk = JSON.stringify({ type, data });
+					controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+				} catch {
+					/* controller already closed — safe to ignore */
+				}
 			};
 
-			const timeoutHandle = setTimeout(() => {
+			const closeStream = () => {
+				if (sessionClosed) return;
+				sessionClosed = true;
+				if (timeoutHandle !== undefined) { clearTimeout(timeoutHandle); timeoutHandle = undefined; }
+				try { session?.close(); } catch { /* ignore */ }
+				try { controller.close(); } catch { /* ignore */ }
+			};
+
+			timeoutHandle = setTimeout(() => {
 				if (!sessionClosed) {
-					sessionClosed = true;
 					logger.warn('Live API stream session timed out after 45s');
-					try { session?.close(); } catch (e) { /* ignore */ }
-					controller.close();
+					closeStream();
 				}
 			}, 45000);
 
@@ -423,42 +435,34 @@ export async function generateWithLiveAPIStream(
 							logger.info('Live API WebSocket connected (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 						},
 						onmessage: (message: LiveServerMessage) => {
-							// 1. Send Audio Chunks IMMEDIATELY
+							if (sessionClosed) return;
+
 							const data = message.data;
 							if (data) {
-								sendChunk('audio', data); // This is base64 PCM data
+								sendChunk('audio', data);
 							}
 
-							// 2. Send Output Transcription Text Chunks IMMEDIATELY
 							if (message.serverContent?.outputTranscription?.text) {
 								sendChunk('text', message.serverContent.outputTranscription.text);
 							}
 
-							// 3. Handle Turn Complete
 							if (message.serverContent?.turnComplete) {
 								logger.info('Live API turn complete (Stream)', { elapsed: `${Date.now() - startTime}ms` });
-								clearTimeout(timeoutHandle);
-								sessionClosed = true;
-								try { session?.close(); } catch (e) { /* ignore */ }
-								controller.close();
+								closeStream();
 							}
 						},
 						onerror: (e: ErrorEvent) => {
 							logger.error('Live API WebSocket error (Stream)', { error: e?.message || 'unknown' });
-							clearTimeout(timeoutHandle);
 							if (!sessionClosed) {
 								sessionClosed = true;
-								try { session?.close(); } catch (err) { /* ignore */ }
-								controller.error(new Error(`Live API error: ${e?.message || 'WebSocket error'}`));
+								if (timeoutHandle !== undefined) { clearTimeout(timeoutHandle); timeoutHandle = undefined; }
+								try { session?.close(); } catch { /* ignore */ }
+								try { controller.error(new Error(`Live API error: ${e?.message || 'WebSocket error'}`)); } catch { /* ignore */ }
 							}
 						},
 						onclose: (e: CloseEvent) => {
 							logger.info('Live API WebSocket closed (Stream)', { code: e?.code, reason: e?.reason });
-							clearTimeout(timeoutHandle);
-							if (!sessionClosed) {
-								sessionClosed = true;
-								controller.close();
-							}
+							closeStream();
 						},
 					},
 				});
@@ -469,13 +473,21 @@ export async function generateWithLiveAPIStream(
 				});
 
 			} catch (err: any) {
-				clearTimeout(timeoutHandle);
 				if (!sessionClosed) {
 					sessionClosed = true;
-					controller.error(new Error(`Failed to connect to Live API: ${err.message}`));
+					if (timeoutHandle !== undefined) { clearTimeout(timeoutHandle); timeoutHandle = undefined; }
+					try { controller.error(new Error(`Failed to connect to Live API: ${err.message}`)); } catch { /* ignore */ }
 				}
 			}
-		}
+		},
+		cancel(reason) {
+			if (!sessionClosed) {
+				logger.info('[LiveAPIStream] stream cancelled by client', { reason: String(reason) });
+				sessionClosed = true;
+				if (timeoutHandle !== undefined) { clearTimeout(timeoutHandle); timeoutHandle = undefined; }
+				try { session?.close(); } catch { /* ignore */ }
+			}
+		},
 	});
 }
 

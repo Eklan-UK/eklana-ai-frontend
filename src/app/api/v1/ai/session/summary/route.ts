@@ -96,7 +96,7 @@ async function handler(
     return NextResponse.json(
       {
         code: "ServerError",
-        message: msg.includes("429") || msg.includes("quota")
+        message: msg.includes("429") || msg.includes("quota") || msg.includes("503")
           ? "AI is temporarily busy. Please try again in a moment."
           : msg,
       },
