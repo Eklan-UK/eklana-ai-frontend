@@ -34,7 +34,7 @@ interface WordProgress {
   sentenceScore: number | null;
 }
 
-const MAX_RECORDING_SECONDS = 45;
+const MAX_RECORDING_SECONDS = 120;
 
 // Recording Button Component
 function RecordButton({
@@ -261,7 +261,7 @@ export default function VocabularyDrill({
 
       autoStopTimerRef.current = setTimeout(() => {
         stopRecording();
-        toast.info("Recording stopped — 45 second limit reached.");
+        toast.info("Recording stopped — 2 minute limit reached.");
       }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);
