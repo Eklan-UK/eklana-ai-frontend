@@ -99,7 +99,7 @@ class SpeechaceService {
 			}
 
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+			const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 second timeout (upload + Speechace processing for up to 2 min audio)
 
 			const url = `${this.apiEndpoint}/api/scoring/text/v9/json?key=${encodeURIComponent(this.apiKey)}&dialect=en-us&user_id=${encodeURIComponent(userId)}`;
 			

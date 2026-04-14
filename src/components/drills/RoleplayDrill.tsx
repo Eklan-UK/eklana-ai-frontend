@@ -108,7 +108,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const MAX_RECORDING_SECONDS = 45;
+  const MAX_RECORDING_SECONDS = 120;
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -316,7 +316,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
       autoStopTimerRef.current = setTimeout(() => {
         stopRecording();
-        toast.info("Recording stopped — 45 second limit reached.");
+        toast.info("Recording stopped — 2 minute limit reached.");
       }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);

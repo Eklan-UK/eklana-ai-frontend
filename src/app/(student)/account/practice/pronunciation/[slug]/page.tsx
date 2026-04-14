@@ -49,7 +49,7 @@ export default function PronunciationWordPracticePage() {
   const [isSavingAnalytics, setIsSavingAnalytics] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "word" | "sound" | "sentence">("all");
 
-  const MAX_RECORDING_SECONDS = 45;
+  const MAX_RECORDING_SECONDS = 120;
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -128,7 +128,7 @@ export default function PronunciationWordPracticePage() {
 
       autoStopTimerRef.current = setTimeout(() => {
         stopRecording();
-        toast.info("Recording stopped — 45 second limit reached.");
+        toast.info("Recording stopped — 2 minute limit reached.");
       }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);
@@ -150,10 +150,10 @@ export default function PronunciationWordPracticePage() {
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentWord || !user?.id) return;
 
-    // Safety net: reject recordings that somehow exceed the limit
+    // Safety net: reject recordings that somehow escaped the auto-stop timer
     if (audioBlob.size > 0) {
       const durationEstimate = audioBlob.size / 6000; // ~6 KB/s for opus webm
-      if (durationEstimate > MAX_RECORDING_SECONDS + 5) {
+      if (durationEstimate > MAX_RECORDING_SECONDS + 10) {
         toast.error(`Recording too long (max ${MAX_RECORDING_SECONDS}s). Please try again.`);
         return;
       }
