@@ -48,8 +48,8 @@ export function useTTS(options: UseTTSOptions = {}) {
         objectUrlRef.current = audioObjectUrl;
         setCurrentAudioUrl(audioObjectUrl);
 
-        // Always create the audio element and prepare playback.
         const audio = new Audio(audioObjectUrl);
+        audio.setAttribute("playsinline", "true");
         audio.muted = false;
         audio.volume = 1;
         audioRef.current = audio;
@@ -98,8 +98,13 @@ export function useTTS(options: UseTTSOptions = {}) {
             console.error("Error playing audio:", playErr);
             setIsGenerating(false);
             setIsPlaying(false);
-            onError?.(new Error("Failed to play audio"));
-            toast.error("Failed to play audio. Please try again.");
+            if (playErr.name === "NotAllowedError") {
+              onError?.(new Error("Audio blocked — tap anywhere first, then try again."));
+              toast.error("Audio blocked by browser. Tap the page and try again.");
+            } else {
+              onError?.(new Error("Failed to play audio"));
+              toast.error("Failed to play audio. Please try again.");
+            }
           }
         };
 

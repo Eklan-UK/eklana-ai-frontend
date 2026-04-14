@@ -90,10 +90,15 @@ export default function PronunciationWordPracticePage() {
   // Start recording
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/mp4";
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -104,9 +109,11 @@ export default function PronunciationWordPracticePage() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        setAudioBlob(audioBlob);
         stream.getTracks().forEach((track) => track.stop());
+        // Brief pause lets iOS switch audio route from earpiece back to speaker
+        await new Promise((r) => setTimeout(r, 120));
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        setAudioBlob(audioBlob);
         await analyzePronunciation(audioBlob);
       };
 
@@ -268,7 +275,7 @@ export default function PronunciationWordPracticePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -280,7 +287,7 @@ export default function PronunciationWordPracticePage() {
 
   if (error || !problem) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -301,7 +308,7 @@ export default function PronunciationWordPracticePage() {
 
   if (words.length === 0 || filteredWords.length === 0) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -326,7 +333,7 @@ export default function PronunciationWordPracticePage() {
   const isPassed = wordProgress?.passed || (pronunciationScore && pronunciationScore.speechace_score.pronunciation >= 70);
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 

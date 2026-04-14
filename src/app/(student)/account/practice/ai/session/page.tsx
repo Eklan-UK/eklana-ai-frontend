@@ -26,6 +26,7 @@ import {
   type SessionReviewPhase,
 } from "@/components/ai/SessionReviewModal";
 import type { SessionSummaryPayload } from "@/types/ai-session-summary";
+import { releaseMediaStream, unlockAudioContext } from "@/lib/ios-audio-utils";
 
 /* ─── Gemini native audio playback ─────────────────────────────────────────── */
 
@@ -263,7 +264,8 @@ function AISessionPage() {
   const MIN_REC_MS        = 1200;
 
   const startVAD = (stream: MediaStream) => {
-    const ctx      = new AudioContext();
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx      = new AC();
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
     ctx.createMediaStreamSource(stream).connect(analyser);
@@ -616,6 +618,7 @@ function AISessionPage() {
   /* ─── Send message ─────────────────────────────────────────────────────── */
 
   const handleSendText = async (text: string) => {
+    unlockAudioContext(currentAudioStreamPlayerRef.current?.getAudioContext() ?? null);
     const trimmed = text.trim();
     if (!trimmed || isThinking) return;
 
@@ -779,8 +782,11 @@ function AISessionPage() {
 
   const startVoiceRecording = useCallback(async () => {
     try {
+      unlockAudioContext(currentAudioStreamPlayerRef.current?.getAudioContext() ?? null);
       stopAllAudio();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       mediaStreamRef.current = stream;
       audioChunksRef.current = [];
 
@@ -1023,6 +1029,8 @@ function AISessionPage() {
   const stopVoiceRecording = useCallback(() => {
     stopVAD();
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    releaseMediaStream(mediaStreamRef.current);
+    mediaStreamRef.current = null;
   }, []);
 
   const toggleVoiceRecording = useCallback(() => {
