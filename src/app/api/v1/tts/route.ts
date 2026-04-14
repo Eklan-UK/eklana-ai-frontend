@@ -3,6 +3,7 @@ import { logger } from '@/lib/api/logger';
 import { withAuth } from '@/lib/api/middleware';
 import { findCachedTTS, findCachedTTSReadOnly, persistTTSInCache } from '@/services/tts-cache.service';
 import { generateElevenLabsAudio, TTSProviderError } from '@/services/tts-provider.service';
+import { resolveVoiceId } from '@/services/tts-config';
 
 const requestWindowMs = 60_000;
 const maxRequestsPerWindow = 30;
@@ -37,7 +38,11 @@ async function postHandler(
   try {
     const startedAt = Date.now();
     const body = await req.json();
-    const { text, voice = 'default' } = body;
+    const { text, voice: rawVoice } = body;
+    // Resolve to the real ElevenLabs voice ID up-front so the cache key,
+    // audio generation, and telemetry all use the same concrete ID.
+    // Falls back to ELEVEN_LABS_DEFAULT_VOICE_ID, then to Rachel (21m00Tcm4TlvDq8ikWAM).
+    const voice = resolveVoiceId(rawVoice);
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json(
@@ -150,7 +155,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const text = searchParams.get('text');
-    const voice = searchParams.get('voice') || 'default';
+    const voice = resolveVoiceId(searchParams.get('voice') ?? undefined);
 
     if (!text) {
       return NextResponse.json(
