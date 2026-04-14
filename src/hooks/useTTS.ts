@@ -75,6 +75,11 @@ export function useTTS(options: UseTTSOptions = {}) {
         };
 
         audio.onerror = (e) => {
+          // AbortError fires when audio is intentionally stopped/cleaned up mid-load — ignore it
+          const mediaErr = audio.error;
+          if (mediaErr?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED && !audio.src) return;
+          if (mediaErr?.message?.includes("abort") || mediaErr?.message?.includes("Abort")) return;
+
           setIsPlaying(false);
           setIsGenerating(false);
           const error = new Error("Failed to play audio");
@@ -95,13 +100,14 @@ export function useTTS(options: UseTTSOptions = {}) {
           try {
             await audio.play();
           } catch (playErr: any) {
-            console.error("Error playing audio:", playErr);
+            if (playErr.name === "AbortError") return;
             setIsGenerating(false);
             setIsPlaying(false);
             if (playErr.name === "NotAllowedError") {
               onError?.(new Error("Audio blocked — tap anywhere first, then try again."));
               toast.error("Audio blocked by browser. Tap the page and try again.");
             } else {
+              console.error("Error playing audio:", playErr);
               onError?.(new Error("Failed to play audio"));
               toast.error("Failed to play audio. Please try again.");
             }
@@ -156,12 +162,6 @@ export function useTTS(options: UseTTSOptions = {}) {
       const el = audioRef.current;
       el.pause();
       el.currentTime = 0;
-      try {
-        el.removeAttribute("src");
-        el.load();
-      } catch {
-        /* ignore */
-      }
       audioRef.current = null;
       setIsPlaying(false);
     }

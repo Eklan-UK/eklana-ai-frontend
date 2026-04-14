@@ -39,12 +39,14 @@ export class Mp3QueuePlayer {
 			void this.playNext();
 		};
 		audio.onerror = () => {
+			if (this.disposed) return;
 			this.currentAudio = null;
 			void this.playNext();
 		};
 		try {
 			await audio.play();
-		} catch {
+		} catch (err: any) {
+			if (err?.name === "AbortError") return;
 			void this.playNext();
 		}
 	}
@@ -62,12 +64,7 @@ export class Mp3QueuePlayer {
 		if (this.currentAudio) {
 			const el = this.currentAudio;
 			el.pause();
-			try {
-				el.removeAttribute('src');
-				el.load();
-			} catch {
-				/* ignore */
-			}
+			el.currentTime = 0;
 			this.currentAudio = null;
 		}
 		this.cleanupCurrentUrl();

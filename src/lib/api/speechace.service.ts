@@ -122,9 +122,16 @@ class SpeechaceService {
 			// The API returns text_score (snake_case) object with speechace_score.pronunciation
 			// The API response has text_score (snake_case), not textScore (camelCase)
 			const textScoreObj = rawData.text_score || rawData.textScore;
-			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation || 
-			                          (typeof textScoreObj === 'number' ? textScoreObj : 0) ||
-			                          rawData.text_score || 0;
+			// #region agent log
+			fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4613a4'},body:JSON.stringify({sessionId:'4613a4',location:'speechace.service.ts:124',message:'textScoreObj extracted',data:{rawTextScoreType:typeof rawData.text_score,rawTextScoreIsObj:rawData.text_score !== null && typeof rawData.text_score === 'object',rawTextScoreVal:typeof rawData.text_score === 'object' ? 'OBJECT' : rawData.text_score,textScoreObjType:typeof textScoreObj,textScoreObjIsObj:textScoreObj !== null && typeof textScoreObj === 'object',speechacePronunciation:textScoreObj?.speechace_score?.pronunciation},timestamp:Date.now(),hypothesisId:'A-D'})}).catch(()=>{});
+			// #endregion
+			// Use nullish coalescing (??) so a genuine score of 0 is preserved and does not
+			// fall through to rawData.text_score (which is the full TextScore object).
+			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation ??
+			                          (typeof textScoreObj === 'number' ? textScoreObj : 0);
+			// #region agent log
+			fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4613a4'},body:JSON.stringify({sessionId:'4613a4',location:'speechace.service.ts:128',message:'pronunciationScore computed',data:{pronunciationScoreType:typeof pronunciationScore,pronunciationScoreVal:pronunciationScore,isObject:typeof pronunciationScore === 'object'},timestamp:Date.now(),hypothesisId:'A-B'})}).catch(()=>{});
+			// #endregion
 
 			// Convert word_score_list to word_scores format for backward compatibility
 			const word_scores = textScoreObj?.word_score_list?.map((ws: WordScore) => ({

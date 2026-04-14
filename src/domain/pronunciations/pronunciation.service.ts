@@ -374,6 +374,9 @@ export class PronunciationService {
         cleanAudioBase64,
         params.learnerId
       );
+      // #region agent log
+      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4613a4'},body:JSON.stringify({sessionId:'4613a4',location:'pronunciation.service.ts:376',message:'evaluationResult from scorePronunciation',data:{textScoreType:typeof evaluationResult.text_score,textScoreIsObj:typeof evaluationResult.text_score === 'object',textScoreVal:typeof evaluationResult.text_score === 'object' ? 'OBJECT' : evaluationResult.text_score,textScoreCamelType:typeof (evaluationResult as any).textScore,textScoreCamelIsObj:typeof (evaluationResult as any).textScore === 'object'},timestamp:Date.now(),hypothesisId:'B-C'})}).catch(()=>{});
+      // #endregion
     } catch (error: any) {
       logger.error('Speechace evaluation failed for drill attempt', { error: error.message });
       throw new ValidationError('Failed to evaluate pronunciation: ' + error.message);
