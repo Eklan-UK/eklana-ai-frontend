@@ -7,6 +7,17 @@ import { logger } from "@/lib/api/logger";
 import type { SessionSummaryPayload, TranscriptTurn } from "@/types/ai-session-summary";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-2.0-flash";
+
+const DEFAULT_SUMMARY: SessionSummaryPayload = {
+  grammar: { headline: "Session recorded", detail: "We'll have a full breakdown ready next time." },
+  vocabulary: { headline: "Session recorded" },
+  flow: { headline: "Session recorded" },
+  strengths: ["You showed up and practiced — that matters!"],
+  tips: ["Keep practicing regularly for the best results."],
+  encouragement: "Great job today! We've saved your session and will analyze it fully next time.",
+  overallScore: undefined,
+};
 
 let genAI: GoogleGenerativeAI | null = null;
 if (config.GEMINI_API_KEY) {
@@ -57,7 +68,38 @@ function parseJsonObject(text: string): SessionSummaryPayload {
 }
 
 /**
+ * Call a Gemini model with exponential-backoff retry on transient errors (503/429).
+ */
+async function callModelWithRetry(
+  modelName: string,
+  prompt: string,
+  maxRetries = 3,
+): Promise<SessionSummaryPayload> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const model = genAI!.getGenerativeModel({
+        model: modelName,
+        generationConfig: { temperature: 0.35, maxOutputTokens: 1200 },
+      });
+      const result = await model.generateContent(prompt);
+      return parseJsonObject(result.response.text());
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const isRetryable = /503|429|unavailable|overloaded|quota/i.test(msg);
+      logger.warn(`Summary attempt ${attempt}/${maxRetries} failed (${modelName})`, {
+        error: msg,
+        retryable: isRetryable,
+      });
+      if (!isRetryable || attempt === maxRetries) throw error;
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+    }
+  }
+  throw new Error("Exhausted retries");
+}
+
+/**
  * Analyze transcript and return structured feedback for the learner.
+ * Never throws on model failures — falls back through models then to a safe default.
  */
 export async function generateSessionSummaryFromTranscript(
   messages: TranscriptTurn[],
@@ -92,26 +134,35 @@ Rules:
 - If the student barely spoke, lower the score and keep tips short and kind.
 - All text in English.`;
 
-  const model = genAI.getGenerativeModel({
-    model: DEFAULT_MODEL,
-    generationConfig: {
-      temperature: 0.35,
-      maxOutputTokens: 1200,
-    },
-  });
-
+  // 1. Try primary model with retries
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const parsed = parseJsonObject(text);
+    const parsed = await callModelWithRetry(DEFAULT_MODEL, prompt);
     logger.info("Session summary generated", {
+      model: DEFAULT_MODEL,
       overallScore: parsed.overallScore,
       strengthCount: parsed.strengths.length,
     });
     return parsed;
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error("Session summary generation failed", { error: msg });
-    throw new Error(`Failed to generate session summary: ${msg}`);
+  } catch (primaryErr) {
+    const msg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+    logger.error("Primary summary model exhausted", { model: DEFAULT_MODEL, error: msg });
   }
+
+  // 2. Try fallback model with retries
+  try {
+    const parsed = await callModelWithRetry(FALLBACK_MODEL, prompt);
+    logger.info("Session summary generated (fallback)", {
+      model: FALLBACK_MODEL,
+      overallScore: parsed.overallScore,
+      strengthCount: parsed.strengths.length,
+    });
+    return parsed;
+  } catch (fallbackErr) {
+    const msg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+    logger.error("Fallback summary model exhausted", { model: FALLBACK_MODEL, error: msg });
+  }
+
+  // 3. All models unavailable — return safe default so the student always sees a summary
+  logger.warn("Returning default summary — all models unavailable");
+  return DEFAULT_SUMMARY;
 }
