@@ -289,6 +289,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: "audio/webm;codecs=opus",
+        audioBitsPerSecond: 32000,
       });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
