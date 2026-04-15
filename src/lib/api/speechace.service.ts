@@ -88,11 +88,6 @@ class SpeechaceService {
 			// Convert base64 to buffer and then to Blob for native FormData
 			const audioBuffer = Buffer.from(audioBase64, 'base64');
 
-			// #region agent log
-			const _keyInService = !!(config.SPEECHACE_API_KEY);
-			console.log(`[speechace.service] >>> scorePronunciation: bufferBytes=${audioBuffer.length} keyFromEnv=${_keyInService}`);
-			fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'speechace.service.ts:entry',message:'service entry',data:{bufferBytes:audioBuffer.length,keyFromEnv:_keyInService,apiEndpoint:this.apiEndpoint},timestamp:Date.now(),hypothesisId:'H-A,H-D,H-E'})}).catch(()=>{});
-			// #endregion
 			// Guard: reject oversized payloads before hitting Speechace (120 s at 32 kbps ≈ 480 KB)
 			if (audioBuffer.length > 5 * 1024 * 1024) {
 				throw new Error('Audio file is too large to score (max 5 MB). Try a shorter recording.');
@@ -121,11 +116,6 @@ class SpeechaceService {
 			});
 
 			clearTimeout(timeoutId);
-
-			// #region agent log
-			console.log(`[speechace.service] >>> Speechace HTTP status: ${response.status}`);
-			fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'speechace.service.ts:response',message:'Speechace HTTP response',data:{httpStatus:response.status,httpOk:response.ok},timestamp:Date.now(),hypothesisId:'H-E'})}).catch(()=>{});
-			// #endregion
 
 			if (!response.ok) {
 				const errorBody = await response.text();
