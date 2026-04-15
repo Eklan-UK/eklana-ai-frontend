@@ -87,6 +87,12 @@ class SpeechaceService {
 		try {
 			// Convert base64 to buffer and then to Blob for native FormData
 			const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+			// Guard: reject oversized payloads before hitting Speechace (120 s at 32 kbps ≈ 480 KB)
+			if (audioBuffer.length > 5 * 1024 * 1024) {
+				throw new Error('Audio file is too large to score (max 5 MB). Try a shorter recording.');
+			}
+
 			const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
 
 			// Use native FormData
