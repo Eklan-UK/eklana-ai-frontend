@@ -146,6 +146,9 @@ export class ClassRepository {
       meetingUrl = createdCalendarEvent.meetingUrl;
     } catch (error: unknown) {
       const err = error as Error;
+      // #region agent log
+      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'class.repository.ts:googleCalendarCatch',message:'Google Calendar event creation failed',data:{rawErrorMessage:err.message,errorName:err.name},timestamp:Date.now(),hypothesisId:'H-A,H-B,H-C,H-D,H-E'})}).catch(()=>{});
+      // #endregion
       logger.error('ClassRepository.create.googleCalendarEvent', {
         tutorId: body.tutorId,
         message: err.message,
