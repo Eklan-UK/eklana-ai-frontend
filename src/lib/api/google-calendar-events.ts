@@ -15,12 +15,6 @@ export interface CreateGoogleMeetEventInput {
 export async function createGoogleCalendarEventWithMeetLink(
   input: CreateGoogleMeetEventInput,
 ): Promise<{ meetingUrl: string; eventId: string }> {
-  // #region agent log
-  const _clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
-  const _clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
-  fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'google-calendar-events.ts:entry',message:'createGoogleCalendarEventWithMeetLink entry',data:{hasClientId:!!_clientId,hasClientSecret:!!_clientSecret,clientIdPrefix:_clientId?_clientId.substring(0,8):'MISSING',hasRefreshToken:!!input.refreshToken},timestamp:Date.now(),hypothesisId:'H-A,H-B',runId:'post-fix'})}).catch(()=>{});
-  // #endregion
-
   const clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
   const clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) {
@@ -74,10 +68,6 @@ export async function createGoogleCalendarEventWithMeetLink(
     event.hangoutLink?.trim() ||
     event.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === "video")?.uri?.trim() ||
     "";
-  // #region agent log
-  fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'google-calendar-events.ts:post-insert',message:'Google Calendar event insert response',data:{hasEventId:!!event.id,hasHangoutLink:!!event.hangoutLink,hasMeetingUrl:!!meetingUrl,conferenceEntryPointCount:event.conferenceData?.entryPoints?.length??0},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
-  // #endregion
-
   if (!event.id) {
     throw new Error("Google Calendar event created without event id");
   }
