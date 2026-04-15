@@ -1,47 +1,6 @@
 import crypto from "crypto";
+import { google as googleApis } from "googleapis";
 import config from "./config";
-
-type RuntimeRequire = (name: string) => unknown;
-
-interface GoogleApisRuntime {
-  auth: {
-    OAuth2: new (clientId: string, clientSecret: string) => {
-      setCredentials: (credentials: { refresh_token: string }) => void;
-    };
-  };
-  calendar: (options: {
-    version: "v3";
-    auth: unknown;
-  }) => {
-    events: {
-      insert: (options: {
-        calendarId: string;
-        conferenceDataVersion: number;
-        requestBody: {
-          summary: string;
-          description?: string;
-          start: { dateTime: string; timeZone: string };
-          end: { dateTime: string; timeZone: string };
-          attendees: Array<{ email: string }>;
-          conferenceData: {
-            createRequest: {
-              requestId: string;
-              conferenceSolutionKey: { type: "hangoutsMeet" };
-            };
-          };
-        };
-      }) => Promise<{
-        data: {
-          id?: string;
-          hangoutLink?: string;
-          conferenceData?: {
-            entryPoints?: Array<{ entryPointType?: string; uri?: string }>;
-          };
-        };
-      }>;
-    };
-  };
-}
 
 export interface CreateGoogleMeetEventInput {
   refreshToken: string;
@@ -56,27 +15,11 @@ export interface CreateGoogleMeetEventInput {
 export async function createGoogleCalendarEventWithMeetLink(
   input: CreateGoogleMeetEventInput,
 ): Promise<{ meetingUrl: string; eventId: string }> {
-  // Load at runtime so this file still type-checks if package installation is pending.
-  let google: GoogleApisRuntime | null = null;
-  try {
-    const runtimeRequire = eval("require") as RuntimeRequire;
-    const googleapisModule = runtimeRequire("googleapis") as
-      | { google?: GoogleApisRuntime }
-      | undefined;
-    google = googleapisModule?.google ?? null;
-  } catch {
-    google = null;
-  }
   // #region agent log
   const _clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
   const _clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
-  fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'google-calendar-events.ts:entry',message:'createGoogleCalendarEventWithMeetLink entry',data:{googleLoaded:!!google,hasClientId:!!_clientId,hasClientSecret:!!_clientSecret,clientIdPrefix:_clientId?_clientId.substring(0,8):'MISSING',hasRefreshToken:!!input.refreshToken},timestamp:Date.now(),hypothesisId:'H-A,H-B'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'google-calendar-events.ts:entry',message:'createGoogleCalendarEventWithMeetLink entry',data:{hasClientId:!!_clientId,hasClientSecret:!!_clientSecret,clientIdPrefix:_clientId?_clientId.substring(0,8):'MISSING',hasRefreshToken:!!input.refreshToken},timestamp:Date.now(),hypothesisId:'H-A,H-B',runId:'post-fix'})}).catch(()=>{});
   // #endregion
-  if (!google) {
-    throw new Error(
-      "googleapis package is required for Calendar event creation. Install with: npm install googleapis",
-    );
-  }
 
   const clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
   const clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
@@ -91,10 +34,10 @@ export async function createGoogleCalendarEventWithMeetLink(
     throw new Error("Google Calendar refresh token is missing for this tutor");
   }
 
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  const oauth2Client = new googleApis.auth.OAuth2(clientId, clientSecret);
   oauth2Client.setCredentials({ refresh_token: refreshToken });
 
-  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+  const calendar = googleApis.calendar({ version: "v3", auth: oauth2Client });
   const requestId = crypto.randomUUID();
   const attendees =
     input.attendees?.filter((email) => !!email && email.includes("@")).map((email) => ({ email })) ??
