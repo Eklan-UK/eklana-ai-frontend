@@ -26,6 +26,7 @@ import {
   type SessionReviewPhase,
 } from "@/components/ai/SessionReviewModal";
 import type { SessionSummaryPayload } from "@/types/ai-session-summary";
+import { releaseMediaStream, unlockAudioContext } from "@/lib/ios-audio-utils";
 
 /* ─── Gemini native audio playback ─────────────────────────────────────────── */
 
@@ -197,6 +198,7 @@ function AISessionPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [drillInitFailed, setDrillInitFailed] = useState(false);
   const [drillInfo, setDrillInfo] = useState<{ drillType: string; drillTitle: string } | null>(
     preparedCache?.drillInfo ?? null
   );
@@ -238,8 +240,9 @@ function AISessionPage() {
   // Audio stream reference
   const currentAudioStreamPlayerRef = useRef<AudioStreamPlayer | null>(null);
   const currentMp3QueueRef = useRef<Mp3QueuePlayer | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Voice recording
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -261,7 +264,8 @@ function AISessionPage() {
   const MIN_REC_MS        = 1200;
 
   const startVAD = (stream: MediaStream) => {
-    const ctx      = new AudioContext();
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx      = new AC();
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
     ctx.createMediaStreamSource(stream).connect(analyser);
@@ -345,6 +349,13 @@ function AISessionPage() {
 
   const drillInitRef = useRef(false);
 
+  const handleRetryDrillInit = useCallback(() => {
+    setDrillInitFailed(false);
+    drillInitRef.current = false;
+    initializeDrillPractice();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -355,6 +366,10 @@ function AISessionPage() {
       drillInitRef.current = true;
       initializeDrillPractice();
     }
+    return () => {
+      // Reset guard so StrictMode remount or dependency change can re-initialize
+      drillInitRef.current = false;
+    };
   }, [drillId, showResumePrompt]);
 
   useEffect(() => {
@@ -374,6 +389,22 @@ function AISessionPage() {
       if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach((t) => t.stop());
     };
   }, [stopAllAudio]);
+
+  // iOS keyboard pushes content behind the viewport — track visualViewport to compensate
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const onResize = () => {
+      if (containerRef.current) {
+        containerRef.current.style.height = `${vv.height}px`;
+      }
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // Save session to cache whenever messages change, BUT DO NOT save incomplete streaming text
   useEffect(() => {
@@ -563,10 +594,21 @@ function AISessionPage() {
       ]);
       setConversationHistory([{ role: "model", content: finalGreeting }]);
     } catch (e: unknown) {
-      if ((e as { name?: string })?.name === "AbortError") return;
+      const isAbort = (e as { name?: string })?.name === "AbortError";
+      if (isAbort) {
+        if (!isExiting.current) {
+          // StrictMode / unexpected abort — reset state so the effect can re-initialize
+          drillInitRef.current = false;
+          setMessages([]);
+        }
+        return;
+      }
+      console.error("[DrillInit] Failed to load drill greeting:", e);
       const fallback = "Alright! Let's get started with your practice. I've got exercises ready for you!";
       setMessages([{ type: "ai", text: fallback, isStreaming: false }]);
       setConversationHistory([{ role: "model", content: fallback }]);
+      setDrillInitFailed(true);
+    } finally {
       setIsInitializing(false);
       setStreamingAudioActive(false);
       setPlayingMessageIndex(null);
@@ -576,6 +618,7 @@ function AISessionPage() {
   /* ─── Send message ─────────────────────────────────────────────────────── */
 
   const handleSendText = async (text: string) => {
+    unlockAudioContext(currentAudioStreamPlayerRef.current?.getAudioContext() ?? null);
     const trimmed = text.trim();
     if (!trimmed || isThinking) return;
 
@@ -739,8 +782,11 @@ function AISessionPage() {
 
   const startVoiceRecording = useCallback(async () => {
     try {
+      unlockAudioContext(currentAudioStreamPlayerRef.current?.getAudioContext() ?? null);
       stopAllAudio();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       mediaStreamRef.current = stream;
       audioChunksRef.current = [];
 
@@ -983,6 +1029,8 @@ function AISessionPage() {
   const stopVoiceRecording = useCallback(() => {
     stopVAD();
     if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    releaseMediaStream(mediaStreamRef.current);
+    mediaStreamRef.current = null;
   }, []);
 
   const toggleVoiceRecording = useCallback(() => {
@@ -1049,7 +1097,7 @@ function AISessionPage() {
   /* ─── Render ───────────────────────────────────────────────────────────── */
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-gray-50">
+    <div ref={containerRef} className="relative flex flex-col h-[100dvh] bg-gray-50">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
         <div className="flex items-center px-4 py-3 max-w-2xl mx-auto">
@@ -1058,7 +1106,7 @@ function AISessionPage() {
             onClick={() => {
               finalizeExitToPath("/account/practice/ai");
             }}
-            className="p-1.5 -ml-1.5 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2.5 -ml-2.5 rounded-full hover:bg-gray-100 transition-colors"
             aria-label="Leave session"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -1079,7 +1127,7 @@ function AISessionPage() {
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"
             >
               <MoreVertical className="w-5 h-5 text-gray-500" />
             </button>
@@ -1162,7 +1210,7 @@ function AISessionPage() {
                   <Image src="/logo2.svg" alt="Eklan" width={28} height={28} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+                  <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[92%] sm:max-w-[85%]">
                     <MarkdownText className="text-sm text-gray-900 leading-relaxed">
                       {message.text}
                     </MarkdownText>
@@ -1182,7 +1230,7 @@ function AISessionPage() {
               </div>
             ) : (
               <div key={index} className="flex items-start justify-end gap-3 mb-4">
-                <div className="max-w-[85%]">
+                <div className="max-w-[92%] sm:max-w-[85%]">
                   <div className="bg-emerald-600 rounded-2xl rounded-tr-sm px-4 py-3">
                     <p className="text-sm text-white leading-relaxed">{message.text}</p>
                   </div>
@@ -1197,6 +1245,22 @@ function AISessionPage() {
               </div>
             );
           })}
+
+          {/* Drill init failed — retry CTA */}
+          {drillInitFailed && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <p className="text-xs text-gray-400 text-center">
+                Could not connect to the session. Check your internet and try again.
+              </p>
+              <button
+                type="button"
+                onClick={handleRetryDrillInit}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* Thinking indicator */}
           {isThinking && (
@@ -1255,16 +1319,23 @@ function AISessionPage() {
               <Mic className="w-5 h-5 text-slate-500" />
             </button>
 
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              }}
               placeholder="Type a message…"
               disabled={isInitializing || isThinking}
               autoFocus
-              className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white transition-all disabled:opacity-50"
+              className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white transition-all disabled:opacity-50 resize-none leading-relaxed"
+              style={{ maxHeight: 120 }}
             />
 
             <button

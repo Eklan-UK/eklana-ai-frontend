@@ -21,6 +21,15 @@ export class AudioStreamPlayer {
       this.nextPlayTime = this.audioContext.currentTime + 0.1; // tiny buffer
       this.isPlaying = true;
     }
+    // iOS starts AudioContexts in "suspended" state — resume so playback works
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(() => {});
+    }
+  }
+
+  /** Expose the underlying context so callers can unlock it on user gesture. */
+  public getAudioContext(): AudioContext | null {
+    return this.audioContext;
   }
 
   /**

@@ -87,19 +87,25 @@ class SpeechaceService {
 		try {
 			// Convert base64 to buffer and then to Blob for native FormData
 			const audioBuffer = Buffer.from(audioBase64, 'base64');
-			const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+
+			// Guard: reject oversized payloads before hitting Speechace (120 s at 32 kbps ≈ 480 KB)
+			if (audioBuffer.length > 5 * 1024 * 1024) {
+				throw new Error('Audio file is too large to score (max 5 MB). Try a shorter recording.');
+			}
+
+			const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
 
 			// Use native FormData
 			const formData = new FormData();
 			formData.append('text', text);
-			formData.append('user_audio_file', audioBlob, 'audio.wav');
+			formData.append('user_audio_file', audioBlob, 'audio.webm');
 			
 			if (questionInfo) {
 				formData.append('question_info', questionInfo);
 			}
 
 			const controller = new AbortController();
-			const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+			const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 second timeout (upload + Speechace processing for up to 2 min audio)
 
 			const url = `${this.apiEndpoint}/api/scoring/text/v9/json?key=${encodeURIComponent(this.apiKey)}&dialect=en-us&user_id=${encodeURIComponent(userId)}`;
 			
@@ -117,14 +123,20 @@ class SpeechaceService {
 			}
 
 			const rawData = await response.json();
+			// Surface Speechace API errors as thrown exceptions so callers get a meaningful message
+			if (rawData.status === 'error') {
+				const msg = rawData.detail_message || rawData.short_message || 'Speechace API returned an error';
+				throw new Error(msg);
+			}
 
 			// Extract the score from the response
 			// The API returns text_score (snake_case) object with speechace_score.pronunciation
 			// The API response has text_score (snake_case), not textScore (camelCase)
 			const textScoreObj = rawData.text_score || rawData.textScore;
-			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation || 
-			                          (typeof textScoreObj === 'number' ? textScoreObj : 0) ||
-			                          rawData.text_score || 0;
+			// Use nullish coalescing (??) so a genuine score of 0 is preserved and does not
+			// fall through to rawData.text_score (which is the full TextScore object).
+			const pronunciationScore = textScoreObj?.speechace_score?.pronunciation ??
+			                          (typeof textScoreObj === 'number' ? textScoreObj : 0);
 
 			// Convert word_score_list to word_scores format for backward compatibility
 			const word_scores = textScoreObj?.word_score_list?.map((ws: WordScore) => ({

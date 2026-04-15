@@ -49,6 +49,11 @@ export default function PronunciationWordPracticePage() {
   const [isSavingAnalytics, setIsSavingAnalytics] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "word" | "sound" | "sentence">("all");
 
+  const MAX_RECORDING_SECONDS = 120;
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -73,13 +78,27 @@ export default function PronunciationWordPracticePage() {
   const safeIndex = Math.min(currentWordIndex, filteredWords.length - 1);
   const currentWord = filteredWords[safeIndex >= 0 ? safeIndex : 0];
 
+  const clearRecordingTimers = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
+  };
+
+  useEffect(() => {
+    return () => clearRecordingTimers();
+  }, []);
+
   // Start recording
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/mp4";
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -90,16 +109,27 @@ export default function PronunciationWordPracticePage() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        setAudioBlob(audioBlob);
         stream.getTracks().forEach((track) => track.stop());
-        // Auto-analyze after recording stops
+        // Brief pause lets iOS switch audio route from earpiece back to speaker
+        await new Promise((r) => setTimeout(r, 120));
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        setAudioBlob(audioBlob);
         await analyzePronunciation(audioBlob);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       setPronunciationScore(null);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      autoStopTimerRef.current = setTimeout(() => {
+        stopRecording();
+        toast.info("Recording stopped — 2 minute limit reached.");
+      }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);
       console.error("Error accessing microphone:", error);
@@ -108,6 +138,7 @@ export default function PronunciationWordPracticePage() {
 
   // Stop recording
   const stopRecording = () => {
+    clearRecordingTimers();
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -118,6 +149,15 @@ export default function PronunciationWordPracticePage() {
   // Results are displayed immediately, analytics saved in background
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentWord || !user?.id) return;
+
+    // Safety net: reject recordings that somehow escaped the auto-stop timer
+    if (audioBlob.size > 0) {
+      const durationEstimate = audioBlob.size / 6000; // ~6 KB/s for opus webm
+      if (durationEstimate > MAX_RECORDING_SECONDS + 10) {
+        toast.error(`Recording too long (max ${MAX_RECORDING_SECONDS}s). Please try again.`);
+        return;
+      }
+    }
 
     setIsAnalyzing(true);
     setPronunciationScore(null);
@@ -235,7 +275,7 @@ export default function PronunciationWordPracticePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -247,7 +287,7 @@ export default function PronunciationWordPracticePage() {
 
   if (error || !problem) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -268,7 +308,7 @@ export default function PronunciationWordPracticePage() {
 
   if (words.length === 0 || filteredWords.length === 0) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -293,7 +333,7 @@ export default function PronunciationWordPracticePage() {
   const isPassed = wordProgress?.passed || (pronunciationScore && pronunciationScore.speechace_score.pronunciation >= 70);
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
@@ -448,23 +488,35 @@ export default function PronunciationWordPracticePage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Record your pronunciation
               </h3>
-              <div className="relative">
+              <div className="relative w-24 h-24 mx-auto">
+                {isRecording && (
+                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+                    <circle cx="48" cy="48" r="44" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+                    <circle
+                      cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
+                      strokeDasharray={2 * Math.PI * 44}
+                      strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
+                      strokeLinecap="round"
+                      className="transition-[stroke-dashoffset] duration-1000 linear"
+                    />
+                  </svg>
+                )}
                 <button
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={isAnalyzing}
-                  className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${isRecording
+                  className={`absolute inset-0 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${isRecording
                       ? "bg-red-500 hover:bg-red-600 animate-pulse"
                       : "bg-blue-500 hover:bg-blue-600"
                     }`}
                 >
                   <Mic className="w-12 h-12 text-white" />
                 </button>
-                {isRecording && (
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
-                    Recording... Tap to stop
-                  </div>
-                )}
               </div>
+              {isRecording && (
+                <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
+                  {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
+                </div>
+              )}
               {!isRecording && !isAnalyzing && !pronunciationScore && (
                 <p className="text-sm text-gray-500 mt-4">
                   Tap the microphone to start recording

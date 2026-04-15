@@ -107,6 +107,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const MAX_RECORDING_SECONDS = 120;
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // AI turn state - use ref for synchronous tracking to prevent double-play
   const playedAITurnsRef = useRef<Set<number>>(new Set());
@@ -222,11 +226,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         setTimeout(moveToNextTurn, 300);
       };
       audio.onerror = async () => {
-        // Fallback to TTS
         console.warn("Pre-generated audio failed, falling back to TTS");
         try {
           await playTTSAudio(turn.text);
-          // TTS plays async, wait a bit then move on
           setTimeout(moveToNextTurn, 500);
         } catch {
           moveToNextTurn();
@@ -235,9 +237,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
       try {
         await audio.play();
-      } catch (err) {
-        console.error("Error playing pre-generated audio:", err);
-        // Fallback to TTS
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error("Error playing pre-generated audio:", err);
+        }
         try {
           await playTTSAudio(turn.text);
           setTimeout(moveToNextTurn, 500);
@@ -273,6 +276,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
   }, [currentTurnIndex, currentTurn, isAITurn, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
 
+  const clearRecordingTimers = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
+  };
+
   // Recording functions
   const startRecording = async () => {
     if (!isStudentTurn) return;
@@ -281,6 +289,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: "audio/webm;codecs=opus",
+        audioBitsPerSecond: 32000,
       });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -299,13 +308,24 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
       mediaRecorder.start();
       setIsRecording(true);
+      setRecordingSeconds(0);
       setPronunciationScore(null);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      autoStopTimerRef.current = setTimeout(() => {
+        stopRecording();
+        toast.info("Recording stopped — 2 minute limit reached.");
+      }, MAX_RECORDING_SECONDS * 1000);
     } catch (error: any) {
       toast.error("Failed to access microphone: " + error.message);
     }
   };
 
   const stopRecording = () => {
+    clearRecordingTimers();
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -533,15 +553,17 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
   };
 
-  // Cleanup audio on unmount
+  // Cleanup audio and recording timers on unmount
   useEffect(() => {
     return () => {
+      clearRecordingTimers();
       if (preGenAudioRef.current) {
         preGenAudioRef.current.pause();
         preGenAudioRef.current = null;
       }
       stopTTSAudio();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopTTSAudio]);
 
   if (isCompleted) {
@@ -816,40 +838,60 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
               {/* Recording Button */}
               <div className="flex flex-col items-center mb-6">
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isAnalyzing || currentProgress.passed}
-                  className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${currentProgress.passed
-                      ? "bg-green-500 cursor-default"
-                      : isRecording
-                        ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                        : isAnalyzing
-                          ? "bg-gray-300 cursor-not-allowed"
-                          : "bg-blue-500 hover:bg-blue-600"
-                    }`}
-                >
-                  {currentProgress.passed ? (
-                    <CheckCircle className="w-12 h-12 text-white" />
-                  ) : isRecording ? (
-                    <Square className="w-10 h-10 text-white" />
-                  ) : isAnalyzing ? (
-                    <Loader2 className="w-10 h-10 text-white animate-spin" />
-                  ) : (
-                    <Mic className="w-12 h-12 text-white" />
+                <div className="relative w-24 h-24">
+                  {isRecording && (
+                    <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+                      <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+                      <circle
+                        cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
+                        strokeDasharray={2 * Math.PI * 44}
+                        strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
+                        strokeLinecap="round"
+                        className="transition-[stroke-dashoffset] duration-1000 linear"
+                      />
+                    </svg>
                   )}
-                </button>
+                  <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isAnalyzing || currentProgress.passed}
+                    className={`absolute inset-0 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${currentProgress.passed
+                        ? "bg-green-500 cursor-default"
+                        : isRecording
+                          ? "bg-red-500 hover:bg-red-600"
+                          : isAnalyzing
+                            ? "bg-gray-300 cursor-not-allowed"
+                            : "bg-blue-500 hover:bg-blue-600"
+                      }`}
+                  >
+                    {currentProgress.passed ? (
+                      <CheckCircle className="w-12 h-12 text-white" />
+                    ) : isRecording ? (
+                      <Square className="w-10 h-10 text-white" />
+                    ) : isAnalyzing ? (
+                      <Loader2 className="w-10 h-10 text-white animate-spin" />
+                    ) : (
+                      <Mic className="w-12 h-12 text-white" />
+                    )}
+                  </button>
+                </div>
 
-                <p className="text-sm text-gray-600 mt-3 text-center">
-                  {currentProgress.passed ? (
-                    <span className="text-green-600 font-medium">Line passed! ✓</span>
-                  ) : isRecording ? (
-                    <span className="text-red-600 font-medium">Recording... Tap to stop</span>
-                  ) : isAnalyzing ? (
-                    <span className="text-blue-600">Analyzing your pronunciation...</span>
-                  ) : (
-                    <span>Tap to record your line</span>
-                  )}
-                </p>
+                {isRecording && (
+                  <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
+                    {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
+                  </div>
+                )}
+
+                {!isRecording && (
+                  <p className="text-sm text-gray-600 mt-3 text-center">
+                    {currentProgress.passed ? (
+                      <span className="text-green-600 font-medium">Line passed! ✓</span>
+                    ) : isAnalyzing ? (
+                      <span className="text-blue-600">Analyzing your pronunciation — longer recordings may take a moment...</span>
+                    ) : (
+                      <span>Tap to record your line</span>
+                    )}
+                  </p>
+                )}
 
                 {currentProgress.attempts > 0 && !currentProgress.passed && (
                   <p className="text-xs text-gray-500 mt-1">

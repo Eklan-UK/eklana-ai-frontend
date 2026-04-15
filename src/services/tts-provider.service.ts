@@ -119,6 +119,7 @@ export async function generateElevenLabsAudio(
       tts_code: errorInfo.code,
       voice_id: voiceId,
       text_len: options.text.length,
+      key_len: apiKey.length,
       latency_ms: Date.now() - startedAt,
     });
     throw new TTSProviderError(errorInfo);
