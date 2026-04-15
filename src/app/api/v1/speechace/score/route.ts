@@ -1,6 +1,8 @@
 // POST /api/v1/speechace/score
 // Score pronunciation using Speechace API
 import { NextRequest, NextResponse } from 'next/server';
+
+export const maxDuration = 300; // Allow up to 5 min for Speechace to process long audio
 import { withAuth } from '@/lib/api/middleware';
 import { speechaceService } from '@/lib/api/speechace.service';
 import { logger } from '@/lib/api/logger';

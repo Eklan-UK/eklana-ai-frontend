@@ -885,7 +885,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                     {currentProgress.passed ? (
                       <span className="text-green-600 font-medium">Line passed! ✓</span>
                     ) : isAnalyzing ? (
-                      <span className="text-blue-600">Analyzing your pronunciation...</span>
+                      <span className="text-blue-600">Analyzing your pronunciation — longer recordings may take a moment...</span>
                     ) : (
                       <span>Tap to record your line</span>
                     )}
