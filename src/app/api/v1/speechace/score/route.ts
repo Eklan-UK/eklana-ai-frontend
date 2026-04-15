@@ -12,6 +12,12 @@ async function handler(
 	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string }
 ): Promise<NextResponse> {
+	// #region agent log
+	const _stagingKeyPresent = !!(process.env.SPEECHACE_API_KEY);
+	const _stagingKeyPrefix = process.env.SPEECHACE_API_KEY ? process.env.SPEECHACE_API_KEY.substring(0, 6) : 'MISSING';
+	console.log(`[speechace/score] >>> ROUTE HIT at ${new Date().toISOString()} | key_present=${_stagingKeyPresent} | key_prefix=${_stagingKeyPrefix} | content-length=${req.headers.get('content-length')}`);
+	fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'score/route.ts:entry',message:'route handler hit',data:{keyPresent:_stagingKeyPresent,keyPrefix:_stagingKeyPrefix,contentLength:req.headers.get('content-length')},timestamp:Date.now(),hypothesisId:'H-A,H-B,H-C'})}).catch(()=>{});
+	// #endregion
 	try {
 		const body = await req.json();
 		const { text, audioBase64, questionInfo } = body;
@@ -57,6 +63,12 @@ async function handler(
 			cleanAudioBase64 = audioBase64.split(',')[1];
 		}
 
+		// #region agent log
+		const _base64Bytes = cleanAudioBase64.length;
+		const _bufferBytes = Math.floor(_base64Bytes * 0.75);
+		console.log(`[speechace/score] >>> PAYLOAD: base64Len=${_base64Bytes} estimatedBufferBytes=${_bufferBytes} textLen=${text.length}`);
+		fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'score/route.ts:pre-call',message:'payload details before Speechace call',data:{base64Len:_base64Bytes,estimatedBufferBytes:_bufferBytes,textLen:text.length},timestamp:Date.now(),hypothesisId:'H-B,H-D'})}).catch(()=>{});
+		// #endregion
 		// Call Speechace service
 		const result = await speechaceService.scorePronunciation(
 			text,
@@ -80,6 +92,10 @@ async function handler(
 			{ status: 200 }
 		);
 	} catch (error: any) {
+		// #region agent log
+		console.error(`[speechace/score] >>> ERROR: ${error.message}`, error.stack);
+		fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3e4a0a'},body:JSON.stringify({sessionId:'3e4a0a',location:'score/route.ts:catch',message:'handler caught error',data:{errorMessage:error.message,errorName:error.name},timestamp:Date.now(),hypothesisId:'H-A,H-C,H-D,H-E'})}).catch(()=>{});
+		// #endregion
 		logger.error('Error scoring pronunciation', {
 			error: error.message,
 			stack: error.stack,
