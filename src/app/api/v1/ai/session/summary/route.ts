@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/api/db";
 import { Types } from "mongoose";
 import { z } from "zod";
 import AiSession from "@/models/ai-session";
-import type { AiSessionMode, TranscriptTurn } from "@/types/ai-session-summary";
+import type { AiSessionMode, SessionSummaryContext, TranscriptTurn } from "@/types/ai-session-summary";
 import { generateSessionSummaryFromTranscript } from "@/services/summary.service";
 import { logger } from "@/lib/api/logger";
 
@@ -19,6 +19,8 @@ const bodySchema = z.object({
   mode: z.enum(["free", "topic", "drill"]),
   topic: z.string().optional(),
   drillId: z.string().optional(),
+  /** Short human-readable session focus (e.g. drill title + type) for tailored summaries. */
+  focusLabel: z.string().max(240).optional(),
 });
 
 async function handler(
@@ -47,7 +49,13 @@ async function handler(
 
     await connectToDatabase();
 
-    const summary = await generateSessionSummaryFromTranscript(transcript);
+    const summaryContext: SessionSummaryContext = {
+      mode: validated.mode as AiSessionMode,
+      topic: validated.topic?.trim() || undefined,
+      focusLabel: validated.focusLabel?.trim() || undefined,
+    };
+
+    const summary = await generateSessionSummaryFromTranscript(transcript, summaryContext);
 
     const drillOid =
       validated.drillId && Types.ObjectId.isValid(validated.drillId)

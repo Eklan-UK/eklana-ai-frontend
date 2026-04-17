@@ -4,7 +4,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
-import type { SessionSummaryPayload, TranscriptTurn } from "@/types/ai-session-summary";
+import type {
+  SessionSummaryContext,
+  SessionSummaryPayload,
+  TranscriptTurn,
+} from "@/types/ai-session-summary";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const FALLBACK_MODEL = "gemini-2.0-flash";
@@ -79,7 +83,7 @@ async function callModelWithRetry(
     try {
       const model = genAI!.getGenerativeModel({
         model: modelName,
-        generationConfig: { temperature: 0.35, maxOutputTokens: 1200 },
+        generationConfig: { temperature: 0.4, maxOutputTokens: 1800 },
       });
       const result = await model.generateContent(prompt);
       return parseJsonObject(result.response.text());
@@ -101,38 +105,65 @@ async function callModelWithRetry(
  * Analyze transcript and return structured feedback for the learner.
  * Never throws on model failures — falls back through models then to a safe default.
  */
+function buildSummaryPrompt(
+  messages: TranscriptTurn[],
+  context: SessionSummaryContext,
+): string {
+  const lines = messages
+    .map((m) => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`)
+    .join("\n");
+
+  const modeLine =
+    context.mode === "drill"
+      ? "Structured drill / guided practice"
+      : context.mode === "topic"
+        ? `Themed practice${context.topic ? ` (topic slug: ${context.topic})` : ""}`
+        : "Open free conversation";
+
+  const focusBlock = context.focusLabel
+    ? `Practice focus (use this to frame goals and vocabulary): "${context.focusLabel}"\n`
+    : "";
+
+  return `You are an expert English teacher writing a personalized wrap-up for ONE completed practice session.
+
+SESSION CONTEXT (must shape your feedback — do not ignore):
+- Mode: ${context.mode} — ${modeLine}
+${focusBlock}
+FULL TRANSCRIPT (your evidence base — every claim must trace back here):
+${lines}
+
+Respond with ONLY valid JSON (no markdown, no code fences) in this exact shape:
+{
+  "grammar": { "headline": "short label", "detail": "one sentence" },
+  "vocabulary": { "headline": "short label", "detail": "one sentence" },
+  "flow": { "headline": "short label", "detail": "one sentence" },
+  "strengths": ["2–4 items"],
+  "tips": ["2–4 items"],
+  "encouragement": "One warm sentence; start with praise (Great job / Nice work / Well done).",
+  "overallScore": 75
+}
+
+STRICT PERSONALIZATION RULES:
+1. grammar.detail MUST quote or closely paraphrase something the Student actually wrote (short clause). If their grammar was very clean, name the pattern they handled well with an example from the transcript.
+2. vocabulary.detail MUST mention specific words or phrases the Student used, OR a clear gap (e.g. repeated simple word where a richer alternative appeared in the Tutor turn). No generic "expand vocabulary" without a transcript anchor.
+3. flow.detail MUST describe how the Student responded to the Tutor in this chat (e.g. elaboration, answering the question, staying on ${context.mode === "topic" ? "the topic" : context.mode === "drill" ? "the drill task" : "the thread"}).
+4. Every item in "strengths" must reference a concrete Student turn or pattern visible above (no platitudes like "you practiced English").
+5. Every item in "tips" must fix something observable in THIS transcript only (not advice for "learners in general").
+6. encouragement must name one specific positive from this session (topic, idea, or sentence they produced).
+7. overallScore: 0–100 holistic for THIS session only; if the Student had very few short turns, score modestly and say so implicitly in tips.
+8. If the transcript is mostly voice placeholders (e.g. "[Voice message]" with little text), infer only from available Tutor prompts and visible Student text — do not invent Student quotes.
+9. All text in English.`;
+}
+
 export async function generateSessionSummaryFromTranscript(
   messages: TranscriptTurn[],
+  context: SessionSummaryContext,
 ): Promise<SessionSummaryPayload> {
   if (!genAI) {
     throw new Error("Gemini API is not configured");
   }
 
-  const lines = messages
-    .map((m) => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`)
-    .join("\n");
-
-  const prompt = `You are an expert English teacher. Read this English practice conversation and give concise, encouraging feedback.
-
-Conversation:
-${lines}
-
-Respond with ONLY valid JSON (no markdown fences) in this exact shape:
-{
-  "grammar": { "headline": "short label", "detail": "one sentence" },
-  "vocabulary": { "headline": "short label", "detail": "one sentence" },
-  "flow": { "headline": "short label", "detail": "one sentence" },
-  "strengths": ["bullet 1", "bullet 2", "up to 4 items"],
-  "tips": ["actionable tip 1", "tip 2", "up to 4 items"],
-  "encouragement": "One warm sentence starting with praise (Great job / Nice work / Well done).",
-  "overallScore": 75
-}
-
-Rules:
-- overallScore is 0-100 for overall spoken English quality in this chat (holistic).
-- Be specific to what the student actually said; avoid generic filler.
-- If the student barely spoke, lower the score and keep tips short and kind.
-- All text in English.`;
+  const prompt = buildSummaryPrompt(messages, context);
 
   // 1. Try primary model with retries
   try {
