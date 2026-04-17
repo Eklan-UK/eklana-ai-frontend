@@ -61,7 +61,7 @@ async function postHandler(
 
     const audioBuffer = await generateGeminiTTSAudio(text, voiceName);
 
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: {
         'Content-Type': 'audio/wav',
         'Cache-Control': 'no-store',
