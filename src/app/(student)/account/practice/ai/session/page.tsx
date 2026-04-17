@@ -924,9 +924,11 @@ function AISessionPage() {
             ]);
           } else {
             // Free talk voice: use Live API + built-in transcription.
-            const contextPrompt = topic
-              ? `Practice English in a ${topic.replace(/-/g, " ")} conversation. Be natural, encouraging, and conversational.`
-              : "Practice English conversation. Be natural, encouraging, and conversational.";
+          const contextPrompt = topic
+            ? topic === "pressure-test"
+              ? "Ekln Pressure Test: respond quickly. Keep your replies brief and natural. If the user is slow, nudge them to answer sooner, then continue with the next prompt."
+              : `Practice English in a ${topic.replace(/-/g, " ")} conversation. Be natural, encouraging, and conversational.`
+            : "Practice English conversation. Be natural, encouraging, and conversational.";
 
             await aiService.streamVoiceConversationMessage(
               {

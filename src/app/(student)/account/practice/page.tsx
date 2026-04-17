@@ -72,6 +72,18 @@ export default function PracticePage() {
           />
         )}
 
+        {/* ── Pressure Test Card ── */}
+        <div className="mb-8">
+          <PracticeCard
+            href="/account/practice/ai/pressure-test"
+            iconBg="bg-[#3B883E]"
+            iconSrc="/icons/logo-yellow.svg"
+            title="Eklan Pressure Test"
+            subtitle="Test your response speed in a real-life scenario."
+            meta={[]}
+          />
+        </div>
+
         {/* ── Practice Freely Section ── */}
         <div className="mb-8">
           <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Practice freely</h2>
