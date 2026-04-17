@@ -20,8 +20,8 @@ if (config.GEMINI_API_KEY) {
 	logger.warn('Gemini API key not configured. AI features will not work.');
 }
 
-// Text model (for non-drill functions — cheaper, no "thinking" overhead)
-// gemini-2.5-flash-lite: 20 req/day free tier (resets daily); 2.0-flash-lite has limit:0 on this key
+// Text model (for non-drill functions — transcription, chat)
+// gemini-2.5-flash-lite: 20 req/day on the free tier; upgrade Gemini billing for higher limits
 const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
 /** Low-latency chat + streaming (see config.GEMINI_CHAT_MODEL). */
@@ -1090,6 +1090,26 @@ interface LiveSessionEntry {
 const LIVE_SESSION_IDLE_MS = 3 * 60 * 1000;
 const liveSessionCache = new Map<string, LiveSessionEntry>();
 
+/** Close WebSocket and drop cache entry. Used after each Free Talk turn — reused sessions
+ *  often never emit audio on the next turn (runtime: turn 2 → timeout_no_response, 0 chunks). */
+function evictLiveSessionByKey(key: string) {
+	const entry = liveSessionCache.get(key);
+	if (!entry) return;
+	if (entry.idleTimer) {
+		clearTimeout(entry.idleTimer);
+		entry.idleTimer = null;
+	}
+	entry.onTurnMessage = null;
+	entry.onTurnError = null;
+	entry.onTurnClose = null;
+	try {
+		entry.session?.close?.();
+	} catch {
+		/* ignore */
+	}
+	liveSessionCache.delete(key);
+}
+
 function resetSessionIdleTimer(key: string, entry: LiveSessionEntry) {
 	if (entry.idleTimer) clearTimeout(entry.idleTimer);
 	entry.idleTimer = setTimeout(() => {
@@ -1178,14 +1198,14 @@ async function getOrCreateLiveSession(
 }
 
 // ─── Voice conversation (Live API + built-in transcription, SSE) ──────────
-// Persistent-socket voice pipeline: mic audio → reused Gemini Live socket
-// → audio + text SSE.  Each turn reuses the cached WS, saving ~1-2 s per turn.
+// Mic audio → Gemini Live WebSocket → audio + text SSE. After each turn the Live
+// session is closed and evicted — reused sockets often produced no audio on
+// turn 2+ (timeout_no_response). Context is re-sent via systemInstruction + history.
 //
 // Key design decisions (per Google Live API docs):
 //   1. Audio input MUST be raw PCM 16-bit, 16 kHz, little-endian mono.
 //   2. Use sendRealtimeInput({ audio }) — enables automatic VAD + transcription.
 //   3. Disable thinking (thinkingBudget: 0) for lowest latency.
-//   4. Conversation context is maintained naturally by the live session.
 export async function generateVoiceConversationSSEStream(
 	audioBuffer: Buffer,
 	conversationHistory: ConversationMessage[] = [],
@@ -1210,8 +1230,7 @@ export async function generateVoiceConversationSSEStream(
 	const pcmBase64 = pcmBuffer.toString('base64');
 	const pcmBytes  = pcmBuffer.length;
 
-	// Build system instruction — only used when a NEW session is opened.
-	// On reused sessions the model already holds conversation context.
+	// Build system instruction — applied on each new Live connection (we evict after each turn).
 	const persona = contextPrompt ||
 		'You are Eklan, a friendly AI English speaking practice partner. Your role is to have natural, encouraging conversations to help the student improve their English.';
 	let systemInstruction = persona;
@@ -1226,7 +1245,7 @@ export async function generateVoiceConversationSSEStream(
 			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 
-	// ② Get or create a cached WebSocket session (saves ~1-2 s per turn after the first).
+	// ② Live session key (cache is evicted after each completed turn — see closeStream).
 	const cacheKey = userId ? `freetalk_${userId}` : `freetalk_anon_${Date.now()}`;
 	const tSession = Date.now();
 	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
@@ -1259,97 +1278,113 @@ export async function generateVoiceConversationSSEStream(
 				}
 			};
 
-			const fullAssistantText: string[] = [];
-			let fullUserText = '';
-			let metadataSent = false;
-			let tFirstChunk   = 0;
+		const fullAssistantText: string[] = [];
+		let fullUserText = '';
+		let metadataSent = false;
+		let tFirstChunk   = 0;
 
-			const releaseSession = () => {
-				entry.onTurnMessage = null;
-				entry.onTurnError   = null;
-				entry.onTurnClose   = null;
-				if (entry.status === 'busy') entry.status = 'ready';
-			};
+		const releaseSession = () => {
+			entry.onTurnMessage = null;
+			entry.onTurnError   = null;
+			entry.onTurnClose   = null;
+			if (entry.status === 'busy') entry.status = 'ready';
+		};
 
-			const clearTimers = () => {
-				if (sseCtx.timeoutHandle !== undefined) {
-					clearTimeout(sseCtx.timeoutHandle);
-					sseCtx.timeoutHandle = undefined;
-				}
-				if (sseCtx.turnCompleteHandle !== undefined) {
-					clearTimeout(sseCtx.turnCompleteHandle);
-					sseCtx.turnCompleteHandle = undefined;
-				}
-			};
+		const clearTimers = () => {
+			if (sseCtx.timeoutHandle !== undefined) {
+				clearTimeout(sseCtx.timeoutHandle);
+				sseCtx.timeoutHandle = undefined;
+			}
+			if (sseCtx.turnCompleteHandle !== undefined) {
+				clearTimeout(sseCtx.turnCompleteHandle);
+				sseCtx.turnCompleteHandle = undefined;
+			}
+		};
 
-			const closeStream = (reason?: string) => {
-				if (sseCtx.streamClosed) return;
-				sseCtx.streamClosed = true;
-				clearTimers();
-				releaseSession();
-				if (reason) logger.info('[FreeTalk] stream closed', { reason });
-				try {
-					controller.close();
-				} catch (e: unknown) {
-					const err = e as { code?: string };
-					if (err?.code !== 'ERR_INVALID_STATE') throw e;
-				}
-			};
+		const closeStream = (reason?: string) => {
+			if (sseCtx.streamClosed) return;
+			sseCtx.streamClosed = true;
+			clearTimers();
+			releaseSession();
+			evictLiveSessionByKey(cacheKey);
+			if (reason) logger.info('[FreeTalk] stream closed', { reason });
+			try {
+				controller.close();
+			} catch (e: unknown) {
+				const err = e as { code?: string };
+				if (err?.code !== 'ERR_INVALID_STATE') throw e;
+			}
+		};
 
-			// Per-turn message handler
-			entry.onTurnMessage = (message: LiveServerMessage) => {
-				if (message.data) {
-					if (!tFirstChunk) {
-						tFirstChunk = Date.now();
-						logger.info('[FreeTalk] ③ first audio chunk', { ms: tFirstChunk - tSession });
-					}
-					sendChunk('audio', message.data);
-				}
-				const inputText = (message.serverContent as any)?.inputTranscription?.text;
-				if (inputText) fullUserText += inputText;
-
-				const outputText = message.serverContent?.outputTranscription?.text;
-				if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
-
-				if (message.serverContent?.turnComplete && !metadataSent) {
-					metadataSent = true;
-					sseCtx.turnCompleteHandle = setTimeout(() => {
-						sseCtx.turnCompleteHandle = undefined;
-						if (sseCtx.streamClosed) return;
-						logger.info('[FreeTalk] ④ turn complete', {
-							totalMs:      Date.now() - t0,
-							ffmpegMs:     tSession - t0,
-							sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
-							firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
-						});
-						sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
-						closeStream('turnComplete');
-					}, 800);
-				}
-			};
-
-			entry.onTurnError = (e: ErrorEvent) => {
-				logger.error('[FreeTalk] WS error on turn', { error: e?.message });
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
-				closeStream('error');
-			};
-
-			entry.onTurnClose = (e: CloseEvent) => {
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
-				closeStream('onclose');
-			};
-
+		// Two-stage timeout: 45 s for first audio chunk, then 90 s to complete.
+		// This prevents the 55 s hard cut when Gemini 2.5 Flash spends a long time
+		// on its thinking pass before producing audio (the original cut-off bug).
+		const scheduleFirstChunkTimeout = () => {
 			sseCtx.timeoutHandle = setTimeout(() => {
 				sseCtx.timeoutHandle = undefined;
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
-				closeStream('timeout');
-			}, 55000);
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: '', inputText: '', error: 'timeout_no_response' }); }
+				closeStream('timeout_no_response');
+			}, 45_000);
+		};
+		const resetToStreamCompleteTimeout = () => {
+			if (sseCtx.timeoutHandle !== undefined) { clearTimeout(sseCtx.timeoutHandle); }
+			sseCtx.timeoutHandle = setTimeout(() => {
+				sseCtx.timeoutHandle = undefined;
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout_stream_too_long' }); }
+				closeStream('timeout_stream_too_long');
+			}, 90_000);
+		};
 
-			// Send audio — session is already open
-			entry.status = 'busy';
-			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-			entry.session.sendRealtimeInput({ audioStreamEnd: true });
-			logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.onTurnMessage = (message: LiveServerMessage) => {
+			if (message.data) {
+				if (!tFirstChunk) {
+					tFirstChunk = Date.now();
+					resetToStreamCompleteTimeout();
+					logger.info('[FreeTalk] ③ first audio chunk', { ms: tFirstChunk - tSession });
+				}
+				sendChunk('audio', message.data);
+			}
+			const inputText = (message.serverContent as any)?.inputTranscription?.text;
+			if (inputText) fullUserText += inputText;
+
+			const outputText = message.serverContent?.outputTranscription?.text;
+			if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+
+			if (message.serverContent?.turnComplete && !metadataSent) {
+				metadataSent = true;
+				sseCtx.turnCompleteHandle = setTimeout(() => {
+					sseCtx.turnCompleteHandle = undefined;
+					if (sseCtx.streamClosed) return;
+					logger.info('[FreeTalk] ④ turn complete', {
+						totalMs:      Date.now() - t0,
+						ffmpegMs:     tSession - t0,
+						sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
+						firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+					});
+					sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
+					closeStream('turnComplete');
+				}, 800);
+			}
+		};
+
+		entry.onTurnError = (e: ErrorEvent) => {
+			logger.error('[FreeTalk] WS error on turn', { error: e?.message });
+			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
+			closeStream('error');
+		};
+
+		entry.onTurnClose = (e: CloseEvent) => {
+			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
+			closeStream('onclose');
+		};
+
+		scheduleFirstChunkTimeout();
+
+		// Send audio — session is already open
+		entry.status = 'busy';
+		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
+		entry.session.sendRealtimeInput({ audioStreamEnd: true });
+		logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
@@ -1362,10 +1397,7 @@ export async function generateVoiceConversationSSEStream(
 				clearTimeout(sseCtx.turnCompleteHandle);
 				sseCtx.turnCompleteHandle = undefined;
 			}
-			entry.onTurnMessage = null;
-			entry.onTurnError   = null;
-			entry.onTurnClose   = null;
-			if (entry.status === 'busy') entry.status = 'ready';
+			evictLiveSessionByKey(cacheKey);
 			logger.info('[FreeTalk] stream cancelled', { reason: String(reason) });
 		},
 	});
@@ -1454,101 +1486,115 @@ export async function generateDrillPracticeVoiceResponseStream(
 				}
 			};
 
-			const fullAssistantText: string[] = [];
-			let fullUserText = '';
-			let metadataSent = false;
-			let tFirstChunk   = 0;
+		const fullAssistantText: string[] = [];
+		let fullUserText = '';
+		let metadataSent = false;
+		let tFirstChunk   = 0;
 
-			const releaseSession = () => {
-				entry.onTurnMessage = null;
-				entry.onTurnError   = null;
-				entry.onTurnClose   = null;
-				if (entry.status === 'busy') entry.status = 'ready';
-			};
+		const releaseSession = () => {
+			entry.onTurnMessage = null;
+			entry.onTurnError   = null;
+			entry.onTurnClose   = null;
+			if (entry.status === 'busy') entry.status = 'ready';
+		};
 
-			const clearTimers = () => {
-				if (sseCtx.timeoutHandle !== undefined) {
-					clearTimeout(sseCtx.timeoutHandle);
-					sseCtx.timeoutHandle = undefined;
-				}
-				if (sseCtx.turnCompleteHandle !== undefined) {
-					clearTimeout(sseCtx.turnCompleteHandle);
-					sseCtx.turnCompleteHandle = undefined;
-				}
-			};
+		const clearTimers = () => {
+			if (sseCtx.timeoutHandle !== undefined) {
+				clearTimeout(sseCtx.timeoutHandle);
+				sseCtx.timeoutHandle = undefined;
+			}
+			if (sseCtx.turnCompleteHandle !== undefined) {
+				clearTimeout(sseCtx.turnCompleteHandle);
+				sseCtx.turnCompleteHandle = undefined;
+			}
+		};
 
-			const closeStream = (reason?: string) => {
-				if (sseCtx.streamClosed) return;
-				sseCtx.streamClosed = true;
-				clearTimers();
-				releaseSession();
-				if (reason) logger.info('[Drill] stream closed', { reason });
-				try {
-					controller.close();
-				} catch (e: unknown) {
-					const err = e as { code?: string };
-					if (err?.code !== 'ERR_INVALID_STATE') throw e;
-				}
-			};
+		const closeStream = (reason?: string) => {
+			if (sseCtx.streamClosed) return;
+			sseCtx.streamClosed = true;
+			clearTimers();
+			releaseSession();
+			if (reason) logger.info('[Drill] stream closed', { reason });
+			try {
+				controller.close();
+			} catch (e: unknown) {
+				const err = e as { code?: string };
+				if (err?.code !== 'ERR_INVALID_STATE') throw e;
+			}
+		};
 
-			entry.onTurnMessage = (message: LiveServerMessage) => {
-				if (message.data) {
-					if (!tFirstChunk) {
-						tFirstChunk = Date.now();
-						logger.info('[Drill] ③ first audio chunk', { ms: tFirstChunk - tSession });
-					}
-					sendChunk('audio', message.data);
-				}
-				const inputText = (message.serverContent as any)?.inputTranscription?.text;
-				if (inputText) fullUserText += inputText;
-
-				const outputText = message.serverContent?.outputTranscription?.text;
-				if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
-
-				if (message.serverContent?.turnComplete && !metadataSent) {
-					metadataSent = true;
-					sseCtx.turnCompleteHandle = setTimeout(() => {
-						sseCtx.turnCompleteHandle = undefined;
-						if (sseCtx.streamClosed) return;
-						logger.info('[Drill] ④ turn complete', {
-							totalMs:      Date.now() - t0,
-							ffmpegMs:     tSession - t0,
-							sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
-							firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
-						});
-						sendChunk('metadata', {
-							fullText:   fullAssistantText.join('').trim(),
-							inputText:  fullUserText.trim(),
-							drillType:  drill.type,
-							drillTitle: drill.title,
-						});
-						closeStream('turnComplete');
-					}, 800);
-				}
-			};
-
-			entry.onTurnError = (e: ErrorEvent) => {
-				logger.error('[Drill] WS error on turn', { error: e?.message });
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
-				closeStream('error');
-			};
-
-			entry.onTurnClose = (e: CloseEvent) => {
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
-				closeStream('onclose');
-			};
-
+		// Two-stage timeout: 45 s for first audio chunk, then 90 s to complete.
+		const scheduleFirstChunkTimeout = () => {
 			sseCtx.timeoutHandle = setTimeout(() => {
 				sseCtx.timeoutHandle = undefined;
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: 'timeout' }); }
-				closeStream('timeout');
-			}, 60000);
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: '', inputText: '', drillType: drill.type, drillTitle: drill.title, error: 'timeout_no_response' }); }
+				closeStream('timeout_no_response');
+			}, 45_000);
+		};
+		const resetToStreamCompleteTimeout = () => {
+			if (sseCtx.timeoutHandle !== undefined) { clearTimeout(sseCtx.timeoutHandle); }
+			sseCtx.timeoutHandle = setTimeout(() => {
+				sseCtx.timeoutHandle = undefined;
+				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), drillType: drill.type, drillTitle: drill.title, error: 'timeout_stream_too_long' }); }
+				closeStream('timeout_stream_too_long');
+			}, 90_000);
+		};
 
-			// Send audio — session is already open
-			entry.status = 'busy';
-			entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-			entry.session.sendRealtimeInput({ audioStreamEnd: true });
-			logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.onTurnMessage = (message: LiveServerMessage) => {
+			if (message.data) {
+				if (!tFirstChunk) {
+					tFirstChunk = Date.now();
+					resetToStreamCompleteTimeout();
+					logger.info('[Drill] ③ first audio chunk', { ms: tFirstChunk - tSession });
+				}
+				sendChunk('audio', message.data);
+			}
+			const inputText = (message.serverContent as any)?.inputTranscription?.text;
+			if (inputText) fullUserText += inputText;
+
+			const outputText = message.serverContent?.outputTranscription?.text;
+			if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+
+			if (message.serverContent?.turnComplete && !metadataSent) {
+				metadataSent = true;
+				sseCtx.turnCompleteHandle = setTimeout(() => {
+					sseCtx.turnCompleteHandle = undefined;
+					if (sseCtx.streamClosed) return;
+					logger.info('[Drill] ④ turn complete', {
+						totalMs:      Date.now() - t0,
+						ffmpegMs:     tSession - t0,
+						sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
+						firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+					});
+					sendChunk('metadata', {
+						fullText:   fullAssistantText.join('').trim(),
+						inputText:  fullUserText.trim(),
+						drillType:  drill.type,
+						drillTitle: drill.title,
+					});
+					closeStream('turnComplete');
+				}, 800);
+			}
+		};
+
+		entry.onTurnError = (e: ErrorEvent) => {
+			logger.error('[Drill] WS error on turn', { error: e?.message });
+			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
+			closeStream('error');
+		};
+
+		entry.onTurnClose = (e: CloseEvent) => {
+			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
+			closeStream('onclose');
+		};
+
+		scheduleFirstChunkTimeout();
+
+		// Send audio — session is already open
+		entry.status = 'busy';
+		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
+		entry.session.sendRealtimeInput({ audioStreamEnd: true });
+		logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
@@ -1907,4 +1953,46 @@ export async function generateTopicPracticeResponseStream(
 		});
 		throw new Error(`Failed to generate topic practice response: ${error.message}`);
 	}
+}
+
+// ─── Gemini TTS (text-to-speech via generateContent) ─────────────────────────
+// Uses gemini-2.5-flash-preview-tts which returns PCM audio inline.
+// Much cheaper than ElevenLabs for the pressure test AI voice.
+
+const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+
+/**
+ * Generate TTS audio using Gemini's native TTS model.
+ * Returns a WAV audio Buffer (raw PCM wrapped in a RIFF/WAV header at 24 kHz).
+ */
+export async function generateGeminiTTSAudio(
+	text: string,
+	voiceName: string = 'Kore',
+): Promise<Buffer> {
+	if (!genAINew) {
+		throw new Error('Gemini API is not configured');
+	}
+
+	const response = await genAINew.models.generateContent({
+		model: GEMINI_TTS_MODEL,
+		contents: [{ role: 'user', parts: [{ text }] }],
+		config: {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: {
+				voiceConfig: {
+					prebuiltVoiceConfig: { voiceName },
+				},
+			},
+		},
+	});
+
+	const pcmBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+	if (!pcmBase64) {
+		throw new Error('Gemini TTS returned no audio data');
+	}
+
+	// Gemini TTS outputs PCM at 24 kHz — wrap in WAV header so browsers can play it.
+	const wavBase64 = pcmToWavBase64(pcmBase64, 24000);
+	return Buffer.from(wavBase64, 'base64');
 }

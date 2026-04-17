@@ -761,7 +761,9 @@ function AISessionPage() {
       }
 
     } catch (error: unknown) {
-      if ((error as { name?: string })?.name === "AbortError") return;
+      if ((error as { name?: string })?.name === "AbortError") {
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Failed to get AI response";
       toast.error(message || "Failed to get AI response");
@@ -1001,7 +1003,9 @@ function AISessionPage() {
             ]);
           }
         } catch (err: unknown) {
-          if ((err as { name?: string })?.name === "AbortError") return;
+          if ((err as { name?: string })?.name === "AbortError") {
+            return;
+          }
           const message =
             err instanceof Error ? err.message : "Failed to process voice.";
           toast.error(

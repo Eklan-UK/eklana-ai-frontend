@@ -7,11 +7,13 @@ import {
   ArrowLeft,
   Languages,
   Mic,
+  MoreVertical,
   Play,
   Send,
   Square,
   Trash2,
   Volume2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDrill } from "@/hooks/useDrills";
@@ -99,6 +101,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [reviewData, setReviewData] = useState<any | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   const [isTranscribing, setIsTranscribing] = useState(false);
 
@@ -109,6 +112,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     isPlaying: isTTSPlaying,
   } = useTTS({
     onError: () => {}, // silent — TTS is best-effort
+    apiPath: "/api/v1/pressure-test/tts",
   });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -128,6 +132,9 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
+
+  const analyzeAbortRef = useRef<AbortController | null>(null);
+  const isExitingRef = useRef(false);
 
   const firstName = useMemo(
     () => String(user?.firstName || user?.name || "there").trim().split(" ")[0],
@@ -156,6 +163,47 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     }
     analyserRef.current = null;
   }, []);
+
+  const stopAllActivity = useCallback(() => {
+    isExitingRef.current = true;
+
+    // Cancel any in-flight analysis request
+    analyzeAbortRef.current?.abort();
+    analyzeAbortRef.current = null;
+
+    // Stop TTS playback
+    stopTTS();
+
+    // Clear the recording timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Stop MediaRecorder and detach handlers so onstop callbacks don't fire
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      if (mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      mediaRecorderRef.current = null;
+    }
+    chunksRef.current = [];
+
+    // Release the microphone
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+
+    // Stop Web Speech recognition
+    try {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+    } catch (_) {}
+
+    // Cancel the waveform animation frame and close the AudioContext
+    stopVisualizer();
+  }, [stopTTS, stopVisualizer]);
 
   const startVisualizer = useCallback((stream: MediaStream) => {
     const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -280,18 +328,12 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      stopAllActivity();
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      stopVisualizer();
-      try { recognitionRef.current?.stop(); recognitionRef.current = null; } catch (_) {}
     };
-  }, [previewUrl, stopVisualizer]);
+  }, [stopAllActivity, previewUrl]);
 
   const startRecording = useCallback(async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:startRecording',message:'startRecording called',data:{isRecording,isAnalyzing,isAiTyping,hasAudio:!!recordedAudio},timestamp:Date.now(),hypothesisId:'H-A/H-C'})}).catch(()=>{});
-    // #endregion
     if (isRecording || isAnalyzing || isAiTyping) return;
     // Stop any AI voice so it doesn't bleed into the student's microphone
     stopTTS();
@@ -425,9 +467,6 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
       let finalText = "";
       setIsAiTyping(true);
       setMessages((prev) => [...prev, { role: "ai", text: "" }]);
-      // #region agent log
-      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:streamAiReply-start',message:'streamAiReply started',data:{turnNumber,payloadLen:nextMessages.length},timestamp:Date.now(),hypothesisId:'H-D'})}).catch(()=>{});
-      // #endregion
 
       const updateLastAi = (text: string) => {
         setMessages((prev) => {
@@ -480,15 +519,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   );
 
   const submitTurn = useCallback(async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:submitTurn-entry',message:'submitTurn called',data:{hasAudio:!!recordedAudio,isAiTyping,isAnalyzing,isTranscribing,turnNumber},timestamp:Date.now(),hypothesisId:'H-A/H-E'})}).catch(()=>{});
-    // #endregion
-    if (!recordedAudio || isAiTyping || isAnalyzing || isTranscribing) {
-      // #region agent log
-      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:submitTurn-guard',message:'submitTurn BLOCKED by guard',data:{hasAudio:!!recordedAudio,isAiTyping,isAnalyzing,isTranscribing},timestamp:Date.now(),hypothesisId:'H-A/H-E'})}).catch(()=>{});
-      // #endregion
-      return;
-    }
+    if (!recordedAudio || isAiTyping || isAnalyzing || isTranscribing) return;
 
     try {
       setIsTranscribing(true);
@@ -519,9 +550,6 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
       // Final fallback: audio was captured even without a transcript
       if (!userText) userText = "(voice response)";
 
-      // #region agent log
-      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:submitTurn-userText',message:'userText resolved (post-fix)',data:{userText,speechReady:!!speechReadyRef.current,speechRef:speechTranscriptRef.current,isFallback:userText==='(voice response)'},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H-B/H-C'})}).catch(()=>{});
-      // #endregion
       setIsTranscribing(false);
       const latestAiPrompt =
         [...messages].reverse().find((m) => m.role === "ai")?.text || "Prompt unavailable";
@@ -537,28 +565,32 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
       const nextTurns = [...turns, turnDraft];
       setTurns(nextTurns);
       resetRecording();
-      // #region agent log
-      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:submitTurn-setMessages',message:'adding user message',data:{userText,messagesCount:messages.length},timestamp:Date.now(),hypothesisId:'H-B/H-D'})}).catch(()=>{});
-      // #endregion
       setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
       if (turnNumber >= TOTAL_TURNS) {
         setIsAnalyzing(true);
-        const resultRes = await fetch("/api/v1/pressure-test/analyze", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            level: studentLevel,
-            drillId,
-            turns: nextTurns,
-          }),
-        });
-        const result = await resultRes.json();
-        // #region agent log
-        fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'PressureTestDrill.tsx:analyze-response',message:'analyze response received',data:{ok:resultRes.ok,hasData:!!result?.data,strengths:result?.data?.strengths,accuracy:result?.data?.sentenceAccuracy?.value},timestamp:Date.now(),hypothesisId:'EVAL'})}).catch(()=>{});
-        // #endregion
-        if (!resultRes.ok) throw new Error(result?.message || "Analysis failed");
+        const analyzeAc = new AbortController();
+        analyzeAbortRef.current = analyzeAc;
+        let resultRes: Response;
+        try {
+          resultRes = await fetch("/api/v1/pressure-test/analyze", {
+            method: "POST",
+            credentials: "include",
+            signal: analyzeAc.signal,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              level: studentLevel,
+              drillId,
+              turns: nextTurns,
+            }),
+          });
+        } finally {
+          if (analyzeAbortRef.current === analyzeAc) analyzeAbortRef.current = null;
+        }
+        // If the user exited while the request was in flight, don't touch state
+        if (isExitingRef.current) return;
+        const result = await resultRes!.json();
+        if (!resultRes!.ok) throw new Error(result?.message || "Analysis failed");
         setReviewData(result.data);
         setShowReview(true);
         setIsAnalyzing(false);
@@ -567,6 +599,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
       const historyWithUser = [...messages, { role: "user" as const, text: userText }];
       const aiText = await streamAiReply(historyWithUser, studentLevel);
+      if (isExitingRef.current) return;
       setTurnNumber((prev) => prev + 1);
       // Speak the AI's follow-up prompt aloud
       if (aiText) void playTTS(aiText);
@@ -600,7 +633,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => { stopAllActivity(); router.back(); }}
                 className="w-8 h-8 rounded-full bg-[#eff0ef] flex items-center justify-center"
                 aria-label="Go back"
               >
@@ -608,9 +641,40 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
               </button>
               <h1 className="text-md font-semibold text-gray-900 leading-tight">Pressure Test</h1>
             </div>
-            <span className="text-md font-medium text-gray-500 tabular-nums">
-              {turnNumber} of {TOTAL_TURNS}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-md font-medium text-gray-500 tabular-nums">
+                {turnNumber} of {TOTAL_TURNS}
+              </span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="More options"
+                >
+                  <MoreVertical className="w-5 h-5 text-gray-500" />
+                </button>
+                {showMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
+                    <div className="absolute right-0 top-10 z-40 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMenu(false);
+                          stopAllActivity();
+                          router.back();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>End Session</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
           <div className="ml-10 mt-2.5 h-1 rounded-full bg-[#dedede] overflow-hidden">
             <div className="h-full bg-[#4dab56] transition-all" style={{ width: progressWidth }} />
@@ -653,8 +717,14 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
                       <Languages className="w-4 h-4" />
                       <button
                         type="button"
-                        onClick={() => void playTTS(msg.text)}
-                        aria-label="Replay AI message"
+                        onClick={() => {
+                          if (isTTSGenerating || isTTSPlaying) {
+                            stopTTS();
+                          } else {
+                            void playTTS(msg.text);
+                          }
+                        }}
+                        aria-label={(isTTSGenerating || isTTSPlaying) ? "Stop audio" : "Play AI message"}
                         className="focus:outline-none"
                       >
                         <Volume2 className={`w-4 h-4 transition-colors ${(isTTSGenerating || isTTSPlaying) ? "text-emerald-600 animate-pulse" : "text-gray-500 hover:text-emerald-600"}`} />

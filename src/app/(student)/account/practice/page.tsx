@@ -15,6 +15,9 @@ function PracticeCard({
   title,
   subtitle,
   meta,
+  iconWidth = 24,
+  iconHeight = 24,
+  iconImageClassName = "brightness-0 invert",
 }: {
   href: string;
   iconBg: string;
@@ -22,14 +25,23 @@ function PracticeCard({
   title: string;
   subtitle: string;
   meta: string[];
+  iconWidth?: number;
+  iconHeight?: number;
+  iconImageClassName?: string;
 }) {
   return (
     <Link href={href}>
       <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-3 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] transition-transform cursor-pointer">
         <div
-          className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}
+          className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
         >
-          <Image src={iconSrc} alt={title} width={24} height={24} className="brightness-0 invert" />
+          <Image
+            src={iconSrc}
+            alt={title}
+            width={iconWidth}
+            height={iconHeight}
+            className={iconImageClassName}
+          />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-base font-bold font-nunito text-gray-900 mb-0.5">{title}</p>
@@ -76,11 +88,14 @@ export default function PracticePage() {
         <div className="mb-8">
           <PracticeCard
             href="/account/practice/ai/pressure-test"
-            iconBg="bg-[#3B883E]"
-            iconSrc="/icons/logo-yellow.svg"
+            iconBg="bg-[#2A602C]"
+            iconSrc="/Pressure_test_logo.svg"
             title="Eklan Pressure Test"
             subtitle="Test your response speed in a real-life scenario."
             meta={[]}
+            iconWidth={40}
+            iconHeight={38}
+            iconImageClassName=""
           />
         </div>
 

@@ -130,9 +130,6 @@ Return ONLY a valid JSON object with this exact shape (no markdown, no extra tex
     const validRating = (r: unknown): "strong" | "adequate" | "needs_work" =>
       r === "strong" || r === "needs_work" ? r : "adequate";
 
-    // #region agent log
-    try { await fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'analyze/route.ts:evaluateSession-success',message:'LLM eval SUCCESS',data:{model:config.GEMINI_CHAT_MODEL,accuracy:clamp(parsed.accuracy),confidence:clamp(parsed.confidence)},timestamp:Date.now(),hypothesisId:'EVAL'})}); } catch(_){}
-    // #endregion
     return {
       accuracy: clamp(parsed.accuracy) || 50,
       confidence: clamp(parsed.confidence) || 50,
@@ -147,11 +144,8 @@ Return ONLY a valid JSON object with this exact shape (no markdown, no extra tex
           }))
         : [],
     };
-  } catch (error: any) {
+  } catch (error) {
     logger.warn("Pressure-test LLM evaluation fallback used", { error });
-    // #region agent log
-    try { await fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'eb14d6'},body:JSON.stringify({sessionId:'eb14d6',location:'analyze/route.ts:evaluateSession-fallback',message:'LLM eval failed, using fallback',data:{model:config.GEMINI_CHAT_MODEL,errMsg:String(error?.message||error).slice(0,120)},timestamp:Date.now(),hypothesisId:'EVAL'})}); } catch(_){}
-    // #endregion
     return {
       accuracy: 50,
       confidence: 50,

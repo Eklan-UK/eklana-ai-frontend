@@ -133,6 +133,6 @@ async function handler(
 
 export const POST = withAuth(handler);
 
-// Allow enough time for native audio generation.
-export const maxDuration = 60;
+// Two-stage timeout: 45 s for first chunk + 90 s to complete = 135 s max server time.
+export const maxDuration = 300;
 
