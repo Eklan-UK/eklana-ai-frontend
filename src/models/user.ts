@@ -48,6 +48,7 @@ export interface IUser extends Document {
   subscriptionPaymentMethod?: string | null;
   subscriptionAdminNote?: string | null;
   subscriptionUpdatedBy?: Types.ObjectId | null;
+  pressureTestLevel?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -217,6 +218,12 @@ const userSchema = new Schema<IUser>(
     subscriptionUpdatedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
+    },
+    pressureTestLevel: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 20,
     },
   },
   {
