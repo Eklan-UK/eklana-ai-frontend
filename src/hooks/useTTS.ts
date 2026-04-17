@@ -7,13 +7,15 @@ interface UseTTSOptions {
   onPlayStart?: () => void;
   onPlayEnd?: () => void;
   onError?: (error: Error) => void;
+  /** Override the backend TTS endpoint. Defaults to '/api/v1/tts'. */
+  apiPath?: string;
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
   // Note: this hook's `playAudio()` method is always an explicit "play now"
   // action from the caller. We therefore always attempt playback after
   // generating the audio Blob.
-  const { onPlayStart, onPlayEnd, onError } = options;
+  const { onPlayStart, onPlayEnd, onError, apiPath } = options;
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         const audioBlob = await generateTTS({
           text,
           voiceId,
+          apiPath,
         });
 
         // Create object URL from blob (no CORS issues since it's a local blob URL)
@@ -154,7 +157,7 @@ export function useTTS(options: UseTTSOptions = {}) {
         toast.error(error.message || "Failed to generate speech");
       }
     },
-    [onPlayStart, onPlayEnd, onError]
+    [onPlayStart, onPlayEnd, onError, apiPath]
   );
 
   const stopAudio = useCallback(() => {
