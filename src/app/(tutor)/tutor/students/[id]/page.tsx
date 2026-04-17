@@ -5,19 +5,398 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
   ArrowLeft,
-  Mail,
+  ArrowRight,
   BookOpen,
-  Loader2,
-  Clock,
   CheckCircle,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  CircleCheck,
+  Clock,
   FileCheck,
+  Loader2,
+  Mail,
   Pencil,
+  Target,
+  Trophy,
+  Volume2,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
+
+// ── Pressure Test types ────────────────────────────────────────────────────
+
+interface PTScores {
+  responseSpeed: number;
+  accuracy: number;
+  pronunciation: number;
+  confidence: number;
+}
+
+interface PTTurnFeedback {
+  turnNumber: number;
+  feedback: string;
+  rating: "strong" | "adequate" | "needs_work";
+}
+
+interface PTTurn {
+  turnNumber: number;
+  aiPrompt: string;
+  studentResponseText: string;
+  latencyMs: number;
+  latencySeconds: number;
+}
+
+interface PTSession {
+  sessionId: string;
+  date: string;
+  drillId: string | null;
+  level: number;
+  levelBefore: number;
+  levelAfter: number;
+  levelChanged: boolean;
+  scores: PTScores;
+  progressToNextLevel: number;
+  strengths: string[];
+  weaknesses: string[];
+  nextSteps: string[];
+  turnFeedback: PTTurnFeedback[];
+}
+
+interface PTOverview {
+  student: { id: string; name: string; email: string };
+  currentLevel: number;
+  totalSessions: number;
+  averages: PTScores | null;
+  trends: Record<string, string> | null;
+  sessions: PTSession[];
+  pagination: { total: number; limit: number; offset: number };
+}
+
+interface PTSessionDetail extends PTSession {
+  turns: PTTurn[];
+}
+
+// ── Pressure Test sub-components ──────────────────────────────────────────
+
+function ScoreBar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all ${color}`}
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+      />
+    </div>
+  );
+}
+
+function TrendBadge({ trend }: { trend?: string }) {
+  if (!trend) return null;
+  const map: Record<string, { label: string; cls: string }> = {
+    improving: { label: "↑ Improving", cls: "bg-emerald-100 text-emerald-700" },
+    declining: { label: "↓ Declining", cls: "bg-red-100 text-red-700" },
+    stable: { label: "→ Stable", cls: "bg-slate-100 text-slate-600" },
+  };
+  const m = map[trend] ?? map.stable;
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.cls}`}>{m.label}</span>
+  );
+}
+
+function RatingDot({ rating }: { rating: PTTurnFeedback["rating"] }) {
+  const cls =
+    rating === "strong"
+      ? "bg-emerald-500"
+      : rating === "adequate"
+      ? "bg-amber-400"
+      : "bg-red-400";
+  return <span className={`inline-block w-2 h-2 rounded-full ${cls} mr-1.5`} />;
+}
+
+function PTSessionRow({
+  session,
+  studentId,
+}: {
+  session: PTSession;
+  studentId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<PTSessionDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const toggle = async () => {
+    if (!expanded && !detail) {
+      setLoadingDetail(true);
+      try {
+        const res = await fetch(
+          `/api/v1/tutor/pressure-test/${studentId}/${session.sessionId}`,
+          { credentials: "include" },
+        );
+        const data = await res.json();
+        setDetail(data.data);
+      } catch {
+        // silently ignore — show basic info from overview
+      } finally {
+        setLoadingDetail(false);
+      }
+    }
+    setExpanded((v) => !v);
+  };
+
+  const d = detail ?? session;
+  const date = new Date(session.date).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <div className="border border-slate-200 rounded-2xl overflow-hidden">
+      {/* Row header */}
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex-shrink-0 w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center">
+            <span className="text-xs font-bold text-violet-700">L{session.levelAfter}</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 truncate">{date}</p>
+            <p className="text-xs text-slate-500">
+              Speed {session.scores.responseSpeed.toFixed(1)}s &nbsp;·&nbsp;
+              Accuracy {session.scores.accuracy}% &nbsp;·&nbsp;
+              Pronunciation {session.scores.pronunciation}%
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {session.levelChanged && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+              {session.levelAfter > session.levelBefore ? "↑ Level Up" : "↓ Level Down"}
+            </span>
+          )}
+          {loadingDetail ? (
+            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          ) : expanded ? (
+            <ChevronUp className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-slate-100 space-y-4 pt-3">
+          {/* Score bars */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Response Speed", value: Math.min(100, (2 / Math.max(d.scores.responseSpeed, 0.1)) * 100), raw: `${d.scores.responseSpeed.toFixed(1)}s`, color: "bg-blue-500" },
+              { label: "Accuracy", value: d.scores.accuracy, raw: `${d.scores.accuracy}%`, color: "bg-emerald-500" },
+              { label: "Pronunciation", value: d.scores.pronunciation, raw: `${d.scores.pronunciation}%`, color: "bg-orange-500" },
+              { label: "Confidence", value: d.scores.confidence, raw: `${d.scores.confidence}%`, color: "bg-violet-500" },
+            ].map((m) => (
+              <div key={m.label}>
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs text-slate-600">{m.label}</span>
+                  <span className="text-xs font-semibold text-slate-800">{m.raw}</span>
+                </div>
+                <ScoreBar value={m.value} color={m.color} />
+              </div>
+            ))}
+          </div>
+
+          {/* Turn transcripts */}
+          {detail?.turns && detail.turns.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                Turn Transcripts
+              </p>
+              {detail.turns.map((t) => {
+                const fb = d.turnFeedback?.find((f) => f.turnNumber === t.turnNumber);
+                return (
+                  <div key={t.turnNumber} className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500">
+                        Turn {t.turnNumber}
+                      </span>
+                      <span className="text-xs text-slate-400">{t.latencySeconds}s response</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      <span className="font-medium text-slate-700">AI: </span>
+                      {t.aiPrompt}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      <span className="font-medium text-slate-700">Student: </span>
+                      {t.studentResponseText}
+                    </p>
+                    {fb && (
+                      <p className="text-xs text-slate-500 italic flex items-center">
+                        <RatingDot rating={fb.rating} />
+                        {fb.feedback}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Strengths / Weaknesses / Next Steps */}
+          {d.strengths?.length > 0 && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-emerald-700 mb-1.5">What went well</p>
+              <ul className="space-y-1">
+                {d.strengths.map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <CircleCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-xs text-emerald-800">{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {d.weaknesses?.length > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1.5">Needs work</p>
+              <ul className="space-y-1">
+                {d.weaknesses.map((w, i) => (
+                  <li key={i} className="text-xs text-amber-800 flex items-start gap-1.5">
+                    <span className="text-amber-500 font-bold flex-shrink-0">●</span>
+                    {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {d.nextSteps?.length > 0 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-semibold text-blue-700 mb-1.5">Next steps</p>
+              <ul className="space-y-1">
+                {d.nextSteps.map((n, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <ArrowRight className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-xs text-blue-800">{n}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PressureTestPanel({ studentId }: { studentId: string }) {
+  const [data, setData] = useState<PTOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/v1/tutor/pressure-test/${studentId}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.code === "Success") setData(d.data);
+        else setError(d.message || "Failed to load pressure test data.");
+      })
+      .catch(() => setError("Failed to load pressure test data."))
+      .finally(() => setLoading(false));
+  }, [studentId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-gray-500 text-sm">{error}</p>
+      </Card>
+    );
+  }
+
+  if (!data || data.totalSessions === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p className="text-slate-500 text-sm">No pressure test sessions yet.</p>
+        <p className="text-slate-400 text-xs mt-1">
+          Sessions will appear here once the student completes their first test.
+        </p>
+      </Card>
+    );
+  }
+
+  const a = data.averages;
+  const t = data.trends;
+
+  return (
+    <div className="space-y-5">
+      {/* Overview header */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4 col-span-2 bg-violet-50 border-violet-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-violet-600 font-medium">Current Level</p>
+              <p className="text-3xl font-bold text-violet-900">Level {data.currentLevel}</p>
+              <p className="text-xs text-violet-500 mt-0.5">{data.totalSessions} session{data.totalSessions !== 1 ? "s" : ""} completed</p>
+            </div>
+            <div className="w-14 h-14 rounded-2xl bg-violet-600 flex items-center justify-center shadow-md">
+              <Trophy className="w-7 h-7 text-white" />
+            </div>
+          </div>
+        </Card>
+
+        {a && (
+          <>
+            {[
+              { icon: <Zap className="w-4 h-4 text-blue-500" />, label: "Avg Speed", value: `${a.responseSpeed.toFixed(1)}s`, trend: t?.responseSpeed, bar: Math.min(100, (2 / Math.max(a.responseSpeed, 0.1)) * 100), color: "bg-blue-500" },
+              { icon: <Target className="w-4 h-4 text-emerald-500" />, label: "Avg Accuracy", value: `${a.accuracy}%`, trend: t?.accuracy, bar: a.accuracy, color: "bg-emerald-500" },
+              { icon: <Volume2 className="w-4 h-4 text-orange-500" />, label: "Avg Pronunciation", value: `${a.pronunciation}%`, trend: t?.pronunciation, bar: a.pronunciation, color: "bg-orange-500" },
+              { icon: <CircleCheck className="w-4 h-4 text-violet-500" />, label: "Avg Confidence", value: `${a.confidence}%`, trend: t?.confidence, bar: a.confidence, color: "bg-violet-500" },
+            ].map((m) => (
+              <Card key={m.label} className="p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  {m.icon}
+                  <span className="text-xs text-slate-500">{m.label}</span>
+                </div>
+                <div className="flex items-end justify-between mb-1.5">
+                  <span className="text-lg font-bold text-slate-800">{m.value}</span>
+                  <TrendBadge trend={m.trend} />
+                </div>
+                <ScoreBar value={m.bar} color={m.color} />
+              </Card>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Session list */}
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">
+          Session History ({data.totalSessions})
+        </h3>
+        <div className="space-y-2">
+          {data.sessions.map((s) => (
+            <PTSessionRow key={s.sessionId} session={s} studentId={studentId} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Student {
   id: string;
@@ -136,6 +515,7 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"drills" | "pressure-test">("drills");
   const [editingName, setEditingName] = useState(false);
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
@@ -383,6 +763,33 @@ export default function StudentDetailPage() {
           </Card>
         </div>
 
+        {/* ── Tab bar ── */}
+        <div className="flex gap-1 mb-6 border-b border-gray-200">
+          {(["drills", "pressure-test"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${
+                activeTab === tab
+                  ? "border-emerald-600 text-emerald-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {tab === "pressure-test" ? "Pressure Test" : "Drills"}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Pressure Test panel ── */}
+        {activeTab === "pressure-test" && (
+          <PressureTestPanel studentId={studentId} />
+        )}
+
+        {/* ── Drill sections (hidden when on Pressure Test tab) ── */}
+        {activeTab === "drills" && (
+          <>
+
         {/* Assigned Drills (Pending/In Progress) */}
         {student.assignedDrills && student.assignedDrills.length > 0 && (
           <div className="mb-6">
@@ -455,6 +862,9 @@ export default function StudentDetailPage() {
             </Button>
           </Link>
         </div>
+
+          </>
+        )}
       </div>
     </div>
   );

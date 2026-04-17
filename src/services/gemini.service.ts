@@ -21,7 +21,8 @@ if (config.GEMINI_API_KEY) {
 }
 
 // Text model (for non-drill functions — cheaper, no "thinking" overhead)
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+// gemini-2.5-flash-lite: 20 req/day free tier (resets daily); 2.0-flash-lite has limit:0 on this key
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
 /** Low-latency chat + streaming (see config.GEMINI_CHAT_MODEL). */
 const CHAT_MODEL = config.GEMINI_CHAT_MODEL;
