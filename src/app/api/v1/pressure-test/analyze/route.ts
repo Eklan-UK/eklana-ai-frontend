@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Types } from "mongoose";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { withAuth } from "@/lib/api/middleware";
 import { logger } from "@/lib/api/logger";
@@ -168,7 +169,7 @@ Return ONLY a valid JSON object with this exact shape (no markdown, no extra tex
 
 async function handler(
   req: NextRequest,
-  context: { userId: { toString(): string }; userRole: string },
+  context: { userId: Types.ObjectId; userRole: string },
 ): Promise<NextResponse> {
   void context.userRole;
   try {
