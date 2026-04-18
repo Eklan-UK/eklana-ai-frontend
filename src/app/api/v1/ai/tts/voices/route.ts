@@ -47,4 +47,3 @@ async function handler(
 }
 
 export const GET = withAuth(handler);
-

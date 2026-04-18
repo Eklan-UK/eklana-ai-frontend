@@ -505,6 +505,14 @@ function AISessionPage() {
       setReviewPhase("loading");
       try {
         const mode = isDrillPractice ? "drill" : topic ? "topic" : "free";
+        const focusLabel = isDrillPractice && drillInfo
+          ? `${DRILL_TYPE_LABELS[drillInfo.drillType] || "Practice"} · ${drillInfo.drillTitle}`
+          : topic
+            ? topic === "pressure-test"
+              ? "Ekln Pressure Test — respond quickly under light time pressure"
+              : `Topic practice: ${topic.replace(/-/g, " ")}`
+            : undefined;
+
         const res = await fetch("/api/v1/ai/session/summary", {
           method: "POST",
           credentials: "include",
@@ -515,6 +523,7 @@ function AISessionPage() {
             mode,
             ...(topic ? { topic } : {}),
             ...(drillId ? { drillId } : {}),
+            ...(focusLabel ? { focusLabel } : {}),
           }),
         });
         const json = await res.json().catch(() => ({}));
@@ -540,7 +549,7 @@ function AISessionPage() {
         }
       }
     },
-    [conversationHistory, sessionKey, drillId, topic, isDrillPractice, stopAllAudio],
+    [conversationHistory, sessionKey, drillId, topic, isDrillPractice, drillInfo, stopAllAudio],
   );
 
   /** Resume prompt: one tap → home (replace), no review modal. */
@@ -761,7 +770,9 @@ function AISessionPage() {
       }
 
     } catch (error: unknown) {
-      if ((error as { name?: string })?.name === "AbortError") return;
+      if ((error as { name?: string })?.name === "AbortError") {
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Failed to get AI response";
       toast.error(message || "Failed to get AI response");
@@ -1001,7 +1012,9 @@ function AISessionPage() {
             ]);
           }
         } catch (err: unknown) {
-          if ((err as { name?: string })?.name === "AbortError") return;
+          if ((err as { name?: string })?.name === "AbortError") {
+            return;
+          }
           const message =
             err instanceof Error ? err.message : "Failed to process voice.";
           toast.error(

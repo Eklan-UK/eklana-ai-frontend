@@ -7,6 +7,15 @@ export interface TranscriptTurn {
   content: string;
 }
 
+/** Optional context passed to the summarizer so feedback matches the session type. */
+export interface SessionSummaryContext {
+  mode: AiSessionMode;
+  /** URL topic slug or theme (e.g. travel, pressure-test). */
+  topic?: string;
+  /** Human label: drill title, topic phrase, etc. */
+  focusLabel?: string;
+}
+
 export interface SessionSummaryPayload {
   grammar: { headline: string; detail?: string };
   vocabulary: { headline: string; detail?: string };

@@ -39,9 +39,6 @@ async function postHandler(
     const startedAt = Date.now();
     const body = await req.json();
     const { text, voice: rawVoice } = body;
-    // Resolve to the real ElevenLabs voice ID up-front so the cache key,
-    // audio generation, and telemetry all use the same concrete ID.
-    // Falls back to ELEVEN_LABS_DEFAULT_VOICE_ID, then to Rachel (21m00Tcm4TlvDq8ikWAM).
     const voice = resolveVoiceId(rawVoice);
 
     if (!text || typeof text !== 'string') {
@@ -51,7 +48,6 @@ async function postHandler(
       );
     }
 
-    // Limit text length
     if (text.length > 5000) {
       return NextResponse.json(
         { code: 'ValidationError', message: 'Text too long (max 5000 characters)' },
@@ -89,7 +85,6 @@ async function postHandler(
       });
     }
 
-    // Cache miss - generate new audio
     logger.info('TTS cache miss, generating new audio', { textHash, textLength: text.length });
 
     const audioBuffer = await generateElevenLabsAudio({ text, voiceId: voice });
@@ -193,5 +188,3 @@ export async function GET(req: NextRequest) {
 }
 
 export const POST = withAuth(postHandler);
-
-

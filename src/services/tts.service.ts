@@ -6,6 +6,8 @@ interface TTSOptions {
   similarityBoost?: number;
   style?: number;
   useSpeakerBoost?: boolean;
+  /** Override the backend TTS endpoint. Defaults to '/api/v1/tts'. */
+  apiPath?: string;
 }
 
 // In-memory blob cache — avoids any network call when the same phrase is replayed in-session.
@@ -17,13 +19,14 @@ const sessionBlobCache = new Map<string, Blob>();
  * the redundant pre-flight GET that used to add an extra round-trip before every generation.
  */
 async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
-  const cacheKey = `${options.text}:${options.voiceId || 'default'}`;
+  const endpoint = options.apiPath || '/api/v1/tts';
+  const cacheKey = `${endpoint}:${options.text}:${options.voiceId || 'default'}`;
 
   // Return immediately from in-memory blob cache (same-session replay).
   const cached = sessionBlobCache.get(cacheKey);
   if (cached) return cached;
 
-  const response = await fetch('/api/v1/tts', {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -60,9 +63,8 @@ async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
 }
 
 /**
- * Generate TTS audio from text
- * Uses caching layer first, then falls back to direct ElevenLabs API
- * Returns a Blob that can be used to create an audio object URL
+ * Generate TTS audio from text.
+ * Uses in-session blob cache for replay; returns a Blob for an object URL.
  */
 export async function generateTTS(options: TTSOptions): Promise<Blob> {
   return await generateTTSWithCache(options);

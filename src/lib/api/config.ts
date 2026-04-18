@@ -94,7 +94,7 @@ export const config = {
 	CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
 	// Google Gemini AI
 	GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-	/** Low-latency model for text chat + streaming. gemini-2.5-flash-lite has 20/day free tier on this key; 2.0-flash-lite has limit:0. */
+	/** Low-latency model for text chat + streaming. Override via GEMINI_CHAT_MODEL env var. */
 	GEMINI_CHAT_MODEL:
 		process.env.GEMINI_CHAT_MODEL?.trim() || 'gemini-2.5-flash-lite',
 	// Speechace Configuration
