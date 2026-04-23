@@ -23,23 +23,23 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
         components={{
           // Customize heading styles
           h1: ({ children }) => (
-            <h1 className="text-lg font-bold text-gray-900 mt-4 mb-2">
+            <h1 className="text-lg font-bold text-foreground mt-4 mb-2">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-base font-bold text-gray-900 mt-3 mb-2">
+            <h2 className="text-base font-bold text-foreground mt-3 mb-2">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-sm font-semibold text-gray-900 mt-2 mb-1">
+            <h3 className="text-sm font-semibold text-foreground mt-2 mb-1">
               {children}
             </h3>
           ),
           // Paragraphs with proper spacing
           p: ({ children }) => (
-            <p className="text-sm leading-relaxed text-gray-900 mb-2 last:mb-0">
+            <p className="text-sm leading-relaxed text-foreground mb-2 last:mb-0">
               {children}
             </p>
           ),
@@ -55,33 +55,33 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
             </ol>
           ),
           li: ({ children }) => (
-            <li className="text-sm leading-relaxed text-gray-900">
+            <li className="text-sm leading-relaxed text-foreground">
               {children}
             </li>
           ),
           // Bold and italic
           strong: ({ children }) => (
-            <strong className="font-semibold text-gray-900">{children}</strong>
+            <strong className="font-semibold text-foreground">{children}</strong>
           ),
           em: ({ children }) => (
-            <em className="italic text-gray-800">{children}</em>
+            <em className="italic text-text-secondary">{children}</em>
           ),
           // Code blocks
           code: ({ children, className }) => {
             const isInline = !className;
             return isInline ? (
-              <code className="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono text-gray-800">
+              <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono text-foreground">
                 {children}
               </code>
             ) : (
-              <code className="block bg-gray-100 p-2 rounded text-xs font-mono text-gray-800 overflow-x-auto">
+              <code className="block overflow-x-auto rounded bg-muted p-2 text-xs font-mono text-foreground">
                 {children}
               </code>
             );
           },
           // Blockquotes
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-700 my-2">
+            <blockquote className="my-2 border-l-4 border-border pl-3 italic text-text-secondary">
               {children}
             </blockquote>
           ),
@@ -91,7 +91,7 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-green-600 hover:text-green-700 underline"
+              className="text-primary hover:text-primary-dark underline"
             >
               {children}
             </a>

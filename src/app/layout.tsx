@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { FCMNotificationListener } from "@/components/notifications/FCMNotificationListener";
 
 export const metadata: Metadata = {
@@ -59,14 +61,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(() => {
+            try {
+              const key = "theme";
+              const stored = localStorage.getItem(key);
+              const theme = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+              const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+              const resolved = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+              document.documentElement.classList.toggle("dark", resolved === "dark");
+              document.documentElement.setAttribute("data-theme", resolved);
+            } catch (_) {}
+          })();`}
+        </Script>
+      </head>
       <body className="antialiased font-satoshi" suppressHydrationWarning>
-        <QueryProvider>
-          <AuthProvider>
-            <ToastProvider />
-            <FCMNotificationListener />
-            {children}
-          </AuthProvider>
-        </QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <ToastProvider />
+              <FCMNotificationListener />
+              {children}
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

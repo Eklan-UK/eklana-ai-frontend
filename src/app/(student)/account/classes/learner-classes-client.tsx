@@ -55,8 +55,8 @@ function SessionCard({ session }: { session: TeachingClass }) {
     jVariant === "live" || jVariant === "ready"
       ? "bg-[#2d6a32] text-white shadow-sm hover:bg-[#245528] disabled:opacity-50"
       : jVariant === "soon"
-        ? "bg-amber-400 text-gray-900 hover:bg-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
-        : "cursor-not-allowed bg-gray-200 text-gray-400";
+        ? "bg-amber-400 text-foreground hover:bg-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
+        : "cursor-not-allowed bg-muted text-muted-foreground";
 
   const badgeClass =
     badge.kind === "live"
@@ -70,11 +70,11 @@ function SessionCard({ session }: { session: TeachingClass }) {
           : "bg-sky-50 text-sky-800 border border-sky-100";
 
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
-          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" strokeWidth={2} />
-          <span className="text-sm font-bold text-gray-900">{dateLine}</span>
+          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="text-sm font-bold text-foreground">{dateLine}</span>
         </div>
         <span
           className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}
@@ -86,11 +86,11 @@ function SessionCard({ session }: { session: TeachingClass }) {
         </span>
       </div>
 
-      <div className="mb-1 flex items-center gap-2 text-sm text-gray-600">
-        <Clock className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+      <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
+        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
         <span>{timeLine}</span>
       </div>
-      <p className="mb-4 text-sm text-gray-600">{session.tutorName}</p>
+      <p className="mb-4 text-sm text-text-secondary">{session.tutorName}</p>
 
       <div className="flex gap-2">
         <button
@@ -114,7 +114,7 @@ function SessionCard({ session }: { session: TeachingClass }) {
         {session.nextSessionId ? (
           <Link
             href={`/account/classes/${session.nextSessionId}`}
-            className="flex flex-1 items-center justify-center rounded-full border border-gray-200 bg-white py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
+            className="flex flex-1 items-center justify-center rounded-full border border-border bg-card py-3 text-sm font-bold text-text-secondary transition-colors hover:bg-muted"
           >
             Reschedule
           </Link>
@@ -122,7 +122,7 @@ function SessionCard({ session }: { session: TeachingClass }) {
       </div>
 
       {!canJoin && session.status !== "completed" && start && start > now ? (
-        <p className="mt-2 text-center text-xs text-gray-500">
+        <p className="mt-2 text-center text-xs text-muted-foreground">
           Link appears up to {TUTOR_JOIN_EARLY_MINUTES} minutes before start
         </p>
       ) : null}
@@ -143,12 +143,12 @@ function PastSessionCard({ row }: { row: LearnerPastSessionItemDTO }) {
         : "bg-amber-50 text-amber-900 border border-amber-200";
 
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <p className="mb-1 text-sm font-bold text-gray-900">{row.classTitle}</p>
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <p className="mb-1 text-sm font-bold text-foreground">{row.classTitle}</p>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
-          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" strokeWidth={2} />
-          <span className="text-sm font-bold text-gray-900">{dateLine}</span>
+          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+          <span className="text-sm font-bold text-foreground">{dateLine}</span>
         </div>
         <span
           className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}
@@ -157,16 +157,16 @@ function PastSessionCard({ row }: { row: LearnerPastSessionItemDTO }) {
         </span>
       </div>
 
-      <div className="mb-1 flex items-center gap-2 text-sm text-gray-600">
-        <Clock className="h-4 w-4 shrink-0 text-gray-400" strokeWidth={2} />
+      <div className="mb-1 flex items-center gap-2 text-sm text-text-secondary">
+        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
         <span>{timeLine}</span>
       </div>
-      <p className="text-sm text-gray-600">{row.tutorName}</p>
+      <p className="text-sm text-text-secondary">{row.tutorName}</p>
 
       <div className="mt-4">
         <Link
           href={`/account/classes/${row.sessionId}`}
-          className="flex w-full items-center justify-center rounded-full border border-gray-200 bg-white py-3 text-sm font-bold text-slate-800 transition-colors hover:bg-gray-50"
+          className="flex w-full items-center justify-center rounded-full border border-border bg-card py-3 text-sm font-bold text-slate-800 transition-colors hover:bg-muted"
         >
           Session details
         </Link>
@@ -230,16 +230,16 @@ export function LearnerClassesClient() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-800 shadow-sm transition-colors hover:bg-gray-50"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-gray-800 shadow-sm transition-colors hover:bg-muted"
           aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={2} />
         </button>
-        <h1 className="text-xl font-bold text-gray-900">My Sessions</h1>
+        <h1 className="text-xl font-bold text-foreground">My Sessions</h1>
       </div>
 
       <div
-        className="mb-6 flex rounded-full border border-gray-200 bg-gray-50 p-1"
+        className="mb-6 flex rounded-full border border-gray-200 bg-muted p-1"
         role="tablist"
         aria-label="Session schedule"
       >
@@ -253,7 +253,7 @@ export function LearnerClassesClient() {
             className={`flex min-w-0 flex-1 items-center justify-center rounded-full px-2 py-2.5 text-xs font-semibold transition-colors sm:text-sm ${
               tab === key
                 ? "text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-800"
+                : "text-muted-foreground hover:text-gray-800"
             }`}
             style={
               tab === key
@@ -264,7 +264,7 @@ export function LearnerClassesClient() {
             {TAB_LABEL[key]}
             <span
               className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums sm:text-xs ${
-                tab === key ? "bg-white/25 text-white" : "bg-gray-200 text-gray-700"
+                tab === key ? "bg-white/25 text-white" : "bg-muted text-text-secondary"
               }`}
             >
               {key === "thisWeek"
@@ -285,13 +285,13 @@ export function LearnerClassesClient() {
       ) : null}
 
       {listLoading ? (
-        <div className="rounded-2xl border border-gray-100 bg-white px-4 py-16 text-center text-sm text-gray-500">
+        <div className="rounded-2xl border border-border bg-white px-4 py-16 text-center text-sm text-muted-foreground">
           Loading sessions…
         </div>
       ) : null}
 
       {!listLoading && isEmpty ? (
-        <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-12 text-center text-sm text-gray-600">
+        <div className="rounded-2xl border border-gray-200 bg-muted px-4 py-12 text-center text-sm text-text-secondary">
           No sessions in this tab.
         </div>
       ) : null}
