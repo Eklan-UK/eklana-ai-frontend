@@ -98,6 +98,18 @@ export function useLearnerClasses(filters?: {
   });
 }
 
+/** Ended sessions for the Past tab (newest first). */
+export function useLearnerPastSessions(filters?: { limit?: number; offset?: number }) {
+  return useQuery({
+    queryKey: queryKeys.classes.learnerPastSessions(filters),
+    queryFn: async () => {
+      const res = await classesAPI.learnerPastSessions(filters);
+      return res.data;
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
 export function useLearnerSession(sessionId: string | null) {
   return useQuery({
     queryKey: queryKeys.classes.learnerSession(sessionId ?? ''),
@@ -124,6 +136,12 @@ export function useRecordLearnerAttendance() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['tutor', 'sessions'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['learner', 'sessions', 'past'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['learner', 'classes', 'list'],
       });
     },
   });

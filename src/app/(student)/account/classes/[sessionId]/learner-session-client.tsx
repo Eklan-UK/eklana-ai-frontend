@@ -42,8 +42,10 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="space-y-6 pb-24">
+      {/* replace: avoid stacking list + session in history; back from list should not return to session */}
       <Link
         href="/account/classes"
+        replace
         className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800"
       >
         <ArrowLeft className="h-4 w-4" />

@@ -1,8 +1,12 @@
 // services/streak.service.ts
 import DailyFocusCompletion from '@/models/daily-focus-completion';
+import StreakActivityDay from '@/models/streak-activity-day';
 import UserStreak from '@/models/user-streak';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
+
+/** Merged row for streak math (daily focus + login/drill activity days). */
+type StreakDayRow = { dateString: string; date: Date; score?: number };
 
 export interface StreakData {
   currentStreak: number;
@@ -46,8 +50,10 @@ export const BADGE_DEFINITIONS = [
 ];
 
 export class StreakService {
-  // Feature flag to disable streak functionality
-  private static readonly STREAK_ENABLED = false; // Set to false to disable
+  /** Streaks run unless `STREAK_ENABLED=false` in environment. */
+  private static streakFeatureEnabled(): boolean {
+    return process.env.STREAK_ENABLED !== 'false';
+  }
 
   /**
    * Get normalized date string (YYYY-MM-DD) for a given date in UTC
@@ -88,8 +94,7 @@ export class StreakService {
     timeSpent: number = 0,
     answers?: any[]
   ): Promise<{ streakUpdated: boolean; badgeUnlocked: Badge | null }> {
-    // Early return if streak is disabled
-    if (!this.STREAK_ENABLED) {
+    if (!this.streakFeatureEnabled()) {
       return { streakUpdated: false, badgeUnlocked: null };
     }
 
@@ -162,19 +167,101 @@ export class StreakService {
   }
 
   /**
+   * Record a qualifying UTC day from login or drill (idempotent per user+day).
+   */
+  static async recordActivityDay(
+    userId: string,
+    opts?: { score?: number }
+  ): Promise<{ streakUpdated: boolean }> {
+    if (!this.streakFeatureEnabled()) {
+      return { streakUpdated: false };
+    }
+    try {
+      const todayString = this.getTodayString();
+      const today = new Date(`${todayString}T00:00:00.000Z`);
+      const uid = new Types.ObjectId(userId);
+
+      const update: Record<string, unknown> = {
+        $set: { date: today },
+        $setOnInsert: {
+          userId: uid,
+          dateString: todayString,
+        },
+      };
+      if (opts?.score != null) {
+        update.$max = { score: opts.score };
+      }
+
+      await StreakActivityDay.updateOne(
+        { userId: uid, dateString: todayString },
+        update,
+        { upsert: true }
+      ).exec();
+
+      const streakUpdated = await this.updateStreak(userId);
+      return { streakUpdated };
+    } catch (error: any) {
+      logger.error('Error recording streak activity day', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Merge daily-focus first completions with streak activity days (UTC).
+   */
+  private static async getMergedStreakDayRows(
+    userId: string
+  ): Promise<StreakDayRow[]> {
+    const uid = new Types.ObjectId(userId);
+    const [dfRows, actRows] = await Promise.all([
+      DailyFocusCompletion.find({
+        userId: uid,
+        isFirstCompletion: true,
+      })
+        .sort({ date: -1 })
+        .limit(400)
+        .lean()
+        .exec(),
+      StreakActivityDay.find({ userId: uid })
+        .sort({ dateString: -1 })
+        .limit(400)
+        .lean()
+        .exec(),
+    ]);
+
+    const map = new Map<string, StreakDayRow>();
+
+    for (const r of dfRows as any[]) {
+      map.set(r.dateString, {
+        dateString: r.dateString,
+        date: new Date(r.date),
+        score: r.score,
+      });
+    }
+    for (const r of actRows as any[]) {
+      if (!map.has(r.dateString)) {
+        map.set(r.dateString, {
+          dateString: r.dateString,
+          date: new Date(r.date),
+          score: r.score,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) => b.date.getTime() - a.date.getTime()
+    );
+  }
+
+  /**
    * Update user's streak based on completions
    */
   private static async updateStreak(userId: string): Promise<boolean> {
     try {
-      // Get all first completions, sorted by date descending
-      const completions = await DailyFocusCompletion.find({
-        userId: new Types.ObjectId(userId),
-        isFirstCompletion: true,
-      })
-        .sort({ date: -1 })
-        .limit(365) // Last year max
-        .lean()
-        .exec();
+      const completions = await this.getMergedStreakDayRows(userId);
 
       if (completions.length === 0) {
         // No completions, reset streak
@@ -422,8 +509,7 @@ export class StreakService {
    * Get streak data for a user
    */
   static async getStreakData(userId: string): Promise<StreakData> {
-    // Early return if streak is disabled
-    if (!this.STREAK_ENABLED) {
+    if (!this.streakFeatureEnabled()) {
       return {
         currentStreak: 0,
         longestStreak: 0,
@@ -466,26 +552,21 @@ export class StreakService {
         };
       }
 
-      // Check today and yesterday completions
-      const todayCompletion = await DailyFocusCompletion.findOne({
-        userId: new Types.ObjectId(userId),
-        dateString: todayString,
-        isFirstCompletion: true,
-      }).lean().exec();
-
-      const yesterdayCompletion = await DailyFocusCompletion.findOne({
-        userId: new Types.ObjectId(userId),
-        dateString: yesterdayString,
-        isFirstCompletion: true,
-      }).lean().exec();
+      const mergedForFlags = await this.getMergedStreakDayRows(userId);
+      const todayCompleted = mergedForFlags.some(
+        (r) => r.dateString === todayString
+      );
+      const yesterdayCompleted = mergedForFlags.some(
+        (r) => r.dateString === yesterdayString
+      );
 
       return {
         currentStreak: userStreak.currentStreak || 0,
         longestStreak: userStreak.longestStreak || 0,
         lastActivityDate: userStreak.lastActivityDate || null,
         streakStartDate: userStreak.streakStartDate || null,
-        todayCompleted: !!todayCompletion,
-        yesterdayCompleted: !!yesterdayCompletion,
+        todayCompleted,
+        yesterdayCompleted,
         weeklyActivity: userStreak.weeklyActivity || this.getEmptyWeeklyActivity(),
         badges: userStreak.badges || [],
       };

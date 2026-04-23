@@ -13,6 +13,7 @@ const preferencesSchema = z.object({
 	nationality: z.string().optional(),
 	language: z.string().optional(),
 	learningGoal: z.string().optional(),
+	learningGoals: z.array(z.string()).optional(),
 });
 
 async function handler(
@@ -55,6 +56,7 @@ async function handler(
 					nationality: profile.nationality,
 					language: profile.language,
 					learningGoal: profile.learningGoal,
+					learningGoals: profile.learningGoals,
 				},
 			},
 			{ status: 200 }

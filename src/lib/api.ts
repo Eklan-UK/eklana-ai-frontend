@@ -527,8 +527,32 @@ export const tutorAPI = {
 // User API
 export const userAPI = {
   // Get current user
-  getCurrent: () => {
-    return apiRequest<{ user: any; tutorProfile?: any; learnerProfile?: any }>('/users/current');
+  getCurrent: (options?: { cache?: boolean }) => {
+    return apiRequest<{ user: any; profile?: any; tutorProfile?: any; learnerProfile?: any }>(
+      '/users/current',
+      { cache: options?.cache }
+    );
+  },
+
+  updatePreferences: (data: {
+    nationality?: string;
+    language?: string;
+    learningGoal?: string;
+    learningGoals?: string[];
+  }) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        nationality?: string;
+        language?: string;
+        learningGoal?: string;
+        learningGoals?: string[];
+      };
+    }>('/users/preferences', {
+      method: 'PATCH',
+      data,
+    });
   },
 
   // Update current user
@@ -845,6 +869,26 @@ export const classesAPI = {
     });
   },
 
+  /** Learner: ended class sessions (Past tab), newest first. */
+  learnerPastSessions: (params?: { limit?: number; offset?: number }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        sessions: import('@/domain/classes/class.api.types').LearnerPastSessionItemDTO[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore?: boolean;
+        };
+      };
+    }>('/learner/sessions/past', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
   learnerSession: (sessionId: string) => {
     return apiRequest<{
       code: string;
@@ -1076,6 +1120,14 @@ export const streakAPI = {
     }>('/users/streak', {
       method: 'GET',
     });
+  },
+  recordActivity: () => {
+    return apiRequest<{ code?: string; data?: { recorded: boolean } }>(
+      '/users/streak/activity',
+      {
+        method: 'POST',
+      }
+    );
   },
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
-import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
+import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
@@ -62,6 +62,8 @@ export default function GrammarDrill({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [startTime] = useState(Date.now());
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollToTopAfterNextRef = useRef(false);
 
   const currentPattern = patternItems[currentIndex];
   const currentAnswer = answers[currentIndex] || {
@@ -89,6 +91,13 @@ export default function GrammarDrill({
     });
   }, [patternItems, answers]);
 
+  useEffect(() => {
+    if (!scrollToTopAfterNextRef.current) return;
+    scrollToTopAfterNextRef.current = false;
+    scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentIndex]);
+
   const updateCurrentAnswer = (field: keyof PatternAnswer, value: string) => {
     setAnswers((prev) => ({
       ...prev,
@@ -105,12 +114,16 @@ export default function GrammarDrill({
     }
   };
 
-  const handleNext = () => {
+  /** Advance to next pattern, or submit on the last pattern. */
+  const handlePrimaryAction = async () => {
     if (!isCurrentPatternComplete) {
       toast.error("Please write both sentences before proceeding.");
       return;
     }
-    if (!isLastPattern) {
+    if (isLastPattern) {
+      await handleSubmit();
+    } else {
+      scrollToTopAfterNextRef.current = true;
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -190,6 +203,8 @@ export default function GrammarDrill({
         title="Drill Submitted"
         message="Your grammar sentences have been submitted for review. You'll be notified when your work has been reviewed."
         drillType="grammar"
+        returnPath="/account/drills"
+        returnLabel="Back to My Plan"
         refreshOnMount={true}
       />
     );
@@ -214,25 +229,21 @@ export default function GrammarDrill({
 
   return (
     <DrillLayout title={drill.title}>
+      <div className="flex flex-col h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0 gap-3">
+        <div
+          ref={scrollAreaRef}
+          className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto overscroll-y-contain pb-8 sm:gap-10"
+        >
       {/* Context */}
       {drill.context && (
-        <Card className="mb-4">
-          <p className="text-sm text-gray-700">{drill.context}</p>
+        <Card className="mb-0 w-full shrink-0" padding="lg">
+          <p className="text-sm text-gray-700 leading-relaxed">{drill.context}</p>
         </Card>
       )}
 
-      {/* Progress */}
-      {totalPatterns > 1 && (
-        <DrillProgress
-          current={currentIndex + 1}
-          total={totalPatterns}
-          label="Pattern"
-        />
-      )}
-
       {/* Pattern Display Card */}
-      <Card className="mb-4 bg-gradient-to-r from-primary-50 to-pink-50 border-primary-200">
-        <div className="text-center py-4">
+      <Card className="mb-0 w-full shrink-0 bg-gradient-to-r from-primary-50 to-pink-50 border-primary-200" padding="lg">
+        <div className="text-center py-2 sm:py-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-semibold mb-3">
             <FileText className="w-3 h-3" />
             Grammar Pattern
@@ -266,7 +277,7 @@ export default function GrammarDrill({
       </Card>
 
       {/* Example Display - Always shown as guide */}
-      <Card className="mb-4 bg-green-50 border-green-200">
+      <Card className="mb-0 w-full shrink-0 bg-green-50 border-green-200" padding="lg">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
             <BookOpen className="w-5 h-5 text-green-600" />
@@ -290,7 +301,7 @@ export default function GrammarDrill({
       </Card>
 
       {/* Instructions */}
-      <Card className="mb-4 bg-blue-50 border-blue-200">
+      <Card className="mb-0 w-full shrink-0 bg-blue-50 border-blue-200" padding="lg">
         <div className="flex items-start gap-2">
           <PenTool className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
           <div>
@@ -304,8 +315,8 @@ export default function GrammarDrill({
       </Card>
 
       {/* Sentence 1 Input */}
-      <Card className="mb-4">
-        <div className="mb-4">
+      <Card className="mb-0 w-full shrink-0" padding="lg">
+        <div>
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <span className="w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
               1
@@ -325,8 +336,8 @@ export default function GrammarDrill({
       </Card>
 
       {/* Sentence 2 Input */}
-      <Card className="mb-4">
-        <div className="mb-4">
+      <Card className="mb-0 w-full shrink-0" padding="lg">
+        <div>
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <span className="w-6 h-6 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs font-bold">
               2
@@ -344,82 +355,52 @@ export default function GrammarDrill({
           </p>
         </div>
       </Card>
-
-      {/* Navigation Buttons */}
-      <div className="flex gap-3">
-        {/* Previous Button */}
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handlePrevious}
-          disabled={isFirstPattern}
-          className="flex-shrink-0"
-        >
-          <ChevronLeft className="w-5 h-5 mr-1" />
-          Previous
-        </Button>
-
-        {/* Next or Submit Button */}
-        {isLastPattern ? (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={!isCurrentPatternComplete || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit for Review"
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleNext}
-            disabled={!isCurrentPatternComplete}
-          >
-            Next
-            <ChevronRight className="w-5 h-5 ml-1" />
-          </Button>
-        )}
-      </div>
-
-      {/* Pattern Progress Indicators */}
-      {totalPatterns > 1 && (
-        <div className="mt-6 flex justify-center gap-2">
-          {patternItems.map((_, idx) => {
-            const answer = answers[idx];
-            const isComplete =
-              answer &&
-              answer.sentence1.trim().length > 0 &&
-              answer.sentence2.trim().length > 0;
-            const isCurrent = idx === currentIndex;
-
-            return (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${isCurrent
-                    ? "bg-primary-500 text-white ring-2 ring-primary-300"
-                    : isComplete
-                      ? "bg-green-100 text-green-700 hover:bg-green-200"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                  }`}
-                title={`Pattern ${idx + 1}: ${patternItems[idx].pattern}`}
-              >
-                {idx + 1}
-              </button>
-            );
-          })}
         </div>
-      )}
+
+        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+          <div className="relative flex min-h-12 items-center justify-between gap-2 sm:gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handlePrevious}
+              disabled={isFirstPattern || isSubmitting}
+              className="z-10 min-h-12 shrink-0 px-4 sm:px-6"
+            >
+              <ChevronLeft className="w-5 h-5 shrink-0 sm:mr-1" />
+              <span>Previous</span>
+            </Button>
+            <p className="pointer-events-none absolute left-1/2 top-1/2 z-0 max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-medium leading-tight text-gray-600 tabular-nums sm:max-w-none sm:text-sm">
+              Pattern {currentIndex + 1} of {totalPatterns}
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={() => void handlePrimaryAction()}
+              disabled={!isCurrentPatternComplete || isSubmitting}
+              className="z-10 min-h-12 min-w-[6.5rem] shrink-0 px-4 sm:min-w-[9rem] sm:px-6"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin sm:mr-2" />
+                  <span className="hidden sm:inline">Submitting…</span>
+                </>
+              ) : isLastPattern ? (
+                <>
+                  <span className="sm:hidden">Submit</span>
+                  <span className="hidden sm:inline">Submit for Review</span>
+                </>
+              ) : (
+                <>
+                  <span>Next</span>
+                  <ChevronRight className="ml-1 h-5 w-5 shrink-0" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     </DrillLayout>
   );
 }

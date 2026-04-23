@@ -26,7 +26,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
 import { authService } from "@/services/auth.service";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import {
+  formatProfileLearningGoalsShort,
+} from "@/lib/learner-learning-goals";
 
 // Types
 interface SettingItemProps {
@@ -52,61 +56,74 @@ const SECURITY_SETTINGS: SettingItemProps[] = [
   },
 ];
 
-const PREFERENCE_SETTINGS: SettingItemProps[] = [
-  {
-    label: "Nationality",
-    value: "Korean",
-    href: "/account/settings/nationality",
-    icon: <Globe className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "App language",
-    value: "English",
-    href: "/account/settings/language",
-    icon: <Languages className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Learning goals",
-    value: "Speak...",
-    href: "/account/settings/goals",
-    icon: <Target className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Notifications",
-    href: "/account/settings/notifications",
-    icon: <Bell className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Lesson",
-    href: "/account/settings/lesson",
-    icon: <BookOpen className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Theme",
-    href: "/account/settings/theme",
-    icon: <Palette className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Help",
-    href: "/account/settings/help",
-    icon: <HelpCircle className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Subscriptions",
-    href: "/account/settings/subscriptions",
-    icon: <CreditCard className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Privacy policy",
-    href: "/account/settings/privacy",
-    icon: <Shield className="w-5 h-5 text-gray-600" />,
-  },
-  {
-    label: "Terms of use",
-    href: "/account/settings/terms",
-    icon: <FileText className="w-5 h-5 text-gray-600" />,
-  },
-];
+function usePreferenceSettings(): SettingItemProps[] {
+  const { data: me, isLoading } = useUserCurrent();
+  const profile = me?.profile;
+
+  return useMemo((): SettingItemProps[] => {
+    const valueSuffix = isLoading && !me ? "…" : undefined;
+    return [
+      {
+        label: "Nationality",
+        value:
+          valueSuffix ??
+          (profile?.nationality?.trim() || "Not set"),
+        href: "/account/settings/nationality",
+        icon: <Globe className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "App language",
+        value:
+          valueSuffix ??
+          (profile?.language?.trim() || "Not set"),
+        href: "/account/settings/language",
+        icon: <Languages className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Learning goals",
+        value:
+          valueSuffix ?? formatProfileLearningGoalsShort(profile || {}),
+        href: "/account/settings/goals",
+        icon: <Target className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Notifications",
+        href: "/account/settings/notifications",
+        icon: <Bell className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Lesson",
+        href: "/account/settings/lesson",
+        icon: <BookOpen className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Theme",
+        href: "/account/settings/theme",
+        icon: <Palette className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Help",
+        href: "/account/settings/help",
+        icon: <HelpCircle className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Subscriptions",
+        href: "/account/settings/subscriptions",
+        icon: <CreditCard className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Privacy policy",
+        href: "/account/settings/privacy",
+        icon: <Shield className="w-5 h-5 text-gray-600" />,
+      },
+      {
+        label: "Terms of use",
+        href: "/account/settings/terms",
+        icon: <FileText className="w-5 h-5 text-gray-600" />,
+      },
+    ];
+  }, [isLoading, me, profile]);
+}
 
 // Components
 function UserProfileSection() {
@@ -310,6 +327,7 @@ function VersionInfo() {
 }
 
 export default function SettingsPage() {
+  const preferenceItems = usePreferenceSettings();
   return (
     <div className="min-h-screen bg-white pb-6">
       <div className="h-6"></div>
@@ -330,7 +348,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Preferences Section */}
-        <SettingsSection title="Preferences" items={PREFERENCE_SETTINGS} />
+        <SettingsSection title="Preferences" items={preferenceItems} />
 
         <LogoutButton />
       </div>

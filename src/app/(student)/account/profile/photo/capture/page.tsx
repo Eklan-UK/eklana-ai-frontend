@@ -23,8 +23,7 @@ export default function CapturePhotoPage() {
   };
 
   const handleUsePhoto = () => {
-    // In a real app, this would save the photo
-    router.push("/profile/edit");
+    router.push("/account/profile/edit");
   };
 
   return (

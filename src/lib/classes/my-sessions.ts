@@ -5,6 +5,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import type { TeachingClass } from "@/app/(admin)/admin/classes/types";
+import type { LearnerPastAttendance } from "@/domain/classes/class.api.types";
 
 export type MySessionsTab = "thisWeek" | "upcoming" | "past";
 
@@ -44,8 +45,9 @@ export function tabForSessionRow(
     return "thisWeek";
   }
 
+  /** Before this calendar week: past if the session time has already passed. */
   if (start < weekStart) {
-    return "upcoming";
+    return start < now ? "past" : "upcoming";
   }
 
   return "upcoming";
@@ -137,6 +139,35 @@ export function resolveCardBadge(
   }
 
   return { kind: "upcoming", label: "Upcoming" };
+}
+
+/** Outcome for an ended session row (Past tab). */
+export type PastSessionOutcome = "attended" | "missed" | "excused";
+
+/**
+ * Attended: present/late. Excused: own badge. Missed: absent or no record after session end.
+ */
+export function resolvePastSessionBadge(
+  learnerAttendance: LearnerPastAttendance,
+): { outcome: PastSessionOutcome; kind: SessionCardBadge; label: string } {
+  if (learnerAttendance === "present" || learnerAttendance === "late") {
+    return { outcome: "attended", kind: "completed", label: "Completed" };
+  }
+  if (learnerAttendance === "excused") {
+    return { outcome: "excused", kind: "upcoming", label: "Excused" };
+  }
+  return { outcome: "missed", kind: "missed", label: "Missed session" };
+}
+
+/** e.g. "2:00 PM – 3:00 PM" in the user's local timezone. */
+export function formatPastSessionTimeRange(startIso: string, endIso: string): string {
+  const s = parseISO(startIso);
+  const e = parseISO(endIso);
+  const opt: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+  };
+  return `${s.toLocaleTimeString("en-US", opt)} – ${e.toLocaleTimeString("en-US", opt)}`;
 }
 
 export type JoinButtonVariant = "live" | "soon" | "ready" | "disabled";

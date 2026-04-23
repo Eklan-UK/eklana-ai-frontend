@@ -19,7 +19,9 @@ import type {
   AdminClassListItemDTO,
   ClassBucket,
   CreateAdminClassBody,
+  LearnerPastSessionItemDTO,
 } from './class.api.types';
+import SessionAttendance from '@/models/session-attendance';
 
 function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
   const m = rawMessage.toLowerCase();
@@ -576,6 +578,121 @@ export class ClassRepository {
     const total = items.length;
     const paged = items.slice(params.offset, params.offset + params.limit);
     return { items: paged, total };
+  }
+
+  /**
+   * Past session instances for a learner: ended sessions in enrolled series,
+   * newest first, with per-learner attendance when recorded.
+   * No attendance row is returned as `learnerAttendance: "none"`; the UI treats
+   * that like absent (missed) for ended sessions.
+   */
+  async findLearnerPastSessionInstances(params: {
+    learnerId: Types.ObjectId;
+    limit: number;
+    offset: number;
+  }): Promise<{ items: LearnerPastSessionItemDTO[]; total: number }> {
+    const enrollRows = await ClassEnrollment.find({
+      learnerId: params.learnerId,
+      status: 'active',
+    })
+      .lean()
+      .exec();
+
+    if (enrollRows.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    const uniqueSeriesIds = [...new Set(enrollRows.map((e) => e.classSeriesId.toString()))].map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const seriesList = await ClassSeries.find({
+      _id: { $in: uniqueSeriesIds },
+      isActive: true,
+    })
+      .lean()
+      .exec();
+
+    if (seriesList.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    const activeSeriesIds = seriesList.map((s) => s._id);
+    const now = new Date();
+
+    const allPastSessions = await ClassSession.find({
+      classSeriesId: { $in: activeSeriesIds },
+      endUtc: { $lt: now },
+      status: { $ne: 'cancelled' },
+    })
+      .sort({ startUtc: -1 })
+      .lean()
+      .exec();
+
+    const total = allPastSessions.length;
+    const slice = allPastSessions.slice(
+      params.offset,
+      params.offset + params.limit,
+    );
+
+    if (slice.length === 0) {
+      return { items: [], total };
+    }
+
+    const seriesMap = new Map(
+      seriesList.map((s) => [s._id.toString(), s as unknown as IClassSeries]),
+    );
+
+    const tutorIds = [...new Set(seriesList.map((s) => s.tutorId.toString()))];
+    const tutors = await User.find({
+      _id: { $in: tutorIds.map((id) => new Types.ObjectId(id)) },
+    })
+      .select('firstName lastName email')
+      .lean()
+      .exec();
+
+    const tutorNameOf = (uid: string): string => {
+      const t = tutors.find((u) => u._id.toString() === uid);
+      if (!t) return 'Tutor';
+      const n = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim();
+      return n || t.email || 'Tutor';
+    };
+
+    const sessionIds = slice.map((s) => s._id);
+    const attendances = await SessionAttendance.find({
+      sessionId: { $in: sessionIds },
+      learnerId: params.learnerId,
+    })
+      .lean()
+      .exec();
+
+    const attBySessionId = new Map(
+      attendances.map((a) => [a.sessionId.toString(), a]),
+    );
+
+    const items: LearnerPastSessionItemDTO[] = slice.map((sess) => {
+      const ser = seriesMap.get(sess.classSeriesId.toString());
+      const classTitle = ser?.title?.trim() || 'Class';
+      const tid = (ser as IClassSeries | undefined)?.tutorId?.toString() ?? '';
+      const tutorName = tid ? tutorNameOf(tid) : 'Tutor';
+      const att = attBySessionId.get(sess._id.toString());
+      const learnerAttendance: LearnerPastSessionItemDTO['learnerAttendance'] = att
+        ? (att.status as LearnerPastSessionItemDTO['learnerAttendance'])
+        : 'none';
+
+      return {
+        sessionId: sess._id.toString(),
+        classSeriesId: sess.classSeriesId.toString(),
+        classTitle,
+        tutorName,
+        startUtc: new Date(sess.startUtc).toISOString(),
+        endUtc: new Date(sess.endUtc).toISOString(),
+        sessionStatus: sess.status as LearnerPastSessionItemDTO['sessionStatus'],
+        learnerAttendance,
+      };
+    });
+
+    return { items, total };
   }
 
   /** Single session for learner join / deep link; null if not enrolled or missing. */
