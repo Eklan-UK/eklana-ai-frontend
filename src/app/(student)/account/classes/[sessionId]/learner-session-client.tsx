@@ -2,30 +2,30 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Video, CalendarClock } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, Info, X } from "lucide-react";
 import {
   useLearnerSession,
-  useRecordLearnerAttendance,
   useLearnerRescheduleOptions,
   useLearnerRescheduleSession,
-  useLearnerTutorAvailability,
 } from "@/hooks/useClasses";
-import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
 
-const WD_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function formatTimeOnly(date: Date) {
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
-function formatMin(m: number) {
-  const h = Math.floor(m / 60);
-  const min = m % 60;
-  const ap = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(min).padStart(2, "0")} ${ap}`;
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
   const { data, isLoading, error } = useLearnerSession(sessionId);
-  const { data: tutorHours } = useLearnerTutorAvailability(data?.tutorId ?? null);
-  const recordAttendance = useRecordLearnerAttendance();
   const canReschedule =
     !!data &&
     (data.session.status === "scheduled" || data.session.status === "in_progress");
@@ -35,10 +35,13 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
   const reschedule = useLearnerRescheduleSession(sessionId);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
 
-  const meetingUrl = data?.session.meetingUrl?.trim();
-  const canJoin = Boolean(meetingUrl);
-
-  const slotChoices = useMemo(() => optionsData?.slots ?? [], [optionsData?.slots]);
+  const slotChoices = useMemo(
+    () =>
+      [...(optionsData?.slots ?? [])].sort(
+        (a, b) => new Date(a.startUtc).getTime() - new Date(b.startUtc).getTime(),
+      ),
+    [optionsData?.slots],
+  );
 
   return (
     <div className="space-y-6 pb-24">
@@ -64,106 +67,84 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
 
       {data ? (
         <>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{data.classTitle}</h1>
-            <p className="mt-1 text-sm text-gray-600">Tutor: {data.tutorName}</p>
-            {tutorHours && tutorHours.weeklyRules.length > 0 ? (
-              <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
-                <p className="font-semibold text-emerald-900">Tutor teaching hours</p>
-                <p className="mt-1 text-xs text-emerald-800/90">
-                  Shown in their timezone: <span className="font-mono">{tutorHours.timezone}</span>
-                  {tutorHours.bufferMinutes > 0
-                    ? ` · ${tutorHours.bufferMinutes} min buffer between sessions`
-                    : null}
-                </p>
-                <ul className="mt-2 space-y-1 text-xs text-emerald-900">
-                  {tutorHours.weeklyRules.map((r, i) => (
-                    <li key={`${r.weekday}-${r.startMin}-${i}`}>
-                      {WD_SHORT[r.weekday] ?? "Day"} {formatMin(r.startMin)} – {formatMin(r.endMin)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : tutorHours ? (
-              <p className="mt-2 text-xs text-amber-800">
-                Your tutor has not published weekly hours yet. Reschedule options may be limited.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-            <p>
-              <span className="font-medium text-gray-900">Starts: </span>
-              {new Date(data.session.startUtc).toLocaleString()}
-            </p>
-            <p className="mt-2">
-              <span className="font-medium text-gray-900">Ends: </span>
-              {new Date(data.session.endUtc).toLocaleString()}
-            </p>
-            <p className="mt-2">
-              <span className="font-medium text-gray-900">Status: </span>
-              {data.session.status}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={!canJoin}
-            onClick={() => {
-              if (!meetingUrl) return;
-              window.open(meetingUrl, "_blank", "noopener,noreferrer");
-              void recordAttendance.mutate({ sessionId });
-            }}
-            className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold transition-colors ${
-              canJoin
-                ? "bg-[#2d6a32] text-white shadow-sm hover:bg-[#245528]"
-                : "cursor-not-allowed bg-gray-100 text-gray-400"
-            }`}
-          >
-            <Video className={`h-5 w-5 ${canJoin ? "text-white" : "text-gray-400"}`} />
-            Join session
-          </button>
-          {!canJoin && data.session.status !== "completed" ? (
-            <p className="text-center text-xs text-gray-500">
-              Join link is available up to {TUTOR_JOIN_EARLY_MINUTES} minutes before the session
-              starts.
-            </p>
-          ) : null}
-
           {canReschedule ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
-              <div className="mb-3 flex items-center gap-2 text-amber-900">
-                <CalendarClock className="h-5 w-5 shrink-0" />
-                <h2 className="text-sm font-bold">Reschedule (same week)</h2>
+            <section className="overflow-hidden rounded-2xl  bg-[#ffffff]">
+              <div className="flex items-center justify-between px-4 pt-4">
+                <h2 className="text-xl font-semibold text-neutral-900">
+                  Reschedule Session
+                </h2>
               </div>
-              <p className="mb-3 text-xs text-amber-900/80">
-                You can only move this session within the same UTC week as the original time. Pick
-                a slot below.
-              </p>
-              {optionsLoading ? (
-                <p className="text-sm text-amber-900/70">Loading options…</p>
-              ) : slotChoices.length === 0 ? (
-                <p className="text-sm text-amber-900/80">
-                  No other slots this week. Contact support if you need a different time.
-                </p>
-              ) : (
-                <>
-                  <label className="sr-only" htmlFor="reschedule-slot">
-                    New time
-                  </label>
-                  <select
-                    id="reschedule-slot"
-                    value={selectedSlot}
-                    onChange={(e) => setSelectedSlot(e.target.value)}
-                    className="mb-3 w-full rounded-lg border border-amber-200 bg-white px-3 py-2.5 text-sm text-gray-900"
-                  >
-                    <option value="">Choose a new start time…</option>
-                    {slotChoices.map((s) => (
-                      <option key={s.startUtc} value={`${s.startUtc}|${s.endUtc}`}>
-                        {new Date(s.startUtc).toLocaleString()} → {new Date(s.endUtc).toLocaleString()}
-                      </option>
-                    ))}
-                  </select>
+
+              <div className="space-y-4 px-3 pb-3 pt-3 sm:px-4">
+                <div className="rounded-2xl bg-[#fbfafd] px-4 py-3.5">
+                  <p className="text-sm text-[#6b7280]">Current Session</p>
+                  <p className="mt-1 text-xl font-semibold leading-tight text-[#111827]">
+                    {data.tutorName}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[#4b5563]">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4" />
+                      <span>{formatShortDate(new Date(data.session.startUtc))}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock3 className="h-4 w-4" />
+                      <span>
+                        {formatTimeOnly(new Date(data.session.startUtc))} -{" "}
+                        {formatTimeOnly(new Date(data.session.endUtc))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  <Info className="h-4 w-4 mr-2" />
+                  You can only reschedule to another time slot within the same week.
+                </div>
+           
+
+                <div className="space-y-3">
+                  <h3 className="text-xl font-bold leading-tight text-neutral-900">
+                    Available time slot
+                  </h3>
+
+                  {optionsLoading ? (
+                    <p className="rounded-[16px] border border-neutral-200 bg-white px-4 py-4 text-sm text-neutral-600">
+                      Loading options...
+                    </p>
+                  ) : slotChoices.length === 0 ? (
+                    <p className="rounded-[16px] border border-neutral-200 bg-white px-4 py-4 text-sm text-neutral-600">
+                      No other slots this week. Contact support if you need a different time.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {slotChoices.map((slot) => {
+                        const slotKey = `${slot.startUtc}|${slot.endUtc}`;
+                        const startDate = new Date(slot.startUtc);
+                        const isSelected = selectedSlot === slotKey;
+                        return (
+                          <button
+                            key={slotKey}
+                            type="button"
+                            onClick={() => setSelectedSlot(slotKey)}
+                            className={`w-full rounded-[16px] border px-4 py-3 text-left transition-colors ${
+                              isSelected
+                                ? "border-green-600 bg-green-50"
+                                : "border-neutral-200 bg-[#f1f1f3]"
+                            }`}
+                          >
+                            <p className="text-xl font-medium leading-tight text-[#111827]">
+                              {formatShortDate(startDate)}
+                            </p>
+                            <p className="mt-1.5 text-base leading-tight text-[#9ca3af]">
+                              {formatTimeOnly(startDate)}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="sticky bottom-0 bg-[#ffffff] pb-1 pt-1">
                   <button
                     type="button"
                     disabled={!selectedSlot || reschedule.isPending}
@@ -172,14 +153,16 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
                       if (!newStartUtc || !newEndUtc) return;
                       reschedule.mutate({ newStartUtc, newEndUtc });
                     }}
-                    className="w-full rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
+                    className="w-full rounded-full bg-[#d4d4d8] px-4 py-3 text-lg font-semibold text-white disabled:cursor-not-allowed enabled:bg-green-700"
                   >
-                    {reschedule.isPending ? "Saving…" : "Apply new time"}
+                    {reschedule.isPending ? "Saving..." : "Continue"}
                   </button>
-                </>
-              )}
-            </div>
-          ) : null}
+                </div>
+              </div>
+            </section>
+          ) : (
+            <p className="text-sm text-gray-600">This session can no longer be rescheduled.</p>
+          )}
         </>
       ) : null}
     </div>
