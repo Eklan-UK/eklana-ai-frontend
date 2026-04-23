@@ -84,7 +84,7 @@ export default function RecordVideoPage() {
               </Button>
               <Button
                 variant="primary"
-                onClick={() => router.push("/profile/edit")}
+                onClick={() => router.push("/account/profile/edit")}
                 className="bg-green-600 hover:bg-green-700"
               >
                 Use Video

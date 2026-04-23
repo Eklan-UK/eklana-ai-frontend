@@ -567,7 +567,14 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   }, [stopTTSAudio]);
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="roleplay" refreshOnMount={true} />;
+    return (
+      <DrillCompletionScreen
+        drillType="roleplay"
+        returnPath="/account/drills"
+        returnLabel="Back to My Plan"
+        refreshOnMount={true}
+      />
+    );
   }
 
   // Review Screen - Shows all analytics collected during the session

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, Award, Calendar, Check } from "lucide-react";
+import { Flame, Award, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { streakAPI } from "@/lib/api";
 import { Loader2 } from "lucide-react";
@@ -95,22 +95,14 @@ export function StreakDisplay() {
             const dayName = dayNames[date.getUTCDay()];
 
             return (
-              <div key={index} className="text-center">
-                <div className="text-xs font-medium text-gray-600 mb-2">
-                  {dayName}
-                </div>
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${day.completed
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-200 text-gray-400"
-                    }`}
-                >
-                  {day.completed ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                  )}
-                </div>
+              <div
+                key={index}
+                className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full font-black text-white ${
+                  day.completed ? "bg-green-600" : "bg-black"
+                } text-xs`}
+                title={day.date}
+              >
+                {dayName}
               </div>
             );
           })}

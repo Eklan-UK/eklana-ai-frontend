@@ -86,6 +86,8 @@ export const queryKeys = {
       ["tutor", "classes", "list", filters] as const,
     learnerList: (filters?: { bucket?: string; limit?: number }) =>
       ["learner", "classes", "list", filters] as const,
+    learnerPastSessions: (filters?: { limit?: number; offset?: number }) =>
+      ["learner", "sessions", "past", filters] as const,
     learnerSession: (sessionId: string) =>
       ["learner", "classes", "session", sessionId] as const,
     tutorSessionAttendance: (sessionId: string) =>

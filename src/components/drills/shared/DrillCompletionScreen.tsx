@@ -22,7 +22,7 @@ export function DrillCompletionScreen({
   title = "Drill Completed",
   message,
   drillType = "drill",
-  returnPath = "/account",
+  returnPath = "/account/drills",
   returnLabel = "Continue Learning",
   refreshOnMount = false,
 }: DrillCompletionScreenProps) {

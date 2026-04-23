@@ -882,7 +882,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
         }}
         onDoneForToday={() => {
           setShowReview(false);
-          router.push("/account/practice");
+          router.push("/account/practice/ai/pressure-test");
         }}
       />
     </div>

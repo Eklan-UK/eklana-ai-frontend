@@ -3,6 +3,7 @@ import "../globals.css";
 import { VerificationGuard } from "@/components/guards/VerificationGuard";
 import { OnboardingGuard } from "@/components/guards/OnboardingGuard";
 import { RoleGuard } from "@/components/guards/RoleGuard";
+import { StreakActivityPing } from "@/components/streak/StreakActivityPing";
 
 export const metadata: Metadata = {
   title: "Eklan - Create Your Future",
@@ -17,7 +18,10 @@ export default function StudentLayout({
   return (
     <RoleGuard allowedRoles={['user']}>
       <VerificationGuard>
-        <OnboardingGuard>{children}</OnboardingGuard>
+        <OnboardingGuard>
+          <StreakActivityPing />
+          {children}
+        </OnboardingGuard>
       </VerificationGuard>
     </RoleGuard>
   );
