@@ -1,83 +1,78 @@
 "use client";
 
-import { useState } from "react";
+import { Check, Monitor, Moon, Sun } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { useTheme } from "@/components/providers/ThemeProvider";
+
+const THEME_OPTIONS = [
+  { id: "light", label: "Light", description: "Default light theme", Icon: Sun },
+  { id: "dark", label: "Dark", description: "Dark mode for night use", Icon: Moon },
+  { id: "system", label: "System", description: "Follow system settings", Icon: Monitor },
+] as const;
 
 export default function ThemePage() {
-  const [selected, setSelected] = useState("Light");
-
-  const themes = [
-    { name: "Light", icon: "☀️", description: "Default light theme" },
-    { name: "Dark", icon: "🌙", description: "Dark mode for night use" },
-    { name: "Auto", icon: "🔄", description: "Follow system settings" },
-  ];
+  const { theme, resolvedTheme, setTheme, mounted } = useTheme();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
       <Header showBack title="Theme" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
-        <p className="text-base text-gray-600 mb-6">
-          Choose your preferred theme.
+        <p className="mb-2 text-base text-text-secondary">
+          Choose your preferred theme. Changes apply instantly and are saved automatically.
         </p>
+        {mounted ? (
+          <p className="mb-6 text-sm text-muted-foreground">
+            Active appearance: <span className="font-medium capitalize">{resolvedTheme}</span>
+          </p>
+        ) : null}
 
-        <div className="space-y-3 mb-6">
-          {themes.map((theme) => (
+        <div className="space-y-3">
+          {THEME_OPTIONS.map(({ id, label, description, Icon }) => (
             <button
-              key={theme.name}
-              onClick={() => setSelected(theme.name)}
+              key={id}
+              type="button"
+              onClick={() => setTheme(id)}
               className="w-full text-left"
+              aria-pressed={theme === id}
             >
               <Card
                 className={`transition-all ${
-                  selected === theme.name
-                    ? "bg-green-50 ring-2 ring-green-600"
-                    : ""
+                  theme === id
+                    ? "bg-green-50 ring-2 ring-green-600 dark:bg-green-950/40 dark:ring-green-500"
+                    : "bg-card border-border"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <span className="text-3xl">{theme.icon}</span>
+                    <div
+                      className={`rounded-full p-2 ${
+                        theme === id
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300"
+                          : "bg-muted text-text-secondary"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
                     <div>
-                      <p className="text-base font-semibold text-gray-900">
-                        {theme.name}
-                      </p>
-                      <p className="text-sm text-gray-500">{theme.description}</p>
+                      <p className="text-base font-semibold text-foreground">{label}</p>
+                      <p className="text-sm text-muted-foreground">{description}</p>
                     </div>
                   </div>
-                  {selected === theme.name && (
-                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M13 4L6 11L3 8"
-                          stroke="white"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                  {theme === id ? (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white dark:bg-green-500">
+                      <Check className="h-4 w-4" />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </Card>
             </button>
           ))}
         </div>
-
-        <Button variant="primary" size="lg" fullWidth>
-          Save
-        </Button>
       </div>
     </div>
   );

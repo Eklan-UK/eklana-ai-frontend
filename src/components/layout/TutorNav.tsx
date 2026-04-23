@@ -41,7 +41,7 @@ export function TutorNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white md:relative md:h-screen md:w-64 md:border-r md:border-t-0 md:border-gray-200">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:relative md:h-screen md:w-64 md:border-r md:border-t-0 md:border-border">
       {/* Mobile: 6-column grid — Dashboard, Classes, Hours, Drills, Students, Settings */}
       <div className="grid grid-cols-6 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
         {navItems.map((item) => {
@@ -54,7 +54,7 @@ export function TutorNav() {
               className={`flex flex-col items-center justify-center gap-0.5 px-1 py-2.5 transition-colors md:w-full md:flex-row md:gap-2 md:px-6 md:py-3 ${
                 isActive
                   ? "bg-green-50 text-green-600 md:border-l-4 md:border-l-green-600"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  : "text-text-secondary hover:bg-muted hover:text-foreground"
               }`}
             >
               <Icon className="h-5 w-5 shrink-0 md:h-5 md:w-5" />

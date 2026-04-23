@@ -33,7 +33,7 @@ export const metadata = generateMetadata({
 
 export default async function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <div className="h-6"></div>
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
@@ -51,7 +51,7 @@ export default async function HomePage() {
               variant="outline"
               size="lg"
               fullWidth
-              className="border-green-200 text-green-800 hover:bg-green-50"
+              className="border-primary/30 text-primary hover:bg-primary/10"
             >
               <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
               View your classes
@@ -60,7 +60,7 @@ export default async function HomePage() {
         </div>
 
         <div className="mb-4 md:mb-6">
-          <h3 className="text-lg md:text-xl font-bold font-nunito text-gray-900 mb-4">
+          <h3 className="text-lg md:text-xl font-bold font-nunito text-foreground mb-4">
             Your Progress
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -72,17 +72,17 @@ export default async function HomePage() {
 
           <Link
             href="/account/bookmarks"
-            className="mt-3 flex items-center justify-between w-full border border-gray-200 rounded-full px-4 py-3 hover:bg-gray-50 transition-colors group"
+            className="mt-3 flex items-center justify-between w-full border border-border rounded-full px-4 py-3 hover:bg-muted transition-colors group"
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
                 <span className="text-base">📘</span>
               </div>
-              <span className="text-sm font-semibold font-satoshi text-gray-900">
+              <span className="text-sm font-semibold font-satoshi text-foreground">
                 Saved Drills
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-text-secondary transition-colors" />
           </Link>
         </div>
 
@@ -92,12 +92,12 @@ export default async function HomePage() {
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900">
+            <h3 className="text-lg md:text-xl font-bold text-foreground">
               Recent Activity
             </h3>
             <Link
               href="/activity"
-              className="text-sm text-green-600 flex items-center gap-1"
+              className="text-sm text-primary flex items-center gap-1"
             >
               See All
               <ChevronRight className="w-4 h-4" />

@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '../ui/Button';
 import { ArrowLeftIcon } from 'lucide-react';
@@ -23,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter()
 
   return (
-    <header className={`sticky top-0 z-40 bg-white ${className}`}>
+    <header className={`sticky top-0 z-40 bg-background ${className}`}>
       <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
         <div className="flex items-center gap-3">
           {showBack && (
@@ -32,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
             </Button>
           )}
           {title && (
-            <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+            <h1 className="text-xl font-bold text-foreground">{title}</h1>
           )}
         </div>
         {rightAction && <div>{rightAction}</div>}

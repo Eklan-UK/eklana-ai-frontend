@@ -26,7 +26,7 @@ export const Card: React.FC<CardProps> = ({
   
   return (
     <div 
-      className={`bg-white rounded-2xl shadow-sm ${paddingClasses[padding]} ${className} ${onClick ? 'cursor-pointer' : ''}`}
+      className={`rounded-2xl border border-border bg-card text-foreground shadow-sm ${paddingClasses[padding]} ${className} ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

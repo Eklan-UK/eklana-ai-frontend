@@ -31,6 +31,7 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import {
   formatProfileLearningGoalsShort,
 } from "@/lib/learner-learning-goals";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 // Types
 interface SettingItemProps {
@@ -47,18 +48,31 @@ interface SettingSection {
   items: SettingItemProps[];
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 // Constants
 const SECURITY_SETTINGS: SettingItemProps[] = [
   {
     label: "Change Password",
     href: "/account/settings/password",
-    icon: <Lock className="w-5 h-5 text-gray-600" />,
+    icon: <Lock className="w-5 h-5 text-text-secondary" />,
   },
 ];
 
 function usePreferenceSettings(): SettingItemProps[] {
   const { data: me, isLoading } = useUserCurrent();
+  const { theme, mounted } = useTheme();
   const profile = me?.profile;
+  const themeValue = mounted
+    ? theme === "system"
+      ? "System"
+      : theme === "dark"
+        ? "Dark"
+        : "Light"
+    : "…";
 
   return useMemo((): SettingItemProps[] => {
     const valueSuffix = isLoading && !me ? "…" : undefined;
@@ -69,7 +83,7 @@ function usePreferenceSettings(): SettingItemProps[] {
           valueSuffix ??
           (profile?.nationality?.trim() || "Not set"),
         href: "/account/settings/nationality",
-        icon: <Globe className="w-5 h-5 text-gray-600" />,
+        icon: <Globe className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "App language",
@@ -77,52 +91,53 @@ function usePreferenceSettings(): SettingItemProps[] {
           valueSuffix ??
           (profile?.language?.trim() || "Not set"),
         href: "/account/settings/language",
-        icon: <Languages className="w-5 h-5 text-gray-600" />,
+        icon: <Languages className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Learning goals",
         value:
           valueSuffix ?? formatProfileLearningGoalsShort(profile || {}),
         href: "/account/settings/goals",
-        icon: <Target className="w-5 h-5 text-gray-600" />,
+        icon: <Target className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Notifications",
         href: "/account/settings/notifications",
-        icon: <Bell className="w-5 h-5 text-gray-600" />,
+        icon: <Bell className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Lesson",
         href: "/account/settings/lesson",
-        icon: <BookOpen className="w-5 h-5 text-gray-600" />,
+        icon: <BookOpen className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Theme",
+        value: themeValue,
         href: "/account/settings/theme",
-        icon: <Palette className="w-5 h-5 text-gray-600" />,
+        icon: <Palette className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Help",
         href: "/account/settings/help",
-        icon: <HelpCircle className="w-5 h-5 text-gray-600" />,
+        icon: <HelpCircle className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Subscriptions",
         href: "/account/settings/subscriptions",
-        icon: <CreditCard className="w-5 h-5 text-gray-600" />,
+        icon: <CreditCard className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Privacy policy",
         href: "/account/settings/privacy",
-        icon: <Shield className="w-5 h-5 text-gray-600" />,
+        icon: <Shield className="w-5 h-5 text-text-secondary" />,
       },
       {
         label: "Terms of use",
         href: "/account/settings/terms",
-        icon: <FileText className="w-5 h-5 text-gray-600" />,
+        icon: <FileText className="w-5 h-5 text-text-secondary" />,
       },
     ];
-  }, [isLoading, me, profile]);
+  }, [isLoading, me, profile, themeValue]);
 }
 
 // Components
@@ -132,7 +147,7 @@ function UserProfileSection() {
   const displayName = getUserDisplayName(user);
 
   return (
-    <div className="flex items-center gap-4 py-6 border-b border-gray-100">
+    <div className="flex items-center gap-4 py-6 border-b border-border">
       {user?.avatar ? (
         <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-green-500">
           <Image
@@ -149,12 +164,12 @@ function UserProfileSection() {
         </div>
       )}
       <div className="flex-1">
-        <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-1">
+        <h3 className="text-lg md:text-xl font-bold text-foreground mb-1">
           {displayName}
         </h3>
         <Link
           href="/account/profile/edit"
-          className="text-sm text-green-600 font-medium"
+          className="text-sm text-primary font-medium"
         >
           Edit profile
         </Link>
@@ -173,7 +188,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
 }) => {
   const content = (
     <div
-      className={`flex items-center justify-between py-4 border-b border-gray-100 ${isDanger ? "text-red-600" : ""
+      className={`flex items-center justify-between py-4 border-b border-border ${isDanger ? "text-accent-red" : ""
         }`}
     >
       <div className="flex items-center gap-3">
@@ -181,8 +196,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
         <span className="text-base font-medium">{label}</span>
       </div>
       <div className="flex items-center gap-2">
-        {value && <span className="text-sm text-gray-500">{value}</span>}
-        <ChevronRight className="w-5 h-5 text-gray-400" />
+        {value && <span className="text-sm text-muted-foreground">{value}</span>}
+        <ChevronRight className="w-5 h-5 text-muted-foreground" />
       </div>
     </div>
   );
@@ -212,32 +227,32 @@ function EmailVerificationSection() {
     try {
       await authService.sendVerificationEmail();
       toast.success("Verification email sent! Please check your inbox.");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send verification email");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to send verification email"));
     } finally {
       setIsSending(false);
     }
   };
 
   return (
-    <div className="py-4 border-b border-gray-100">
+    <div className="py-4 border-b border-border">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1">
-          <Mail className="w-5 h-5 text-gray-600" />
+          <Mail className="w-5 h-5 text-text-secondary" />
           <div className="flex-1">
-            <span className="text-base font-medium text-gray-900">
+            <span className="text-base font-medium text-foreground">
               Email Verification
             </span>
             <div className="flex items-center gap-2 mt-1">
               {isEmailVerified ? (
                 <>
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-600">Verified</span>
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span className="text-sm text-primary">Verified</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-600">Not Verified</span>
+                  <XCircle className="w-4 h-4 text-accent-red" />
+                  <span className="text-sm text-accent-red">Not Verified</span>
                 </>
               )}
             </div>
@@ -247,7 +262,7 @@ function EmailVerificationSection() {
           <button
             onClick={handleSendVerification}
             disabled={isSending}
-            className="text-sm text-green-600 font-medium hover:underline disabled:opacity-50 flex items-center gap-2"
+            className="text-sm text-primary font-medium hover:underline disabled:opacity-50 flex items-center gap-2"
           >
             {isSending ? (
               <>
@@ -261,7 +276,7 @@ function EmailVerificationSection() {
         )}
       </div>
       {!isEmailVerified && (
-        <p className="text-xs text-gray-500 mt-2 ml-8">
+        <p className="text-xs text-muted-foreground mt-2 ml-8">
           Verify your email to secure your account
         </p>
       )}
@@ -272,7 +287,7 @@ function EmailVerificationSection() {
 function SettingsSection({ title, items }: SettingSection) {
   return (
     <div className="py-4">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 px-1">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
         {title}
       </h3>
       {items.map((item, index) => (
@@ -291,8 +306,8 @@ function LogoutButton() {
       await logout();
       toast.success("Logged out successfully");
       router.push("/auth/login");
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to logout");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to logout"));
     }
   };
 
@@ -301,7 +316,7 @@ function LogoutButton() {
       <button
         onClick={handleLogout}
         disabled={isLoading}
-        className="w-full text-center py-4 text-red-600 font-semibold disabled:opacity-50"
+        className="w-full text-center py-4 text-accent-red font-semibold disabled:opacity-50"
       >
         {isLoading ? "Logging out..." : "Logout"}
       </button>
@@ -320,7 +335,7 @@ function VersionInfo() {
           height={32}
           className="rounded-lg opacity-50"
         />
-        <span className="text-sm text-gray-400">eklan version 1.0</span>
+        <span className="text-sm text-muted-foreground">eklan version 1.0</span>
       </div>
     </div>
   );
@@ -329,7 +344,7 @@ function VersionInfo() {
 export default function SettingsPage() {
   const preferenceItems = usePreferenceSettings();
   return (
-    <div className="min-h-screen bg-white pb-6">
+    <div className="min-h-screen bg-background pb-6">
       <div className="h-6"></div>
       <Header showBack title="Settings" />
 
@@ -338,7 +353,7 @@ export default function SettingsPage() {
 
         {/* Security Section with Email Verification */}
         <div className="py-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 px-1">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
             Security
           </h3>
           <EmailVerificationSection />
@@ -351,6 +366,7 @@ export default function SettingsPage() {
         <SettingsSection title="Preferences" items={preferenceItems} />
 
         <LogoutButton />
+        <VersionInfo />
       </div>
     </div>
   );

@@ -18,24 +18,24 @@ export const Input: React.FC<InputProps> = ({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-text-secondary mb-2">
           {label}
         </label>
       )}
       <div className="relative">
         {icon && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
             {icon}
           </div>
         )}
         <input
           className={`
-            w-full rounded-xl border-2 border-[#22c55e] px-4 py-3
+            w-full rounded-xl border border-border bg-card px-4 py-3
             ${icon ? 'pl-12' : ''}
             ${rightIcon ? 'pr-12' : ''}
-            text-gray-900 placeholder:text-gray-400
-            focus:outline-none focus:ring-2 focus:ring-[#22c55e] focus:ring-offset-2
-            ${error ? 'border-red-500' : ''}
+            text-gray-900 placeholder:text-muted-foreground
+            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+            ${error ? 'border-accent-red' : ''}
             ${className}
           `}
           {...props}
@@ -47,7 +47,7 @@ export const Input: React.FC<InputProps> = ({
         )}
       </div>
       {error && (
-        <p className="mt-1 text-sm text-red-500">{error}</p>
+        <p className="mt-1 text-sm text-accent-red">{error}</p>
       )}
     </div>
   );
