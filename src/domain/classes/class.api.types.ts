@@ -174,3 +174,31 @@ export interface TutorSessionAttendanceResponse {
     attendance: SessionAttendanceItemDTO[];
   };
 }
+
+/** Learner-facing attendance on a past session (GET /learner/sessions/past). */
+export type LearnerPastAttendance = 'present' | 'late' | 'absent' | 'excused' | 'none';
+
+/** One ended class session for the Past tab (session-level row). */
+export interface LearnerPastSessionItemDTO {
+  sessionId: string;
+  classSeriesId: string;
+  classTitle: string;
+  tutorName: string;
+  startUtc: string;
+  endUtc: string;
+  sessionStatus: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  /** `none` = no attendance row (treated as missed for UI when session has ended). */
+  learnerAttendance: LearnerPastAttendance;
+}
+
+export interface LearnerPastSessionsResponse {
+  data?: {
+    sessions: LearnerPastSessionItemDTO[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore?: boolean;
+    };
+  };
+}

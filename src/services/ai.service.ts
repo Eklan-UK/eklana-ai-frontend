@@ -11,6 +11,7 @@ interface ConversationOptions {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  systemInstruction?: string;
 }
 
 
@@ -60,6 +61,9 @@ export const aiService = {
         messages: options.messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens,
+        ...(options.systemInstruction
+          ? { systemInstruction: options.systemInstruction }
+          : {}),
       }),
     });
 
@@ -167,6 +171,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -182,6 +187,9 @@ export const aiService = {
         userMessage: options.userMessage,
         conversationHistory: options.conversationHistory || [],
         temperature: options.temperature,
+        ...(options.freeTalkContext
+          ? { freeTalkContext: options.freeTalkContext }
+          : {}),
       }),
     });
 
@@ -202,12 +210,19 @@ export const aiService = {
   async streamDrillPracticeGreeting(
     drillId: string,
     onChunk: (chunk: { type: string; data: any }) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    freeTalkContext?: { scenarioId: string; vocabularyList: string[] }
   ): Promise<void> {
+    const qs = new URLSearchParams();
+    qs.set("drillId", drillId);
+    if (freeTalkContext?.scenarioId != null && freeTalkContext.scenarioId !== "") {
+      qs.set("scenarioId", freeTalkContext.scenarioId);
+    }
+    if (freeTalkContext?.vocabularyList?.length) {
+      qs.set("vocab", JSON.stringify(freeTalkContext.vocabularyList));
+    }
     const response = await fetch(
-      `${API_BASE_URL}/ai/drill-practice/greeting?drillId=${encodeURIComponent(
-        drillId
-      )}`,
+      `${API_BASE_URL}/ai/drill-practice/greeting?${qs.toString()}`,
       {
         method: "GET",
         headers: {
@@ -277,6 +292,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -289,6 +305,9 @@ export const aiService = {
     );
     if (options.temperature !== undefined) {
       formData.append("temperature", String(options.temperature));
+    }
+    if (options.freeTalkContext) {
+      formData.append("freeTalkContext", JSON.stringify(options.freeTalkContext));
     }
 
     const response = await fetch(`${API_BASE_URL}/ai/drill-practice/voice`, {

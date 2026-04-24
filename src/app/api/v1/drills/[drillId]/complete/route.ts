@@ -15,6 +15,7 @@ import { AssignmentRepository } from '@/domain/assignments/assignment.repository
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import { computeConfidenceMetrics } from '@/domain/confidence/confidence.service';
 import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
+import { StreakService } from '@/services/streak.service';
 
 const completeSchema = z.object({
 	drillAssignmentId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -199,6 +200,16 @@ async function handler(
 			computePronunciationMetrics(context.userId.toString()).catch(() => {})
 		]);
 	});
+
+	if (context.userRole === 'user' && validated.score >= 70) {
+		try {
+			await StreakService.recordActivityDay(context.userId.toString(), {
+				score: validated.score,
+			});
+		} catch {
+			// streak must not fail drill completion
+		}
+	}
 
 	return apiResponse.success({
 		attempt: {

@@ -3,6 +3,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
 import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
+import { resolveAiNameList, type DrillFreeTalkOverlay } from '@/domain/ai/free-talk';
 // Bundled static binary — works in serverless environments where ffmpeg is not on PATH.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegBin: string = require('ffmpeg-static');
@@ -39,6 +40,8 @@ interface ConversationOptions {
 	messages: ConversationMessage[];
 	temperature?: number;
 	maxTokens?: number;
+	/** Injected as model system instruction (Free Talk: topic, scenario, target words). */
+	systemInstruction?: string;
 }
 
 
@@ -53,6 +56,7 @@ interface DrillPracticeOptions {
 		roleplay_scenes?: any[];
 		roleplay_dialogue?: any[];
 		student_character_name?: string;
+		ai_character_name?: string;
 		ai_character_names?: string[];
 		matching_pairs?: any[];
 		definition_items?: any[];
@@ -70,6 +74,8 @@ interface DrillPracticeOptions {
 	temperature?: number;
 	pronunciationWeaknesses?: string[];
 	userName?: string;
+	/** From role-play: fixed scene + target words (Free Talk from drill). */
+	freeTalkOverlay?: DrillFreeTalkOverlay;
 }
 
 // ─── PCM to WAV conversion ───────────────────────────────────────────────────
@@ -261,6 +267,8 @@ async function generateWithLiveAPI(
 						parts: [{ text: systemInstruction }],
 					},
 					outputAudioTranscription: {},
+					// Same as drill voice / free talk: avoid thought parts + SDK warnings on non-data parts.
+					thinkingConfig: { thinkingBudget: 0 },
 				},
 				callbacks: {
 					onopen: () => {
@@ -430,6 +438,7 @@ export async function generateWithLiveAPIStream(
 							parts: [{ text: systemInstruction }],
 						},
 						outputAudioTranscription: {},
+						thinkingConfig: { thinkingBudget: 0 },
 					},
 					callbacks: {
 						onopen: () => {
@@ -614,7 +623,12 @@ async function transcribeWithLiveAPI(
 
 // ─── Build drill practice system prompt ──────────────────────────────────────
 
-function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunciationWeaknesses?: string[], userName?: string): string {
+function buildDrillPracticePrompt(
+	drill: DrillPracticeOptions['drill'],
+	pronunciationWeaknesses?: string[],
+	userName?: string,
+	freeTalkOverlay?: DrillFreeTalkOverlay
+): string {
 	// ═══ LAYER 1 — Identity ═══
 	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
 	if (userName) {
@@ -632,24 +646,58 @@ function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunci
 	if (drill.student_character_name) {
 		prompt += `\n- Student plays: ${drill.student_character_name}`;
 	}
-	if (drill.ai_character_names && drill.ai_character_names.length > 0) {
-		prompt += `\n- AI plays: ${drill.ai_character_names.join(', ')}`;
+	const roleAiNames = resolveAiNameList(drill);
+	if (roleAiNames && roleAiNames.length > 0) {
+		prompt += `\n- AI plays: ${roleAiNames.join(', ')}`;
 	}
 
-	// Scene descriptions (human-readable, not raw JSON)
+	const activeOnly =
+		freeTalkOverlay != null &&
+		typeof freeTalkOverlay.activeSceneIndex === "number" &&
+		freeTalkOverlay.activeSceneIndex >= 0 &&
+		drill.roleplay_scenes &&
+		drill.roleplay_scenes[freeTalkOverlay.activeSceneIndex];
+
+	// Scene descriptions: for Free Talk with a selected scene, only the ACTIVE scene
+	// (avoid mixing e.g. "Interview" + "Technical stand-up" in one session).
 	if (drill.roleplay_scenes && drill.roleplay_scenes.length > 0) {
-		const sceneDescriptions = drill.roleplay_scenes.map((scene: any, i: number) => {
+		if (activeOnly) {
+			const i = freeTalkOverlay!.activeSceneIndex as number;
+			const scene = drill.roleplay_scenes[i];
 			const parts = [];
-			if (scene.title || scene.name) parts.push(scene.title || scene.name);
-			if (scene.description || scene.context) parts.push(scene.description || scene.context);
+			if (scene.scene_name || scene.title || scene.name) {
+				parts.push(scene.scene_name || scene.title || scene.name);
+			}
+			if (scene.context || scene.description) parts.push(scene.context || scene.description);
 			if (scene.setting) parts.push(`Setting: ${scene.setting}`);
-			return `  ${i + 1}. ${parts.join(' — ') || JSON.stringify(scene)}`;
-		}).join('\n');
-		prompt += `\n- The tutor created scenes about:\n${sceneDescriptions}`;
+			prompt += `\n- THIS SESSION's scene only (index ${i} in the drill): ${parts.join(" — ") || JSON.stringify(scene)}`;
+			if (drill.roleplay_scenes.length > 1) {
+				prompt += `\n- Note: this drill has other scenes for other sessions — do not blend their content into this one unless the student explicitly changes topic.`;
+			}
+		} else {
+			const sceneDescriptions = drill.roleplay_scenes.map((scene: any, i: number) => {
+				const parts = [];
+				if (scene.scene_name || scene.title || scene.name) {
+					parts.push(scene.scene_name || scene.title || scene.name);
+				}
+				if (scene.context || scene.description) parts.push(scene.context || scene.description);
+				if (scene.setting) parts.push(`Setting: ${scene.setting}`);
+				return `  ${i + 1}. ${parts.join(' — ') || JSON.stringify(scene)}`;
+			}).join('\n');
+			prompt += `\n- The tutor created scenes about:\n${sceneDescriptions}`;
+		}
 	}
 
-	// Key dialogue patterns
-	if (drill.roleplay_dialogue && drill.roleplay_dialogue.length > 0) {
+	// Key dialogue patterns: skip when reference script is in FOCUSED, or when a multi-scene drill
+	// has an active scene selected (global `roleplay_dialogue` is usually all scenes at once).
+	const skipGlobalDialogueBlueprint =
+		!!freeTalkOverlay?.referenceScript?.trim() ||
+		(!!activeOnly && (drill.roleplay_scenes?.length ?? 0) > 1);
+	if (
+		drill.roleplay_dialogue &&
+		drill.roleplay_dialogue.length > 0 &&
+		!skipGlobalDialogueBlueprint
+	) {
 		const dialoguePatterns = drill.roleplay_dialogue.map((d: any) => {
 			if (typeof d === 'string') return `  - ${d}`;
 			if (d.speaker && d.text) return `  - ${d.speaker}: "${d.text}"`;
@@ -684,8 +732,42 @@ function buildDrillPracticePrompt(drill: DrillPracticeOptions['drill'], pronunci
 		prompt += `\n- Target word: "${drill.sentence_drill_word}"`;
 	}
 
+	// Optional: Free Talk from a specific tutor scene + word list
+	if (freeTalkOverlay?.scenarioDescription) {
+		prompt += `\n\nFOCUSED ROLEPLAY SESSION (from tutor's material):
+The tutor selected THIS setting for the student's free conversation. You MUST keep the entire session in this setting — do not switch to a different place, role, or premise unless the student explicitly asks.
+
+SETTING:
+${freeTalkOverlay.scenarioDescription}`;
+
+		if (freeTalkOverlay.referenceScript?.trim()) {
+			prompt += `\n\nREFERENCE SCRIPT (tutor-authored lines for this scene — match the same situation, tone, roles, and learning goals; improvise natural follow-ups and replies; do NOT replace with a different job, company, or scenario type):
+${freeTalkOverlay.referenceScript.trim()}`;
+		} else if (
+			typeof freeTalkOverlay.activeSceneIndex === "number" &&
+			drill.roleplay_scenes &&
+			drill.roleplay_scenes.length > 1
+		) {
+			prompt += `\n\n(NOTE: The tutor did not provide line-by-line script for this specific scene. Stay strictly in the SETTING and scene title above. Do not blend in the tutor’s other named scenes, and do not improvise a different company, job, or interview round than described for THIS scene.)`;
+		}
+
+		if (freeTalkOverlay.vocabularyList.length > 0) {
+			const lines = freeTalkOverlay.vocabularyList.map(
+				(w, i) => `  ${i + 1}. ${w}`
+			).join('\n');
+			prompt += `\n\nTARGET WORDS (weave into dialogue; praise when the student uses one correctly; gentle corrections on misuse):
+${lines}`;
+		}
+	}
+
 	// ═══ LAYER 3 — Generation Instruction ═══
-	if (drill.type === 'roleplay' || drill.type === 'scenario') {
+	if (freeTalkOverlay?.scenarioDescription) {
+		prompt += `\n\nGENERATION INSTRUCTION:
+Stay within the FOCUSED ROLEPLAY SESSION above — same round, same premise (e.g. same interview stage, same technical review), same role names as in the REFERENCE SCRIPT when present.
+Continue naturally in the same world and roles. Weave the TARGET WORDS (if any) into the dialogue.
+Do not invent a wholly new scenario on each turn; build on the ongoing conversation.
+If a REFERENCE SCRIPT is provided, treat it as the canonical content for what this practice is about; extend it, don't override it with unrelated topics.`;
+	} else if (drill.type === 'roleplay' || drill.type === 'scenario') {
 		prompt += `\n\nGENERATION INSTRUCTION:
 Create a DIFFERENT but related roleplay scenario in the same context.
 Do NOT repeat the human tutor's exact scenes. Generate a fresh scenario that exercises the same skills.
@@ -726,7 +808,7 @@ export async function generateConversationResponse(options: ConversationOptions)
 			throw new Error('Gemini API is not configured');
 		}
 
-		const { messages, temperature = 0.9, maxTokens = 1000 } = options;
+		const { messages, temperature = 0.9, maxTokens = 1000, systemInstruction } = options;
 
 		const model = genAI.getGenerativeModel({
 			model: CHAT_MODEL,
@@ -734,6 +816,14 @@ export async function generateConversationResponse(options: ConversationOptions)
 				temperature,
 				maxOutputTokens: maxTokens,
 			},
+			...(systemInstruction
+				? {
+						systemInstruction: {
+							role: 'user' as const,
+							parts: [{ text: systemInstruction }],
+						},
+					}
+				: {}),
 		});
 
 		const historyMessages = messages.slice(0, -1);
@@ -802,7 +892,7 @@ export async function generateConversationResponseStream(
 		throw new Error('Gemini API is not configured');
 	}
 
-	const { messages, temperature = 0.9, maxTokens = 1000 } = options;
+	const { messages, temperature = 0.9, maxTokens = 1000, systemInstruction } = options;
 
 	const historyMessages = messages.slice(0, -1);
 	let firstUserIndex = -1;
@@ -836,6 +926,14 @@ export async function generateConversationResponseStream(
 			temperature,
 			maxOutputTokens: maxTokens,
 		},
+		...(systemInstruction
+			? {
+					systemInstruction: {
+						role: 'user' as const,
+						parts: [{ text: systemInstruction }],
+					},
+				}
+			: {}),
 	});
 
 	const chat = model.startChat({
@@ -1090,6 +1188,29 @@ interface LiveSessionEntry {
 const LIVE_SESSION_IDLE_MS = 3 * 60 * 1000;
 const liveSessionCache = new Map<string, LiveSessionEntry>();
 
+/**
+ * Live responses usually expose PCM as top-level `data`; some SDK / wire shapes
+ * only attach the same bytes under `serverContent.modelTurn.parts[].inlineData`.
+ */
+function getLivePcmDataFromMessage(message: LiveServerMessage): string | undefined {
+	if (message.data) return message.data;
+	const parts = message.serverContent?.modelTurn?.parts;
+	if (!Array.isArray(parts)) return undefined;
+	for (const part of parts) {
+		const p = part as { inlineData?: { data?: string; mimeType?: string }; thought?: boolean };
+		if (p.thought) continue;
+		const id = p.inlineData;
+		if (id?.data) {
+			const m = (id.mimeType || "").toLowerCase();
+			// e.g. audio/pcm; rate=16000, audio/ogg+pcm, etc.
+			if (m.includes("audio") || m.includes("pcm") || m.includes("ogg")) {
+				return id.data;
+			}
+		}
+	}
+	return undefined;
+}
+
 /** Close WebSocket and drop cache entry. Used after each Free Talk turn — reused sessions
  *  often never emit audio on the next turn (runtime: turn 2 → timeout_no_response, 0 chunks). */
 function evictLiveSessionByKey(key: string) {
@@ -1282,6 +1403,8 @@ export async function generateVoiceConversationSSEStream(
 		let fullUserText = '';
 		let metadataSent = false;
 		let tFirstChunk   = 0;
+		let tFirstModelActivity = 0;
+		let firstModelProducing = false;
 
 		const releaseSession = () => {
 			entry.onTurnMessage = null;
@@ -1316,9 +1439,8 @@ export async function generateVoiceConversationSSEStream(
 			}
 		};
 
-		// Two-stage timeout: 45 s for first audio chunk, then 90 s to complete.
-		// This prevents the 55 s hard cut when Gemini 2.5 Flash spends a long time
-		// on its thinking pass before producing audio (the original cut-off bug).
+		// Two-stage timeout: 45 s for first *model* output (transcription and/or audio), then 90 s to complete.
+		// `outputTranscription` may arrive before top-level `data` — treat it as the first chunk for timeout purposes.
 		const scheduleFirstChunkTimeout = () => {
 			sseCtx.timeoutHandle = setTimeout(() => {
 				sseCtx.timeoutHandle = undefined;
@@ -1335,20 +1457,33 @@ export async function generateVoiceConversationSSEStream(
 			}, 90_000);
 		};
 
+		const noteFirstModelProducing = () => {
+			if (firstModelProducing) return;
+			firstModelProducing = true;
+			tFirstModelActivity = Date.now();
+			resetToStreamCompleteTimeout();
+		};
+
 		entry.onTurnMessage = (message: LiveServerMessage) => {
-			if (message.data) {
-				if (!tFirstChunk) {
-					tFirstChunk = Date.now();
-					resetToStreamCompleteTimeout();
-					logger.info('[FreeTalk] ③ first audio chunk', { ms: tFirstChunk - tSession });
-				}
-				sendChunk('audio', message.data);
+			const outputText = message.serverContent?.outputTranscription?.text;
+			if (outputText) {
+				noteFirstModelProducing();
+				fullAssistantText.push(outputText);
+				sendChunk('text', outputText);
 			}
+
 			const inputText = (message.serverContent as any)?.inputTranscription?.text;
 			if (inputText) fullUserText += inputText;
 
-			const outputText = message.serverContent?.outputTranscription?.text;
-			if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+			const pcm = getLivePcmDataFromMessage(message);
+			if (pcm) {
+				noteFirstModelProducing();
+				if (!tFirstChunk) {
+					tFirstChunk = Date.now();
+					logger.info('[FreeTalk] ③ first PCM routed to SSE', { ms: tFirstChunk - tSession });
+				}
+				sendChunk('audio', pcm);
+			}
 
 			if (message.serverContent?.turnComplete && !metadataSent) {
 				metadataSent = true;
@@ -1356,10 +1491,10 @@ export async function generateVoiceConversationSSEStream(
 					sseCtx.turnCompleteHandle = undefined;
 					if (sseCtx.streamClosed) return;
 					logger.info('[FreeTalk] ④ turn complete', {
-						totalMs:      Date.now() - t0,
-						ffmpegMs:     tSession - t0,
-						sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
-						firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+						totalMs: Date.now() - t0,
+						ffmpegMs: tSession - t0,
+						firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
+						firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
 					});
 					sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
 					closeStream('turnComplete');
@@ -1417,6 +1552,7 @@ export async function generateDrillPracticeVoiceResponseStream(
 		userName?: string;
 		userId?: string;     // used as part of the session cache key
 		drillId?: string;    // used as part of the session cache key
+		freeTalkOverlay?: DrillFreeTalkOverlay;
 	}
 ): Promise<ReadableStream> {
 	const {
@@ -1428,6 +1564,7 @@ export async function generateDrillPracticeVoiceResponseStream(
 		userName,
 		userId,
 		drillId,
+		freeTalkOverlay,
 	} = options;
 
 	if (!genAINew) throw new Error('Gemini Live API is not configured');
@@ -1446,7 +1583,12 @@ export async function generateDrillPracticeVoiceResponseStream(
 	const pcmBytes  = pcmBuffer.length;
 
 	// Build system instruction — only used when a NEW session is opened.
-	let systemInstruction = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName);
+	let systemInstruction = buildDrillPracticePrompt(
+		drill,
+		pronunciationWeaknesses,
+		userName,
+		freeTalkOverlay
+	);
 	if (conversationHistory.length > 0) {
 		const recent = conversationHistory.slice(-6);
 		systemInstruction += '\n\nRecent conversation:\n' +
@@ -1454,8 +1596,16 @@ export async function generateDrillPracticeVoiceResponseStream(
 	}
 	systemInstruction += '\n\nIMPORTANT: The user is speaking via voice. Listen carefully, respond in spoken English. Keep responses concise (2-4 sentences). No JSON or markdown.';
 
-	// ② Get or create a cached WebSocket session per user+drill.
-	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}` : `drill_anon_${Date.now()}`;
+	// ② New Live session if drill + optional Free Talk focus changes
+	const overlayKey = freeTalkOverlay?.scenarioDescription
+		? `_ft_${Buffer.from(freeTalkOverlay.scenarioDescription)
+			.toString('base64')
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_')
+			.replace(/=+$/, '')
+			.slice(0, 48)}`
+		: '';
+	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}${overlayKey}` : `drill_anon_${Date.now()}`;
 	const tSession = Date.now();
 	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
 		responseModalities: [Modality.AUDIO],
@@ -1490,6 +1640,8 @@ export async function generateDrillPracticeVoiceResponseStream(
 		let fullUserText = '';
 		let metadataSent = false;
 		let tFirstChunk   = 0;
+		let tFirstModelActivity = 0;
+		let firstModelProducing = false;
 
 		const releaseSession = () => {
 			entry.onTurnMessage = null;
@@ -1514,6 +1666,9 @@ export async function generateDrillPracticeVoiceResponseStream(
 			sseCtx.streamClosed = true;
 			clearTimers();
 			releaseSession();
+			// Must evict the Live socket every turn (same as Free Talk) — reusing the cached
+			// session often produced zero audio on subsequent turns (timeout_no_response).
+			evictLiveSessionByKey(cacheKey);
 			if (reason) logger.info('[Drill] stream closed', { reason });
 			try {
 				controller.close();
@@ -1523,7 +1678,7 @@ export async function generateDrillPracticeVoiceResponseStream(
 			}
 		};
 
-		// Two-stage timeout: 45 s for first audio chunk, then 90 s to complete.
+		// Two-stage timeout: 45 s for first *model* output, then 90 s to complete.
 		const scheduleFirstChunkTimeout = () => {
 			sseCtx.timeoutHandle = setTimeout(() => {
 				sseCtx.timeoutHandle = undefined;
@@ -1540,20 +1695,33 @@ export async function generateDrillPracticeVoiceResponseStream(
 			}, 90_000);
 		};
 
+		const noteFirstModelProducing = () => {
+			if (firstModelProducing) return;
+			firstModelProducing = true;
+			tFirstModelActivity = Date.now();
+			resetToStreamCompleteTimeout();
+		};
+
 		entry.onTurnMessage = (message: LiveServerMessage) => {
-			if (message.data) {
-				if (!tFirstChunk) {
-					tFirstChunk = Date.now();
-					resetToStreamCompleteTimeout();
-					logger.info('[Drill] ③ first audio chunk', { ms: tFirstChunk - tSession });
-				}
-				sendChunk('audio', message.data);
+			const outputText = message.serverContent?.outputTranscription?.text;
+			if (outputText) {
+				noteFirstModelProducing();
+				fullAssistantText.push(outputText);
+				sendChunk('text', outputText);
 			}
+
 			const inputText = (message.serverContent as any)?.inputTranscription?.text;
 			if (inputText) fullUserText += inputText;
 
-			const outputText = message.serverContent?.outputTranscription?.text;
-			if (outputText) { fullAssistantText.push(outputText); sendChunk('text', outputText); }
+			const pcm = getLivePcmDataFromMessage(message);
+			if (pcm) {
+				noteFirstModelProducing();
+				if (!tFirstChunk) {
+					tFirstChunk = Date.now();
+					logger.info('[Drill] ③ first PCM routed to SSE', { ms: tFirstChunk - tSession });
+				}
+				sendChunk('audio', pcm);
+			}
 
 			if (message.serverContent?.turnComplete && !metadataSent) {
 				metadataSent = true;
@@ -1561,10 +1729,10 @@ export async function generateDrillPracticeVoiceResponseStream(
 					sseCtx.turnCompleteHandle = undefined;
 					if (sseCtx.streamClosed) return;
 					logger.info('[Drill] ④ turn complete', {
-						totalMs:      Date.now() - t0,
-						ffmpegMs:     tSession - t0,
-						sessionMs:    tFirstChunk ? tFirstChunk - tSession : null,
-						firstChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+						totalMs: Date.now() - t0,
+						ffmpegMs: tSession - t0,
+						firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
+						firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
 					});
 					sendChunk('metadata', {
 						fullText:   fullAssistantText.join('').trim(),
@@ -1611,6 +1779,7 @@ export async function generateDrillPracticeVoiceResponseStream(
 			entry.onTurnError   = null;
 			entry.onTurnClose   = null;
 			if (entry.status === 'busy') entry.status = 'ready';
+			evictLiveSessionByKey(cacheKey);
 			logger.info('[Drill] stream cancelled', { reason: String(reason) });
 		},
 	});
@@ -1694,9 +1863,9 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 			throw new Error('Gemini API is not configured');
 		}
 
-		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName } = options;
+		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName, freeTalkOverlay } = options;
 
-		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName);
+		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName, freeTalkOverlay);
 
 		// Build conversation history for Live API turns
 		let validHistory = conversationHistory;
@@ -1756,7 +1925,11 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 	}
 }
 
-export async function generateDrillPracticeGreetingStream(drill: DrillPracticeOptions['drill'], userName?: string): Promise<ReadableStream> {
+export async function generateDrillPracticeGreetingStream(
+	drill: DrillPracticeOptions['drill'],
+	userName?: string,
+	freeTalkOverlay?: DrillFreeTalkOverlay
+): Promise<ReadableStream> {
 	try {
 		if (!config.GEMINI_API_KEY) {
 			throw new Error('Gemini API is not configured');
@@ -1782,6 +1955,26 @@ export async function generateDrillPracticeGreetingStream(drill: DrillPracticeOp
 			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
 		}
 
+		if (freeTalkOverlay?.scenarioDescription) {
+			const vocabLine =
+				freeTalkOverlay.vocabularyList.length > 0
+					? `\n\nTARGET WORDS to feature in this session: ${freeTalkOverlay.vocabularyList.join(', ')}.`
+					: '';
+			const scriptBlock =
+				freeTalkOverlay.referenceScript?.trim()
+					? `\n\nTUTOR SCRIPT (this is what the drill is about — start in-character consistent with it; same interview/technical/role as the lines below):\n${freeTalkOverlay.referenceScript.trim()}`
+					: "";
+			systemPrompt += `\n\nDRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nGeneral context: ${drill.context}` : ''}
+
+FOCUSED FREE TALK SETTING (use this exact situation — do not invent a different scene):
+${freeTalkOverlay.scenarioDescription}${scriptBlock}${vocabLine}
+
+Your opening should be brief and directive (2-3 sentences max):
+1. Acknowledge you're continuing practice tied to their tutor's material
+2. Drop them straight into THIS setting in character and give one clear first thing to say or do
+
+CRITICAL: Do NOT ask "What would you like to practice?" — YOU lead. Stay in the setting above.`;
+		} else {
 		systemPrompt += `\n\nDRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nContext: ${drill.context}` : ''}
 
 Your opening should be brief and directive (2-3 sentences max):
@@ -1791,6 +1984,7 @@ Your opening should be brief and directive (2-3 sentences max):
 
 CRITICAL: Do NOT ask "What would you like to practice?" — YOU lead the session. Jump right into a new scenario.
 Example tone: "Alright! Today we're working on office negotiation. I'm going to set up a scenario for you — you're an employee asking your manager for a deadline extension. Let's begin. I'll be your manager. Go ahead and start the conversation."`;
+		}
 
 		const turns = [
 			{

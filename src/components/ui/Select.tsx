@@ -11,7 +11,7 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   return (
     <select
-      className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white ${className}`}
+      className={`w-full rounded-xl border border-border bg-card px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary ${className}`}
       {...props}
     >
       {children}

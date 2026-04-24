@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
-import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
+import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
@@ -85,6 +85,8 @@ export default function SentenceDrill({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [startTime] = useState(Date.now());
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollToTopAfterNextRef = useRef(false);
 
   const currentWord = wordItems[currentIndex];
   const currentAnswer = answers[currentIndex] || {
@@ -115,6 +117,13 @@ export default function SentenceDrill({
     });
   }, [wordItems, answers]);
 
+  useEffect(() => {
+    if (!scrollToTopAfterNextRef.current) return;
+    scrollToTopAfterNextRef.current = false;
+    scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentIndex]);
+
   const updateCurrentAnswer = (field: keyof WordAnswer, value: string) => {
     setAnswers((prev) => ({
       ...prev,
@@ -131,12 +140,16 @@ export default function SentenceDrill({
     }
   };
 
-  const handleNext = () => {
+  /** Next step, or submit when on the last word (same validation as before). */
+  const handlePrimaryAction = async () => {
     if (!isCurrentWordComplete) {
       toast.error("Please fill in all fields before proceeding.");
       return;
     }
-    if (!isLastWord) {
+    if (isLastWord) {
+      await handleSubmit();
+    } else {
+      scrollToTopAfterNextRef.current = true;
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -245,28 +258,22 @@ export default function SentenceDrill({
     );
   }
 
-  const progress = ((currentIndex + 1) / totalWords) * 100;
-
   return (
     <DrillLayout title={drill.title}>
+      <div className="flex flex-col h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0 gap-3">
+        <div
+          ref={scrollAreaRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 pb-8"
+        >
       {/* Context */}
       {drill.context && (
-        <Card className="mb-4">
+        <Card className="mb-0">
           <p className="text-sm text-gray-700">{drill.context}</p>
         </Card>
       )}
 
-      {/* Progress */}
-      {totalWords > 1 && (
-        <DrillProgress
-          current={currentIndex + 1}
-          total={totalWords}
-          label="Word"
-        />
-      )}
-
       {/* Target Word Card */}
-      <Card className="mb-4">
+      <Card className="mb-0">
         <div className="text-center py-6">
           {currentWord?.word ? (
             <>
@@ -306,7 +313,7 @@ export default function SentenceDrill({
       </Card>
 
       {/* Definition Section */}
-      <Card className="mb-4">
+      <Card className="mb-0">
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-gray-600" />
@@ -325,7 +332,7 @@ export default function SentenceDrill({
       </Card>
 
       {/* Sentence 1 Section */}
-      <Card className="mb-4">
+      <Card className="mb-0">
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <PenTool className="w-4 h-4 text-gray-600" />
@@ -344,7 +351,7 @@ export default function SentenceDrill({
       </Card>
 
       {/* Sentence 2 Section */}
-      <Card className="mb-4">
+      <Card className="mb-0">
         <div className="mb-4">
           <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <PenTool className="w-4 h-4 text-gray-600" />
@@ -361,85 +368,53 @@ export default function SentenceDrill({
           </p>
         </div>
       </Card>
-
-      {/* Navigation Buttons */}
-      <div className="flex gap-3">
-        {/* Previous Button */}
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handlePrevious}
-          disabled={isFirstWord}
-          className="flex-shrink-0"
-        >
-          <ChevronLeft className="w-5 h-5 mr-1" />
-          Previous
-        </Button>
-
-        {/* Next or Submit Button */}
-        {isLastWord ? (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={!isCurrentWordComplete || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit for Review"
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleNext}
-            disabled={!isCurrentWordComplete}
-            className="w-10"
-          >
-            Next
-            <ChevronRight className="w-5 h-5 ml-1" />
-          </Button>
-        )}
-      </div>
-
-      {/* Word Progress Indicators */}
-      {totalWords > 1 && (
-        <div className="mt-6 flex justify-center gap-2">
-          {wordItems.map((_, idx) => {
-            const answer = answers[idx];
-            const isComplete =
-              answer &&
-              answer.definition.trim().length > 0 &&
-              answer.sentence1.trim().length > 0 &&
-              answer.sentence2.trim().length > 0;
-            const isCurrent = idx === currentIndex;
-
-            return (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${
-                  isCurrent
-                    ? "bg-green-500 text-white ring-2 ring-green-300"
-                    : isComplete
-                      ? "bg-green-100 text-green-700 hover:bg-green-200"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-                title={`Word ${idx + 1}: ${wordItems[idx].word}`}
-              >
-                {idx + 1}
-              </button>
-            );
-          })}
         </div>
-      )}
+
+        {/* Fixed bottom navigation (assigned sentence / writing drill) */}
+        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+          <div className="relative flex min-h-12 items-center justify-between gap-2 sm:gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handlePrevious}
+              disabled={isFirstWord || isSubmitting}
+              className="z-10 min-h-12 shrink-0 px-4 sm:px-6"
+            >
+              <ChevronLeft className="w-5 h-5 shrink-0 sm:mr-1" />
+              <span>Previous</span>
+            </Button>
+            <p className="pointer-events-none absolute left-1/2 top-1/2 z-0 max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-medium leading-tight text-gray-600 tabular-nums sm:max-w-none sm:text-sm">
+              Word {currentIndex + 1} of {totalWords}
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={() => void handlePrimaryAction()}
+              disabled={!isCurrentWordComplete || isSubmitting}
+              className="z-10 min-h-12 min-w-[6.5rem] shrink-0 px-4 sm:min-w-[9rem] sm:px-6"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin sm:mr-2" />
+                  <span className="hidden sm:inline">Submitting…</span>
+                </>
+              ) : isLastWord ? (
+                <>
+                  <span className="sm:hidden">Submit</span>
+                  <span className="hidden sm:inline">Submit for Review</span>
+                </>
+              ) : (
+                <>
+                  <span>Next</span>
+                  <ChevronRight className="ml-1 h-5 w-5 shrink-0" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     </DrillLayout>
   );
 }

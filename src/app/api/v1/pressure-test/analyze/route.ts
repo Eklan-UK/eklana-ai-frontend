@@ -309,7 +309,7 @@ async function handler(
         userId: context.userId,
         drillId: validated.drillId ?? null,
         level: levelBefore,
-        geminiModelUsed: config.GEMINI_CHAT_MODEL ?? "gemini-2.0-flash",
+        geminiModelUsed: config.GEMINI_CHAT_MODEL ?? "gemini-2.5-flash-lite",
         systemPromptSnapshot,
         turns: validated.turns.map((turn, i) => ({
           turnNumber: turn.turnNumber,

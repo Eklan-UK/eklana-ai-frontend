@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -12,12 +12,23 @@ import {
   TrendingUp,
   Check,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { userAPI } from "@/lib/api";
+import { toast } from "sonner";
+
+const SETTINGS_GOAL_IDS = new Set([
+  "speak",
+  "travel",
+  "academic",
+  "social",
+  "career",
+]);
 
 export default function SettingsGoalsPage() {
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([
-    "speak",
-    "career",
-  ]);
+  const queryClient = useQueryClient();
+  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const goals = [
     {
@@ -52,6 +63,38 @@ export default function SettingsGoalsPage() {
     },
   ];
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await userAPI.getCurrent({ cache: false });
+        const p = (res as {
+          profile?: {
+            learningGoals?: string[];
+            learningGoal?: string;
+          };
+        }).profile;
+        if (!mounted) return;
+        if (p?.learningGoals && p.learningGoals.length > 0) {
+          setSelectedGoals(
+            p.learningGoals.filter((id) => SETTINGS_GOAL_IDS.has(id))
+          );
+        } else if (p?.learningGoal && SETTINGS_GOAL_IDS.has(p.learningGoal)) {
+          setSelectedGoals([p.learningGoal]);
+        } else {
+          setSelectedGoals([]);
+        }
+      } catch {
+        toast.error("Could not load your profile");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const toggleGoal = (goalId: string) => {
     setSelectedGoals((prev) =>
       prev.includes(goalId)
@@ -60,9 +103,24 @@ export default function SettingsGoalsPage() {
     );
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await userAPI.updatePreferences({
+        learningGoals: selectedGoals,
+        learningGoal: selectedGoals[0],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["user-current"] });
+      toast.success("Saved");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
       <div className="h-6"></div>
 
       <Header showBack title="Learning Goals" />
@@ -125,11 +183,16 @@ export default function SettingsGoalsPage() {
           })}
         </div>
 
-        <Button variant="primary" size="lg" fullWidth>
-          Save Goals
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          disabled={loading || saving}
+          onClick={handleSave}
+        >
+          {saving ? "Saving…" : "Save goals"}
         </Button>
 
-        {/* Info */}
         <Card className="mt-6 bg-blue-50 border-blue-200">
           <div className="flex items-start gap-3">
             <TrendingUp className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -148,4 +211,3 @@ export default function SettingsGoalsPage() {
     </div>
   );
 }
-

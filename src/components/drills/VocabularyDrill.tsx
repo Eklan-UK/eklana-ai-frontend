@@ -497,7 +497,14 @@ export default function VocabularyDrill({
 
   // Completed state
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="vocabulary" refreshOnMount={true} />;
+    return (
+      <DrillCompletionScreen
+        drillType="vocabulary"
+        returnPath="/account/drills"
+        returnLabel="Back to My Plan"
+        refreshOnMount={true}
+      />
+    );
   }
 
   // No content state
@@ -524,21 +531,25 @@ export default function VocabularyDrill({
 
   return (
     <DrillLayout title={drill.title}>
-      <DrillProgress
-        current={currentIndex + 1}
-        total={targetSentences.length}
-      />
+      <div className="flex flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0">
+        <div className="shrink-0 space-y-4">
+          <DrillProgress
+            current={currentIndex + 1}
+            total={targetSentences.length}
+          />
 
-      <ScreenIndicator
-        currentScreen={currentScreen}
-        isWordPassed={isWordPassed}
-        isSentencePassed={isSentencePassed}
-      />
+          <ScreenIndicator
+            currentScreen={currentScreen}
+            isWordPassed={isWordPassed}
+            isSentencePassed={isSentencePassed}
+          />
+        </div>
 
-      <Card className="mb-4">
-        <div className="text-center py-6">
-          {/* Word/Sentence Display */}
-          <div className="mb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 pb-4">
+          <Card className="mb-0">
+            <div className="text-center py-6">
+              {/* Word/Sentence Display */}
+              <div className="mb-6">
             <h2 className="text-sm font-medium text-gray-700 mb-2">
               {currentScreen === "word"
                 ? "Pronounce the Word"
@@ -650,7 +661,7 @@ export default function VocabularyDrill({
             )}
             {pronunciationScore && !isAnalyzing && (
               <p className="text-sm text-green-600 mt-4 font-medium">
-                ✓ Analysis complete! Scroll down to see your score.
+                ✓ Analysis complete! Your breakdown is below.
               </p>
             )}
           </div>
@@ -665,113 +676,117 @@ export default function VocabularyDrill({
             />
             <span>Auto-play pronunciation</span>
           </label>
+            </div>
+          </Card>
+
+          {/* Word Quality Analytics */}
+          {pronunciationScore && (
+            <>
+              <WordAnalytics pronunciationScore={pronunciationScore} />
+
+              {/* Letter-level Feedback for word screen */}
+              {currentScreen === "word" &&
+                pronunciationScore.word_score_list.length > 0 && (
+                  <LetterLevelFeedback
+                    word={currentWord}
+                    wordScore={pronunciationScore.word_score_list[0]}
+                  />
+                )}
+            </>
+          )}
         </div>
-      </Card>
 
-      {/* Word Quality Analytics */}
-      {pronunciationScore && (
-        <>
-          <WordAnalytics pronunciationScore={pronunciationScore} />
-
-          {/* Letter-level Feedback for word screen */}
-          {currentScreen === "word" &&
-            pronunciationScore.word_score_list.length > 0 && (
-              <LetterLevelFeedback
-                word={currentWord}
-                wordScore={pronunciationScore.word_score_list[0]}
-              />
+        {/* Sticky-style action bar: sibling of scroll region so CTAs stay in view */}
+        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/90 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3">
+            {currentScreen === "word" && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={handleContinueToSentence}
+                disabled={!canContinueToSentence || isRecording || isAnalyzing}
+              >
+                {canContinueToSentence ? (
+                  "Continue to Sentence"
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Pass Word First (65%+)
+                  </>
+                )}
+              </Button>
             )}
-        </>
-      )}
 
-      {/* Action Buttons */}
-      <div className="space-y-3">
-        {currentScreen === "word" && (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleContinueToSentence}
-            disabled={!canContinueToSentence || isRecording || isAnalyzing}
-          >
-            {canContinueToSentence ? (
-              "Continue to Sentence"
-            ) : (
-              <>
-                <Lock className="w-4 h-4 mr-2" />
-                Pass Word First (65%+)
-              </>
+            {currentScreen === "sentence" && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={handleNext}
+                disabled={!canProceedToNext || isRecording || isAnalyzing}
+              >
+                {canProceedToNext ? (
+                  currentIndex === targetSentences.length - 1 ? (
+                    "Complete Drill"
+                  ) : (
+                    "Next Item"
+                  )
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Pass Sentence First (65%+)
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
-        )}
 
-        {currentScreen === "sentence" && (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={handleNext}
-            disabled={!canProceedToNext || isRecording || isAnalyzing}
-          >
-            {canProceedToNext ? (
-              currentIndex === targetSentences.length - 1 ? (
-                "Complete Drill"
-              ) : (
-                "Next Item"
-              )
-            ) : (
-              <>
-                <Lock className="w-4 h-4 mr-2" />
-                Pass Sentence First (65%+)
-              </>
+            {pronunciationScore && (
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                onClick={handleTryAgain}
+                disabled={isRecording || isAnalyzing}
+              >
+                Try Again
+              </Button>
             )}
-          </Button>
-        )}
 
-        {pronunciationScore && (
-          <Button
-            variant="outline"
-            size="lg"
-            fullWidth
-            onClick={handleTryAgain}
-            disabled={isRecording || isAnalyzing}
-          >
-            Try Again
-          </Button>
-        )}
+            {currentScreen === "sentence" && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setCurrentScreen("word");
+                  setPronunciationScore(null);
+                  setAudioBlob(null);
+                }}
+                disabled={isRecording || isAnalyzing}
+              >
+                Back to Word
+              </Button>
+            )}
 
-        {currentScreen === "sentence" && (
-          <Button
-            variant="outline"
-            size="md"
-            fullWidth
-            onClick={() => {
-              setCurrentScreen("word");
-              setPronunciationScore(null);
-              setAudioBlob(null);
-            }}
-            disabled={isRecording || isAnalyzing}
-          >
-            Back to Word
-          </Button>
-        )}
-
-        {currentIndex > 0 && currentScreen === "word" && (
-          <Button
-            variant="outline"
-            size="md"
-            fullWidth
-            onClick={() => {
-              setCurrentIndex(currentIndex - 1);
-              setCurrentScreen("word");
-              setPronunciationScore(null);
-              setAudioBlob(null);
-            }}
-            disabled={isRecording || isAnalyzing}
-          >
-            Previous Item
-          </Button>
-        )}
+            {currentIndex > 0 && currentScreen === "word" && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setCurrentIndex(currentIndex - 1);
+                  setCurrentScreen("word");
+                  setPronunciationScore(null);
+                  setAudioBlob(null);
+                }}
+                disabled={isRecording || isAnalyzing}
+              >
+                Previous Item
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </DrillLayout>
   );

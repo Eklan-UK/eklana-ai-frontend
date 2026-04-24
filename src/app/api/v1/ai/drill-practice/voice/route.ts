@@ -8,6 +8,7 @@ import User from '@/models/user';
 import DrillModel from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 import { generateDrillPracticeVoiceResponseStream } from '@/services/gemini.service';
+import { resolveDrillFreeTalkOverlay, type DrillFreeTalkOverlay } from '@/domain/ai/free-talk';
 
 async function handler(
 	req: NextRequest,
@@ -17,6 +18,7 @@ async function handler(
 		const formData = await req.formData();
 		const drillId = formData.get('drillId') as string | null;
 		const conversationHistoryRaw = formData.get('conversationHistory') as string | null;
+		const freeTalkContextRaw = formData.get('freeTalkContext') as string | null;
 		const audioFile = formData.get('audio') as File | null;
 
 		if (!drillId || !audioFile) {
@@ -78,6 +80,7 @@ async function handler(
 			roleplay_scenes: drill.roleplay_scenes,
 			roleplay_dialogue: drill.roleplay_dialogue,
 			student_character_name: drill.student_character_name,
+			ai_character_name: drill.ai_character_name,
 			ai_character_names: drill.ai_character_names,
 			matching_pairs: drill.matching_pairs,
 			definition_items: drill.definition_items,
@@ -95,6 +98,26 @@ async function handler(
 		const audioBuffer = Buffer.from(arrayBuffer);
 		const mimeType = audioFile.type || 'audio/m4a';
 
+		let freeTalkOverlay: DrillFreeTalkOverlay | undefined;
+		if (freeTalkContextRaw) {
+			try {
+				const ft = JSON.parse(freeTalkContextRaw) as {
+					scenarioId?: string;
+					vocabularyList?: string[];
+				};
+				const sid = ft.scenarioId != null && String(ft.scenarioId).trim() !== '' ? String(ft.scenarioId) : undefined;
+				const vl = Array.isArray(ft.vocabularyList)
+					? ft.vocabularyList.map((s) => String(s).trim()).filter(Boolean)
+					: [];
+				const resolved = resolveDrillFreeTalkOverlay(drill, sid, vl);
+				if (resolved) {
+					freeTalkOverlay = resolved;
+				}
+			} catch {
+				/* invalid JSON */
+			}
+		}
+
 		const stream = await generateDrillPracticeVoiceResponseStream({
 			drill: drillData,
 			audioBuffer,
@@ -103,6 +126,7 @@ async function handler(
 			userName,
 			userId:  String(context.userId),  // enables session reuse
 			drillId: drillId,
+			...(freeTalkOverlay ? { freeTalkOverlay } : {}),
 		});
 
 		return new NextResponse(stream, {

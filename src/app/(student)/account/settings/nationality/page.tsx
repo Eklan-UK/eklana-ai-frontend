@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useQueryClient } from "@tanstack/react-query";
+import { userAPI } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function NationalityPage() {
-  const [selected, setSelected] = useState("Korean");
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const nationalities = [
     "Korean",
@@ -23,9 +29,39 @@ export default function NationalityPage() {
     "Other",
   ];
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await userAPI.getCurrent({ cache: false });
+        const p = (res as { profile?: { nationality?: string } }).profile;
+        if (mounted) setSelected(p?.nationality?.trim() || "");
+      } catch {
+        toast.error("Could not load your profile");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await userAPI.updatePreferences({ nationality: selected });
+      await queryClient.invalidateQueries({ queryKey: ["user-current"] });
+      toast.success("Saved");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
       <div className="h-6"></div>
 
       <Header showBack title="Nationality" />
@@ -79,11 +115,16 @@ export default function NationalityPage() {
           ))}
         </div>
 
-        <Button variant="primary" size="lg" fullWidth>
-          Save
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          disabled={loading || saving || !selected}
+          onClick={handleSave}
+        >
+          {saving ? "Saving…" : "Save"}
         </Button>
       </div>
     </div>
   );
 }
-
