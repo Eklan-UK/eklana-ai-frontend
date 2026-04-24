@@ -96,44 +96,75 @@ export default function FreeTalkSelectionPage() {
               {completedScenarioDrills.map((assignment: any) => {
                 const drill = assignment.drill;
                 const drillId = drill._id || assignment.drillId;
+                const targetWords = (Array.isArray(drill.target_sentences) ? drill.target_sentences : [])
+                  .map((s: { word?: string }) => (s?.word ? String(s.word).trim() : ""))
+                  .filter(Boolean);
+                const roleplayScenes = Array.isArray(drill.roleplay_scenes) ? drill.roleplay_scenes : [];
+                const buildSessionUrl = (scenarioIndex: number) => {
+                  const q = new URLSearchParams();
+                  q.set("drillId", String(drillId));
+                  q.set("scenarioId", String(scenarioIndex));
+                  if (targetWords.length) {
+                    q.set("vocab", JSON.stringify(targetWords));
+                  }
+                  return `/account/practice/ai/session?${q.toString()}`;
+                };
+                const defaultUrl = buildSessionUrl(0);
 
                 return (
-                  <button
+                  <div
                     key={assignment.assignmentId || drillId}
-                    onClick={() =>
-                      router.push(`/account/practice/ai/session?drillId=${drillId}`)
-                    }
-                    className="w-full bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4 hover:shadow-md hover:border-emerald-200 transition-all text-left"
+                    className="w-full bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all"
                   >
-                    {/* Drill thumbnail */}
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      <Image
-                        src="/images/thumbnail.png"
-                        alt="Eklan"
-                        width={50}
-                        height={50}
-                      />
-                    </div>
-
-                    {/* Title + meta */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-base font-bold font-nunito text-gray-900 truncate">
-                          {drill.title}
-                        </p>
-                        <span className="text-xs font-satoshi text-blue-500 flex-shrink-0">
-                          • Scenario
-                        </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(defaultUrl)}
+                      className="w-full p-4 flex items-center gap-4 text-left"
+                    >
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <Image
+                          src="/images/thumbnail.png"
+                          alt="Eklan"
+                          width={50}
+                          height={50}
+                        />
                       </div>
-                      <div className="flex items-center gap-1.5 text-gray-400">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span className="text-xs font-satoshi">5-7 minutes</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-base font-bold font-nunito text-gray-900 truncate">
+                            {drill.title}
+                          </p>
+                          <span className="text-xs font-satoshi text-blue-500 flex-shrink-0">
+                            • Scenario
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-gray-400">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span className="text-xs font-satoshi">5-7 minutes</span>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Chevron */}
-                    <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
-                  </button>
+                      <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                    </button>
+                    {roleplayScenes.length > 1 && (
+                      <div className="px-4 pb-3 pt-0 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-satoshi text-gray-500 w-full sm:w-auto">Scene:</span>
+                        {roleplayScenes.map((s: { scene_name?: string; title?: string; name?: string }, i: number) => {
+                          const label =
+                            (s.scene_name || s.title || s.name || `Part ${i + 1}`).trim() || `Scene ${i + 1}`;
+                          return (
+                            <button
+                              key={`${drillId}-scene-${i}`}
+                              type="button"
+                              onClick={() => router.push(buildSessionUrl(i))}
+                              className="text-xs font-semibold font-satoshi px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/80"
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

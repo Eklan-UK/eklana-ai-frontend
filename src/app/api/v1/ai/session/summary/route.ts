@@ -9,6 +9,22 @@ import type { AiSessionMode, SessionSummaryContext, TranscriptTurn } from "@/typ
 import { generateSessionSummaryFromTranscript } from "@/services/summary.service";
 import { logger } from "@/lib/api/logger";
 
+const EMPTY_TURN_PLACEHOLDER = "(no text in this turn)";
+
+/**
+ * Zod allows `content: ""`; Mongoose `required: true` on subdocs rejects empty/whitespace-only strings.
+ * Ensures every saved turn has non-empty `content` for persistence and summarization.
+ */
+function toPersistedTranscript(
+	messages: { role: "user" | "model"; content: string }[],
+): TranscriptTurn[] {
+	return messages.map((m) => {
+		const raw = typeof m.content === "string" ? m.content : "";
+		const content = raw.trim() === "" ? EMPTY_TURN_PLACEHOLDER : raw;
+		return { role: m.role, content };
+	});
+}
+
 const messageSchema = z.object({
   role: z.enum(["user", "model"]),
   content: z.string(),
@@ -42,10 +58,7 @@ async function handler(
       );
     }
 
-    const transcript: TranscriptTurn[] = validated.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const transcript: TranscriptTurn[] = toPersistedTranscript(validated.messages);
 
     await connectToDatabase();
 

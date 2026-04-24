@@ -8,6 +8,7 @@
     "build:low-mem": "NODE_OPTIONS='--max-old-space-size=4096' next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "gemini:check": "node scripts/gemini-key-check.mjs",
     "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {

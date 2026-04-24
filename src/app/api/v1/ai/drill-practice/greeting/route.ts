@@ -8,6 +8,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import DrillModel from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 import User from '@/models/user';
+import { parseVocabListParam, resolveDrillFreeTalkOverlay } from '@/domain/ai/free-talk';
 
 async function handler(
 	req: NextRequest,
@@ -16,6 +17,8 @@ async function handler(
 	try {
 		const { searchParams } = new URL(req.url);
 		const drillId = searchParams.get('drillId');
+		const scenarioId = searchParams.get('scenarioId');
+		const vocabParam = searchParams.get('vocab');
 
 		if (!drillId) {
 			return NextResponse.json(
@@ -60,6 +63,7 @@ async function handler(
 			roleplay_scenes: drill.roleplay_scenes,
 			roleplay_dialogue: drill.roleplay_dialogue,
 			student_character_name: drill.student_character_name,
+			ai_character_name: drill.ai_character_name,
 			ai_character_names: drill.ai_character_names,
 			matching_pairs: drill.matching_pairs,
 			definition_items: drill.definition_items,
@@ -77,7 +81,14 @@ async function handler(
 
 		const userName = (user?.firstName as string | undefined) || undefined;
 
-		const stream = await generateDrillPracticeGreetingStream(drillData, userName);
+		const vList = vocabParam ? parseVocabListParam(vocabParam) : [];
+		const freeTalkOverlay = resolveDrillFreeTalkOverlay(drill, scenarioId, vList) ?? undefined;
+
+		const stream = await generateDrillPracticeGreetingStream(
+			drillData,
+			userName,
+			freeTalkOverlay ?? undefined
+		);
 
 		return new NextResponse(stream, {
 			headers: {

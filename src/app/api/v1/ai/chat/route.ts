@@ -16,6 +16,7 @@ const chatSchema = z.object({
 		.min(1),
 	temperature: z.number().min(0).max(2).optional(),
 	maxTokens: z.number().int().min(1).max(4000).optional(),
+	systemInstruction: z.string().min(1).max(20000).optional(),
 });
 
 async function handler(
@@ -43,6 +44,7 @@ async function handler(
 			messages: validated.messages,
 			temperature: validated.temperature,
 			maxTokens: validated.maxTokens,
+			systemInstruction: validated.systemInstruction,
 		});
 
 		return new NextResponse(stream, {
