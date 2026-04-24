@@ -8,6 +8,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import DrillModel from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 import User from '@/models/user';
+import { resolveDrillFreeTalkOverlay, type DrillFreeTalkOverlay } from '@/domain/ai/free-talk';
 
 async function handler(
 	req: NextRequest,
@@ -15,7 +16,7 @@ async function handler(
 ): Promise<NextResponse> {
 	try {
 		const body = await req.json();
-		const { drillId, userMessage, conversationHistory, temperature } = body;
+		const { drillId, userMessage, conversationHistory, temperature, freeTalkContext } = body;
 
 		if (!drillId || !userMessage) {
 			return NextResponse.json(
@@ -67,6 +68,7 @@ async function handler(
 			roleplay_scenes: drill.roleplay_scenes,
 			roleplay_dialogue: drill.roleplay_dialogue,
 			student_character_name: drill.student_character_name,
+			ai_character_name: drill.ai_character_name,
 			ai_character_names: drill.ai_character_names,
 			matching_pairs: drill.matching_pairs,
 			definition_items: drill.definition_items,
@@ -85,12 +87,28 @@ async function handler(
 		const user = await User.findById(context.userId).select('firstName').lean();
 		const userName = (user?.firstName as string | undefined) || undefined;
 
+		let freeTalkOverlay: DrillFreeTalkOverlay | undefined;
+		if (freeTalkContext && typeof freeTalkContext === 'object') {
+			const rawSid = (freeTalkContext as { scenarioId?: string | number }).scenarioId;
+			const sid =
+				rawSid !== undefined && String(rawSid).trim() !== ''
+					? String(rawSid)
+					: undefined;
+			const rawVl = (freeTalkContext as { vocabularyList?: string[] }).vocabularyList;
+			const vl = Array.isArray(rawVl) ? rawVl.map((s) => String(s).trim()).filter(Boolean) : [];
+			const resolved = resolveDrillFreeTalkOverlay(drill, sid, vl);
+			if (resolved) {
+				freeTalkOverlay = resolved;
+			}
+		}
+
 		const stream = await generateDrillPracticeResponseStream({
 			drill: drillData,
 			userMessage,
 			conversationHistory: conversationHistory || [],
 			temperature,
 			userName,
+			...(freeTalkOverlay ? { freeTalkOverlay } : {}),
 		});
 
 		return new NextResponse(stream, {

@@ -97,6 +97,13 @@ export const config = {
 	/** Low-latency model for text chat + streaming. Override via GEMINI_CHAT_MODEL env var. */
 	GEMINI_CHAT_MODEL:
 		process.env.GEMINI_CHAT_MODEL?.trim() || 'gemini-2.5-flash-lite',
+	/** Post-session JSON summary. Override via GEMINI_SUMMARY_MODEL. */
+	GEMINI_SUMMARY_MODEL:
+		process.env.GEMINI_SUMMARY_MODEL?.trim() || 'gemini-2.5-flash',
+	/** If primary summary model fails, try this (see summary.service). */
+	GEMINI_SUMMARY_FALLBACK_MODEL:
+		process.env.GEMINI_SUMMARY_FALLBACK_MODEL?.trim() ||
+		'gemini-2.5-flash-lite',
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Mic,
   Send,
@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Keyboard,
   Home,
+  Target,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -27,6 +28,12 @@ import {
 } from "@/components/ai/SessionReviewModal";
 import type { SessionSummaryPayload } from "@/types/ai-session-summary";
 import { releaseMediaStream, unlockAudioContext } from "@/lib/ios-audio-utils";
+import {
+  parseVocabListParam,
+  findVocabularyUsedInText,
+  buildFreeTalkSystemInstruction,
+  buildFreeTalkVoiceContextPrompt,
+} from "@/domain/ai/free-talk";
 
 /* ─── Gemini native audio playback ─────────────────────────────────────────── */
 
@@ -86,16 +93,23 @@ const DRILL_TYPE_LABELS: Record<string, string> = {
 
 /* ─── Session cache helpers ────────────────────────────────────────────────── */
 
-function getSessionKey(drillId: string | null, topic: string | null): string {
-  if (drillId) return `ai-session-drill-${drillId}`;
-  if (topic) return `ai-session-topic-${topic}`;
-  return "ai-session-free";
+function getSessionKey(
+  drillId: string | null,
+  topic: string | null,
+  freeTalkTag: string
+): string {
+  const ft = freeTalkTag ? `-ft-${freeTalkTag}` : "";
+  if (drillId) return `ai-session-drill-${drillId}${ft}`;
+  if (topic) return `ai-session-topic-${topic}${ft}`;
+  return `ai-session-free${ft}`;
 }
 
 interface CachedSession {
   messages: Array<{ type: "ai" | "user"; text: string }>;
   conversationHistory: Array<{ role: "user" | "model"; content: string }>;
   drillInfo?: { drillType: string; drillTitle: string } | null;
+  masteredVocab?: Record<string, boolean>;
+  vocabularySnapshot?: string[];
   timestamp: number;
 }
 
@@ -174,12 +188,28 @@ function AISessionPage() {
   const searchParams = useSearchParams();
   const drillId = searchParams.get("drillId");
   const topic = searchParams.get("topic");
+  const scenarioIdParam = searchParams.get("scenarioId");
+  const vocabParam = searchParams.get("vocab");
+  const scenarioTextParam = searchParams.get("scenarioText");
+  const vocabularyList = useMemo(
+    () => parseVocabListParam(vocabParam),
+    [vocabParam]
+  );
+  const scenarioTextDecoded = useMemo(() => {
+    if (!scenarioTextParam) return null;
+    try {
+      return decodeURIComponent(scenarioTextParam);
+    } catch {
+      return null;
+    }
+  }, [scenarioTextParam]);
+  const freeTalkTag = [scenarioIdParam || "", vocabParam || "", scenarioTextParam || ""].join("::");
   const isDrillPractice = !!drillId;
   const router = useRouter();
   const { user } = useAuthStore();
   const initials = getUserInitials(user);
 
-  const sessionKey = getSessionKey(drillId, topic);
+  const sessionKey = getSessionKey(drillId, topic, freeTalkTag);
   const { cached: preparedCache, showResume: initialShowResume } =
     prepareResumePrompt(sessionKey);
   const cachedSession = useRef(preparedCache);
@@ -229,6 +259,62 @@ function AISessionPage() {
   const [showTextInput, setShowTextInput] = useState(false);
   // Real-time mic amplitude for button animation (0–1)
   const [micAmplitude, setMicAmplitude] = useState(0);
+  const [showGoalWords, setShowGoalWords] = useState(false);
+
+  const shouldSendFreeTalkDrillContext = useMemo(
+    () =>
+      isDrillPractice &&
+      (vocabularyList.length > 0 ||
+        (scenarioIdParam != null && String(scenarioIdParam).trim() !== "")),
+    [isDrillPractice, vocabularyList, scenarioIdParam]
+  );
+
+  const freeTalkContextForApi = useMemo(():
+    | { scenarioId: string; vocabularyList: string[] }
+    | undefined => {
+    if (!shouldSendFreeTalkDrillContext) return undefined;
+    return {
+      scenarioId:
+        scenarioIdParam != null && String(scenarioIdParam).trim() !== ""
+          ? String(scenarioIdParam)
+          : "",
+      vocabularyList,
+    };
+  }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList]);
+
+  const freeTalkSystemInstruction = useMemo(
+    () =>
+      isDrillPractice
+        ? null
+        : buildFreeTalkSystemInstruction({
+            topic,
+            scenarioDescription: scenarioTextDecoded,
+            vocabularyList,
+          }),
+    [isDrillPractice, topic, scenarioTextDecoded, vocabularyList]
+  );
+
+  const [masteredVocab, setMasteredVocab] = useState<Record<string, boolean>>(() => {
+    const snap = preparedCache?.vocabularySnapshot?.join("|") ?? "";
+    if (preparedCache?.masteredVocab && snap === vocabularyList.join("|")) {
+      return { ...preparedCache.masteredVocab };
+    }
+    return {};
+  });
+
+  const recordVocabMastery = useCallback(
+    (userText: string) => {
+      if (vocabularyList.length === 0) return;
+      const used = findVocabularyUsedInText(userText, vocabularyList);
+      if (used.length === 0) return;
+      setMasteredVocab((prev) => {
+        const next = { ...prev };
+        for (const w of used) next[w] = true;
+        return next;
+      });
+    },
+    [vocabularyList]
+  );
 
   /** Post-session AI summary (modal) before leaving */
   const [showExitReview, setShowExitReview] = useState(false);
@@ -370,7 +456,7 @@ function AISessionPage() {
       // Reset guard so StrictMode remount or dependency change can re-initialize
       drillInitRef.current = false;
     };
-  }, [drillId, showResumePrompt]);
+  }, [drillId, showResumePrompt, freeTalkTag]);
 
   useEffect(() => {
     if (!isDrillPractice && !showResumePrompt && messages[0]?.type === "ai" && autoPlayAudio) {
@@ -413,10 +499,20 @@ function AISessionPage() {
         messages: messages.map((m) => ({ type: m.type, text: m.text })),
         conversationHistory,
         drillInfo,
+        masteredVocab,
+        vocabularySnapshot: vocabularyList,
         timestamp: Date.now(),
       });
     }
-  }, [messages, conversationHistory, drillInfo, sessionKey, showResumePrompt]);
+  }, [
+    messages,
+    conversationHistory,
+    drillInfo,
+    sessionKey,
+    showResumePrompt,
+    masteredVocab,
+    vocabularyList,
+  ]);
 
   /* ─── Resume / New session handlers ────────────────────────────────────── */
 
@@ -432,6 +528,7 @@ function AISessionPage() {
     setMessages(freshMessages);
     setConversationHistory([]);
     setDrillInfo(null);
+    setMasteredVocab({});
     drillInitRef.current = false;
     if (isDrillPractice) {
       initializeDrillPractice();
@@ -575,7 +672,9 @@ function AISessionPage() {
 
     try {
       const signal = beginNewStream();
-      await aiService.streamDrillPracticeGreeting(drillId!, (chunk) => {
+      await aiService.streamDrillPracticeGreeting(
+        drillId!,
+        (chunk) => {
         setIsInitializing(false);
 
         if (chunk.type === "metadata") {
@@ -592,7 +691,10 @@ function AISessionPage() {
         } else if (chunk.type === "audio" && autoPlayAudio) {
           audioPlayer.enqueueBase64Pcm(chunk.data);
         }
-      }, signal);
+      },
+        signal,
+        shouldSendFreeTalkDrillContext ? freeTalkContextForApi : undefined
+      );
       
       setMessages([
         {
@@ -631,6 +733,8 @@ function AISessionPage() {
     const trimmed = text.trim();
     if (!trimmed || isThinking) return;
 
+    recordVocabMastery(trimmed);
+
     const userMessage: ChatMessage = { type: "user", text: trimmed };
     const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
     const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
@@ -660,6 +764,9 @@ function AISessionPage() {
           userMessage: trimmed,
           conversationHistory: newHistory,
           signal: streamSignal,
+          ...(shouldSendFreeTalkDrillContext && freeTalkContextForApi
+            ? { freeTalkContext: freeTalkContextForApi }
+            : {}),
         }, (chunk) => {
           setIsThinking(false);
 
@@ -724,6 +831,9 @@ function AISessionPage() {
             temperature: 0.7,
             maxTokens: 1000,
             signal: streamSignal,
+            ...(freeTalkSystemInstruction
+              ? { systemInstruction: freeTalkSystemInstruction }
+              : {}),
           },
           (chunk) => {
             if (chunk.type === "text" && typeof chunk.data === "string") {
@@ -870,6 +980,9 @@ function AISessionPage() {
                 audioBlob,
                 conversationHistory: drillHistoryBeforeTurn,
                 signal: streamSignal,
+                ...(shouldSendFreeTalkDrillContext && freeTalkContextForApi
+                  ? { freeTalkContext: freeTalkContextForApi }
+                  : {}),
               },
               (chunk) => {
                 if (!didReceiveFirstChunk) {
@@ -933,13 +1046,14 @@ function AISessionPage() {
               { role: "user", content: inputTextMeta || "[Voice message]" },
               { role: "model", content: fullTextMeta || finalResponse },
             ]);
+            if (inputTextMeta) recordVocabMastery(inputTextMeta);
           } else {
             // Free talk voice: use Live API + built-in transcription.
-          const contextPrompt = topic
-            ? topic === "pressure-test"
-              ? "Ekln Pressure Test: respond quickly. Keep your replies brief and natural. If the user is slow, nudge them to answer sooner, then continue with the next prompt."
-              : `Practice English in a ${topic.replace(/-/g, " ")} conversation. Be natural, encouraging, and conversational.`
-            : "Practice English conversation. Be natural, encouraging, and conversational.";
+            const contextPrompt = buildFreeTalkVoiceContextPrompt({
+              topic,
+              scenarioDescription: scenarioTextDecoded,
+              vocabularyList,
+            });
 
             await aiService.streamVoiceConversationMessage(
               {
@@ -1010,6 +1124,7 @@ function AISessionPage() {
               { role: "user", content: inputTextMeta || "[Voice message]" },
               { role: "model", content: fullTextMeta || finalResponse },
             ]);
+            if (inputTextMeta) recordVocabMastery(inputTextMeta);
           }
         } catch (err: unknown) {
           if ((err as { name?: string })?.name === "AbortError") {
@@ -1139,7 +1254,19 @@ function AISessionPage() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="flex items-center gap-0.5">
+            {vocabularyList.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowGoalWords((s) => !s)}
+                className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"
+                aria-label="Goal words"
+                title="Goal words"
+              >
+                <Target className="w-5 h-5 text-emerald-600" />
+              </button>
+            )}
+            <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"
@@ -1175,9 +1302,55 @@ function AISessionPage() {
                 </div>
               </>
             )}
+            </div>
           </div>
         </div>
       </header>
+
+      {showGoalWords && vocabularyList.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/30"
+            onClick={() => setShowGoalWords(false)}
+            aria-label="Close goal words"
+          />
+          <aside
+            className="fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-white shadow-xl border-l border-gray-100 flex flex-col"
+            role="dialog"
+            aria-label="Goal words"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-gray-900">Goal words</h2>
+              <button
+                type="button"
+                onClick={() => setShowGoalWords(false)}
+                className="p-2 rounded-full hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <ul className="flex-1 overflow-y-auto p-4 space-y-2">
+              {vocabularyList.map((w) => (
+                <li
+                  key={w}
+                  className={
+                    masteredVocab[w]
+                      ? "text-sm line-through text-emerald-600/90"
+                      : "text-sm font-medium text-gray-800"
+                  }
+                >
+                  {w}
+                </li>
+              ))}
+            </ul>
+            <p className="p-3 text-xs text-gray-500 border-t border-gray-100">
+              Say a target word in chat to mark it as mastered.
+            </p>
+          </aside>
+        </>
+      )}
 
       {/* ── Initialization overlay (matches mobile) ────────────────────── */}
       {isInitializing && (

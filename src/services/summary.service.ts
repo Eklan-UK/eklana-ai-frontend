@@ -10,8 +10,8 @@ import type {
   TranscriptTurn,
 } from "@/types/ai-session-summary";
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
-const FALLBACK_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = config.GEMINI_SUMMARY_MODEL;
+const FALLBACK_MODEL = config.GEMINI_SUMMARY_FALLBACK_MODEL;
 
 const DEFAULT_SUMMARY: SessionSummaryPayload = {
   grammar: { headline: "Session recorded", detail: "We'll have a full breakdown ready next time." },
