@@ -75,7 +75,7 @@ export default function DrillsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
 
       <div className="sticky top-0 z-40 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100/80">

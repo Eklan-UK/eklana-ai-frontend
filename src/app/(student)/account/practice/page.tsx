@@ -71,7 +71,7 @@ export default function PracticePage() {
   const continueDrill = inProgressDrill || newestDrill;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <Header title="Practice" />
 

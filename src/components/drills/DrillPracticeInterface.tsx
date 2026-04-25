@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
 import VocabularyDrill from "./VocabularyDrill";
 import RoleplayDrill from "./RoleplayDrill";
 import MatchingDrill from "./MatchingDrill";
@@ -103,7 +102,7 @@ export default function DrillPracticeInterface({
         return <FillBlankDrill {...commonProps} />;
       default:
         return (
-          <div className="min-h-screen bg-white pb-20 md:pb-0">
+          <div className="min-h-screen bg-white pb-6">
             <div className="h-6"></div>
             <Header title="Unknown Drill Type" showBack={true} />
             <div className="max-w-md mx-auto px-4 py-6">
@@ -113,7 +112,6 @@ export default function DrillPracticeInterface({
                 </p>
               </Card>
             </div>
-            <BottomNav />
           </div>
         );
     }

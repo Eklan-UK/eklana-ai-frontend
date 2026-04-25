@@ -38,7 +38,7 @@ export function AssignedDrillsSkeleton() {
  */
 export default function HomeSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         <HomeHeaderSkeleton />

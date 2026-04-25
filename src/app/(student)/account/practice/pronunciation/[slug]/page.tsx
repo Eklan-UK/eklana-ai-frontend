@@ -275,7 +275,7 @@ export default function PronunciationWordPracticePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -287,7 +287,7 @@ export default function PronunciationWordPracticePage() {
 
   if (error || !problem) {
     return (
-      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -308,7 +308,7 @@ export default function PronunciationWordPracticePage() {
 
   if (words.length === 0 || filteredWords.length === 0) {
     return (
-      <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-white pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
         <div className="h-6"></div>
         <Header title="Pronunciation Practice" />
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
@@ -333,7 +333,7 @@ export default function PronunciationWordPracticePage() {
   const isPassed = wordProgress?.passed || (pronunciationScore && pronunciationScore.speechace_score.pronunciation >= 70);
 
   return (
-    <div className="min-h-screen bg-white pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-0">
+    <div className="min-h-screen bg-white pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 

@@ -74,7 +74,7 @@ export default function ListeningPracticePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-white pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 

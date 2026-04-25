@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
@@ -43,7 +42,7 @@ export function DrillCompletionScreen({
   };
 
   return (
-    <div className="min-h-screen bg-white pb-20 md:pb-0">
+    <div className="min-h-screen bg-white pb-6">
       <div className="h-6"></div>
       <Header title={title} showBack={true} />
       <div className="max-w-md mx-auto px-4 py-6">
@@ -56,7 +55,6 @@ export function DrillCompletionScreen({
           </Button>
         </Card>
       </div>
-      <BottomNav />
     </div>
   );
 }
