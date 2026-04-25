@@ -18,9 +18,13 @@ import {
 import { useLearnerById, useLearnerDrills, useUpdateLearnerName } from "@/hooks/useAdmin";
 import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
 import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciation-analytics";
+import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics";
+import { SentenceAnalyticsComponent } from "@/components/admin/sentence-analytics";
+import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
 import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
+import { LearnerAiSessionsSection } from "@/components/admin/learner-ai-sessions";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -256,6 +260,8 @@ export default function LearnerProfilePage() {
         <LearnerProgressSummary learnerId={learnerId} learnerName={name} />
       </div>
 
+      <LearnerAiSessionsSection learnerId={learnerId} />
+
       {/* Drill Submissions & Analytics */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
@@ -273,6 +279,21 @@ export default function LearnerProfilePage() {
           learnerId={learnerId}
           learnerName={name}
         />
+      </div>
+
+      {/* Grammar Analytics */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <GrammarAnalyticsComponent learnerId={learnerId} learnerName={name} />
+      </div>
+
+      {/* Sentence Analytics */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <SentenceAnalyticsComponent learnerId={learnerId} learnerName={name} />
+      </div>
+
+      {/* Matching Analytics */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <MatchingAnalyticsComponent learnerId={learnerId} learnerName={name} />
       </div>
 
       {/* Challenging Words */}

@@ -742,6 +742,140 @@ export const adminAPI = {
     });
   },
 
+  /**
+   * Eklan AI session summaries (Free Talk / topic / drill) for a learner.
+   * Access: admin (any) or tutor (assigned only). Same as drill-assignments.
+   */
+  getLearnerAiSessions: (
+    learnerId: string,
+    params?: { limit?: number; offset?: number; mode?: 'free' | 'topic' | 'drill' }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        sessions: Array<{
+          id: string;
+          mode: string;
+          topic?: string;
+          drillId?: string;
+          summary: import('@/types/ai-session-summary').SessionSummaryPayload;
+          endedAt: string;
+          createdAt: string;
+        }>;
+        total: number;
+        limit: number;
+        offset: number;
+      };
+    }>(`/admin/learners/${learnerId}/ai-sessions`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Grammar drill analytics for a learner (aggregated attempts). Admin/tutor. */
+  getLearnerGrammarAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssignedPatterns: number;
+        correctSentence: number;
+        incorrectSentence: number;
+        problemRows: Array<{
+          id: string;
+          patternLabel: string;
+          sentence: string;
+          count: number;
+        }>;
+        feedbackRows: Array<{
+          id: string;
+          label: string;
+          sentence: string;
+          count: number;
+        }>;
+        hasReviewedData: boolean;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/grammar-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Sentence-writing drill analytics for a learner (aggregated attempts). Admin/tutor. */
+  getLearnerSentenceAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssignedTargets: number;
+        correctSentence: number;
+        incorrectSentence: number;
+        problemRows: Array<{
+          id: string;
+          areaLabel: string;
+          sentence: string;
+          count: number;
+        }>;
+        feedbackRows: Array<{
+          id: string;
+          label: string;
+          sentence: string;
+          count: number;
+        }>;
+        hasReviewedData: boolean;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/sentence-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Matching drill analytics for a learner (aggregated attempts). Admin/tutor. */
+  getLearnerMatchingAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssignedPairs: number;
+        totalAttempts: number;
+        accuracyRatePct: number;
+        confusions: Array<{
+          id: string;
+          left: string;
+          attemptedMatch: string;
+          correctRight: string;
+          count: number;
+        }>;
+        fastMatches: number;
+        slowMatches: number;
+        slowestMatchSeconds: number | null;
+        slowestMatchLabel: string | null;
+        hasPairTimingData: boolean;
+        timingAvailableSince: string | null;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/matching-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
   // Get discovery calls (admin only)
   getDiscoveryCalls: (params?: {
     limit?: number;

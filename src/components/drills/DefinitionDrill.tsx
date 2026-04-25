@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -135,7 +134,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
 
   if (isCompleted) {
     return (
-      <div className="min-h-screen bg-white pb-20 md:pb-0">
+      <div className="min-h-screen bg-white pb-6">
         <div className="h-6"></div>
         <Header title="Drill Completed" showBack={true} />
         <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
@@ -156,14 +155,13 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
             </Button>
           </Card>
         </div>
-        <BottomNav />
       </div>
     );
   }
 
   if (showResults) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-20 md:pb-0">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-6">
         <div className="h-6"></div>
         <Header title="Review Your Definitions" showBack={true} />
         
@@ -238,8 +236,6 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
             </Button>
           </div>
         </div>
-        
-        <BottomNav />
       </div>
     );
   }
@@ -247,7 +243,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   const progress = items.length > 0 ? ((currentIndex + 1) / items.length) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 pb-6">
       <div className="h-6"></div>
       <Header title={drill.title} showBack={true} />
       
@@ -353,8 +349,6 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
           </Button>
         </div>
       </div>
-      
-      <BottomNav />
     </div>
   );
 }

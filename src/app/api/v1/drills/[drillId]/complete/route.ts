@@ -48,6 +48,11 @@ const completeSchema = z.object({
 			right: z.string(),
 			attemptedMatch: z.string(),
 		})).optional(),
+		pairMatchEvents: z.array(z.object({
+			durationSec: z.number(),
+			left: z.string(),
+			right: z.string(),
+		})).optional(),
 	}).optional(),
 	definitionResults: z.object({
 		wordsDefined: z.number(),

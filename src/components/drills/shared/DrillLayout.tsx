@@ -45,7 +45,11 @@ export function DrillLayout({
   showBack = true, // Default to showing back button
 }: DrillLayoutProps) {
   return (
-    <div className={`min-h-screen ${backgroundGradient} ${hideNavigation ? 'pb-6' : 'pb-20 md:pb-0'}`}>
+    <div
+      className={`min-h-screen ${backgroundGradient} ${
+        hideNavigation ? 'pb-6' : 'pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]'
+      }`}
+    >
       <div className="h-6"></div>
       <Header title={title} showBack={showBack} />
       <div className={`max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6 ${className}`}>

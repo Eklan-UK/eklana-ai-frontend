@@ -1234,7 +1234,7 @@ function AISessionPage() {
           <button
             type="button"
             onClick={() => {
-              finalizeExitToPath("/account/practice/ai");
+              void beginExitFlow("/account/practice/ai");
             }}
             className="p-2.5 -ml-2.5 rounded-full hover:bg-gray-100 transition-colors"
             aria-label="Leave session"

@@ -45,7 +45,10 @@ export const BottomNav: React.FC = () => {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="max-w-md mx-auto px-1 py-1 grid grid-cols-4 items-center gap-0">
         {navItems.map((item) => {
           const isHomeTab = item.href === HOME_HREF;
