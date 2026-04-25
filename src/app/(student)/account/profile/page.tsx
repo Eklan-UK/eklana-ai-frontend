@@ -64,7 +64,7 @@ export default function ProfilePage() {
       : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6"></div>
 
       <div className="bg-gradient-to-br from-green-600 to-green-700 text-white pt-4 pb-8 md:pt-8 md:pb-12">

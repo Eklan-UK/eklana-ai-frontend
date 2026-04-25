@@ -33,7 +33,7 @@ export const metadata = generateMetadata({
 
 export default async function HomePage() {
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6"></div>
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
