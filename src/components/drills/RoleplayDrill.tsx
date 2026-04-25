@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -50,12 +50,28 @@ interface TurnProgress {
 
 // Analytics collected silently during the session
 interface TurnAnalytics {
+  sceneIndex: number;
   turnIndex: number;
   text: string;
   score: number;
   textScore: TextScore | null;
   attempts: number;
   timestamp: Date;
+}
+
+type TurnProgressMap = Record<string, TurnProgress>;
+
+function makeTurnKey(sceneIndex: number, turnIndex: number): string {
+  return `${sceneIndex}-${turnIndex}`;
+}
+
+function isStudentLine(turn: DialogueTurn | undefined, roleMode: "original" | "swapped"): boolean {
+  if (!turn) return false;
+  return roleMode === "original" ? turn.speaker === "student" : turn.speaker !== "student";
+}
+
+function countStudentLinesInDialogue(dialogue: DialogueTurn[], roleMode: "original" | "swapped"): number {
+  return dialogue.filter((t) => isStudentLine(t, roleMode)).length;
 }
 
 interface CompletedMessage {
@@ -84,7 +100,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [completedMessages, setCompletedMessages] = useState<CompletedMessage[]>([]);
-  const [turnProgress, setTurnProgress] = useState<Record<number, TurnProgress>>({});
+  const [turnProgress, setTurnProgress] = useState<TurnProgressMap>({});
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
@@ -100,8 +116,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [showRoleSwitchOption, setShowRoleSwitchOption] = useState(false);
 
   // Track progress for each role mode separately
-  const [originalRoleProgress, setOriginalRoleProgress] = useState<Record<number, TurnProgress>>({});
-  const [swappedRoleProgress, setSwappedRoleProgress] = useState<Record<number, TurnProgress>>({});
+  const [originalRoleProgress, setOriginalRoleProgress] = useState<TurnProgressMap>({});
+  const [swappedRoleProgress, setSwappedRoleProgress] = useState<TurnProgressMap>({});
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -113,7 +129,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // AI turn state - use ref for synchronous tracking to prevent double-play
-  const playedAITurnsRef = useRef<Set<number>>(new Set());
+  const playedAITurnsRef = useRef<Set<string>>(new Set());
   const [isPlayingAI, setIsPlayingAI] = useState(false);
 
   // Silent analytics collection during the session
@@ -136,8 +152,12 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     autoPlay: false,
   });
 
-  // Drill data
-  const scenes = drill.roleplay_scenes || (drill.roleplay_dialogue ? [{ dialogue: drill.roleplay_dialogue }] : []);
+  // Drill data — memoize so scene-advance effects do not re-fire every render in legacy single-scene path
+  const scenes = useMemo(
+    () =>
+      drill.roleplay_scenes || (drill.roleplay_dialogue ? [{ dialogue: drill.roleplay_dialogue }] : []),
+    [drill.roleplay_scenes, drill.roleplay_dialogue],
+  );
   const currentScene = scenes[currentSceneIndex];
   const dialogue: DialogueTurn[] = currentScene?.dialogue || [];
   const studentCharacter = drill.student_character_name || "You";
@@ -154,16 +174,39 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const isAITurn = roleMode === "original"
     ? currentTurn && currentTurn.speaker !== "student"
     : currentTurn?.speaker === "student";
-  const currentProgress = turnProgress[currentTurnIndex] || { passed: false, score: null, attempts: 0 };
+  const currentTurnKey = makeTurnKey(currentSceneIndex, currentTurnIndex);
+  const currentProgress = turnProgress[currentTurnKey] || { passed: false, score: null, attempts: 0 };
 
-  // Check if conversation is complete
-  const isConversationComplete = currentTurnIndex >= dialogue.length;
+  /** All scenes finished (past last line of the last non-empty flow). */
+  const isEntireDrillComplete = useMemo(() => {
+    if (scenes.length === 0) return true;
+    const d = currentScene?.dialogue || [];
+    if (d.length === 0) {
+      return currentSceneIndex >= scenes.length - 1;
+    }
+    return currentSceneIndex >= scenes.length - 1 && currentTurnIndex >= d.length;
+  }, [scenes, currentSceneIndex, currentScene, currentTurnIndex]);
 
-  // Count turns based on current role mode
-  const totalStudentTurns = roleMode === "original"
-    ? dialogue.filter(d => d.speaker === "student").length
-    : dialogue.filter(d => d.speaker !== "student").length;
-  const completedStudentTurns = Object.values(turnProgress).filter(p => p.passed).length;
+  const totalStudentTurns = useMemo(
+    () =>
+      scenes.reduce(
+        (sum: number, sc: { dialogue?: DialogueTurn[] }) =>
+          sum + countStudentLinesInDialogue(sc?.dialogue || [], roleMode),
+        0,
+      ),
+    [scenes, roleMode],
+  );
+
+  const completedStudentTurns = useMemo(() => {
+    let n = 0;
+    for (const [key, p] of Object.entries(turnProgress)) {
+      if (!p.passed) continue;
+      const [si, ti] = key.split("-").map(Number);
+      const t = (scenes[si]?.dialogue || [])[ti];
+      if (t && isStudentLine(t, roleMode)) n += 1;
+    }
+    return n;
+  }, [turnProgress, scenes, roleMode]);
 
   // Get character name for the role the student is currently playing
   const currentStudentRole = roleMode === "original"
@@ -183,7 +226,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   // Scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [completedMessages, currentTurnIndex]);
+  }, [completedMessages, currentTurnIndex, currentSceneIndex]);
 
   // Move to next turn after AI finishes
   const moveToNextTurn = useCallback(() => {
@@ -193,16 +236,16 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   // Play AI turn - only called once per turn
   const playAITurn = useCallback(async (turn: DialogueTurn, turnIndex: number) => {
-    // Check synchronously and mark as played immediately (ref is synchronous)
-    if (playedAITurnsRef.current.has(turnIndex)) {
+    const turnKey = makeTurnKey(currentSceneIndex, turnIndex);
+    if (playedAITurnsRef.current.has(turnKey)) {
       return; // Already played, skip
     }
-    playedAITurnsRef.current.add(turnIndex);
+    playedAITurnsRef.current.add(turnKey);
     setIsPlayingAI(true);
 
     // Add AI message to completed messages
     const aiMessage: CompletedMessage = {
-      id: `msg-${Date.now()}-${turnIndex}`,
+      id: `msg-${Date.now()}-${turnKey}`,
       speaker: turn.speaker,
       text: turn.text,
       translation: turn.translation,
@@ -260,21 +303,54 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         moveToNextTurn();
       }
     }
-  }, [playTTSAudio, moveToNextTurn]);
+  }, [playTTSAudio, moveToNextTurn, currentSceneIndex]);
 
   // Auto-play AI turns - only if not already played
   useEffect(() => {
     if (
       isAITurn &&
       currentTurn &&
-      !playedAITurnsRef.current.has(currentTurnIndex) &&
+      !playedAITurnsRef.current.has(makeTurnKey(currentSceneIndex, currentTurnIndex)) &&
       !isPlayingAI &&
       !isTTSGenerating &&
       !isTTSPlaying
     ) {
       playAITurn(currentTurn, currentTurnIndex);
     }
-  }, [currentTurnIndex, currentTurn, isAITurn, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
+  }, [currentSceneIndex, currentTurnIndex, currentTurn, isAITurn, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
+
+  // Skip scenes with no dialogue
+  useEffect(() => {
+    if (isCompleted) return;
+    if (!scenes.length) return;
+    const d = scenes[currentSceneIndex]?.dialogue || [];
+    if (d.length > 0) return;
+    if (currentSceneIndex < scenes.length - 1) {
+      setCurrentSceneIndex((i) => i + 1);
+      setCurrentTurnIndex(0);
+      setCompletedMessages([]);
+      setPronunciationScore(null);
+    }
+  }, [currentSceneIndex, scenes, isCompleted]);
+
+  // After a scene ends, advance to the next (multi-scene)
+  useEffect(() => {
+    if (isCompleted) return;
+    if (showReview) return;
+    if (!scenes.length) return;
+    const d = scenes[currentSceneIndex]?.dialogue || [];
+    if (d.length === 0) return;
+    if (currentTurnIndex < d.length) return;
+    if (currentSceneIndex < scenes.length - 1) {
+      const next = currentSceneIndex + 1;
+      const nextName = scenes[next]?.scene_name || `Scene ${next + 1}`;
+      setCurrentSceneIndex(next);
+      setCurrentTurnIndex(0);
+      setCompletedMessages([]);
+      setPronunciationScore(null);
+      toast.success(`Next: ${nextName}`);
+    }
+  }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -375,12 +451,12 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
         const passed = score >= PASS_THRESHOLD;
-        const newAttempts = (turnProgress[currentTurnIndex]?.attempts || 0) + 1;
+        const newAttempts = (turnProgress[currentTurnKey]?.attempts || 0) + 1;
 
         // Update turn progress
-        setTurnProgress(prev => ({
+        setTurnProgress((prev) => ({
           ...prev,
-          [currentTurnIndex]: {
+          [currentTurnKey]: {
             passed,
             score,
             attempts: newAttempts,
@@ -388,9 +464,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         }));
 
         // Silently collect analytics for review screen
-        setSessionAnalytics(prev => [
+        setSessionAnalytics((prev) => [
           ...prev,
           {
+            sceneIndex: currentSceneIndex,
             turnIndex: currentTurnIndex,
             text: currentTurn.text,
             score,
@@ -473,10 +550,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     const newMode = roleMode === "original" ? "swapped" : "original";
     setRoleMode(newMode);
 
-    // Reset for new round
+    // Reset for new round (all scenes, composite turn keys)
+    setCurrentSceneIndex(0);
     setCurrentTurnIndex(0);
     setCompletedMessages([]);
-    playedAITurnsRef.current = new Set(); // Reset played turns tracking
+    playedAITurnsRef.current = new Set();
     setPronunciationScore(null);
     setShowRoleSwitchOption(false);
 
@@ -495,13 +573,13 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     setShowReview(true);
   };
 
-  // Show role switch option when conversation completes
+  // Show role switch option when the full multi-scene drill is complete
   useEffect(() => {
-    if (isConversationComplete && !showRoleSwitchOption && !showReview && !isCompleted) {
+    if (isEntireDrillComplete && !showRoleSwitchOption && !showReview && !isCompleted) {
       setHasCompletedRound(true);
       setShowRoleSwitchOption(true);
     }
-  }, [isConversationComplete, showRoleSwitchOption, showReview, isCompleted]);
+  }, [isEntireDrillComplete, showRoleSwitchOption, showReview, isCompleted]);
 
   const handleSubmit = async () => {
     if (!assignmentId) {
@@ -513,23 +591,40 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     try {
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      // Calculate average score from all student turns
-      const studentScores = Object.values(turnProgress).filter(p => p.score !== null);
-      const avgScore = studentScores.length > 0
-        ? Math.round(studentScores.reduce((sum, p) => sum + (p.score || 0), 0) / studentScores.length)
+      // Mean of all recorded line scores (same weighting as before, with composite keys)
+      const allScores = Object.values(turnProgress)
+        .map((p) => p.score)
+        .filter((s): s is number => s != null);
+      const avgScore = allScores.length > 0
+        ? Math.round(allScores.reduce((sum, s) => sum + s, 0) / allScores.length)
         : 0;
+
+      const sceneScores = scenes.map((scene: { scene_name?: string; dialogue?: DialogueTurn[] }, sceneIndex: number) => {
+        const d = scene?.dialogue || [];
+        const lineScores: number[] = [];
+        for (let turnIndex = 0; turnIndex < d.length; turnIndex++) {
+          const t = d[turnIndex];
+          if (!isStudentLine(t, roleMode)) continue;
+          const s = turnProgress[makeTurnKey(sceneIndex, turnIndex)]?.score;
+          if (s != null) lineScores.push(s);
+        }
+        const sceneAvg = lineScores.length > 0
+          ? Math.round(lineScores.reduce((a, b) => a + b, 0) / lineScores.length)
+          : 0;
+        return {
+          sceneName: scene.scene_name || `Scene ${sceneIndex + 1}`,
+          score: sceneAvg,
+          fluencyScore: sceneAvg,
+          pronunciationScore: sceneAvg,
+        };
+      });
 
       await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
         score: avgScore,
         timeSpent,
         roleplayResults: {
-          sceneScores: [{
-            sceneName: currentScene?.scene_name || "Scene 1",
-            score: avgScore,
-            fluencyScore: avgScore,
-            pronunciationScore: avgScore,
-          }],
+          sceneScores,
         },
         platform: "web",
       });
@@ -605,14 +700,23 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         <div className="space-y-4 mb-6">
           {sessionAnalytics
             .filter((a, index, arr) =>
-              // Only show the best attempt for each turn
-              arr.findIndex(b => b.turnIndex === a.turnIndex && b.score >= a.score) === index
+              arr.findIndex(
+                (b) =>
+                  b.sceneIndex === a.sceneIndex &&
+                  b.turnIndex === a.turnIndex &&
+                  b.score >= a.score
+              ) === index
             )
+            .sort((a, b) => a.sceneIndex - b.sceneIndex || a.turnIndex - b.turnIndex)
             .map((analytics, idx) => (
-              <Card key={idx} className="border-gray-200">
+              <Card key={`${analytics.sceneIndex}-${analytics.turnIndex}-${idx}`} className="border-gray-200">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Line {analytics.turnIndex + 1}</p>
+                    <p className="text-sm font-medium text-gray-500 mb-1">
+                      {scenes.length > 1
+                        ? `Scene ${analytics.sceneIndex + 1} · Line ${analytics.turnIndex + 1}`
+                        : `Line ${analytics.turnIndex + 1}`}
+                    </p>
                     <p className="text-base text-gray-900">{analytics.text}</p>
                   </div>
                   <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold ${analytics.score >= PASS_THRESHOLD
@@ -770,7 +874,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       </Card>
 
       {/* Current Turn Interface */}
-      {!isConversationComplete && currentTurn && (
+      {!isEntireDrillComplete && currentTurn && (
         <Card className="mb-4">
           {/* AI Turn - Show loading/playing state */}
           {isAITurn && (
@@ -958,7 +1062,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       {/* Action Buttons */}
       <div className="space-y-3">
         {/* Student turn actions */}
-        {isStudentTurn && !isConversationComplete && (
+        {isStudentTurn && !isEntireDrillComplete && (
           <>
             {currentProgress.passed ? (
               <Button
@@ -986,7 +1090,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         )}
 
         {/* Conversation complete - Show Review and Role Switch options */}
-        {isConversationComplete && (
+        {isEntireDrillComplete && (
           <Card className="mb-4 bg-green-50 border-green-200">
             <div className="text-center py-4">
               <PartyPopper className="w-12 h-12 text-green-500 mx-auto mb-3" />

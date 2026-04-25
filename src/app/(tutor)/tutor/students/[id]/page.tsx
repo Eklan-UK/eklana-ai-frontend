@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
+import { LearnerAiSessionsSection } from "@/components/admin/learner-ai-sessions";
 
 // ── Pressure Test types ────────────────────────────────────────────────────
 
@@ -761,6 +762,10 @@ export default function StudentDetailPage() {
             </div>
             <div className="text-sm text-gray-600">Total Assigned</div>
           </Card>
+        </div>
+
+        <div className="mb-6">
+          <LearnerAiSessionsSection learnerId={studentId} />
         </div>
 
         {/* ── Tab bar ── */}

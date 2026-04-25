@@ -21,6 +21,7 @@ import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciatio
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
 import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
+import { LearnerAiSessionsSection } from "@/components/admin/learner-ai-sessions";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -255,6 +256,8 @@ export default function LearnerProfilePage() {
         </h2>
         <LearnerProgressSummary learnerId={learnerId} learnerName={name} />
       </div>
+
+      <LearnerAiSessionsSection learnerId={learnerId} />
 
       {/* Drill Submissions & Analytics */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
