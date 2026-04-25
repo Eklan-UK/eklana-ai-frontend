@@ -44,6 +44,12 @@ export interface IDrillAttempt extends Document {
 			right: string;
 			attemptedMatch: string;
 		}>;
+		/** Per successful lock: duration since previous lock (or session start for first), with canonical pair labels. */
+		pairMatchEvents?: Array<{
+			durationSec: number;
+			left: string;
+			right: string;
+		}>;
 	};
 
 	definitionResults?: {
@@ -239,6 +245,13 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					left: String,
 					right: String,
 					attemptedMatch: String,
+				},
+			],
+			pairMatchEvents: [
+				{
+					durationSec: Number,
+					left: String,
+					right: String,
 				},
 			],
 		},

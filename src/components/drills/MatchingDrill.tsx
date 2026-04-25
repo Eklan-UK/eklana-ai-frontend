@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
@@ -42,6 +42,14 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  /** Anchor for per-pair timing: session start until first lock, then previous successful lock. */
+  const matchTimingAnchorRef = useRef<number>(Date.now());
+  const incorrectPairsRef = useRef<
+    Array<{ left: string; right: string; attemptedMatch: string }>
+  >([]);
+  const pairMatchEventsRef = useRef<
+    Array<{ durationSec: number; left: string; right: string }>
+  >([]);
 
   // Shuffle array helper
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -81,6 +89,9 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     setIncorrectAttempts(new Set());
     setSelectedLeftIndex(null);
     setSelectedRightIndex(null);
+    matchTimingAnchorRef.current = Date.now();
+    incorrectPairsRef.current = [];
+    pairMatchEventsRef.current = [];
   }, [drill.matching_pairs]);
 
   // Check if item is matched
@@ -149,6 +160,22 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     const isCorrect = leftItem.id === rightItem.id;
 
     if (isCorrect) {
+      const now = Date.now();
+      const durationSec =
+        Math.round(((now - matchTimingAnchorRef.current) / 1000) * 100) / 100;
+      matchTimingAnchorRef.current = now;
+      const canonical = pairs[leftItem.id];
+      if (canonical) {
+        pairMatchEventsRef.current = [
+          ...pairMatchEventsRef.current,
+          {
+            durationSec: Math.max(0, durationSec),
+            left: canonical.left,
+            right: canonical.right,
+          },
+        ].slice(0, 100);
+      }
+
       // Correct match - lock the pair
       const pairKey = `${leftItem.id}-${rightItem.id}`;
       setMatchedPairs((prev) => new Set([...prev, pairKey]));
@@ -171,6 +198,17 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         }, 1000);
       }
     } else {
+      const canonical = pairs[leftItem.id];
+      if (canonical) {
+        incorrectPairsRef.current = [
+          ...incorrectPairsRef.current,
+          {
+            left: leftItem.text,
+            right: canonical.right,
+            attemptedMatch: rightItem.text,
+          },
+        ].slice(-50);
+      }
       // Incorrect match - show error feedback
       const attemptKey = `${leftIndex}-${rightIndex}`;
       setIncorrectAttempts((prev) => new Set([...prev, attemptKey]));
@@ -216,6 +254,9 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     setIncorrectAttempts(new Set());
     setSelectedLeftIndex(null);
     setSelectedRightIndex(null);
+    matchTimingAnchorRef.current = Date.now();
+    incorrectPairsRef.current = [];
+    pairMatchEventsRef.current = [];
     toast.info("Reset! Items shuffled.");
   };
 
@@ -251,7 +292,10 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
           pairsMatched,
           totalPairs,
           accuracy,
-          incorrectPairs: [], // All pairs are correct since we only allow correct matches
+          incorrectPairs:
+            incorrectPairsRef.current.length > 0 ? incorrectPairsRef.current : undefined,
+          pairMatchEvents:
+            pairMatchEventsRef.current.length > 0 ? pairMatchEventsRef.current : undefined,
         },
         platform: "web",
       });

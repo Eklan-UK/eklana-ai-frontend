@@ -173,6 +173,54 @@ export function useLearnerDrillAssignments(learnerId: string) {
   });
 }
 
+/** Grammar analytics for admin learner profile (optional date range). */
+export function useLearnerGrammarAnalytics(
+  learnerId: string,
+  range?: { from?: string; to?: string }
+) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "grammar-analytics", range?.from, range?.to],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerGrammarAnalytics(learnerId, range);
+      return response.data ?? null;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Sentence-writing analytics for admin learner profile (optional date range). */
+export function useLearnerSentenceAnalytics(
+  learnerId: string,
+  range?: { from?: string; to?: string }
+) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "sentence-analytics", range?.from, range?.to],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerSentenceAnalytics(learnerId, range);
+      return response.data ?? null;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Matching drill analytics for admin learner profile (optional date range). */
+export function useLearnerMatchingAnalytics(
+  learnerId: string,
+  range?: { from?: string; to?: string }
+) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "matching-analytics", range?.from, range?.to],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerMatchingAnalytics(learnerId, range);
+      return response.data ?? null;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
 // Update a learner's name (admin)
 export function useUpdateLearnerName(learnerId: string) {
   const queryClient = useQueryClient();
