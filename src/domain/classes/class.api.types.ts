@@ -20,7 +20,7 @@ export interface ClassDrawerDetailPartialDTO {
   participants?: { initials: string; name: string; role: 'Student' | 'Tutor' }[];
 }
 
-export type ClassBucket = 'today' | 'upcoming';
+export type ClassBucket = 'today' | 'upcoming' | 'completed';
 
 export type ApiClassStatus = 'active' | 'completed' | 'upcoming';
 

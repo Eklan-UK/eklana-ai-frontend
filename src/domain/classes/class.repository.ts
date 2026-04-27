@@ -22,6 +22,52 @@ import type {
   LearnerPastSessionItemDTO,
 } from './class.api.types';
 import SessionAttendance from '@/models/session-attendance';
+import { getUserDisplayName } from '@/utils/user';
+
+/**
+ * First session row when scheduling a new series — keep in sync with
+ * `ClassSession.sequenceNumber` in `create()`.
+ */
+const FIRST_SESSION_SEQUENCE_NUMBER = 1;
+
+/** Calendar month view + DB; truncate long rosters instead of overflowing. */
+const FALLBACK_CLASS_TITLE_MAX_LEN = 120;
+
+/** Single session index in the series (1 for the first scheduled session). */
+function buildFallbackTitlePrefix(sequenceNumber: number): string {
+	return `Class ${sequenceNumber}`;
+}
+
+function buildFallbackClassSeriesTitle(
+	sequenceNumber: number,
+	learnersOrdered: Array<{
+		email?: string;
+		firstName?: string;
+		lastName?: string;
+		name?: string;
+	}>,
+): string {
+	const prefix = buildFallbackTitlePrefix(sequenceNumber);
+
+	if (learnersOrdered.length === 0) {
+		return prefix;
+	}
+
+	const names = learnersOrdered.map((u) => getUserDisplayName(u));
+	for (let k = names.length; k >= 1; k--) {
+		const head = names.slice(0, k).join(', ');
+		const rest = names.length - k;
+		const inner = rest > 0 ? `${head} + ${rest} more` : head;
+		const candidate = `${prefix} (${inner})`;
+		if (candidate.length <= FALLBACK_CLASS_TITLE_MAX_LEN) return candidate;
+	}
+	const first = names[0] ?? 'Student';
+	const budget = Math.max(
+		12,
+		FALLBACK_CLASS_TITLE_MAX_LEN - prefix.length - 5,
+	);
+	return `${prefix} (${first.slice(0, budget)}…)`;
+}
 
 function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
   const m = rawMessage.toLowerCase();
@@ -53,6 +99,13 @@ function validationMessageForGoogleCalendarEventFailure(rawMessage: string): str
     return (
       "This tutor's Google Calendar connection is no longer valid. Ask them to open " +
       'Tutor Settings and disconnect and reconnect Google Calendar, then try scheduling again.'
+    );
+  }
+  /** OAuth refresh endpoint — expired refresh token, revoked access, or transient Google outage */
+  if (m.includes('oauth2.googleapis.com/token')) {
+    return (
+      'Google could not refresh the Calendar connection for this tutor. Ask them to open Tutor Settings, ' +
+      'disconnect and reconnect Google Calendar, then try scheduling again.'
     );
   }
   return (
@@ -111,11 +164,28 @@ export class ClassRepository {
       body.recurrence?.totalSessions ??
       1;
 
+    const learnerRows = await User.find({
+      _id: { $in: body.learnerIds.map((id) => new Types.ObjectId(id)) },
+      role: 'user',
+    })
+      .select('email firstName lastName name')
+      .lean();
+
+    const learnerById = new Map(
+      learnerRows.map((u) => [u._id.toString(), u]),
+    );
+    const learnersOrdered = body.learnerIds
+      .map((id) => learnerById.get(id))
+      .filter((u): u is NonNullable<(typeof learnerRows)[number]> => u != null);
+
+    const totalPlannedNorm = Math.max(1, totalPlanned);
+
     const title =
       body.title?.trim() ||
-      (body.learnerIds.length
-        ? `Class (${body.learnerIds.length} learner${body.learnerIds.length > 1 ? 's' : ''})`
-        : 'Class');
+      buildFallbackClassSeriesTitle(
+        FIRST_SESSION_SEQUENCE_NUMBER,
+        learnersOrdered,
+      );
 
     const refreshToken = await getGoogleCalendarRefreshTokenForUser(body.tutorId);
     if (!refreshToken) {
@@ -124,25 +194,19 @@ export class ClassRepository {
       );
     }
 
-    const learnerEmails = await User.find({
-      _id: { $in: body.learnerIds.map((id) => new Types.ObjectId(id)) },
-      role: 'user',
-    })
-      .select('email')
-      .lean();
-
     let meetingUrl: string;
     try {
       const createdCalendarEvent = await createGoogleCalendarEventWithMeetLink({
         refreshToken,
         summary: title,
-        description: `Eklana class scheduled by admin.`,
         startIsoUtc: start.toISOString(),
         endIsoUtc: end.toISOString(),
         timezone: body.timezone,
         attendees: [
           tutor.email ?? '',
-          ...learnerEmails.map((u) => (typeof u.email === 'string' ? u.email : '')),
+          ...learnersOrdered.map((u) =>
+            typeof u.email === 'string' ? u.email : '',
+          ),
         ].filter(Boolean),
       });
       meetingUrl = createdCalendarEvent.meetingUrl;
@@ -167,7 +231,7 @@ export class ClassRepository {
             title,
             classType: body.classType,
             timezone: body.timezone,
-            totalSessionsPlanned: Math.max(1, totalPlanned),
+            totalSessionsPlanned: totalPlannedNorm,
             scheduleDayLabels: body.scheduleDayLabels ?? [],
             scheduleStartTime: body.scheduleStartTime ?? '',
             scheduleEndTime: body.scheduleEndTime ?? '',
@@ -202,7 +266,7 @@ export class ClassRepository {
             endUtc: end,
             meetingUrl,
             status: 'scheduled' as const,
-            sequenceNumber: 1,
+            sequenceNumber: FIRST_SESSION_SEQUENCE_NUMBER,
           },
         ],
         { session: mongoSession },

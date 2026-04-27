@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import VocabularyDrill from "./VocabularyDrill";
 import RoleplayDrill from "./RoleplayDrill";
@@ -25,7 +24,6 @@ export default function DrillPracticeInterface({
   drill,
   assignmentId: propAssignmentId,
 }: DrillPracticeInterfaceProps) {
-  const router = useRouter();
   const [assignmentId, setAssignmentId] = useState<string | null>(
     propAssignmentId || null
   );

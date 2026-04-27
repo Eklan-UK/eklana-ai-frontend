@@ -503,38 +503,33 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
+        <div className="flex">
           <Button
-            variant="secondary"
-            size="md"
-            onClick={handleReset}
-            className="gap-2"
-            disabled={isSubmitting}
-          >
-            <Shuffle className="w-4 h-4" />
-            Shuffle & Reset
-          </Button>
-          <Button
-            variant="primary"
+            variant="outline"
             size="md"
             fullWidth
             onClick={handleSubmit}
             disabled={isSubmitting || !allMatched}
-            className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+            className={
+              isSubmitting || !allMatched
+                ? "!rounded-full !border-transparent !bg-[#E8E8E8] !text-white hover:!bg-gray-400 focus-visible:!ring-gray-400 disabled:!opacity-100 cursor-not-allowed shadow-none overflow-hidden"
+                : "!rounded-full !border-transparent !bg-[#3B883E] !text-white hover:!bg-emerald-700 active:!bg-emerald-800 focus-visible:!ring-emerald-600 shadow-none overflow-hidden"
+            }
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Submitting...
               </>
-            ) : allMatched ? (
-              "Complete Drill"
             ) : (
-              `Match ${pairs.length - matchedCount} more pair${pairs.length - matchedCount !== 1 ? "s" : ""}`
+              "Submit"
             )}
           </Button>
+   
+     
+        </div>
+   
         </div>
       </div>
-    </div>
   );
 }

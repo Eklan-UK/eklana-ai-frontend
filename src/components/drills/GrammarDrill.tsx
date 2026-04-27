@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -44,7 +43,6 @@ export default function GrammarDrill({
   drill,
   assignmentId,
 }: GrammarDrillProps) {
-  const router = useRouter();
   const patternItems: PatternItem[] = useMemo(() => {
     return (drill.grammar_items || []).map((item: any) => ({
       pattern: item.pattern || "",
@@ -99,13 +97,19 @@ export default function GrammarDrill({
   }, [currentIndex]);
 
   const updateCurrentAnswer = (field: keyof PatternAnswer, value: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentIndex]: {
-        ...currentAnswer,
-        [field]: value,
-      },
-    }));
+    setAnswers((prev) => {
+      const existing = prev[currentIndex] ?? {
+        sentence1: "",
+        sentence2: "",
+      };
+      return {
+        ...prev,
+        [currentIndex]: {
+          ...existing,
+          [field]: value,
+        },
+      };
+    });
   };
 
   const handlePrevious = () => {
@@ -186,8 +190,9 @@ export default function GrammarDrill({
         type: drill.type,
       });
 
-      // Refresh the page to update drill status
-      router.refresh();
+      // Do not call router.refresh() here: it races setIsCompleted and refetches the
+      // server page before React commits, remounting GrammarDrill at pattern 0.
+      // DrillCompletionScreen uses refreshOnMount to refresh after the completion UI shows.
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")

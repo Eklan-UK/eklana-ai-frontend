@@ -900,7 +900,7 @@ export const adminAPI = {
 // Classes (admin teaching sessions)
 export const classesAPI = {
   list: (params?: {
-    bucket?: 'today' | 'upcoming';
+    bucket?: import('@/domain/classes/class.api.types').ClassBucket;
     limit?: number;
     offset?: number;
   }) => {
@@ -957,7 +957,7 @@ export const classesAPI = {
 
   /** Tutor-scoped list; meetingUrl only within join window (Phase 2). */
   tutorList: (params?: {
-    bucket?: 'today' | 'upcoming';
+    bucket?: import('@/domain/classes/class.api.types').ClassBucket;
     limit?: number;
     offset?: number;
   }) => {
@@ -981,7 +981,7 @@ export const classesAPI = {
 
   /** Learner: enrolled classes (Phase 3). */
   learnerList: (params?: {
-    bucket?: 'today' | 'upcoming';
+    bucket?: import('@/domain/classes/class.api.types').ClassBucket;
     limit?: number;
     offset?: number;
   }) => {

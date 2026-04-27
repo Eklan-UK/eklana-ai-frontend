@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import type { CreateAdminClassBody } from '@/domain/classes/class.api.types';
 
 export function useAdminClasses(filters?: {
-  bucket?: 'today' | 'upcoming';
+  bucket?: import('@/domain/classes/class.api.types').ClassBucket;
   limit?: number;
   offset?: number;
 }) {
@@ -68,7 +68,7 @@ export function useDeleteAdminClass() {
 
 /** Tutor dashboard: classes assigned to the logged-in tutor (Phase 2). */
 export function useTutorClasses(filters?: {
-  bucket?: 'today' | 'upcoming';
+  bucket?: import('@/domain/classes/class.api.types').ClassBucket;
   limit?: number;
   offset?: number;
 }) {
@@ -84,7 +84,7 @@ export function useTutorClasses(filters?: {
 
 /** Learner: enrolled classes (Phase 3). */
 export function useLearnerClasses(filters?: {
-  bucket?: 'today' | 'upcoming';
+  bucket?: import('@/domain/classes/class.api.types').ClassBucket;
   limit?: number;
   offset?: number;
 }) {
