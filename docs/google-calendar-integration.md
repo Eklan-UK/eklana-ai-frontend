@@ -99,7 +99,7 @@ When admin schedules a class, `ClassRepository.create()`:
 2. Confirms tutor is connected to Google Calendar.
 3. Loads tutor refresh token.
 4. Calls `createGoogleCalendarEventWithMeetLink()` with:
-   - summary (if the admin leaves the title blank, defaults to `Class (<learner display names>)`, with truncation for long rosters)
+   - summary (if the admin leaves the title blank, defaults to `Class N (<learner display names>)` where _N_ is the session index in the series (1 for the first session); long rosters are truncated)
    - UTC start/end
    - timezone
    - attendees (tutor + learners)

@@ -24,10 +24,22 @@ import type {
 import SessionAttendance from '@/models/session-attendance';
 import { getUserDisplayName } from '@/utils/user';
 
+/**
+ * First session row when scheduling a new series — keep in sync with
+ * `ClassSession.sequenceNumber` in `create()`.
+ */
+const FIRST_SESSION_SEQUENCE_NUMBER = 1;
+
 /** Calendar month view + DB; truncate long rosters instead of overflowing. */
-const FALLBACK_CLASS_TITLE_MAX_LEN = 110;
+const FALLBACK_CLASS_TITLE_MAX_LEN = 120;
+
+/** Single session index in the series (1 for the first scheduled session). */
+function buildFallbackTitlePrefix(sequenceNumber: number): string {
+	return `Class ${sequenceNumber}`;
+}
 
 function buildFallbackClassSeriesTitle(
+	sequenceNumber: number,
 	learnersOrdered: Array<{
 		email?: string;
 		firstName?: string;
@@ -35,17 +47,26 @@ function buildFallbackClassSeriesTitle(
 		name?: string;
 	}>,
 ): string {
-	if (learnersOrdered.length === 0) return 'Class';
+	const prefix = buildFallbackTitlePrefix(sequenceNumber);
+
+	if (learnersOrdered.length === 0) {
+		return prefix;
+	}
+
 	const names = learnersOrdered.map((u) => getUserDisplayName(u));
 	for (let k = names.length; k >= 1; k--) {
 		const head = names.slice(0, k).join(', ');
 		const rest = names.length - k;
 		const inner = rest > 0 ? `${head} + ${rest} more` : head;
-		const candidate = `Class (${inner})`;
+		const candidate = `${prefix} (${inner})`;
 		if (candidate.length <= FALLBACK_CLASS_TITLE_MAX_LEN) return candidate;
 	}
 	const first = names[0] ?? 'Student';
-	return `Class (${first.slice(0, Math.max(20, FALLBACK_CLASS_TITLE_MAX_LEN - 12))}…)`;
+	const budget = Math.max(
+		12,
+		FALLBACK_CLASS_TITLE_MAX_LEN - prefix.length - 5,
+	);
+	return `${prefix} (${first.slice(0, budget)}…)`;
 }
 
 function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
@@ -150,9 +171,14 @@ export class ClassRepository {
       .map((id) => learnerById.get(id))
       .filter((u): u is NonNullable<(typeof learnerRows)[number]> => u != null);
 
+    const totalPlannedNorm = Math.max(1, totalPlanned);
+
     const title =
       body.title?.trim() ||
-      buildFallbackClassSeriesTitle(learnersOrdered);
+      buildFallbackClassSeriesTitle(
+        FIRST_SESSION_SEQUENCE_NUMBER,
+        learnersOrdered,
+      );
 
     const refreshToken = await getGoogleCalendarRefreshTokenForUser(body.tutorId);
     if (!refreshToken) {
@@ -198,7 +224,7 @@ export class ClassRepository {
             title,
             classType: body.classType,
             timezone: body.timezone,
-            totalSessionsPlanned: Math.max(1, totalPlanned),
+            totalSessionsPlanned: totalPlannedNorm,
             scheduleDayLabels: body.scheduleDayLabels ?? [],
             scheduleStartTime: body.scheduleStartTime ?? '',
             scheduleEndTime: body.scheduleEndTime ?? '',
@@ -233,7 +259,7 @@ export class ClassRepository {
             endUtc: end,
             meetingUrl,
             status: 'scheduled' as const,
-            sequenceNumber: 1,
+            sequenceNumber: FIRST_SESSION_SEQUENCE_NUMBER,
           },
         ],
         { session: mongoSession },
