@@ -15,14 +15,14 @@ export function sessionsTooClose(
   return startA.getTime() < endB.getTime() + bufferMs && endA.getTime() + bufferMs > startB.getTime();
 }
 
-export async function findTutorSessionConflict(
+export type TutorSessionInterval = { startUtc: Date; endUtc: Date };
+
+/** One query; use with `proposedOverlapsTutorSessions` to avoid N+1 in reschedule option lists. */
+export async function loadTutorActiveSessionsExcluding(
   tutorId: Types.ObjectId,
   excludeSessionId: Types.ObjectId,
-  proposedStart: Date,
-  proposedEnd: Date,
-  bufferMs: number,
-): Promise<boolean> {
-  const others = await ClassSession.find({
+): Promise<TutorSessionInterval[]> {
+  const rows = await ClassSession.find({
     tutorId,
     _id: { $ne: excludeSessionId },
     status: { $in: ['scheduled', 'in_progress'] },
@@ -30,13 +30,33 @@ export async function findTutorSessionConflict(
     .select('startUtc endUtc')
     .lean()
     .exec();
+  return rows.map((r) => ({
+    startUtc: new Date(r.startUtc),
+    endUtc: new Date(r.endUtc),
+  }));
+}
 
+export function proposedOverlapsTutorSessions(
+  others: TutorSessionInterval[],
+  proposedStart: Date,
+  proposedEnd: Date,
+  bufferMs: number,
+): boolean {
   for (const row of others) {
-    const s = new Date(row.startUtc);
-    const e = new Date(row.endUtc);
-    if (sessionsTooClose(proposedStart, proposedEnd, s, e, bufferMs)) {
+    if (sessionsTooClose(proposedStart, proposedEnd, row.startUtc, row.endUtc, bufferMs)) {
       return true;
     }
   }
   return false;
+}
+
+export async function findTutorSessionConflict(
+  tutorId: Types.ObjectId,
+  excludeSessionId: Types.ObjectId,
+  proposedStart: Date,
+  proposedEnd: Date,
+  bufferMs: number,
+): Promise<boolean> {
+  const others = await loadTutorActiveSessionsExcluding(tutorId, excludeSessionId);
+  return proposedOverlapsTutorSessions(others, proposedStart, proposedEnd, bufferMs);
 }
