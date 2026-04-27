@@ -2,11 +2,10 @@
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
-import { ChevronRight, Play } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useLearnerDrills } from "@/hooks/useDrills";
-import { useRouter } from "next/navigation";
 
 function PracticeCard({
   href,
@@ -61,30 +60,26 @@ function PracticeCard({
 }
 
 export default function PracticePage() {
-  const { data: drillsData } = useLearnerDrills();
-
-  const activeDrills = (drillsData ?? []).filter(
-    (a: any) => a.status === "pending" || a.status === "in_progress"
-  );
-  const inProgressDrill = activeDrills.find((a: any) => a.status === "in_progress");
-  const newestDrill = activeDrills[0];
-  const continueDrill = inProgressDrill || newestDrill;
-
   return (
     <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <Header title="Practice" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
-        {/* ── Continue / Start Practice Card ── */}
-        {continueDrill && (
-          <ContinuePracticeCard
-            drill={continueDrill}
-            isResume={!!inProgressDrill}
-          />
-        )}
 
-        {/* ── Pressure Test Card ── */}
+        {/* ── Practice Freely Section ── */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Practice freely</h2>
+
+          <PracticeCard
+            href="/account/practice/ai"
+            iconBg="bg-[#3B883E]"
+            iconSrc="/icons/logo-yellow.svg"
+            title="Eklan Free Talk"
+            subtitle="Speak about anything"
+            meta={["5–10 mins", "No pressure"]}
+          />
+                  {/* ── Pressure Test Card ── */}
         <div className="mb-8">
           <PracticeCard
             href="/account/practice/ai/pressure-test"
@@ -99,18 +94,6 @@ export default function PracticePage() {
           />
         </div>
 
-        {/* ── Practice Freely Section ── */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Practice freely</h2>
-
-          <PracticeCard
-            href="/account/practice/ai"
-            iconBg="bg-[#3B883E]"
-            iconSrc="/icons/logo-yellow.svg"
-            title="Eklan Free Talk"
-            subtitle="Speak about anything"
-            meta={["5–10 mins", "No pressure"]}
-          />
 
           <PracticeCard
             href="/account/practice/pronunciation"
@@ -136,56 +119,6 @@ export default function PracticePage() {
       </div>
 
       <BottomNav />
-    </div>
-  );
-}
-
-/* ─── Continue Practice Card ──────────────────────────────────────────────── */
-
-function ContinuePracticeCard({ drill, isResume }: { drill: any; isResume: boolean }) {
-  const router = useRouter();
-  const drillData = drill.drill;
-  if (!drillData) return null;
-
-  const drillId = drillData._id || drill.drillId;
-  const drillType = drillData.type || "practice";
-
-  const DRILL_TYPE_LABELS: Record<string, string> = {
-    roleplay: "Roleplay",
-    vocabulary: "Vocabulary",
-    grammar: "Grammar",
-    matching: "Matching",
-    definition: "Definition",
-    sentence_writing: "Sentence Building",
-    fill_blank: "Fill-in-the-Blank",
-    summary: "Reading",
-    listening: "Listening",
-    sentence: "Sentence",
-  };
-
-  return (
-    <div className="mb-6">
-      <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-3xl p-5 shadow-lg">
-        <div className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-full px-3 py-1 mb-3">
-          <Play className="w-3 h-3 text-emerald-200 fill-emerald-200" />
-          <span className="text-emerald-200 text-xs font-semibold uppercase tracking-wide">
-            {isResume ? "Continue Practice" : "Start Practice"}
-          </span>
-        </div>
-        <h3 className="text-white text-xl font-bold font-nunito mb-2">{drillData.title}</h3>
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-white/80 text-sm capitalize">
-            {DRILL_TYPE_LABELS[drillType] || drillType}
-          </span>
-          <span className="text-white/80 text-sm">5–10 mins</span>
-        </div>
-        <button
-          onClick={() => router.push(`/account/drills/${drillId}`)}
-          className="w-full bg-yellow-400 hover:bg-yellow-300 text-emerald-900 font-semibold text-base py-3.5 rounded-2xl transition-colors"
-        >
-          {isResume ? "Resume" : "Start"}
-        </button>
-      </div>
     </div>
   );
 }

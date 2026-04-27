@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Flame, Clock, Target, Loader2, Calendar, CheckCircle } from "lucide-react";
+import { Flame, Clock, Target, Loader2, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { useLearnerDrills } from "@/hooks/useDrills";
+import { ContinuePracticeCard } from "@/components/practice/ContinuePracticeCard";
 
 interface DailyFocus {
   _id: string;
@@ -33,6 +35,14 @@ const focusTypeLabels: Record<string, string> = {
 };
 
 export function TodaysFocusCard() {
+  const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
+
+  const activeDrills = (drillsData ?? []).filter(
+    (a: any) => a.status === "pending" || a.status === "in_progress"
+  );
+  const inProgressDrill = activeDrills.find((a: any) => a.status === "in_progress");
+  const continueDrill = inProgressDrill || activeDrills[0];
+
   const [dailyFocus, setDailyFocus] = useState<DailyFocus | null>(null);
   const [personalization, setPersonalization] =
     useState<PersonalizationPayload | null>(null);
@@ -91,19 +101,25 @@ export function TodaysFocusCard() {
   }
 
   if (!dailyFocus) {
-    return (
-      <Card className="bg-gradient-to-br from-gray-600 to-gray-700 text-white mb-6 md:mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="bg-gray-500 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-            <Calendar className="w-3 h-3" /> FOCUS TODAY
-          </span>
-        </div>
-        <h2 className="text-2xl font-bold mb-2">No focus today</h2>
-        <p className="text-gray-200 mb-4">
-          Check back later—your coach hasn&apos;t published today&apos;s practice yet.
-        </p>
-      </Card>
-    );
+    if (drillsLoading) {
+      return (
+        <div
+          className="mb-6 md:mb-8 rounded-3xl bg-gradient-to-br from-emerald-600/35 to-emerald-700/35 animate-pulse min-h-[220px]"
+          aria-hidden
+        />
+      );
+    }
+
+    if (continueDrill) {
+      return (
+        <ContinuePracticeCard
+          drill={continueDrill}
+          isResume={!!inProgressDrill}
+        />
+      );
+    }
+
+    return null;
   }
 
   return (
