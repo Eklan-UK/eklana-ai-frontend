@@ -110,6 +110,13 @@ function deriveStatus(
     return 'completed';
   }
   const now = new Date();
+  if (
+    totalPlanned > 0 &&
+    nonCancelled.length >= totalPlanned &&
+    nonCancelled.every((s) => new Date(s.endUtc).getTime() < now.getTime())
+  ) {
+    return 'completed';
+  }
   if (next) {
     if (next.status === 'in_progress') return 'active';
     if (now >= new Date(next.startUtc) && now <= new Date(next.endUtc)) {
@@ -151,11 +158,13 @@ export function mapSeriesToListItem(
     ? formatNextSessionLabel(new Date(next.startUtc), tz)
     : '—';
 
-  const bucket: ClassBucket = next
-    ? computeBucket(new Date(next.startUtc), tz)
-    : 'upcoming';
-
   const status = deriveStatus(sorted, next, totalSessions);
+  const bucket: ClassBucket =
+    status === 'completed'
+      ? 'completed'
+      : next
+        ? computeBucket(new Date(next.startUtc), tz)
+        : 'upcoming';
 
   return {
     id: series._id.toString(),

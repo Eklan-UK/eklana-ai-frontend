@@ -101,6 +101,13 @@ function validationMessageForGoogleCalendarEventFailure(rawMessage: string): str
       'Tutor Settings and disconnect and reconnect Google Calendar, then try scheduling again.'
     );
   }
+  /** OAuth refresh endpoint — expired refresh token, revoked access, or transient Google outage */
+  if (m.includes('oauth2.googleapis.com/token')) {
+    return (
+      'Google could not refresh the Calendar connection for this tutor. Ask them to open Tutor Settings, ' +
+      'disconnect and reconnect Google Calendar, then try scheduling again.'
+    );
+  }
   return (
     'Could not create a Google Meet link for this class. If this keeps happening, ask ' +
     'the tutor to reconnect Google Calendar in Tutor Settings.'

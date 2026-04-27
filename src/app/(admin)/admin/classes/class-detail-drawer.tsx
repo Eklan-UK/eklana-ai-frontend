@@ -30,8 +30,7 @@ function DrawerStatusPill({ status }: { status: ClassStatus }) {
   }
   if (status === "completed") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-600">
-        <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
         Completed
       </span>
     );
