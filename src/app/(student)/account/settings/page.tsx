@@ -7,7 +7,6 @@ import {
   Target,
   Bell,
   BookOpen,
-  Palette,
   HelpCircle,
   CreditCard,
   Shield,
@@ -31,7 +30,6 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import {
   formatProfileLearningGoalsShort,
 } from "@/lib/learner-learning-goals";
-import { useTheme } from "@/components/providers/ThemeProvider";
 
 // Types
 interface SettingItemProps {
@@ -64,15 +62,7 @@ const SECURITY_SETTINGS: SettingItemProps[] = [
 
 function usePreferenceSettings(): SettingItemProps[] {
   const { data: me, isLoading } = useUserCurrent();
-  const { theme, mounted } = useTheme();
   const profile = me?.profile;
-  const themeValue = mounted
-    ? theme === "system"
-      ? "System"
-      : theme === "dark"
-        ? "Dark"
-        : "Light"
-    : "…";
 
   return useMemo((): SettingItemProps[] => {
     const valueSuffix = isLoading && !me ? "…" : undefined;
@@ -111,12 +101,6 @@ function usePreferenceSettings(): SettingItemProps[] {
         icon: <BookOpen className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Theme",
-        value: themeValue,
-        href: "/account/settings/theme",
-        icon: <Palette className="w-5 h-5 text-text-secondary" />,
-      },
-      {
         label: "Help",
         href: "/account/settings/help",
         icon: <HelpCircle className="w-5 h-5 text-text-secondary" />,
@@ -137,7 +121,7 @@ function usePreferenceSettings(): SettingItemProps[] {
         icon: <FileText className="w-5 h-5 text-text-secondary" />,
       },
     ];
-  }, [isLoading, me, profile, themeValue]);
+  }, [isLoading, me, profile]);
 }
 
 // Components

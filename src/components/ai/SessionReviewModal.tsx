@@ -246,7 +246,7 @@ export function SessionReviewModal({
             {summary.tips.length > 0 && (
               <Card className="!p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Lightbulb className="w-4 h-4 text-amber-700 dark:text-amber-300" />
+                  <Lightbulb className="w-4 h-4 text-amber-700" />
                   <span className="text-sm font-bold font-satoshi text-foreground">Tips</span>
                 </div>
                 <ul className="list-disc list-inside space-y-1 text-sm text-text-secondary">

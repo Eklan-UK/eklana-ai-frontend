@@ -60,7 +60,7 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-red-300 bg-red-100/70 dark:border-red-700 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <div className="rounded-xl border border-red-300 bg-red-100/70 px-4 py-3 text-sm text-red-700">
           {error instanceof Error ? error.message : "Could not load this session."}
         </div>
       ) : null}
@@ -95,7 +95,7 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-2xl border border-blue-300 bg-blue-100/70 dark:border-blue-700 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-300 bg-blue-100/70 px-4 py-3 text-sm text-blue-700">
                   <Info className="h-4 w-4 mr-2" />
                   You can only reschedule to another time slot within the same week.
                 </div>

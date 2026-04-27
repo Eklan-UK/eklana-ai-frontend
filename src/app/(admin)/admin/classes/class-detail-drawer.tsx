@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   X,
   Calendar,
@@ -389,18 +390,35 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
 
           <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
             <div className="flex gap-3">
-              <button
-                type="button"
-                disabled={isCompleted}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-bold transition-colors ${
-                  isCompleted
-                    ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400"
-                    : "border-gray-200 bg-white text-slate-800 hover:bg-gray-50"
-                }`}
-              >
-                <RefreshCw className="h-4 w-4" strokeWidth={2} />
-                Reschedule
-              </button>
+              {isCompleted ? (
+                <button
+                  type="button"
+                  disabled
+                  className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 py-3 text-sm font-bold text-gray-400"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  Reschedule
+                </button>
+              ) : session.nextSessionId ? (
+                <Link
+                  href={`/admin/classes/session/${session.nextSessionId}`}
+                  onClick={onClose}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-bold text-slate-800 transition-colors hover:bg-gray-50"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  Reschedule
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="No schedulable session on file for this class"
+                  className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 py-3 text-sm font-bold text-gray-400"
+                >
+                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
+                  Reschedule
+                </button>
+              )}
               {isCompleted ? (
                 <button
                   type="button"

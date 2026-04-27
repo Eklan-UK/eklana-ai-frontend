@@ -149,6 +149,15 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: '/home', destination: '/account' }];
   },
+  async redirects() {
+    return [
+      {
+        source: '/account/settings/theme',
+        destination: '/account/settings',
+        permanent: false,
+      },
+    ];
+  },
   // swcMinify is enabled by default in Next.js 16, no need to specify
   // Note: next-pwa uses webpack, so we need to use webpack mode
   // Adding empty turbopack config to silence the error since next-pwa requires webpack
