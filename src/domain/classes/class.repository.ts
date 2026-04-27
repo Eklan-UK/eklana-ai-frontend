@@ -22,6 +22,31 @@ import type {
   LearnerPastSessionItemDTO,
 } from './class.api.types';
 import SessionAttendance from '@/models/session-attendance';
+import { getUserDisplayName } from '@/utils/user';
+
+/** Calendar month view + DB; truncate long rosters instead of overflowing. */
+const FALLBACK_CLASS_TITLE_MAX_LEN = 110;
+
+function buildFallbackClassSeriesTitle(
+	learnersOrdered: Array<{
+		email?: string;
+		firstName?: string;
+		lastName?: string;
+		name?: string;
+	}>,
+): string {
+	if (learnersOrdered.length === 0) return 'Class';
+	const names = learnersOrdered.map((u) => getUserDisplayName(u));
+	for (let k = names.length; k >= 1; k--) {
+		const head = names.slice(0, k).join(', ');
+		const rest = names.length - k;
+		const inner = rest > 0 ? `${head} + ${rest} more` : head;
+		const candidate = `Class (${inner})`;
+		if (candidate.length <= FALLBACK_CLASS_TITLE_MAX_LEN) return candidate;
+	}
+	const first = names[0] ?? 'Student';
+	return `Class (${first.slice(0, Math.max(20, FALLBACK_CLASS_TITLE_MAX_LEN - 12))}…)`;
+}
 
 function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
   const m = rawMessage.toLowerCase();
@@ -111,11 +136,23 @@ export class ClassRepository {
       body.recurrence?.totalSessions ??
       1;
 
+    const learnerRows = await User.find({
+      _id: { $in: body.learnerIds.map((id) => new Types.ObjectId(id)) },
+      role: 'user',
+    })
+      .select('email firstName lastName name')
+      .lean();
+
+    const learnerById = new Map(
+      learnerRows.map((u) => [u._id.toString(), u]),
+    );
+    const learnersOrdered = body.learnerIds
+      .map((id) => learnerById.get(id))
+      .filter((u): u is NonNullable<(typeof learnerRows)[number]> => u != null);
+
     const title =
       body.title?.trim() ||
-      (body.learnerIds.length
-        ? `Class (${body.learnerIds.length} learner${body.learnerIds.length > 1 ? 's' : ''})`
-        : 'Class');
+      buildFallbackClassSeriesTitle(learnersOrdered);
 
     const refreshToken = await getGoogleCalendarRefreshTokenForUser(body.tutorId);
     if (!refreshToken) {
@@ -124,25 +161,19 @@ export class ClassRepository {
       );
     }
 
-    const learnerEmails = await User.find({
-      _id: { $in: body.learnerIds.map((id) => new Types.ObjectId(id)) },
-      role: 'user',
-    })
-      .select('email')
-      .lean();
-
     let meetingUrl: string;
     try {
       const createdCalendarEvent = await createGoogleCalendarEventWithMeetLink({
         refreshToken,
         summary: title,
-        description: `Eklana class scheduled by admin.`,
         startIsoUtc: start.toISOString(),
         endIsoUtc: end.toISOString(),
         timezone: body.timezone,
         attendees: [
           tutor.email ?? '',
-          ...learnerEmails.map((u) => (typeof u.email === 'string' ? u.email : '')),
+          ...learnersOrdered.map((u) =>
+            typeof u.email === 'string' ? u.email : '',
+          ),
         ].filter(Boolean),
       });
       meetingUrl = createdCalendarEvent.meetingUrl;

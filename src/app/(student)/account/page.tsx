@@ -6,7 +6,6 @@ import { ChevronRight, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { generateMetadata } from "@/utils/seo";
 import { TodaysFocusCard } from "@/components/daily-focus/TodaysFocusCard";
-import { RecentActivities } from "@/components/activity/RecentActivities";
 import { PushNotificationPrompt } from "@/components/notifications/PushNotificationPrompt";
 import { HomeConfidenceCard } from "@/components/confidence/HomeConfidenceCard";
 import { HomePronunciationCard } from "@/components/pronunciation/HomePronunciationCard";
@@ -89,22 +88,6 @@ export default async function HomePage() {
         <Suspense fallback={<AssignedDrillsSkeleton />}>
           <AssignedDrillsSection />
         </Suspense>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold text-foreground">
-              Recent Activity
-            </h3>
-            <Link
-              href="/activity"
-              className="text-sm text-primary flex items-center gap-1"
-            >
-              See All
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <RecentActivities limit={4} />
-        </div>
       </div>
 
       <BottomNav />

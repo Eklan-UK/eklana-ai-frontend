@@ -5,8 +5,6 @@ import { Header } from "@/components/layout/Header";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useLearnerDrills } from "@/hooks/useDrills";
-
 function PracticeCard({
   href,
   iconBg,
@@ -69,7 +67,7 @@ export default function PracticePage() {
 
         {/* ── Practice Freely Section ── */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Practice freely</h2>
+          <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Choose your mode of practice</h2>
 
           <PracticeCard
             href="/account/practice/ai"
@@ -77,9 +75,11 @@ export default function PracticePage() {
             iconSrc="/icons/logo-yellow.svg"
             title="Eklan Free Talk"
             subtitle="Speak about anything"
-            meta={["5–10 mins", "No pressure"]}
+            meta={[""]}
           />
-                  {/* ── Pressure Test Card ── */}
+        </div>
+
+        {/* ── Pressure Test Card ── */}
         <div className="mb-8">
           <PracticeCard
             href="/account/practice/ai/pressure-test"
@@ -93,117 +93,8 @@ export default function PracticePage() {
             iconImageClassName=""
           />
         </div>
-
-
-          <PracticeCard
-            href="/account/practice/pronunciation"
-            iconBg="bg-[#3B883E]"
-            iconSrc="/icons/headphone.svg"
-            title="Pronunciation"
-            subtitle="Practice sounds and words at your own pace."
-            meta={["3–5 mins"]}
-          />
-
-          <PracticeCard
-            href="/account/practice/listening"
-            iconBg="bg-blue-500"
-            iconSrc="/icons/mic-outline.svg"
-            title="Listening"
-            subtitle="Listen, repeat, and improve natural rhythm."
-            meta={["5–10 mins", "No pressure"]}
-          />
-        </div>
-
-        {/* ── Your Guided Drills Section ── */}
-        <GuidedDrillsSection />
       </div>
-
       <BottomNav />
-    </div>
-  );
-}
-
-/* ─── Guided Drills Section ───────────────────────────────────────────────── */
-
-function GuidedDrillsSection() {
-  const { data: drillsData, isLoading, isError } = useLearnerDrills();
-
-  const assignedDrills = (drillsData ?? []).filter(
-    (a: any) => a.status === "pending" || a.status === "in_progress"
-  );
-
-  return (
-    <div className="pb-4">
-      <h2 className="text-xl font-bold font-nunito text-gray-900 mb-1">Your guided drills</h2>
-      <p className="text-sm font-satoshi text-gray-500 mb-4">
-        Designed for you, based on your goals and coach insights.
-      </p>
-
-      {isLoading ? (
-        <>
-          <div className="bg-gray-100 rounded-2xl p-4 mb-3 h-28 animate-pulse" />
-          <div className="bg-gray-100 rounded-2xl p-4 mb-3 h-28 animate-pulse" />
-        </>
-      ) : isError ? (
-        <div className="bg-red-50 rounded-2xl p-4 mb-3 text-center">
-          <p className="text-red-600 text-sm font-satoshi">Failed to load drills</p>
-        </div>
-      ) : assignedDrills.length === 0 ? (
-        <div className="bg-gray-50 rounded-2xl p-6 flex flex-col items-center">
-          <span className="text-4xl mb-2">📚</span>
-          <p className="text-gray-700 font-bold font-nunito mb-1">No drills assigned yet</p>
-          <p className="text-gray-500 text-sm font-satoshi text-center">
-            Your coach will assign drills based on your goals
-          </p>
-        </div>
-      ) : (
-        assignedDrills.slice(0, 3).map((assignment: any) => {
-          const drill = assignment.drill;
-          const isCompleted = assignment.status === "completed";
-
-          return (
-            <Link
-              key={assignment.assignmentId}
-              href={`/account/drills/${drill?._id || assignment.drillId}`}
-              className="block"
-            >
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-3 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="text-base font-bold font-nunito text-gray-900 mb-0.5">
-                      {drill?.title}
-                    </p>
-                    <p className="text-sm font-satoshi text-gray-500">{drill?.type}</p>
-                    {assignment.assignedBy && (
-                      <p className="text-xs font-satoshi text-gray-400 mt-1">
-                        👤 Assigned by a coach
-                      </p>
-                    )}
-                  </div>
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    {isCompleted ? (
-                      <span className="text-green-500 text-sm">✓</span>
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </div>
-
-                {assignment.status === "in_progress" && (
-                  <span className="inline-block bg-blue-50 text-blue-700 text-xs font-satoshi px-3 py-1 rounded-lg">
-                    In Progress
-                  </span>
-                )}
-                {assignment.status === "completed" && (
-                  <span className="inline-block bg-green-50 text-green-700 text-xs font-satoshi px-3 py-1 rounded-lg">
-                    ✓ Completed
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })
-      )}
     </div>
   );
 }
