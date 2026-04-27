@@ -102,9 +102,11 @@ function SessionCard({ session }: { session: TeachingClass }) {
               : `Join becomes available up to ${TUTOR_JOIN_EARLY_MINUTES} minutes before start`
           }
           onClick={() => {
-            if (!joinUrl || !session.nextSessionId) return;
+            if (!joinUrl) return;
             window.open(joinUrl, "_blank", "noopener,noreferrer");
-            void recordAttendance.mutate({ sessionId: session.nextSessionId });
+            if (session.nextSessionId) {
+              void recordAttendance.mutate({ sessionId: session.nextSessionId });
+            }
           }}
           className={`flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-bold transition-colors ${joinClasses}`}
         >

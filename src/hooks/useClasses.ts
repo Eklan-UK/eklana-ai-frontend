@@ -19,6 +19,7 @@ export function useAdminClasses(filters?: {
       return res.data;
     },
     staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
   });
 }
 
@@ -79,6 +80,7 @@ export function useTutorClasses(filters?: {
       return res.data;
     },
     staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
   });
 }
 

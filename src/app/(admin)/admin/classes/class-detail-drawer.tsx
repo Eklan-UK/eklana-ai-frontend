@@ -246,6 +246,16 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
                   <button
                     type="button"
                     disabled={!canJoinMeet}
+                    title={canJoinMeet ? "Open meeting in a new tab" : undefined}
+                    onClick={() => {
+                      if (!canJoinMeet) return;
+                      const url = detail.meetingUrl?.trim();
+                      if (!url) {
+                        toast.error("No meeting link for this session");
+                        return;
+                      }
+                      window.open(url, "_blank", "noopener,noreferrer");
+                    }}
                     className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold shadow-sm transition-colors ${
                       canJoinMeet
                         ? "bg-[#2d6a32] text-white hover:bg-[#245528]"
