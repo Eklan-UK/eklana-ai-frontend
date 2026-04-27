@@ -18,6 +18,7 @@ import { ClassDetailDrawer } from "./class-detail-drawer";
 import { ScheduleClassModal } from "./schedule-class-modal";
 import { useAdminClasses, useDeleteAdminClass } from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
+import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 
 function formatHeaderDate() {
   return new Date().toLocaleDateString("en-US", {
@@ -110,10 +111,10 @@ export default function AdminClassesPage() {
     [classes],
   );
 
-  const visibleClasses = useMemo(
-    () => classes.filter((c) => c.bucket === tab),
-    [classes, tab],
-  );
+  const visibleClasses = useMemo(() => {
+    const filtered = classes.filter((c) => c.bucket === tab);
+    return sortTeachingClassesByTab(tab, filtered);
+  }, [classes, tab]);
 
   const headerDate = formatHeaderDate();
 
@@ -285,7 +286,8 @@ export default function AdminClassesPage() {
                   (session.completedSessions / session.totalSessions) * 100,
                 )
               : 0;
-          const canJoin = session.status === "active";
+          const joinUrl = session.meetingUrl?.trim();
+          const canJoin = session.status === "active" && Boolean(joinUrl);
 
           return (
             <article
@@ -387,6 +389,17 @@ export default function AdminClassesPage() {
                 <button
                   type="button"
                   disabled={!canJoin}
+                  title={
+                    canJoin
+                      ? "Open meeting in a new tab"
+                      : session.status === "active"
+                        ? "No meeting link for this session yet"
+                        : undefined
+                  }
+                  onClick={() => {
+                    if (!joinUrl) return;
+                    window.open(joinUrl, "_blank", "noopener,noreferrer");
+                  }}
                   className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-colors ${
                     canJoin
                       ? "bg-[#2d6a32] text-white shadow-sm hover:bg-[#245528]"

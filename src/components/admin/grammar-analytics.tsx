@@ -73,8 +73,8 @@ export function GrammarAnalyticsComponent({
     return (
       <div>
         {headerRow}
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
-          <p className="text-sm text-red-800 dark:text-red-200">Failed to load grammar analytics</p>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">Failed to load grammar analytics</p>
         </div>
       </div>
     );
@@ -223,7 +223,7 @@ export function GrammarAnalyticsComponent({
                   <li key={row.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="text-sm text-muted-foreground">{row.patternLabel}</span>
-                      <span className="inline-flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500/15 px-2 text-xs font-bold text-red-600 dark:text-red-400">
+                      <span className="inline-flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500/15 px-2 text-xs font-bold text-red-600">
                         {row.count}
                       </span>
                     </div>

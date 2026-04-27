@@ -56,7 +56,10 @@ export function getNextSessionForList(sessions: IClassSession[]): IClassSession 
     (a, b) => new Date(a.startUtc).getTime() - new Date(b.startUtc).getTime(),
   );
   return (
-    sorted.find((s) => s.status !== 'cancelled' && new Date(s.endUtc) >= new Date()) ??
+    sorted.find(
+      (s) =>
+        s.status !== 'cancelled' && new Date(s.endUtc).getTime() > new Date().getTime(),
+    ) ??
     sorted.filter((s) => s.status !== 'cancelled').slice(-1)[0] ??
     null
   );
@@ -110,16 +113,35 @@ function deriveStatus(
     return 'completed';
   }
   const now = new Date();
+  const t = now.getTime();
   if (
     totalPlanned > 0 &&
     nonCancelled.length >= totalPlanned &&
-    nonCancelled.every((s) => new Date(s.endUtc).getTime() < now.getTime())
+    nonCancelled.every((s) => t >= new Date(s.endUtc).getTime())
   ) {
     return 'completed';
   }
+  /** All persisted session rows are over, even if totalPlanned is greater (e.g. not all sessions materialized in DB). */
+  if (
+    nonCancelled.length > 0 &&
+    nonCancelled.every((s) => t >= new Date(s.endUtc).getTime())
+  ) {
+    return 'completed';
+  }
+  /**
+   * getNextSessionForList only returns a row with end > now, or else the last non-cancelled row.
+   * If that "next" has end <= now (valid end), no session is in the future — series is done.
+   * Fills the gap when every() above is false (e.g. another row has invalid endUtc, so t >= end is false for that row).
+   */
+  if (next) {
+    const nextEndMs = new Date(next.endUtc).getTime();
+    if (!Number.isNaN(nextEndMs) && t >= nextEndMs) {
+      return 'completed';
+    }
+  }
   if (next) {
     if (next.status === 'in_progress') return 'active';
-    if (now >= new Date(next.startUtc) && now <= new Date(next.endUtc)) {
+    if (t >= new Date(next.startUtc).getTime() && t < new Date(next.endUtc).getTime()) {
       return 'active';
     }
   }

@@ -112,8 +112,8 @@ export function MatchingAnalyticsComponent({
     return (
       <div>
         {headerRow}
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
-          <p className="text-sm text-red-800 dark:text-red-200">Failed to load matching analytics</p>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-800">Failed to load matching analytics</p>
         </div>
       </div>
     );
@@ -181,7 +181,7 @@ export function MatchingAnalyticsComponent({
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+              <AlertCircle className="h-5 w-5 shrink-0 text-red-600" aria-hidden />
               <h3 className="text-base font-semibold text-foreground">Common Confusions</h3>
             </div>
             {confusions.length === 0 ? (
@@ -197,7 +197,7 @@ export function MatchingAnalyticsComponent({
                 {confusions.map((row) => (
                   <li
                     key={row.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-red-200/80 bg-red-500/5 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/20"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-red-200/80 bg-red-500/5 px-4 py-3"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">
@@ -207,7 +207,7 @@ export function MatchingAnalyticsComponent({
                         Correct: {row.correctRight}
                       </p>
                     </div>
-                    <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-bold text-white dark:bg-red-500">
+                    <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-red-600 px-2 text-xs font-bold text-white">
                       {row.count}x
                     </span>
                   </li>
@@ -219,7 +219,7 @@ export function MatchingAnalyticsComponent({
 
           <div>
             <div className="mb-4 flex items-center gap-2">
-              <Clock className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+              <Clock className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
               <h3 className="text-base font-semibold text-foreground">Response Speed Analysis</h3>
             </div>
 
@@ -233,7 +233,7 @@ export function MatchingAnalyticsComponent({
             </div>
 
             <div
-              className="mb-6 h-5 w-full overflow-hidden rounded-full border border-black/10 shadow-sm dark:border-white/15"
+              className="mb-6 h-5 w-full overflow-hidden rounded-full border border-black/10 shadow-sm"
               role="img"
               aria-label={
                 totalSpeed > 0
@@ -263,17 +263,17 @@ export function MatchingAnalyticsComponent({
               </p>
             ) : null}
 
-            <div className="rounded-xl border border-amber-200/80 bg-amber-500/10 p-4 dark:border-amber-900/40 dark:bg-amber-950/25">
+            <div className="rounded-xl border border-amber-200/80 bg-amber-500/10 p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                     Slowest Match
                   </p>
                   <p className="mt-1 text-sm font-semibold text-foreground">
                     {slowestMatchLabel ?? "—"}
                   </p>
                 </div>
-                <p className="font-nunito text-2xl font-bold text-amber-600 tabular-nums dark:text-amber-400">
+                <p className="font-nunito text-2xl font-bold text-amber-600 tabular-nums">
                   {slowestMatchSeconds != null ? `${slowestMatchSeconds}s` : "—"}
                 </p>
               </div>

@@ -16,6 +16,7 @@ import {
 import type { ClassStatus, ClassType } from "@/app/(admin)/admin/classes/types";
 import { useTutorClasses } from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
+import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
 
 function formatHeaderDate() {
@@ -90,10 +91,10 @@ export function TutorClassesClient() {
     [classes],
   );
 
-  const visibleClasses = useMemo(
-    () => classes.filter((c) => c.bucket === tab),
-    [classes, tab],
-  );
+  const visibleClasses = useMemo(() => {
+    const filtered = classes.filter((c) => c.bucket === tab);
+    return sortTeachingClassesByTab(tab, filtered);
+  }, [classes, tab]);
 
   const headerDate = formatHeaderDate();
 

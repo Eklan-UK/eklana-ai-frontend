@@ -2,6 +2,7 @@
  * React Query hooks for admin Classes (Phase 1).
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { classesAPI, tutorAPI } from '@/lib/api';
 import { queryKeys } from '@/lib/react-query';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ export function useAdminClasses(filters?: {
       return res.data;
     },
     staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
   });
 }
 
@@ -79,6 +81,7 @@ export function useTutorClasses(filters?: {
       return res.data;
     },
     staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
   });
 }
 
@@ -176,6 +179,33 @@ export function useLearnerRescheduleOptions(
   });
 }
 
+export function useAdminSession(sessionId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.classes.adminSession(sessionId ?? ""),
+    queryFn: async () => {
+      const res = await classesAPI.adminSession(sessionId!);
+      return res.data;
+    },
+    enabled: !!sessionId,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useAdminRescheduleOptions(
+  sessionId: string | null,
+  opts?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: queryKeys.classes.adminRescheduleOptions(sessionId ?? ""),
+    queryFn: async () => {
+      const res = await classesAPI.adminRescheduleOptions(sessionId!);
+      return res.data;
+    },
+    enabled: !!sessionId && opts?.enabled !== false,
+    staleTime: 1000 * 60,
+  });
+}
+
 /** Tutor: weekly availability editor. */
 export function useTutorAvailability() {
   return useQuery({
@@ -261,6 +291,31 @@ export function useLearnerRescheduleSession(sessionId: string) {
         queryKey: queryKeys.classes.learnerRescheduleOptions(sessionId),
       });
       toast.success('Session rescheduled');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Could not reschedule');
+    },
+  });
+}
+
+export function useAdminRescheduleSession(sessionId: string) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: (body: { newStartUtc: string; newEndUtc: string }) =>
+      classesAPI.adminReschedule(sessionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
+      queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
+      queryClient.invalidateQueries({ queryKey: ['learner', 'classes'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.classes.adminSession(sessionId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.classes.adminRescheduleOptions(sessionId),
+      });
+      toast.success('Session rescheduled');
+      router.push('/admin/classes');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Could not reschedule');

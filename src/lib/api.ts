@@ -955,6 +955,53 @@ export const classesAPI = {
     });
   },
 
+  /** Admin: one session (reschedule page). */
+  adminSession: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        session: {
+          id: string;
+          classSeriesId: string;
+          startUtc: string;
+          endUtc: string;
+          status: string;
+        };
+        classTitle: string;
+        tutorName: string;
+      };
+    }>(`/admin/sessions/${sessionId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  adminRescheduleOptions: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        slots: { startUtc: string; endUtc: string }[];
+        weekPolicy?: string;
+      };
+    }>(`/admin/sessions/${sessionId}/reschedule-options`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  adminReschedule: (
+    sessionId: string,
+    body: { newStartUtc: string; newEndUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { updated: boolean };
+    }>(`/admin/sessions/${sessionId}/reschedule`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
   /** Tutor-scoped list; meetingUrl only within join window (Phase 2). */
   tutorList: (params?: {
     bucket?: import('@/domain/classes/class.api.types').ClassBucket;
