@@ -42,7 +42,9 @@ async function getHandler(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const bucketRaw = searchParams.get('bucket');
   const bucket =
-    bucketRaw === 'today' || bucketRaw === 'upcoming'
+    bucketRaw === 'today' ||
+    bucketRaw === 'upcoming' ||
+    bucketRaw === 'completed'
       ? (bucketRaw as ClassBucket)
       : undefined;
   const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10) || 50, 200);

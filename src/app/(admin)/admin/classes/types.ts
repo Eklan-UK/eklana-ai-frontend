@@ -40,7 +40,7 @@ export interface TeachingClass {
   /** ISO UTC for next session start (learner list); used for relative "Starts in …" labels. */
   nextSessionStartUtc?: string;
   status: ClassStatus;
-  bucket: "today" | "upcoming";
+  bucket: "today" | "upcoming" | "completed";
   /** Set when API allows join (e.g. tutor list within join window). */
   meetingUrl?: string;
   drawer?: ClassDrawerDetailPartial;

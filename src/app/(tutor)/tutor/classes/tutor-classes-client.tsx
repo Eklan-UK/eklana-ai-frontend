@@ -37,8 +37,8 @@ function StatusBadge({ status }: { status: ClassStatus }) {
   }
   if (status === "completed") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-600">
-        <Check className="h-3 w-3" strokeWidth={2.5} />
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
+        <Check className="h-3 w-3 text-emerald-700" strokeWidth={2.5} />
         Completed
       </span>
     );
@@ -69,7 +69,7 @@ function ClassTypeBadge({ type }: { type: ClassType }) {
 }
 
 export function TutorClassesClient() {
-  const [tab, setTab] = useState<"today" | "upcoming">("today");
+  const [tab, setTab] = useState<"today" | "upcoming" | "completed">("today");
   const { data, isLoading, error } = useTutorClasses({ limit: 100 });
 
   const classes = useMemo(() => {
@@ -83,6 +83,10 @@ export function TutorClassesClient() {
   );
   const upcomingCount = useMemo(
     () => classes.filter((c) => c.bucket === "upcoming").length,
+    [classes],
+  );
+  const completedCount = useMemo(
+    () => classes.filter((c) => c.bucket === "completed").length,
     [classes],
   );
 
@@ -104,7 +108,7 @@ export function TutorClassesClient() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div
-          className="inline-flex w-full max-w-md items-center rounded-full border border-gray-200 bg-white px-2 py-1.5 sm:w-auto sm:max-w-none"
+          className="inline-flex w-full max-w-2xl items-center rounded-full border border-gray-200 bg-white px-2 py-1.5 sm:w-auto sm:max-w-none"
           role="tablist"
           aria-label="Class schedule filter"
         >
@@ -113,7 +117,7 @@ export function TutorClassesClient() {
             role="tab"
             aria-selected={tab === "today"}
             onClick={() => setTab("today")}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full py-2.5 pl-3 pr-2 text-sm transition-colors ${
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 px-2 text-sm transition-colors sm:gap-2 sm:pl-3 sm:pr-2 ${
               tab === "today"
                 ? "text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
@@ -143,7 +147,7 @@ export function TutorClassesClient() {
             role="tab"
             aria-selected={tab === "upcoming"}
             onClick={() => setTab("upcoming")}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full py-2.5 pl-2 pr-3 text-sm transition-colors ${
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 px-2 text-sm transition-colors sm:gap-2 sm:pl-2 sm:pr-2 ${
               tab === "upcoming"
                 ? "text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
@@ -166,6 +170,36 @@ export function TutorClassesClient() {
             </span>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold tabular-nums text-gray-900">
               {upcomingCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "completed"}
+            onClick={() => setTab("completed")}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 px-2 text-sm transition-colors sm:gap-2 sm:pr-3 ${
+              tab === "completed"
+                ? "text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Check
+              className={`h-4 w-4 shrink-0 ${
+                tab === "completed" ? "text-gray-900" : "text-gray-400"
+              }`}
+              strokeWidth={2.5}
+            />
+            <span
+              className={
+                tab === "completed"
+                  ? "font-bold text-gray-900"
+                  : "font-medium text-gray-500"
+              }
+            >
+              Completed
+            </span>
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold tabular-nums text-gray-900">
+              {completedCount}
             </span>
           </button>
         </div>
