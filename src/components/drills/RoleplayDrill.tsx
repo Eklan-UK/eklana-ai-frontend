@@ -18,7 +18,6 @@ import {
   ChevronRight,
   AlertCircle,
   PartyPopper,
-  RefreshCw,
   ArrowLeftRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -533,9 +532,50 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     setPronunciationScore(null);
   };
 
-  const handleTryAgain = () => {
+  /** Clears scoring UI and unlocks mic so the student can redo the line (before or after passing). */
+  const handleRetrySpeaking = () => {
     setPronunciationScore(null);
+    setTurnProgress((prev) => ({
+      ...prev,
+      [currentTurnKey]: {
+        passed: false,
+        score: null,
+        attempts: prev[currentTurnKey]?.attempts ?? 0,
+      },
+    }));
+    setSessionAnalytics((prev) =>
+      prev.filter(
+        (a) =>
+          !(a.sceneIndex === currentSceneIndex && a.turnIndex === currentTurnIndex),
+      ),
+    );
   };
+
+  /** Same role: restart entire roleplay from scene 1 / first line (after completion screen). */
+  const handleRestartDrill = () => {
+    setCurrentSceneIndex(0);
+    setCurrentTurnIndex(0);
+    setCompletedMessages([]);
+    playedAITurnsRef.current = new Set();
+    setTurnProgress({});
+    setOriginalRoleProgress({});
+    setSwappedRoleProgress({});
+    setPronunciationScore(null);
+    setSessionAnalytics([]);
+    setShowRoleSwitchOption(false);
+    setHasCompletedRound(false);
+    setShowReview(false);
+    setIsPlayingAI(false);
+    stopTTSAudio();
+    if (preGenAudioRef.current) {
+      preGenAudioRef.current.pause();
+      preGenAudioRef.current = null;
+    }
+    toast.success(`Starting over from the beginning as ${currentStudentRole}.`);
+  };
+
+  const retrySpeakingButtonClass =
+    "w-full bg-white border-2 border-[#3B883E] text-[#3B883E] hover:bg-emerald-50/80 font-semibold text-base py-3.5 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2";
 
   // Switch roles - student becomes AI character and vice versa
   const handleSwitchRoles = () => {
@@ -1065,26 +1105,39 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         {isStudentTurn && !isEntireDrillComplete && (
           <>
             {currentProgress.passed ? (
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onClick={handleContinue}
-              >
-                <ChevronRight className="w-5 h-5 mr-2" />
-                Continue
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleContinue}
+                >
+                  <ChevronRight className="w-5 h-5 mr-2" />
+                  Continue
+                </Button>
+                <button
+                  type="button"
+                  className={retrySpeakingButtonClass}
+                  onClick={handleRetrySpeaking}
+                  disabled={isRecording || isAnalyzing}
+                >
+                  <RotateCcw className="w-5 h-5 shrink-0" />
+                  Retry speaking
+                </button>
+                <p className="text-xs text-center text-gray-500 px-2">
+                  Redo this line if you want a higher score before moving on.
+                </p>
+              </div>
             ) : pronunciationScore ? (
-              <Button
-                variant="outline"
-                size="lg"
-                fullWidth
-                onClick={handleTryAgain}
+              <button
+                type="button"
+                className={retrySpeakingButtonClass}
+                onClick={handleRetrySpeaking}
                 disabled={isRecording || isAnalyzing}
               >
-                <RotateCcw className="w-5 h-5 mr-2" />
-                Try Again
-              </Button>
+                <RotateCcw className="w-5 h-5 shrink-0" />
+                Retry speaking
+              </button>
             ) : null}
           </>
         )}
@@ -1130,9 +1183,16 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <ArrowLeftRight className="w-5 h-5 mr-2" />
                   Switch Roles & Practice as {roleMode === "original" ? aiCharacters[0] || "AI" : studentCharacter}
                 </Button>
-
-                <p className="text-xs text-gray-500 mt-2">
-                  Practice the conversation again from the other character's perspective
+                <button
+                  type="button"
+                  className={`${retrySpeakingButtonClass} mt-4`}
+                  onClick={handleRestartDrill}
+                >
+                  <RotateCcw className="w-5 h-5 shrink-0" />
+                  Restart drill
+                </button>
+                <p className="text-xs text-gray-500 mt-2 text-center px-2">
+                  Start from the first line again as {currentStudentRole} — same role, scores reset for this run.
                 </p>
               </div>
             </div>
