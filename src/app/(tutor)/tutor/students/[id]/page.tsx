@@ -71,6 +71,8 @@ interface PTOverview {
   student: { id: string; name: string; email: string };
   currentLevel: number;
   totalSessions: number;
+  /** Fast vs slow (2s rule) from stored session turns; null if no per-turn data yet. */
+  pressure2s: { fast: number; slow: number; total: number } | null;
   averages: PTScores | null;
   trends: Record<string, string> | null;
   sessions: PTSession[];
@@ -362,6 +364,24 @@ function PressureTestPanel({ studentId }: { studentId: string }) {
 
         {a && (
           <>
+            {data.pressure2s && data.pressure2s.total > 0 && (
+              <Card className="p-3 col-span-2 bg-amber-50/80 border-amber-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs text-slate-600 font-medium">
+                    2s response rule (first speech or record after AI)
+                  </span>
+                </div>
+                <p className="text-sm text-slate-800">
+                  <span className="font-bold text-emerald-700 tabular-nums">{data.pressure2s.fast}</span>
+                  <span className="text-slate-500"> fast</span>
+                  <span className="mx-2 text-slate-300">|</span>
+                  <span className="font-bold text-amber-800 tabular-nums">{data.pressure2s.slow}</span>
+                  <span className="text-slate-500"> not fast</span>
+                  <span className="ml-1 text-xs text-slate-500 tabular-nums">({data.pressure2s.total} turns with data)</span>
+                </p>
+              </Card>
+            )}
             {[
               { icon: <Zap className="w-4 h-4 text-blue-500" />, label: "Avg Speed", value: `${a.responseSpeed.toFixed(1)}s`, trend: t?.responseSpeed, bar: Math.min(100, (2 / Math.max(a.responseSpeed, 0.1)) * 100), color: "bg-blue-500" },
               { icon: <Target className="w-4 h-4 text-emerald-500" />, label: "Avg Accuracy", value: `${a.accuracy}%`, trend: t?.accuracy, bar: a.accuracy, color: "bg-emerald-500" },

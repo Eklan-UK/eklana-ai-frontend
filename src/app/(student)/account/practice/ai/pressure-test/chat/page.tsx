@@ -1,12 +1,25 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PressureTestDrill } from "@/components/ai/PressureTestDrill";
 
 function PressureTestChatPageInner() {
   const searchParams = useSearchParams();
   const drillId = searchParams.get("drillId");
+  /** New id on each navigation from the list (`run`); fallback for bookmarks or links without it. */
+  const run = searchParams.get("run");
+  const [sessionFallback] = useState(() => crypto.randomUUID());
+  /** When the page is restored from the browser back-forward cache, remount the drill with a fresh run. */
+  const [bfcacheBust, setBfcacheBust] = useState(0);
+
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setBfcacheBust((n) => n + 1);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   if (!drillId) {
     return (
@@ -16,7 +29,17 @@ function PressureTestChatPageInner() {
     );
   }
 
-  return <PressureTestDrill drillId={drillId} />;
+  const sessionKey = run ?? sessionFallback;
+
+  const mountKey = `${sessionKey}-${bfcacheBust}`;
+
+  return (
+    <PressureTestDrill
+      key={`${drillId}-${mountKey}`}
+      drillId={drillId}
+      sessionRunId={mountKey}
+    />
+  );
 }
 
 export default function PressureTestChatPage() {

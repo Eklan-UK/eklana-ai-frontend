@@ -66,7 +66,7 @@ async function handler(
     );
     const offset = Math.max(0, parseInt(searchParams.get("offset") ?? "0", 10) || 0);
 
-    const [sessions, total] = await Promise.all([
+    const [sessions, total, sessionsFor2s] = await Promise.all([
       PressureTestSession.find({ userId: studentObjectId })
         .sort({ createdAt: -1 })
         .skip(offset)
@@ -78,7 +78,27 @@ async function handler(
         )
         .lean(),
       PressureTestSession.countDocuments({ userId: studentObjectId }),
+      // Option A: fast/slow rollups from PressureTestSession turns only (not Matching/Sentence DrillAttempt).
+      PressureTestSession.find({ userId: studentObjectId })
+        .select("turns.speedSuccess")
+        .lean(),
     ]);
+
+    let pressure2s: { fast: number; slow: number; total: number } | null = null;
+    {
+      let fast = 0;
+      let slow = 0;
+      for (const doc of sessionsFor2s as Array<{ turns?: Array<{ speedSuccess?: boolean }> }>) {
+        for (const t of doc.turns || []) {
+          if (t.speedSuccess === true) fast++;
+          else if (t.speedSuccess === false) slow++;
+        }
+      }
+      const t = fast + slow;
+      if (t > 0) {
+        pressure2s = { fast, slow, total: t };
+      }
+    }
 
     // Fetch student name for context
     const studentUser = await User.findById(studentObjectId)
@@ -134,6 +154,8 @@ async function handler(
         },
         currentLevel,
         totalSessions: total,
+        /** Option A: 2s mental-gap rollups (PressureTestSession only; not Matching/Sentence Drills). */
+        pressure2s,
         averages,
         trends,
         sessions: sessions.map((s: any) => ({

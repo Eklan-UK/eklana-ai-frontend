@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Header } from "@/components/layout/Header";
 import { useLearnerDrills } from "@/hooks/useDrills";
@@ -200,7 +199,6 @@ function SessionHistoryRow({ session }: { session: PTSession }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function PressureTestSelectionPage() {
-  const router = useRouter();
   const { data: drillsData, isLoading } = useLearnerDrills();
   const [history, setHistory] = useState<PTHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -324,9 +322,15 @@ export default function PressureTestSelectionPage() {
                       title={item.title}
                       isUnlocked={item.status === "completed"}
                       onClick={() => {
-                        router.push(
-                          `/account/practice/ai/pressure-test/chat?drillId=${encodeURIComponent(item.drillId)}`,
-                        );
+                        const run =
+                          typeof crypto !== "undefined" && "randomUUID" in crypto
+                            ? crypto.randomUUID()
+                            : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                        // Full navigation so the chat route always cold-loads (no stale client state / bfcache from SPA).
+                        if (typeof window !== "undefined") {
+                          const url = `/account/practice/ai/pressure-test/chat?drillId=${encodeURIComponent(item.drillId)}&run=${encodeURIComponent(run)}`;
+                          window.location.assign(url);
+                        }
                       }}
                     />
                   ))}

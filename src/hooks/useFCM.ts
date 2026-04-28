@@ -132,9 +132,16 @@ export const useFCM = () => {
               new CustomEvent("fcm-message", { detail: notification }),
             );
           });
-        } else if (result.error === "Notification permission not granted") {
-          // Permission denial is an expected user choice, not a runtime failure.
-          console.info("FCM skipped: notification permission not granted");
+        } else if (
+          result.error === "Notification permission not granted" ||
+          result.error === "PUSH_SERVICE_UNAVAILABLE"
+        ) {
+          // Permission denial, or no browser push service (dev, strict privacy, region, etc.).
+          console.info(
+            result.error === "PUSH_SERVICE_UNAVAILABLE"
+              ? "FCM skipped: push service not available in this environment"
+              : "FCM skipped: notification permission not granted",
+          );
           setState({
             isInitialized: false,
             isLoading: false,

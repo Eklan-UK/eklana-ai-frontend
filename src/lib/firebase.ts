@@ -25,6 +25,20 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let messaging: Messaging | null = null;
 
+/** True when FCM cannot register (dev, incognito, Brave shields, no push in region, etc.) — not an app bug. */
+export function isBenignFCMPushError(error: unknown): boolean {
+  if (error == null) return false;
+  const name = error instanceof Error ? error.name : String((error as { name?: string }).name ?? "");
+  const message =
+    error instanceof Error ? error.message : String((error as { message?: string }).message ?? error);
+  if (name === "AbortError" || name === "NotSupportedError") return true;
+  const m = message.toLowerCase();
+  if (m.includes("push service not available")) return true;
+  if (m.includes("registration failed") && m.includes("push")) return true;
+  if (m.includes("browsing context is inactive")) return true;
+  return false;
+}
+
 /**
  * Initialize Firebase app (singleton pattern)
  */
@@ -120,7 +134,15 @@ export const getFCMToken = async (): Promise<string | null> => {
 
     return token || null;
   } catch (error) {
-    console.error("Error getting FCM token:", error);
+    if (isBenignFCMPushError(error)) {
+      if (process.env.NODE_ENV === "development") {
+        console.info(
+          "FCM: push registration skipped (browser or environment does not provide a push service).",
+        );
+      }
+    } else {
+      console.error("Error getting FCM token:", error);
+    }
     return null;
   }
 };

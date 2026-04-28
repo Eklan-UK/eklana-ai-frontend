@@ -165,8 +165,10 @@ export const initializeFCM = async (
     const token = await getFCMToken();
 
     if (!token) {
-      console.error("Failed to get FCM token");
-      return { success: false, error: "Failed to get FCM token" };
+      return {
+        success: false,
+        error: "PUSH_SERVICE_UNAVAILABLE",
+      };
     }
 
     // Step 3: Register token with backend

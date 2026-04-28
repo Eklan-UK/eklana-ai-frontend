@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRegisterPushToken, useUnregisterPushToken } from './useNotifications';
+import { isBenignFCMPushError } from '@/lib/firebase';
 
 interface WebPushState {
   isSupported: boolean;
@@ -151,10 +152,18 @@ export function useWebPush() {
         });
         console.log('[WebPush] Push subscription created');
       } catch (pushError: any) {
-        console.error('[WebPush] Push subscription failed:', pushError);
-        // Brave specific: check if shields are blocking
+        if (isBenignFCMPushError(pushError)) {
+          if (process.env.NODE_ENV === "development") {
+            console.info("[WebPush] Push subscription not available in this environment.");
+          }
+        } else {
+          console.error("[WebPush] Push subscription failed:", pushError);
+        }
         if (pushError.message?.includes('denied') || pushError.name === 'NotAllowedError') {
           throw new Error('Push blocked by browser privacy settings. Check Brave Shields.');
+        }
+        if (isBenignFCMPushError(pushError)) {
+          throw new Error('Push is not available in this browser or environment (e.g. private mode or blocked push service).');
         }
         throw new Error(`Push subscription failed: ${pushError.message}`);
       }
@@ -180,11 +189,21 @@ export function useWebPush() {
 
       return { success: true };
     } catch (error: any) {
-      console.error('[WebPush] Subscribe failed:', error);
-      setState(prev => ({ 
-        ...prev, 
+      const benign =
+        isBenignFCMPushError(error) ||
+        (typeof error?.message === "string" &&
+          error.message.includes("not available in this browser or environment"));
+      if (benign) {
+        if (process.env.NODE_ENV === "development") {
+          console.info("[WebPush] Subscribe skipped:", error?.message);
+        }
+      } else {
+        console.error("[WebPush] Subscribe failed:", error);
+      }
+      setState(prev => ({
+        ...prev,
         isLoading: false,
-        error: error.message || 'Failed to subscribe'
+        error: error.message || "Failed to subscribe",
       }));
       return { success: false, error: error.message };
     }
