@@ -24,11 +24,12 @@ import {
   UserPlus,
   Video,
 } from "lucide-react";
-import { authClient } from "@/lib/auth-client";
+import { useAuthStore } from "@/store/auth-store";
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
+  const logout = useAuthStore((s) => s.logout);
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -48,17 +49,18 @@ const Sidebar: React.FC = () => {
   ];
 
   const handleLogout = async () => {
+    const loginPath = "/auth/admin/login";
     try {
-      await authClient.signOut();
-      router.push("/admin/auth/login");
+      await logout();
+      router.push(loginPath);
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      <div className="p-6 flex items-center gap-2">
+    <aside className="flex h-full min-h-0 w-64 min-w-64 flex-col border-r border-gray-200 bg-white">
+      <div className="shrink-0 p-6 flex items-center gap-2">
         <Image
           src="/logo2.png"
           alt="eklan Logo"
@@ -70,7 +72,10 @@ const Sidebar: React.FC = () => {
         <Layout className="ml-auto w-4 h-4 text-gray-400" />
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain px-4"
+        aria-label="Admin"
+      >
         {navItems.map((item) => {
           const isActive =
             pathname === item.path || pathname?.startsWith(item.path + "/");
@@ -108,7 +113,7 @@ const Sidebar: React.FC = () => {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-100">
+      <div className="shrink-0 border-t border-gray-100 p-4">
         <div className="bg-gray-50 p-1 rounded-xl flex items-center justify-around mb-4">
           <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white shadow-sm rounded-lg text-gray-700">
             <Sun className="w-4 h-4" />

@@ -2150,10 +2150,80 @@ export async function generateTopicPracticeResponseStream(
 }
 
 // ─── Gemini TTS (text-to-speech via generateContent) ─────────────────────────
-// Uses gemini-2.5-flash-preview-tts which returns PCM audio inline.
-// Much cheaper than ElevenLabs for the pressure test AI voice.
+// Native TTS returns PCM in inlineData (see https://ai.google.dev/gemini-api/docs/speech-generation).
+// Model id must match a current TTS-capable preview (was gemini-2.5-flash-preview-tts).
 
-const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+const GEMINI_TTS_MODEL_PRIMARY = 'gemini-3.1-flash-tts-preview';
+const GEMINI_TTS_MODEL_FALLBACK = 'gemini-2.5-flash-preview-tts';
+
+/**
+ * Per Gemini TTS docs, vague inputs can be rejected; 3.1 also occasionally returns
+ * text tokens instead of audio. A short preamble reduces classifier / empty-part failures.
+ */
+function buildTtsPrompt(plain: string): string {
+	const t = plain.trim();
+	if (!t) return t;
+	// Preamble: instruct synthesis; body is the line to read (not stage directions).
+	return `Read the following line aloud in a clear, natural speaking voice. Read only the words in the quote, do not read these instructions.\n\n"""${t}"""`;
+}
+
+function extractPcmBase64FromTtsResponse(response: {
+	candidates?: Array<{
+		content?: { parts?: Array<{ inlineData?: { data?: string }; text?: string }> };
+		finishReason?: string;
+	}>;
+}): { pcmBase64: string | null; finishReason?: string; partsLen: number } {
+	const c0 = response.candidates?.[0];
+	const parts = c0?.content?.parts;
+	const n = parts?.length ?? 0;
+	if (!parts?.length) {
+		return { pcmBase64: null, finishReason: c0?.finishReason, partsLen: n };
+	}
+	for (const p of parts) {
+		const d = p?.inlineData?.data;
+		if (d) return { pcmBase64: d, finishReason: c0?.finishReason, partsLen: n };
+	}
+	return { pcmBase64: null, finishReason: c0?.finishReason, partsLen: n };
+}
+
+async function generateTtsWithModel(
+	model: string,
+	text: string,
+	voiceName: string,
+): Promise<Buffer> {
+	const response = await genAINew!.models.generateContent({
+		model,
+		contents: [{ parts: [{ text: buildTtsPrompt(text) }] }],
+		config: {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: {
+				voiceConfig: {
+					prebuiltVoiceConfig: { voiceName },
+				},
+			},
+		},
+	});
+	const { pcmBase64, finishReason, partsLen } = extractPcmBase64FromTtsResponse(
+		response as {
+			candidates?: Array<{
+				content?: { parts?: Array<{ inlineData?: { data?: string }; text?: string }> };
+				finishReason?: string;
+			}>;
+		},
+	);
+	if (pcmBase64) {
+		const wavBase64 = pcmToWavBase64(pcmBase64, 24000);
+		return Buffer.from(wavBase64, 'base64');
+	}
+	const block = response.candidates?.[0] as { finishReason?: string; content?: unknown } | undefined;
+	logger.error('Gemini TTS: no inline audio in response', {
+		model,
+		finishReason: block?.finishReason ?? finishReason,
+		partsCount: partsLen,
+		attempt: model,
+	});
+	throw new Error('Gemini TTS returned no audio data');
+}
 
 /**
  * Generate TTS audio using Gemini's native TTS model.
@@ -2166,27 +2236,14 @@ export async function generateGeminiTTSAudio(
 	if (!genAINew) {
 		throw new Error('Gemini API is not configured');
 	}
-
-	const response = await genAINew.models.generateContent({
-		model: GEMINI_TTS_MODEL,
-		contents: [{ role: 'user', parts: [{ text }] }],
-		config: {
-			responseModalities: [Modality.AUDIO],
-			speechConfig: {
-				voiceConfig: {
-					prebuiltVoiceConfig: { voiceName },
-				},
-			},
-		},
-	});
-
-	const pcmBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-
-	if (!pcmBase64) {
-		throw new Error('Gemini TTS returned no audio data');
+	try {
+		return await generateTtsWithModel(GEMINI_TTS_MODEL_PRIMARY, text, voiceName);
+	} catch (e) {
+		logger.warn('Gemini TTS primary model failed, trying fallback', {
+			primary: GEMINI_TTS_MODEL_PRIMARY,
+			fallback: GEMINI_TTS_MODEL_FALLBACK,
+			message: (e as Error)?.message,
+		});
+		return await generateTtsWithModel(GEMINI_TTS_MODEL_FALLBACK, text, voiceName);
 	}
-
-	// Gemini TTS outputs PCM at 24 kHz — wrap in WAV header so browsers can play it.
-	const wavBase64 = pcmToWavBase64(pcmBase64, 24000);
-	return Buffer.from(wavBase64, 'base64');
 }
