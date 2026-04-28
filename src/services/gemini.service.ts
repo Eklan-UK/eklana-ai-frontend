@@ -2151,10 +2151,7 @@ export async function generateTopicPracticeResponseStream(
 
 // ─── Gemini TTS (text-to-speech via generateContent) ─────────────────────────
 // Native TTS returns PCM in inlineData (see https://ai.google.dev/gemini-api/docs/speech-generation).
-// Model id must match a current TTS-capable preview (was gemini-2.5-flash-preview-tts).
-
-const GEMINI_TTS_MODEL_PRIMARY = 'gemini-3.1-flash-tts-preview';
-const GEMINI_TTS_MODEL_FALLBACK = 'gemini-2.5-flash-preview-tts';
+// TTS model ids: see `config.GEMINI_TTS_MODEL_*` (default: try lighter 2.5 first, 3.1 as fallback).
 
 /**
  * Per Gemini TTS docs, vague inputs can be rejected; 3.1 also occasionally returns
@@ -2237,13 +2234,13 @@ export async function generateGeminiTTSAudio(
 		throw new Error('Gemini API is not configured');
 	}
 	try {
-		return await generateTtsWithModel(GEMINI_TTS_MODEL_PRIMARY, text, voiceName);
+		return await generateTtsWithModel(config.GEMINI_TTS_MODEL_PRIMARY, text, voiceName);
 	} catch (e) {
 		logger.warn('Gemini TTS primary model failed, trying fallback', {
-			primary: GEMINI_TTS_MODEL_PRIMARY,
-			fallback: GEMINI_TTS_MODEL_FALLBACK,
+			primary: config.GEMINI_TTS_MODEL_PRIMARY,
+			fallback: config.GEMINI_TTS_MODEL_FALLBACK,
 			message: (e as Error)?.message,
 		});
-		return await generateTtsWithModel(GEMINI_TTS_MODEL_FALLBACK, text, voiceName);
+		return await generateTtsWithModel(config.GEMINI_TTS_MODEL_FALLBACK, text, voiceName);
 	}
 }
