@@ -18,6 +18,7 @@ import { useTutorClasses } from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 function formatHeaderDate() {
   return new Date().toLocaleDateString("en-US", {
@@ -247,6 +248,11 @@ export function TutorClassesClient() {
                 key={session.id}
                 className="flex flex-col rounded-[18px] border border-gray-200/80 bg-white p-6 shadow-sm"
               >
+                {session.nextSessionIsReschedule ? (
+                  <div className="mb-2">
+                    <RescheduleTag />
+                  </div>
+                ) : null}
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <h2 className="text-base font-bold leading-tight text-slate-900">
                     {session.studentLabel}

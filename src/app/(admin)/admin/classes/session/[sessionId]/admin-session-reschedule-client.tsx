@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ArrowLeft, CalendarDays, Clock3, Info } from "lucide-react";
 import {
   useAdminRescheduleOptions,
   useAdminRescheduleSession,
   useAdminSession,
+  useAdminReserveRescheduleSlot,
 } from "@/hooks/useClasses";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 function formatTimeOnly(date: Date) {
   return date.toLocaleTimeString(undefined, {
@@ -33,11 +36,18 @@ export function AdminSessionRescheduleClient({
   const canReschedule =
     !!data &&
     (data.session.status === "scheduled" ||
-      data.session.status === "in_progress");
+      data.session.status === "in_progress" ||
+      data.session.status === "completed");
   const { data: optionsData, isLoading: optionsLoading } =
     useAdminRescheduleOptions(sessionId, { enabled: canReschedule });
   const reschedule = useAdminRescheduleSession(sessionId);
+  const reserve = useAdminReserveRescheduleSlot(sessionId);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [hold, setHold] = useState<{
+    reservationId: string;
+    token: string;
+  } | null>(null);
+  const lastReserveKey = useRef<string | null>(null);
 
   const slotChoices = useMemo(
     () =>
@@ -72,7 +82,10 @@ export function AdminSessionRescheduleClient({
           {canReschedule ? (
             <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-100 px-4 py-4">
-                <h1 className="text-xl font-bold text-slate-900">Reschedule session</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-bold text-slate-900">Reschedule session</h1>
+                  {data.session.isReschedule ? <RescheduleTag /> : null}
+                </div>
                 <p className="mt-1 text-sm text-gray-500">{data.classTitle}</p>
               </div>
 
@@ -131,7 +144,34 @@ export function AdminSessionRescheduleClient({
                           <button
                             key={slotKey}
                             type="button"
-                            onClick={() => setSelectedSlot(slotKey)}
+                            onClick={() => {
+                              setSelectedSlot(slotKey);
+                              setHold(null);
+                              lastReserveKey.current = slotKey;
+                              reserve.mutate(
+                                { startUtc: slot.startUtc, endUtc: slot.endUtc },
+                                {
+                                  onSuccess: (data) => {
+                                    if (lastReserveKey.current === slotKey) {
+                                      setHold({
+                                        reservationId: data.reservationId,
+                                        token: data.token,
+                                      });
+                                    }
+                                  },
+                                  onError: (err) => {
+                                    if (lastReserveKey.current === slotKey) {
+                                      setHold(null);
+                                    }
+                                    toast.error(
+                                      err instanceof Error
+                                        ? err.message
+                                        : "Could not hold this time. Try another slot.",
+                                    );
+                                  },
+                                },
+                              );
+                            }}
                             className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                               isSelected
                                 ? "border-[#2d6a32] bg-emerald-50/80"
@@ -153,15 +193,29 @@ export function AdminSessionRescheduleClient({
 
                 <button
                   type="button"
-                  disabled={!selectedSlot || reschedule.isPending}
+                  disabled={
+                    !selectedSlot ||
+                    !hold ||
+                    reserve.isPending ||
+                    reschedule.isPending
+                  }
                   onClick={() => {
                     const [newStartUtc, newEndUtc] = selectedSlot.split("|");
-                    if (!newStartUtc || !newEndUtc) return;
-                    reschedule.mutate({ newStartUtc, newEndUtc });
+                    if (!newStartUtc || !newEndUtc || !hold) return;
+                    reschedule.mutate({
+                      newStartUtc,
+                      newEndUtc,
+                      reservationId: hold.reservationId,
+                      reservationToken: hold.token,
+                    });
                   }}
                   className="w-full rounded-2xl bg-[#2d6a32] py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#245528] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {reschedule.isPending ? "Saving…" : "Apply new time"}
+                  {reserve.isPending
+                    ? "Holding time…"
+                    : reschedule.isPending
+                      ? "Saving…"
+                      : "Apply new time"}
                 </button>
               </div>
             </section>

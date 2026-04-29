@@ -93,6 +93,42 @@ const TargetSentenceSchema = new Schema(
   { _id: false }
 );
 
+const PronunciationItemSchema = new Schema(
+  {
+    sound: {
+      type: String,
+      default: "",
+      description: "Target sound / phonetic sample for pronunciation practice",
+    },
+    word: {
+      type: String,
+      default: "",
+      description: "Word to practice",
+    },
+    sentence: {
+      type: String,
+      default: "",
+      description: "Sentence containing the target sound/word",
+    },
+    soundAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sound",
+    },
+    wordAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the word",
+    },
+    sentenceAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sentence",
+    },
+  },
+  { _id: false }
+);
+
 const MatchingPairSchema = new Schema(
   {
     left: {
@@ -291,6 +327,14 @@ export interface IDrill extends Document {
     wordAudioUrl?: string;
     sentenceAudioUrl?: string;
   }>;
+  pronunciation_items?: Array<{
+    sound: string;
+    word: string;
+    sentence: string;
+    soundAudioUrl?: string;
+    wordAudioUrl?: string;
+    sentenceAudioUrl?: string;
+  }>;
 
   // Roleplay Drill Fields
   roleplay_dialogue: Array<{
@@ -478,6 +522,12 @@ const drillSchema = new Schema<IDrill>(
       type: [TargetSentenceSchema],
       default: [],
       description: "Array of sentences/words for vocabulary drills",
+    },
+
+    pronunciation_items: {
+      type: [PronunciationItemSchema],
+      default: [],
+      description: "Pronunciation problems (sound, word, sentence) for vocabulary drills",
     },
 
     // Roleplay Drill Fields

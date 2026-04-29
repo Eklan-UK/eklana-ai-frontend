@@ -204,6 +204,7 @@ export function mapSeriesToListItem(
     nextSessionLabel,
     nextSessionId: next?._id.toString(),
     nextSessionStartUtc: next ? new Date(next.startUtc).toISOString() : undefined,
+    nextSessionIsReschedule: Boolean(next?.isReschedule),
     status,
     bucket,
     meetingUrl: next?.meetingUrl,

@@ -80,3 +80,34 @@ export async function createGoogleCalendarEventWithMeetLink(
     eventId: event.id,
   };
 }
+
+/**
+ * Remove a primary-calendar event (e.g. before replacing on reschedule). Non-fatal if already removed.
+ */
+export async function deleteGoogleCalendarEvent(
+  refreshToken: string,
+  eventId: string,
+): Promise<void> {
+  const clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
+  const clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      'Google Calendar OAuth client is not configured (GOOGLE_CALENDAR_CLIENT_ID/SECRET)',
+    );
+  }
+  const token = refreshToken.trim();
+  if (!token) {
+    throw new Error('Google Calendar refresh token is missing for this tutor');
+  }
+  const id = eventId?.trim();
+  if (!id) {
+    return;
+  }
+  const oauth2Client = new googleApis.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: token });
+  const calendar = googleApis.calendar({ version: 'v3', auth: oauth2Client });
+  await calendar.events.delete({
+    calendarId: 'primary',
+    eventId: id,
+  });
+}

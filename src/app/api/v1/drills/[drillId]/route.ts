@@ -46,6 +46,14 @@ const updateDrillSchema = z.object({
 		wordAudioUrl: z.string().optional(),
 		sentenceAudioUrl: z.string().optional(),
 	})).optional(),
+	pronunciation_items: z.array(z.object({
+		sound: z.string(),
+		word: z.string(),
+		sentence: z.string(),
+		soundAudioUrl: z.string().optional(),
+		wordAudioUrl: z.string().optional(),
+		sentenceAudioUrl: z.string().optional(),
+	})).optional(),
 	student_character_name: z.string().optional(),
 	ai_character_names: z.array(z.string()).optional(),
 	roleplay_scenes: z.array(z.object({
@@ -168,6 +176,7 @@ async function putHandler(
 	if (validated.context !== undefined) updateData.context = validated.context;
 	if (validated.audio_example_url !== undefined) updateData.audio_example_url = validated.audio_example_url;
 	if (validated.target_sentences !== undefined) updateData.target_sentences = validated.target_sentences;
+	if (validated.pronunciation_items !== undefined) updateData.pronunciation_items = validated.pronunciation_items;
 	if (validated.student_character_name !== undefined) updateData.student_character_name = validated.student_character_name;
 	if (validated.ai_character_names !== undefined) updateData.ai_character_names = validated.ai_character_names;
 	if (validated.roleplay_scenes !== undefined) updateData.roleplay_scenes = validated.roleplay_scenes;
