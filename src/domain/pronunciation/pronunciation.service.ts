@@ -13,13 +13,16 @@ export async function computePronunciationMetrics(learnerId: string) {
   await connectToDatabase();
   const learnerObjId = new Types.ObjectId(learnerId);
 
-  // Fetch all vocabulary and roleplay attempts for the learner
-  // We only care about attempts that have results
+  // Fetch attempts with pronunciation signal (vocabulary, dedicated pronunciation, roleplay)
   const attempts = await DrillAttempt.find({
     learnerId: learnerObjId,
-    $or: [{ 'vocabularyResults.wordScores': { $exists: true, $ne: [] } }, { 'roleplayResults.sceneScores': { $exists: true, $ne: [] } }],
+    $or: [
+      { 'vocabularyResults.wordScores': { $exists: true, $ne: [] } },
+      { 'pronunciationResults.wordScores': { $exists: true, $ne: [] } },
+      { 'roleplayResults.sceneScores': { $exists: true, $ne: [] } },
+    ],
   })
-    .select('vocabularyResults roleplayResults drillType completedAt')
+    .select('vocabularyResults pronunciationResults roleplayResults drillType completedAt')
     .sort({ completedAt: 1 }) // Process in chronological order
     .lean();
 
@@ -33,6 +36,16 @@ export async function computePronunciationMetrics(learnerId: string) {
       for (const word of attempt.vocabularyResults.wordScores) {
         // Use pronunciationScore if available, otherwise fall back to score if sensible
         // Only count valid scores > 0 to avoid skewing with skipped words
+        const score = word.pronunciationScore ?? word.score;
+        if (typeof score === 'number' && score > 0) {
+          totalScoreSum += score;
+          totalCount++;
+        }
+      }
+    }
+
+    if (attempt.pronunciationResults?.wordScores) {
+      for (const word of attempt.pronunciationResults.wordScores) {
         const score = word.pronunciationScore ?? word.score;
         if (typeof score === 'number' && score > 0) {
           totalScoreSum += score;

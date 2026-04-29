@@ -465,6 +465,7 @@ export class DrillService {
       score: params.score,
       maxScore: 100,
       vocabularyResults: params.results.vocabularyResults,
+      pronunciationResults: params.results.pronunciationResults,
       roleplayResults: params.results.roleplayResults,
       matchingResults: params.results.matchingResults,
       definitionResults: params.results.definitionResults,

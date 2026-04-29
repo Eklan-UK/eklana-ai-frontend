@@ -33,6 +33,8 @@ export interface TeachingClass {
   scheduleDays: string;
   timeRange: string;
   completedSessions: number;
+  /** 1-based index in the planned program for “N of M” progress (session sequence, not only completed). */
+  programPosition: number;
   totalSessions: number;
   nextSessionLabel: string;
   /** Present when the list API includes the next session id (e.g. learner links). */
@@ -83,15 +85,11 @@ export function mergeClassDrawerDetail(s: TeachingClass): ClassDrawerDetailResol
 
   const blockTotal = d.blockTotal ?? s.totalSessions;
   const blockCompleted = Math.min(
-    d.blockCompleted ?? s.completedSessions,
+    d.blockCompleted ?? s.programPosition ?? s.completedSessions,
     blockTotal,
   );
   const sessionTotal = d.sessionTotal ?? blockTotal;
-  const sessionNumber =
-    d.sessionNumber ??
-    (s.status === "completed"
-      ? sessionTotal
-      : Math.min(blockCompleted + 1, sessionTotal));
+  const sessionNumber = d.sessionNumber ?? Math.min(s.programPosition, sessionTotal);
 
   return {
     sessionNumber,

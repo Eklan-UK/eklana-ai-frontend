@@ -1,12 +1,168 @@
 /**
  * React Query hooks for admin Classes (Phase 1).
  */
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { classesAPI, tutorAPI } from '@/lib/api';
 import { queryKeys } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type { CreateAdminClassBody } from '@/domain/classes/class.api.types';
+import type {
+  AdminClassListItemDTO,
+  ClassBucket,
+  CreateAdminClassBody,
+} from '@/domain/classes/class.api.types';
+
+type AdminSessionQueryData = {
+  classTitle: string;
+  tutorName: string;
+  session: {
+    id: string;
+    classSeriesId: string;
+    startUtc: string;
+    endUtc: string;
+    status: string;
+    isReschedule?: boolean;
+  };
+};
+
+function applyAdminSessionRescheduleToCache(
+  queryClient: QueryClient,
+  sessionId: string,
+  newStartUtc: string,
+  newEndUtc: string,
+) {
+  queryClient.setQueryData(
+    queryKeys.classes.adminSession(sessionId),
+    (old: AdminSessionQueryData | undefined) => {
+      if (!old) return old;
+      return {
+        ...old,
+        session: {
+          ...old.session,
+          startUtc: newStartUtc,
+          endUtc: newEndUtc,
+          isReschedule: true,
+        },
+      };
+    },
+  );
+}
+
+type ClassListQueryData = {
+  classes: AdminClassListItemDTO[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore?: boolean;
+  };
+};
+
+function formatTimeLabel(d: Date) {
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+function patchClassListDataOnReschedule(
+  old: ClassListQueryData | undefined,
+  classSeriesId: string,
+  newStartUtc: string,
+  newEndUtc: string,
+): ClassListQueryData | undefined {
+  if (!old) return old;
+  const start = new Date(newStartUtc);
+  const end = new Date(newEndUtc);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return old;
+
+  const nextSessionLabel = start.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeRange = `${formatTimeLabel(start)} – ${formatTimeLabel(end)}`;
+  const scheduleDays = start.toLocaleDateString('en-US', { weekday: 'long' });
+
+  const now = new Date();
+  const isToday =
+    start.getFullYear() === now.getFullYear() &&
+    start.getMonth() === now.getMonth() &&
+    start.getDate() === now.getDate();
+  const bucket: ClassBucket = isToday ? 'today' : 'upcoming';
+
+  return {
+    ...old,
+    classes: old.classes.map((row) => {
+      if (row.id !== classSeriesId) return row;
+      const drawer = row.drawer
+        ? {
+            ...row.drawer,
+            sessionTimeRange: timeRange.replace(' – ', ' - '),
+            nextSessionFull: nextSessionLabel,
+          }
+        : { nextSessionFull: nextSessionLabel, sessionTimeRange: timeRange.replace(' – ', ' - ') };
+      return {
+        ...row,
+        nextSessionStartUtc: newStartUtc,
+        nextSessionIsReschedule: true,
+        nextSessionLabel,
+        timeRange,
+        scheduleDays,
+        bucket,
+        drawer,
+      };
+    }),
+  };
+}
+
+function isClassListQueryKey(key: readonly unknown[] | undefined, role: 'admin' | 'tutor' | 'learner') {
+  if (!key || key.length < 3) return false;
+  if (role === 'admin') {
+    return key[0] === 'admin' && key[1] === 'classes' && key[2] === 'list';
+  }
+  if (role === 'tutor') {
+    return key[0] === 'tutor' && key[1] === 'classes' && key[2] === 'list';
+  }
+  return key[0] === 'learner' && key[1] === 'classes' && key[2] === 'list';
+}
+
+/**
+ * List rows must reflect the new next-session time while off-screen; React Query
+ * can keep inactive list data stale. Patch caches + call after invalidate.
+ */
+function patchClassListCachesAfterReschedule(
+  queryClient: QueryClient,
+  classSeriesId: string,
+  newStartUtc: string,
+  newEndUtc: string,
+) {
+  (['admin', 'tutor', 'learner'] as const).forEach((role) => {
+    queryClient.setQueriesData(
+      { predicate: (q) => isClassListQueryKey(q.queryKey as readonly unknown[], role) },
+      (old) => patchClassListDataOnReschedule(old as ClassListQueryData, classSeriesId, newStartUtc, newEndUtc),
+    );
+  });
+}
+
+function readClassSeriesIdFromSessionCache(
+  queryClient: QueryClient,
+  sessionId: string,
+  source: 'admin' | 'tutor',
+) {
+  const k =
+    source === 'admin'
+      ? queryKeys.classes.adminSession(sessionId)
+      : queryKeys.classes.tutorSession(sessionId);
+  return queryClient.getQueryData<AdminSessionQueryData | undefined>(k)?.session
+    .classSeriesId;
+}
+
+async function refetchAllClassListQueries(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.refetchQueries({ queryKey: ['admin', 'classes', 'list'], type: 'all' }),
+    queryClient.refetchQueries({ queryKey: ['tutor', 'classes', 'list'], type: 'all' }),
+    queryClient.refetchQueries({ queryKey: ['learner', 'classes', 'list'], type: 'all' }),
+  ]);
+}
 
 export function useAdminClasses(filters?: {
   bucket?: import('@/domain/classes/class.api.types').ClassBucket;
@@ -40,11 +196,15 @@ export function useCreateAdminClass() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateAdminClassBody) => classesAPI.create(body),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
       queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
       queryClient.invalidateQueries({ queryKey: ['learner', 'classes'] });
       toast.success('Class scheduled');
+      const w = res.data?.calendarSyncWarning;
+      if (w) {
+        toast.warning(w, { duration: 12_000 });
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to schedule class');
@@ -163,15 +323,26 @@ export function useTutorSessionAttendance(sessionId: string | null) {
   });
 }
 
-/** Learner: alternative slots same UTC week (Phase 5). */
-export function useLearnerRescheduleOptions(
+export function useTutorSession(sessionId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.classes.tutorSession(sessionId ?? ''),
+    queryFn: async () => {
+      const res = await classesAPI.tutorSession(sessionId!);
+      return res.data;
+    },
+    enabled: !!sessionId,
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useTutorRescheduleOptions(
   sessionId: string | null,
   opts?: { enabled?: boolean },
 ) {
   return useQuery({
-    queryKey: queryKeys.classes.learnerRescheduleOptions(sessionId ?? ''),
+    queryKey: queryKeys.classes.tutorRescheduleOptions(sessionId ?? ''),
     queryFn: async () => {
-      const res = await classesAPI.learnerRescheduleOptions(sessionId!);
+      const res = await classesAPI.tutorRescheduleOptions(sessionId!);
       return res.data;
     },
     enabled: !!sessionId && opts?.enabled !== false,
@@ -275,26 +446,55 @@ export function useLearnerTutorAvailability(tutorId: string | null) {
   });
 }
 
-export function useLearnerRescheduleSession(sessionId: string) {
+export function useTutorRescheduleSession(sessionId: string) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   return useMutation({
     mutationFn: (body: {
       newStartUtc: string;
       newEndUtc: string;
       reservationId: string;
       reservationToken: string;
-    }) => classesAPI.learnerReschedule(sessionId, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
-      queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
-      queryClient.invalidateQueries({ queryKey: ['learner', 'classes'] });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.learnerSession(sessionId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.learnerRescheduleOptions(sessionId),
-      });
+    }) => classesAPI.tutorReschedule(sessionId, body),
+    onSuccess: async (_res, variables) => {
+      const classSeriesId = readClassSeriesIdFromSessionCache(
+        queryClient,
+        sessionId,
+        'tutor',
+      );
+      if (classSeriesId) {
+        patchClassListCachesAfterReschedule(
+          queryClient,
+          classSeriesId,
+          variables.newStartUtc,
+          variables.newEndUtc,
+        );
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.all,
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['learner', 'classes'], refetchType: 'all' }),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.tutorSession(sessionId),
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.tutorRescheduleOptions(sessionId),
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.tutorSessionAttendance(sessionId),
+          refetchType: 'all',
+        }),
+      ]);
+      await refetchAllClassListQueries(queryClient);
       toast.success('Session rescheduled');
+      router.push('/tutor/classes');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Could not reschedule');
@@ -312,16 +512,45 @@ export function useAdminRescheduleSession(sessionId: string) {
       reservationId: string;
       reservationToken: string;
     }) => classesAPI.adminReschedule(sessionId, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
-      queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
-      queryClient.invalidateQueries({ queryKey: ['learner', 'classes'] });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.adminSession(sessionId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.adminRescheduleOptions(sessionId),
-      });
+    onSuccess: async (_res, variables) => {
+      const classSeriesId = readClassSeriesIdFromSessionCache(
+        queryClient,
+        sessionId,
+        'admin',
+      );
+      applyAdminSessionRescheduleToCache(
+        queryClient,
+        sessionId,
+        variables.newStartUtc,
+        variables.newEndUtc,
+      );
+      if (classSeriesId) {
+        patchClassListCachesAfterReschedule(
+          queryClient,
+          classSeriesId,
+          variables.newStartUtc,
+          variables.newEndUtc,
+        );
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.all,
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['learner', 'classes'], refetchType: 'all' }),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.adminSession(sessionId),
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.adminRescheduleOptions(sessionId),
+          refetchType: 'all',
+        }),
+      ]);
+      await refetchAllClassListQueries(queryClient);
       toast.success('Session rescheduled');
       router.push('/admin/classes');
     },
@@ -331,12 +560,66 @@ export function useAdminRescheduleSession(sessionId: string) {
   });
 }
 
-/** Pessimistic hold for a selected reschedule time (learner). */
-export function useLearnerReserveRescheduleSlot(sessionId: string) {
+export function useAdminRescheduleSessionDirect(sessionId: string) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: (body: { newStartUtc: string; newEndUtc: string }) =>
+      classesAPI.adminRescheduleDirect(sessionId, body),
+    onSuccess: async (_res, variables) => {
+      const classSeriesId = readClassSeriesIdFromSessionCache(
+        queryClient,
+        sessionId,
+        'admin',
+      );
+      applyAdminSessionRescheduleToCache(
+        queryClient,
+        sessionId,
+        variables.newStartUtc,
+        variables.newEndUtc,
+      );
+      if (classSeriesId) {
+        patchClassListCachesAfterReschedule(
+          queryClient,
+          classSeriesId,
+          variables.newStartUtc,
+          variables.newEndUtc,
+        );
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.all,
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['learner', 'classes'], refetchType: 'all' }),
+      ]);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.adminSession(sessionId),
+          refetchType: 'all',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.classes.adminRescheduleOptions(sessionId),
+          refetchType: 'all',
+        }),
+      ]);
+      await refetchAllClassListQueries(queryClient);
+      toast.success('Session rescheduled');
+      router.push('/admin/classes');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Could not reschedule');
+    },
+  });
+}
+
+/** Pessimistic hold for a selected reschedule time (tutor). */
+export function useTutorReserveRescheduleSlot(sessionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (body: { startUtc: string; endUtc: string }) => {
-      const res = await classesAPI.learnerReserveRescheduleSlot(sessionId, body);
+      const res = await classesAPI.tutorReserveRescheduleSlot(sessionId, body);
       if (!res.data) {
         throw new Error('Could not reserve this time');
       }
@@ -344,7 +627,7 @@ export function useLearnerReserveRescheduleSlot(sessionId: string) {
     },
     onError: () => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.classes.learnerRescheduleOptions(sessionId),
+        queryKey: queryKeys.classes.tutorRescheduleOptions(sessionId),
       });
     },
   });

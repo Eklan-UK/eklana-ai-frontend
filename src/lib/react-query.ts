@@ -92,8 +92,10 @@ export const queryKeys = {
       ["learner", "classes", "session", sessionId] as const,
     tutorSessionAttendance: (sessionId: string) =>
       ["tutor", "sessions", sessionId, "attendance"] as const,
-    learnerRescheduleOptions: (sessionId: string) =>
-      ["learner", "sessions", sessionId, "reschedule-options"] as const,
+    tutorSession: (sessionId: string) =>
+      ["tutor", "sessions", sessionId, "summary"] as const,
+    tutorRescheduleOptions: (sessionId: string) =>
+      ["tutor", "sessions", sessionId, "reschedule-options"] as const,
     adminSession: (sessionId: string) =>
       [...queryKeys.classes.all, "admin", "session", sessionId] as const,
     adminRescheduleOptions: (sessionId: string) =>

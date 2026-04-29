@@ -26,9 +26,9 @@ const targetSentenceSchema = z.object({
 });
 
 const pronunciationItemSchema = z.object({
-	sound: z.string(),
-	word: z.string(),
-	sentence: z.string(),
+	sound: z.string().trim().min(1),
+	word: z.string().trim().min(1),
+	sentence: z.string().trim().min(1),
 	soundAudioUrl: z.string().optional(),
 	wordAudioUrl: z.string().optional(),
 	sentenceAudioUrl: z.string().optional(),
@@ -101,7 +101,7 @@ const fillBlankItemSchema = z.object({
 
 const createDrillSchema = z.object({
 	title: z.string().min(1).max(200),
-	type: z.enum(['vocabulary', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank']),
+	type: z.enum(['vocabulary', 'pronunciation', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank']),
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
 	duration_days: z.number().int().min(1).optional(),
@@ -131,6 +131,25 @@ const createDrillSchema = z.object({
 	article_audio_url: z.string().optional(),
 	fill_blank_items: z.array(fillBlankItemSchema).optional(),
 	is_active: z.boolean().optional(),
+}).superRefine((data, ctx) => {
+	if (data.type === 'vocabulary') {
+		if (!data.target_sentences || data.target_sentences.length < 1) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'Vocabulary drills require at least one target sentence',
+				path: ['target_sentences'],
+			});
+		}
+	}
+	if (data.type === 'pronunciation') {
+		if (!data.pronunciation_items || data.pronunciation_items.length < 1) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'Pronunciation drills require at least one pronunciation item',
+				path: ['pronunciation_items'],
+			});
+		}
+	}
 });
 
 // GET handler
@@ -201,8 +220,16 @@ async function postHandler(
 	// Add optional fields
 	if (validated.context !== undefined) drillData.context = validated.context;
 	if (validated.audio_example_url !== undefined) drillData.audio_example_url = validated.audio_example_url;
-	if (validated.target_sentences !== undefined) drillData.target_sentences = validated.target_sentences;
-	if (validated.pronunciation_items !== undefined) drillData.pronunciation_items = validated.pronunciation_items;
+	if (validated.type === 'vocabulary') {
+		if (validated.target_sentences !== undefined) drillData.target_sentences = validated.target_sentences;
+		drillData.pronunciation_items = [];
+	} else if (validated.type === 'pronunciation') {
+		if (validated.pronunciation_items !== undefined) drillData.pronunciation_items = validated.pronunciation_items;
+		drillData.target_sentences = [];
+	} else {
+		if (validated.target_sentences !== undefined) drillData.target_sentences = validated.target_sentences;
+		drillData.pronunciation_items = [];
+	}
 	if (validated.roleplay_dialogue !== undefined) drillData.roleplay_dialogue = validated.roleplay_dialogue;
 	if (validated.roleplay_scenes !== undefined) drillData.roleplay_scenes = validated.roleplay_scenes;
 	if (validated.student_character_name !== undefined) drillData.student_character_name = validated.student_character_name;

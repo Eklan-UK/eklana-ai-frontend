@@ -124,7 +124,7 @@ function SessionCard({ session }: { session: TeachingClass }) {
             href={`/account/classes/${session.nextSessionId}`}
             className="flex flex-1 items-center justify-center rounded-full border border-border bg-card py-3 text-sm font-bold text-text-secondary transition-colors hover:bg-muted"
           >
-            Reschedule
+            Session details
           </Link>
         ) : null}
       </div>

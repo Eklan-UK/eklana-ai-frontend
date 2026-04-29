@@ -5,14 +5,14 @@ import ClassEnrollment from '@/models/class-enrollment';
 import SessionAttendance from '@/models/session-attendance';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
-import { ValidationError } from '@/lib/api/response';
+import { ValidationError, ForbiddenError } from '@/lib/api/response';
 import { getGoogleCalendarRefreshTokenForUser } from '@/lib/api/google-calendar-connection';
 import {
   createGoogleCalendarEventWithMeetLink,
   deleteGoogleCalendarEvent,
 } from '@/lib/api/google-calendar-events';
 import { validationMessageForGoogleCalendarEventFailure } from '@/domain/classes/class.repository';
-import { buildRescheduleCalendarTitle } from '@/domain/classes/class-calendar-titles';
+import { buildClassSessionCalendarTitle } from '@/domain/classes/class-calendar-titles';
 import { SlotReservationService } from '@/domain/classes/slot-reservation.service';
 import {
   utcWeekRangeContaining,
@@ -107,6 +107,20 @@ export class RescheduleService {
       session: session as unknown as IClassSession,
       series: series as unknown as IClassSeries,
     };
+  }
+
+  /**
+   * Tutor may reschedule only sessions they teach (same series rules as admin).
+   */
+  async assertTutorMayAccessSession(
+    sessionId: string,
+    tutorUserId: Types.ObjectId,
+  ): Promise<{ session: IClassSession; series: IClassSeries }> {
+    const { session, series } = await this.assertAdminMayAccessSession(sessionId);
+    if (session.tutorId.toString() !== tutorUserId.toString()) {
+      throw new ForbiddenError('You are not the assigned tutor for this session');
+    }
+    return { session, series };
   }
 
   buildRescheduleOptions(originalStart: Date, originalEnd: Date, now: Date = new Date()): {
@@ -319,6 +333,53 @@ export class RescheduleService {
   }
 
   /**
+   * Admin-only: reschedule to any future time (cross-week), without tutor weekly-availability
+   * restrictions. Still enforces duration, session/buffer conflicts, and reservation holds.
+   */
+  async assertAdminRescheduleTime(
+    session: IClassSession,
+    newStartUtc: Date,
+    newEndUtc: Date,
+  ): Promise<void> {
+    const origStart = new Date(session.startUtc);
+    const origEnd = new Date(session.endUtc);
+    const durationMs = origEnd.getTime() - origStart.getTime();
+    const expectedEnd = new Date(newStartUtc.getTime() + durationMs);
+    if (Math.abs(expectedEnd.getTime() - newEndUtc.getTime()) > 1000) {
+      throw new ValidationError('End time must match original session duration');
+    }
+    if (newStartUtc.getTime() <= Date.now()) {
+      throw new ValidationError('New start must be in the future');
+    }
+
+    const avRepo = new TutorAvailabilityRepository();
+    const avDoc = await avRepo.findByTutorId(session.tutorId as Types.ObjectId);
+    const bufferMs = (avDoc?.bufferMinutes ?? 0) * 60 * 1000;
+
+    const sessionConflict = await findTutorSessionConflict(
+      session.tutorId as Types.ObjectId,
+      session._id as Types.ObjectId,
+      newStartUtc,
+      newEndUtc,
+      bufferMs,
+    );
+    if (sessionConflict) {
+      throw new ValidationError('Time conflicts with another session or buffer');
+    }
+
+    const resConflict = await findTutorReservationConflict(
+      session.tutorId as Types.ObjectId,
+      session._id as Types.ObjectId,
+      newStartUtc,
+      newEndUtc,
+      bufferMs,
+    );
+    if (resConflict) {
+      throw new ValidationError('This time is no longer available. Pick another slot.');
+    }
+  }
+
+  /**
    * Short-lived pessimistic hold before POST reschedule. Caller must be allowed to act on the session.
    */
   async createLearnerRescheduleSlotReservation(
@@ -365,6 +426,28 @@ export class RescheduleService {
     });
   }
 
+  async createTutorRescheduleSlotReservation(
+    sessionId: string,
+    tutorUserId: Types.ObjectId,
+    startIso: string,
+    endIso: string,
+  ): Promise<{ reservationId: string; token: string; expiresAt: string }> {
+    const { session } = await this.assertTutorMayAccessSession(sessionId, tutorUserId);
+    const newStart = new Date(startIso);
+    const newEnd = new Date(endIso);
+    if (Number.isNaN(newStart.getTime()) || Number.isNaN(newEnd.getTime())) {
+      throw new ValidationError('Invalid time');
+    }
+    await this.assertSlotValidForReschedule(session, newStart, newEnd);
+    return new SlotReservationService().createRescheduleSlotHold({
+      tutorId: session.tutorId as Types.ObjectId,
+      sessionId: session._id as Types.ObjectId,
+      holderUserId: tutorUserId,
+      startUtc: newStart,
+      endUtc: newEnd,
+    });
+  }
+
   /**
    * Same-week offset slots, filtered by tutor weekly availability (if configured)
    * and by conflicts with the tutor’s other sessions (respecting buffer minutes).
@@ -393,22 +476,24 @@ export class RescheduleService {
     return this.computeRescheduleSlotsForSession(session, now);
   }
 
-  private async moveSessionToNewTime(
+  /** Same as admin options, but only for the session’s assigned tutor. */
+  async getTutorRescheduleSlots(
+    sessionId: string,
+    tutorUserId: Types.ObjectId,
+    now: Date = new Date(),
+  ): Promise<{
+    slots: { startUtc: string; endUtc: string }[];
+    weekPolicy: string;
+  }> {
+    const { session } = await this.assertTutorMayAccessSession(sessionId, tutorUserId);
+    return this.computeRescheduleSlotsForSession(session, now);
+  }
+
+  private async applyRescheduleToCalendarAndDb(
     session: IClassSession,
     newStartUtc: Date,
     newEndUtc: Date,
-    reservation: { id: string; token: string },
   ): Promise<void> {
-    const slotSvc = new SlotReservationService();
-    await slotSvc.getVerifiedReservation(
-      reservation.id,
-      session._id.toString(),
-      newStartUtc,
-      newEndUtc,
-      reservation.token,
-    );
-    await this.assertSlotValidForReschedule(session, newStartUtc, newEndUtc);
-
     const seriesDoc = await ClassSeries.findById(session.classSeriesId).lean();
     if (!seriesDoc) {
       throw new ValidationError('Class not available');
@@ -470,7 +555,11 @@ export class RescheduleService {
       }
     }
 
-    const summary = buildRescheduleCalendarTitle(learnersOrdered);
+    const summary = buildClassSessionCalendarTitle(
+      session.sequenceNumber,
+      seriesDoc.totalSessionsPlanned,
+      learnersOrdered,
+    );
 
     let meetingUrl: string;
     let googleEventId: string;
@@ -517,7 +606,43 @@ export class RescheduleService {
         },
       },
     );
+  }
+
+  private async moveSessionToNewTime(
+    session: IClassSession,
+    newStartUtc: Date,
+    newEndUtc: Date,
+    reservation: { id: string; token: string },
+  ): Promise<void> {
+    const slotSvc = new SlotReservationService();
+    await slotSvc.getVerifiedReservation(
+      reservation.id,
+      session._id.toString(),
+      newStartUtc,
+      newEndUtc,
+      reservation.token,
+    );
+    await this.assertSlotValidForReschedule(session, newStartUtc, newEndUtc);
+    await this.applyRescheduleToCalendarAndDb(session, newStartUtc, newEndUtc);
     await slotSvc.deleteById(reservation.id);
+  }
+
+  async adminRescheduleSessionDirect(params: {
+    sessionId: string;
+    newStartUtc: Date;
+    newEndUtc: Date;
+  }): Promise<void> {
+    const { session } = await this.assertAdminMayAccessSession(params.sessionId);
+    await this.assertAdminRescheduleTime(
+      session,
+      params.newStartUtc,
+      params.newEndUtc,
+    );
+    await this.applyRescheduleToCalendarAndDb(
+      session,
+      params.newStartUtc,
+      params.newEndUtc,
+    );
   }
 
   async rescheduleSession(params: {
@@ -548,6 +673,26 @@ export class RescheduleService {
     reservationToken: string;
   }): Promise<void> {
     const { session } = await this.assertAdminMayAccessSession(params.sessionId);
+    await this.moveSessionToNewTime(
+      session,
+      params.newStartUtc,
+      params.newEndUtc,
+      { id: params.reservationId, token: params.reservationToken },
+    );
+  }
+
+  async tutorRescheduleSession(params: {
+    sessionId: string;
+    tutorUserId: Types.ObjectId;
+    newStartUtc: Date;
+    newEndUtc: Date;
+    reservationId: string;
+    reservationToken: string;
+  }): Promise<void> {
+    const { session } = await this.assertTutorMayAccessSession(
+      params.sessionId,
+      params.tutorUserId,
+    );
     await this.moveSessionToNewTime(
       session,
       params.newStartUtc,

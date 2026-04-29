@@ -55,6 +55,11 @@ interface DrillFormData {
     text: string;
     translation?: string;
   }>;
+  pronunciation_items?: Array<{
+    sound: string;
+    word: string;
+    sentence: string;
+  }>;
   student_character_name?: string;
   ai_character_names?: string[];
   roleplay_scenes?: Array<{
@@ -155,6 +160,7 @@ function CreateDrillPageContent() {
       target_sentences: [
         { word: "", wordTranslation: "", text: "", translation: "" },
       ],
+      pronunciation_items: [{ sound: "", word: "", sentence: "" }],
       student_character_name: "",
       ai_character_names: [""],
       roleplay_scenes: [
@@ -229,6 +235,9 @@ function CreateDrillPageContent() {
           drill.target_sentences || [
             { text: "", translation: "" },
           ],
+        pronunciation_items: drill.pronunciation_items || [
+          { sound: "", word: "", sentence: "" },
+        ],
         student_character_name: drill.student_character_name || "",
         ai_character_names: aiNames,
         roleplay_scenes: drill.roleplay_scenes || [
@@ -422,6 +431,20 @@ function CreateDrillPageContent() {
       return;
     }
 
+    if (formData.type === "pronunciation") {
+      const pItems = formData.pronunciation_items || [];
+      if (
+        pItems.length === 0 ||
+        pItems.some(
+          (p) =>
+            !p.sound?.trim() || !p.word?.trim() || !p.sentence?.trim()
+        )
+      ) {
+        alert("Pronunciation drills need at least one item with Sound, Word, and Sentence.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const submitData: any = { ...formData };
@@ -429,6 +452,7 @@ function CreateDrillPageContent() {
       // Clean up data based on drill type
       if (formData.type === "roleplay") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.matching_pairs;
         delete submitData.definition_items;
         delete submitData.grammar_items;
@@ -442,6 +466,7 @@ function CreateDrillPageContent() {
         }
       } else if (formData.type === "matching") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -455,6 +480,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_content;
       } else if (formData.type === "definition") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -468,6 +494,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_content;
       } else if (formData.type === "summary") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -480,6 +507,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_content;
       } else if (formData.type === "grammar") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -493,6 +521,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_content;
       } else if (formData.type === "sentence_writing") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -506,6 +535,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_content;
       } else if (formData.type === "fill_blank") {
         delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -519,8 +549,25 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
         delete submitData.sentence_drill_word;
+      } else if (formData.type === "pronunciation") {
+        delete submitData.target_sentences;
+        delete submitData.roleplay_dialogue;
+        delete submitData.roleplay_scenes;
+        delete submitData.student_character_name;
+        delete submitData.ai_character_names;
+        delete submitData.matching_pairs;
+        delete submitData.definition_items;
+        delete submitData.grammar_items;
+        delete submitData.sentence_writing_items;
+        delete submitData.article_content;
+        delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
+        delete submitData.fill_blank_items;
+        delete submitData.sentence_drill_word;
       } else {
         // vocabulary
+        delete submitData.pronunciation_items;
         delete submitData.roleplay_dialogue;
         delete submitData.roleplay_scenes;
         delete submitData.student_character_name;
@@ -598,6 +645,7 @@ function CreateDrillPageContent() {
   const isSentence = formData.type === "sentence";
   const isListening = formData.type === "listening";
   const isVocabulary = formData.type === "vocabulary";
+  const isPronunciation = formData.type === "pronunciation";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -787,6 +835,7 @@ function CreateDrillPageContent() {
                     }
                   >
                     <option value="vocabulary">Vocabulary</option>
+                    <option value="pronunciation">Pronunciation</option>
                     <option value="roleplay">Role-play</option>
                     <option value="matching">Matching</option>
                     <option value="summary">Summary</option>
@@ -1284,6 +1333,98 @@ function CreateDrillPageContent() {
                               setFormData({ ...formData, target_sentences: sentences });
                             }}
                             placeholder="e.g., 나는 어제 식당에 갔다"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {isPronunciation && (
+            <Card className="p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Pronunciation Items *
+                </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      pronunciation_items: [
+                        ...(formData.pronunciation_items || []),
+                        { sound: "", word: "", sentence: "" },
+                      ],
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Item
+                </Button>
+              </div>
+              <div className="space-y-6">
+                {(formData.pronunciation_items || []).map((p, index) => (
+                  <Card key={index} className="border-emerald-100 bg-emerald-50/20">
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <h4 className="font-semibold text-gray-900">Item {index + 1}</h4>
+                        {(formData.pronunciation_items || []).length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const list = (formData.pronunciation_items || []).filter(
+                                (_, i) => i !== index
+                              );
+                              setFormData({ ...formData, pronunciation_items: list });
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Sound *</Label>
+                          <Input
+                            value={p.sound}
+                            onChange={(e) => {
+                              const list = [...(formData.pronunciation_items || [])];
+                              list[index] = { ...list[index], sound: e.target.value };
+                              setFormData({ ...formData, pronunciation_items: list });
+                            }}
+                            placeholder="e.g. /ʃ/ or sh"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label>Word *</Label>
+                          <Input
+                            value={p.word}
+                            onChange={(e) => {
+                              const list = [...(formData.pronunciation_items || [])];
+                              list[index] = { ...list[index], word: e.target.value };
+                              setFormData({ ...formData, pronunciation_items: list });
+                            }}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label>Sentence *</Label>
+                          <Input
+                            value={p.sentence}
+                            onChange={(e) => {
+                              const list = [...(formData.pronunciation_items || [])];
+                              list[index] = { ...list[index], sentence: e.target.value };
+                              setFormData({ ...formData, pronunciation_items: list });
+                            }}
+                            required
                           />
                         </div>
                       </div>

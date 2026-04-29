@@ -141,6 +141,7 @@ export const drillAPI = {
     score: number;
     timeSpent: number;
     vocabularyResults?: any;
+    pronunciationResults?: any;
     roleplayResults?: any;
     matchingResults?: any;
     definitionResults?: any;
@@ -929,6 +930,7 @@ export const classesAPI = {
         classSeriesId: string;
         sessionIds: string[];
         class: import('@/domain/classes/class.api.types').AdminClassListItemDTO;
+        calendarSyncWarning?: string;
       };
     }>('/admin/classes', {
       method: 'POST',
@@ -1008,6 +1010,20 @@ export const classesAPI = {
     });
   },
 
+  /** Admin: reschedule to any future time (cross-week, no slot reservation). */
+  adminRescheduleDirect: (
+    sessionId: string,
+    body: { newStartUtc: string; newEndUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { updated: boolean };
+    }>(`/admin/sessions/${sessionId}/reschedule-direct`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
   adminReserveRescheduleSlot: (
     sessionId: string,
     body: { startUtc: string; endUtc: string },
@@ -1016,6 +1032,72 @@ export const classesAPI = {
       code: string;
       data: { reservationId: string; token: string; expiresAt: string };
     }>(`/admin/sessions/${sessionId}/reserve-slot`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
+  /** Tutor: session summary for assigned tutor (reschedule page). */
+  tutorSession: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        session: {
+          id: string;
+          classSeriesId: string;
+          startUtc: string;
+          endUtc: string;
+          status: string;
+          isReschedule?: boolean;
+        };
+        classTitle: string;
+        tutorName: string;
+      };
+    }>(`/tutor/sessions/${sessionId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  tutorRescheduleOptions: (sessionId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        slots: { startUtc: string; endUtc: string }[];
+        weekPolicy?: string;
+      };
+    }>(`/tutor/sessions/${sessionId}/reschedule-options`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  tutorReschedule: (
+    sessionId: string,
+    body: {
+      newStartUtc: string;
+      newEndUtc: string;
+      reservationId: string;
+      reservationToken: string;
+    },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { updated: boolean };
+    }>(`/tutor/sessions/${sessionId}/reschedule`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
+  tutorReserveRescheduleSlot: (
+    sessionId: string,
+    body: { startUtc: string; endUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { reservationId: string; token: string; expiresAt: string };
+    }>(`/tutor/sessions/${sessionId}/reserve-slot`, {
       method: 'POST',
       data: body,
     });
@@ -1137,51 +1219,6 @@ export const classesAPI = {
     }>(`/tutor/sessions/${sessionId}/attendance`, {
       method: 'GET',
       cache: false,
-    });
-  },
-
-  /** Learner: same-week reschedule alternatives (Phase 5). */
-  learnerRescheduleOptions: (sessionId: string) => {
-    return apiRequest<{
-      code: string;
-      data: {
-        slots: { startUtc: string; endUtc: string }[];
-        weekPolicy?: string;
-      };
-    }>(`/learner/sessions/${sessionId}/reschedule-options`, {
-      method: 'GET',
-      cache: false,
-    });
-  },
-
-  learnerReschedule: (
-    sessionId: string,
-    body: {
-      newStartUtc: string;
-      newEndUtc: string;
-      reservationId: string;
-      reservationToken: string;
-    },
-  ) => {
-    return apiRequest<{
-      code: string;
-      data: { updated: boolean };
-    }>(`/learner/sessions/${sessionId}/reschedule`, {
-      method: 'POST',
-      data: body,
-    });
-  },
-
-  learnerReserveRescheduleSlot: (
-    sessionId: string,
-    body: { startUtc: string; endUtc: string },
-  ) => {
-    return apiRequest<{
-      code: string;
-      data: { reservationId: string; token: string; expiresAt: string };
-    }>(`/learner/sessions/${sessionId}/reserve-slot`, {
-      method: 'POST',
-      data: body,
     });
   },
 

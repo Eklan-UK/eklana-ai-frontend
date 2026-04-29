@@ -78,6 +78,7 @@ export function getDrillStatus(drill: any): DrillStatus {
 export function getDrillIcon(type: string): string {
   const icons: Record<string, string> = {
     vocabulary: "📚",
+    pronunciation: "🎙️",
     roleplay: "💬",
     matching: "🔗",
     definition: "📖",
@@ -104,6 +105,11 @@ export function getDrillTypeInfo(type: string): {
       icon: "📚",
       color: "green",
       borderColor: "border-l-green-500",
+    },
+    pronunciation: {
+      icon: "🎙️",
+      color: "emerald",
+      borderColor: "border-l-emerald-500",
     },
     roleplay: { icon: "💬", color: "blue", borderColor: "border-l-blue-500" },
     matching: {

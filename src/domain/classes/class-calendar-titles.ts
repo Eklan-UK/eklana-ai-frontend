@@ -1,7 +1,7 @@
 import { getUserDisplayName } from '@/utils/user';
 
-/** Aligned with `FALLBACK_CLASS_TITLE_MAX_LEN` in class.repository. */
-const RESCHEDULE_TITLE_MAX_LEN = 120;
+/** Google Calendar event summary max length (month view + DB). */
+const CALENDAR_CLASS_TITLE_MAX_LEN = 120;
 
 type LearnerLike = {
   email?: string;
@@ -11,23 +11,31 @@ type LearnerLike = {
 };
 
 /**
- * Google Calendar event summary for a rescheduled session: `Reschedule (names)`.
- * Mirrors `buildFallbackClassSeriesTitle` ("Class 1 (names)") but with Reschedule prefix.
+ * Google Calendar event summary: `Class N of M (learner name(s))`.
+ * Used for new sessions and rescheduled sessions.
  */
-export function buildRescheduleCalendarTitle(learnersOrdered: LearnerLike[]): string {
-  const prefix = 'Reschedule';
+export function buildClassSessionCalendarTitle(
+  sequenceNumber: number,
+  totalPlanned: number,
+  learnersOrdered: LearnerLike[],
+): string {
+  const m = Math.max(1, Math.trunc(totalPlanned));
+  const n = Math.max(1, Math.min(Math.trunc(sequenceNumber) || 1, m));
+  const prefix = `Class ${n} of ${m}`;
+
   if (learnersOrdered.length === 0) {
     return prefix;
   }
+
   const names = learnersOrdered.map((u) => getUserDisplayName(u));
   for (let k = names.length; k >= 1; k--) {
     const head = names.slice(0, k).join(', ');
     const rest = names.length - k;
     const inner = rest > 0 ? `${head} + ${rest} more` : head;
     const candidate = `${prefix} (${inner})`;
-    if (candidate.length <= RESCHEDULE_TITLE_MAX_LEN) return candidate;
+    if (candidate.length <= CALENDAR_CLASS_TITLE_MAX_LEN) return candidate;
   }
   const first = names[0] ?? 'Student';
-  const budget = Math.max(12, RESCHEDULE_TITLE_MAX_LEN - prefix.length - 5);
+  const budget = Math.max(12, CALENDAR_CLASS_TITLE_MAX_LEN - prefix.length - 5);
   return `${prefix} (${first.slice(0, budget)}…)`;
 }
