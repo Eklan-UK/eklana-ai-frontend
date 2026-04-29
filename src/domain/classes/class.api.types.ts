@@ -50,6 +50,8 @@ export interface AdminClassListItemDTO {
   /** Next session Mongo id (for learner deep links). */
   nextSessionId?: string;
   nextSessionStartUtc?: string;
+  /** True when the list "next" session was created via reschedule (Google + flag). */
+  nextSessionIsReschedule?: boolean;
   status: ApiClassStatus;
   bucket: ClassBucket;
   meetingUrl?: string;
@@ -189,6 +191,8 @@ export interface LearnerPastSessionItemDTO {
   sessionStatus: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   /** `none` = no attendance row (treated as missed for UI when session has ended). */
   learnerAttendance: LearnerPastAttendance;
+  /** True if this session was rescheduled (moved) at least once. */
+  isReschedule?: boolean;
 }
 
 export interface LearnerPastSessionsResponse {

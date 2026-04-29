@@ -49,6 +49,7 @@ async function getHandler(
       startUtc: new Date(session.startUtc).toISOString(),
       endUtc: new Date(session.endUtc).toISOString(),
       status: session.status,
+      isReschedule: Boolean((session as { isReschedule?: boolean }).isReschedule),
     },
     classTitle: series.title?.trim() || 'Class',
     tutorName: formatTutorName(tutor as { firstName?: string; lastName?: string; email?: string }),

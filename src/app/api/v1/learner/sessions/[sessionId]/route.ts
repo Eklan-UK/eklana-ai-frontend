@@ -40,6 +40,7 @@ async function getHandler(
       startUtc: new Date(session.startUtc).toISOString(),
       endUtc: new Date(session.endUtc).toISOString(),
       status: session.status,
+      isReschedule: Boolean((session as { isReschedule?: boolean }).isReschedule),
       meetingUrl,
     },
     classTitle: seriesTitle,

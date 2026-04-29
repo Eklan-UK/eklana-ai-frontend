@@ -966,6 +966,7 @@ export const classesAPI = {
           startUtc: string;
           endUtc: string;
           status: string;
+          isReschedule?: boolean;
         };
         classTitle: string;
         tutorName: string;
@@ -991,12 +992,30 @@ export const classesAPI = {
 
   adminReschedule: (
     sessionId: string,
-    body: { newStartUtc: string; newEndUtc: string },
+    body: {
+      newStartUtc: string;
+      newEndUtc: string;
+      reservationId: string;
+      reservationToken: string;
+    },
   ) => {
     return apiRequest<{
       code: string;
       data: { updated: boolean };
     }>(`/admin/sessions/${sessionId}/reschedule`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
+  adminReserveRescheduleSlot: (
+    sessionId: string,
+    body: { startUtc: string; endUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { reservationId: string; token: string; expiresAt: string };
+    }>(`/admin/sessions/${sessionId}/reserve-slot`, {
       method: 'POST',
       data: body,
     });
@@ -1080,6 +1099,7 @@ export const classesAPI = {
           startUtc: string;
           endUtc: string;
           status: string;
+          isReschedule?: boolean;
           meetingUrl?: string;
         };
         classTitle: string;
@@ -1136,12 +1156,30 @@ export const classesAPI = {
 
   learnerReschedule: (
     sessionId: string,
-    body: { newStartUtc: string; newEndUtc: string },
+    body: {
+      newStartUtc: string;
+      newEndUtc: string;
+      reservationId: string;
+      reservationToken: string;
+    },
   ) => {
     return apiRequest<{
       code: string;
       data: { updated: boolean };
     }>(`/learner/sessions/${sessionId}/reschedule`, {
+      method: 'POST',
+      data: body,
+    });
+  },
+
+  learnerReserveRescheduleSlot: (
+    sessionId: string,
+    body: { startUtc: string; endUtc: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: { reservationId: string; token: string; expiresAt: string };
+    }>(`/learner/sessions/${sessionId}/reserve-slot`, {
       method: 'POST',
       data: body,
     });

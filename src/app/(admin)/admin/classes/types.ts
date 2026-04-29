@@ -39,6 +39,8 @@ export interface TeachingClass {
   nextSessionId?: string;
   /** ISO UTC for next session start (learner list); used for relative "Starts in …" labels. */
   nextSessionStartUtc?: string;
+  /** When the current "next" session is a rescheduled occurrence. */
+  nextSessionIsReschedule?: boolean;
   status: ClassStatus;
   bucket: "today" | "upcoming" | "completed";
   /** Set when API allows join (e.g. tutor list within join window). */

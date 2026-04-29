@@ -21,7 +21,11 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { adminAPI } from "@/lib/api";
 import { useCreateAdminClass } from "@/hooks/useClasses";
-import { computeFirstSessionRange } from "@/lib/classes/first-session";
+import {
+  computeFirstSessionRange,
+  countSessionsThroughEndDate,
+  parseEndsOnDisplayToLocalDate,
+} from "@/lib/classes/first-session";
 import type { CreateAdminClassBody } from "@/domain/classes/class.api.types";
 
 const STEP_LABELS = ["Students", "Tutor", "Type", "Schedule", "Review"] as const;
@@ -62,6 +66,52 @@ function formatReviewUntilSuffix(
     return `Until ${raw}`;
   }
   return `Until ${sessionCount} session${sessionCount !== 1 ? "s" : ""}`;
+}
+
+type ClassTypeOption = "one-time" | "recurring";
+
+type DurationMode = "sessions" | "endDate";
+
+type PlannedSessionResult =
+  | { ok: true; total: number }
+  | { ok: false; reason: "invalid_end" | "count_zero" };
+
+/**
+ * Single source of truth for total planned sessions (must match submit body).
+ */
+function computePlannedSessionTotal(params: {
+  classType: ClassTypeOption | null;
+  durationMode: DurationMode;
+  sessionCount: number;
+  endsOnDateText: string;
+  scheduleDays: string[];
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+}): PlannedSessionResult {
+  if (params.classType !== "recurring") {
+    return { ok: true, total: 1 };
+  }
+  if (params.durationMode === "sessions") {
+    return { ok: true, total: params.sessionCount };
+  }
+  const { start } = computeFirstSessionRange(
+    params.scheduleDays,
+    params.scheduleStartTime,
+    params.scheduleEndTime,
+  );
+  const parsedEnd = parseEndsOnDisplayToLocalDate(params.endsOnDateText);
+  if (!parsedEnd) {
+    return { ok: false, reason: "invalid_end" };
+  }
+  const n = countSessionsThroughEndDate(
+    params.scheduleDays,
+    start,
+    parsedEnd,
+  );
+  if (n < 1) {
+    return { ok: false, reason: "count_zero" };
+  }
+  return { ok: true, total: n };
 }
 
 interface PickerStudent {
@@ -131,10 +181,6 @@ function userToTutorOption(u: {
     googleCalendarConnected: !!u.googleCalendarConnected,
   };
 }
-
-type ClassTypeOption = "one-time" | "recurring";
-
-type DurationMode = "sessions" | "endDate";
 
 interface ScheduleClassModalProps {
   open: boolean;
@@ -338,6 +384,28 @@ export function ScheduleClassModal({
     return `${n} students - Group Class`;
   }, [selectedIds.size]);
 
+  const plannedSessionPreview = useMemo(
+    () =>
+      computePlannedSessionTotal({
+        classType,
+        durationMode,
+        sessionCount,
+        endsOnDateText,
+        scheduleDays,
+        scheduleStartTime,
+        scheduleEndTime,
+      }),
+    [
+      classType,
+      durationMode,
+      sessionCount,
+      endsOnDateText,
+      scheduleDays,
+      scheduleStartTime,
+      scheduleEndTime,
+    ],
+  );
+
   const canContinue = () => {
     if (step === 0) return hasStudentSelection;
     if (step === 1) return tutorId !== null;
@@ -399,6 +467,29 @@ export function ScheduleClassModal({
         scheduleStartTime,
         scheduleEndTime,
       );
+      const isRecurring = classType === "recurring";
+
+      const planned = computePlannedSessionTotal({
+        classType,
+        durationMode,
+        sessionCount,
+        endsOnDateText,
+        scheduleDays,
+        scheduleStartTime,
+        scheduleEndTime,
+      });
+      if (!planned.ok) {
+        if (planned.reason === "invalid_end") {
+          toast.error("Please enter a valid end date (DD MM YYYY).");
+        } else {
+          toast.error(
+            "End date must be on or after the first class. Adjust the end date or schedule days.",
+          );
+        }
+        return;
+      }
+      const totalPlanned = planned.total;
+
       const body: CreateAdminClassBody = {
         tutorId: t.id,
         learnerIds: students.map((s) => s.id),
@@ -406,15 +497,13 @@ export function ScheduleClassModal({
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         firstSessionStart: start.toISOString(),
         firstSessionEnd: end.toISOString(),
-        recurrence:
-          classType === "recurring"
-            ? { rule: "weekly", totalSessions: sessionCount }
-            : { rule: "none" },
+        recurrence: isRecurring
+          ? { rule: "weekly", totalSessions: totalPlanned }
+          : { rule: "none" },
         scheduleDayLabels: scheduleDays,
         scheduleStartTime,
         scheduleEndTime,
-        totalSessionsPlanned:
-          durationMode === "sessions" ? sessionCount : 12,
+        totalSessionsPlanned: totalPlanned,
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;
@@ -954,7 +1043,8 @@ export function ScheduleClassModal({
                               type="number"
                               min={1}
                               max={999}
-                              value={sessionCount}
+                              value={durationMode === "sessions" ? sessionCount : ""}
+                              placeholder="—"
                               onFocus={() => setDurationMode("sessions")}
                               onChange={(e) => {
                                 setDurationMode("sessions");
@@ -1257,6 +1347,18 @@ export function ScheduleClassModal({
                           ? `${scheduleStartTime} - ${scheduleEndTime} · ${formatReviewUntilSuffix(durationMode, endsOnDateText, sessionCount)}`
                           : "—"}
                       </p>
+                      {classType === "recurring" && plannedSessionPreview.ok ? (
+                        <p className="mt-2 text-base font-bold text-[#1B5E20]">
+                          Total planned sessions: {plannedSessionPreview.total}
+                        </p>
+                      ) : null}
+                      {classType === "recurring" && !plannedSessionPreview.ok ? (
+                        <p className="mt-2 text-sm text-amber-800" role="status">
+                          Set a valid end date (DD MM YYYY) on the schedule
+                          step—the total is counted from the first class through
+                          that date.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

@@ -49,3 +49,90 @@ export function computeFirstSessionRange(
   }
   return { start, end };
 }
+
+const dayLabelNorm = (label: string) => label.trim().slice(0, 3).toLowerCase();
+const dayShort = (d: Date) =>
+  d
+    .toLocaleDateString("en-US", { weekday: "short" })
+    .slice(0, 3)
+    .toLowerCase();
+const dayMatchesLabel = (d: Date, weekdayLabels: string[]) =>
+  weekdayLabels.some((w) => dayLabelNorm(w) === dayShort(d));
+
+/**
+ * "Ends on" field from the admin schedule modal (DD   MM   YYYY, space-separated).
+ */
+export function parseEndsOnDisplayToLocalDate(text: string): Date | null {
+  const parts = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+  if (parts.length < 3) {
+    return null;
+  }
+  const d = Number.parseInt(parts[0]!, 10);
+  const m = Number.parseInt(parts[1]!, 10);
+  const y = Number.parseInt(parts[2]!, 10);
+  if (
+    !Number.isFinite(d) ||
+    !Number.isFinite(m) ||
+    !Number.isFinite(y) ||
+    m < 1 ||
+    m > 12 ||
+    d < 1 ||
+    d > 31
+  ) {
+    return null;
+  }
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+    return null;
+  }
+  return dt;
+}
+
+/**
+ * How many class occurrences from the first session (inclusive) through the end day (inclusive
+ * end-of-day), using the same weekday matching as {@link computeFirstSessionRange}.
+ */
+export function countSessionsThroughEndDate(
+  weekdayLabels: string[],
+  firstSessionStart: Date,
+  endDateInclusiveLocal: Date,
+): number {
+  if (weekdayLabels.length === 0) {
+    return 0;
+  }
+  const h = firstSessionStart.getHours();
+  const min = firstSessionStart.getMinutes();
+  const firstMs = firstSessionStart.getTime();
+  const endLimit = new Date(endDateInclusiveLocal);
+  endLimit.setHours(23, 59, 59, 999);
+
+  const startDay = new Date(firstSessionStart);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(endDateInclusiveLocal);
+  endDay.setHours(0, 0, 0, 0);
+
+  let count = 0;
+  for (
+    let d = new Date(startDay);
+    d.getTime() <= endDay.getTime();
+    d.setDate(d.getDate() + 1)
+  ) {
+    if (!dayMatchesLabel(d, weekdayLabels)) {
+      continue;
+    }
+    const occ = new Date(d);
+    occ.setHours(h, min, 0, 0);
+    if (occ.getTime() < firstMs) {
+      continue;
+    }
+    if (occ.getTime() > endLimit.getTime()) {
+      continue;
+    }
+    count += 1;
+  }
+  return count;
+}

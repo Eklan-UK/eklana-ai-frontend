@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import type { ClassStatus, ClassType, TeachingClass } from "./types";
 import { mergeClassDrawerDetail } from "./types";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 type AttendanceOverride = "present" | "late" | "absent" | null;
 
@@ -138,8 +139,11 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
       >
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6">
-            <div className="mb-6 flex items-start justify-between gap-3">
-              <DrawerStatusPill status={session.status} />
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <DrawerStatusPill status={session.status} />
+                {session.nextSessionIsReschedule ? <RescheduleTag /> : null}
+              </div>
               <button
                 type="button"
                 onClick={onClose}
@@ -390,16 +394,7 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
 
           <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
             <div className="flex gap-3">
-              {isCompleted ? (
-                <button
-                  type="button"
-                  disabled
-                  className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 py-3 text-sm font-bold text-gray-400"
-                >
-                  <RefreshCw className="h-4 w-4" strokeWidth={2} />
-                  Reschedule
-                </button>
-              ) : session.nextSessionId ? (
+              {session.nextSessionId ? (
                 <Link
                   href={`/admin/classes/session/${session.nextSessionId}`}
                   onClick={onClose}

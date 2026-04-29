@@ -25,6 +25,15 @@ const targetSentenceSchema = z.object({
 	sentenceAudioUrl: z.string().optional(),
 });
 
+const pronunciationItemSchema = z.object({
+	sound: z.string(),
+	word: z.string(),
+	sentence: z.string(),
+	soundAudioUrl: z.string().optional(),
+	wordAudioUrl: z.string().optional(),
+	sentenceAudioUrl: z.string().optional(),
+});
+
 const dialogueTurnSchema = z.object({
 	speaker: z.enum(['student', 'ai_0', 'ai_1', 'ai_2', 'ai_3']),
 	text: z.string().min(1),
@@ -102,6 +111,7 @@ const createDrillSchema = z.object({
 	context: z.string().optional(),
 	audio_example_url: z.string().url().optional(),
 	target_sentences: z.array(targetSentenceSchema).optional(),
+	pronunciation_items: z.array(pronunciationItemSchema).optional(),
 	roleplay_dialogue: z.array(dialogueTurnSchema).optional(),
 	roleplay_scenes: z.array(roleplaySceneSchema).optional(),
 	student_character_name: z.string().optional(),
@@ -192,6 +202,7 @@ async function postHandler(
 	if (validated.context !== undefined) drillData.context = validated.context;
 	if (validated.audio_example_url !== undefined) drillData.audio_example_url = validated.audio_example_url;
 	if (validated.target_sentences !== undefined) drillData.target_sentences = validated.target_sentences;
+	if (validated.pronunciation_items !== undefined) drillData.pronunciation_items = validated.pronunciation_items;
 	if (validated.roleplay_dialogue !== undefined) drillData.roleplay_dialogue = validated.roleplay_dialogue;
 	if (validated.roleplay_scenes !== undefined) drillData.roleplay_scenes = validated.roleplay_scenes;
 	if (validated.student_character_name !== undefined) drillData.student_character_name = validated.student_character_name;

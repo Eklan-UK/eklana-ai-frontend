@@ -278,8 +278,12 @@ export function useLearnerTutorAvailability(tutorId: string | null) {
 export function useLearnerRescheduleSession(sessionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { newStartUtc: string; newEndUtc: string }) =>
-      classesAPI.learnerReschedule(sessionId, body),
+    mutationFn: (body: {
+      newStartUtc: string;
+      newEndUtc: string;
+      reservationId: string;
+      reservationToken: string;
+    }) => classesAPI.learnerReschedule(sessionId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
       queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
@@ -302,8 +306,12 @@ export function useAdminRescheduleSession(sessionId: string) {
   const queryClient = useQueryClient();
   const router = useRouter();
   return useMutation({
-    mutationFn: (body: { newStartUtc: string; newEndUtc: string }) =>
-      classesAPI.adminReschedule(sessionId, body),
+    mutationFn: (body: {
+      newStartUtc: string;
+      newEndUtc: string;
+      reservationId: string;
+      reservationToken: string;
+    }) => classesAPI.adminReschedule(sessionId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.classes.all });
       queryClient.invalidateQueries({ queryKey: ['tutor', 'classes'] });
@@ -319,6 +327,44 @@ export function useAdminRescheduleSession(sessionId: string) {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Could not reschedule');
+    },
+  });
+}
+
+/** Pessimistic hold for a selected reschedule time (learner). */
+export function useLearnerReserveRescheduleSlot(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { startUtc: string; endUtc: string }) => {
+      const res = await classesAPI.learnerReserveRescheduleSlot(sessionId, body);
+      if (!res.data) {
+        throw new Error('Could not reserve this time');
+      }
+      return res.data;
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.classes.learnerRescheduleOptions(sessionId),
+      });
+    },
+  });
+}
+
+/** Pessimistic hold for a selected reschedule time (admin). */
+export function useAdminReserveRescheduleSlot(sessionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { startUtc: string; endUtc: string }) => {
+      const res = await classesAPI.adminReserveRescheduleSlot(sessionId, body);
+      if (!res.data) {
+        throw new Error('Could not reserve this time');
+      }
+      return res.data;
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.classes.adminRescheduleOptions(sessionId),
+      });
     },
   });
 }

@@ -69,7 +69,7 @@ function buildFallbackClassSeriesTitle(
 	return `${prefix} (${first.slice(0, budget)}…)`;
 }
 
-function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
+export function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
   const m = rawMessage.toLowerCase();
   if (
     m.includes('socket disconnected') ||
@@ -195,6 +195,7 @@ export class ClassRepository {
     }
 
     let meetingUrl: string;
+    let googleCalendarEventId: string;
     try {
       const createdCalendarEvent = await createGoogleCalendarEventWithMeetLink({
         refreshToken,
@@ -210,6 +211,7 @@ export class ClassRepository {
         ].filter(Boolean),
       });
       meetingUrl = createdCalendarEvent.meetingUrl;
+      googleCalendarEventId = createdCalendarEvent.eventId;
     } catch (error: unknown) {
       const err = error as Error;
       logger.error('ClassRepository.create.googleCalendarEvent', {
@@ -265,6 +267,7 @@ export class ClassRepository {
             startUtc: start,
             endUtc: end,
             meetingUrl,
+            googleCalendarEventId,
             status: 'scheduled' as const,
             sequenceNumber: FIRST_SESSION_SEQUENCE_NUMBER,
           },
@@ -753,6 +756,7 @@ export class ClassRepository {
         endUtc: new Date(sess.endUtc).toISOString(),
         sessionStatus: sess.status as LearnerPastSessionItemDTO['sessionStatus'],
         learnerAttendance,
+        isReschedule: Boolean((sess as { isReschedule?: boolean }).isReschedule),
       };
     });
 

@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ArrowLeft, CalendarDays, Clock3, Info } from "lucide-react";
 import {
   useLearnerSession,
   useLearnerRescheduleOptions,
   useLearnerRescheduleSession,
+  useLearnerReserveRescheduleSlot,
 } from "@/hooks/useClasses";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 function formatTimeOnly(date: Date) {
   return date.toLocaleTimeString(undefined, {
@@ -28,12 +31,20 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
   const { data, isLoading, error } = useLearnerSession(sessionId);
   const canReschedule =
     !!data &&
-    (data.session.status === "scheduled" || data.session.status === "in_progress");
+    (data.session.status === "scheduled" ||
+      data.session.status === "in_progress" ||
+      data.session.status === "completed");
   const { data: optionsData, isLoading: optionsLoading } = useLearnerRescheduleOptions(sessionId, {
     enabled: canReschedule,
   });
   const reschedule = useLearnerRescheduleSession(sessionId);
+  const reserve = useLearnerReserveRescheduleSlot(sessionId);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [hold, setHold] = useState<{
+    reservationId: string;
+    token: string;
+  } | null>(null);
+  const lastReserveKey = useRef<string | null>(null);
 
   const slotChoices = useMemo(
     () =>
@@ -70,9 +81,12 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
           {canReschedule ? (
             <section className="overflow-hidden rounded-2xl  bg-card">
               <div className="flex items-center justify-between px-4 pt-4">
-                <h2 className="text-xl font-semibold text-foreground">
-                  Reschedule Session
-                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Reschedule Session
+                  </h2>
+                  {data.session.isReschedule ? <RescheduleTag /> : null}
+                </div>
               </div>
 
               <div className="space-y-4 px-3 pb-3 pt-3 sm:px-4">
@@ -124,7 +138,34 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
                           <button
                             key={slotKey}
                             type="button"
-                            onClick={() => setSelectedSlot(slotKey)}
+                            onClick={() => {
+                              setSelectedSlot(slotKey);
+                              setHold(null);
+                              lastReserveKey.current = slotKey;
+                              reserve.mutate(
+                                { startUtc: slot.startUtc, endUtc: slot.endUtc },
+                                {
+                                  onSuccess: (data) => {
+                                    if (lastReserveKey.current === slotKey) {
+                                      setHold({
+                                        reservationId: data.reservationId,
+                                        token: data.token,
+                                      });
+                                    }
+                                  },
+                                  onError: (err) => {
+                                    if (lastReserveKey.current === slotKey) {
+                                      setHold(null);
+                                    }
+                                    toast.error(
+                                      err instanceof Error
+                                        ? err.message
+                                        : "Could not hold this time. Try another slot.",
+                                    );
+                                  },
+                                },
+                              );
+                            }}
                             className={`w-full rounded-[16px] border px-4 py-3 text-left transition-colors ${
                               isSelected
                                 ? "border-primary bg-primary/10"
@@ -147,15 +188,29 @@ export function LearnerSessionClient({ sessionId }: { sessionId: string }) {
                 <div className="sticky bottom-0 bg-card pb-1 pt-1">
                   <button
                     type="button"
-                    disabled={!selectedSlot || reschedule.isPending}
+                    disabled={
+                      !selectedSlot ||
+                      !hold ||
+                      reserve.isPending ||
+                      reschedule.isPending
+                    }
                     onClick={() => {
                       const [newStartUtc, newEndUtc] = selectedSlot.split("|");
-                      if (!newStartUtc || !newEndUtc) return;
-                      reschedule.mutate({ newStartUtc, newEndUtc });
+                      if (!newStartUtc || !newEndUtc || !hold) return;
+                      reschedule.mutate({
+                        newStartUtc,
+                        newEndUtc,
+                        reservationId: hold.reservationId,
+                        reservationToken: hold.token,
+                      });
                     }}
                     className="w-full rounded-full bg-muted px-4 py-3 text-lg font-semibold text-white disabled:cursor-not-allowed enabled:bg-primary"
                   >
-                    {reschedule.isPending ? "Saving..." : "Continue"}
+                    {reserve.isPending
+                      ? "Holding time…"
+                      : reschedule.isPending
+                        ? "Saving..."
+                        : "Continue"}
                   </button>
                 </div>
               </div>

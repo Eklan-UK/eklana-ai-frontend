@@ -10,6 +10,7 @@ import {
 import { useRecordLearnerAttendance } from "@/hooks/useClasses";
 import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
 import { formatStartsInLabel } from "@/lib/classes/pick-next-learner-session";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 /** Bright cyan at bottom-right → deeper blue at top-left (see design mock). */
 const NEXT_SESSION_CARD_BG: CSSProperties = {
@@ -58,9 +59,10 @@ export function LearnerNextSessionCard({
       style={NEXT_SESSION_CARD_BG}
     >
       <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <Video className="w-5 h-5 shrink-0 opacity-95" strokeWidth={2} />
           <span className="font-semibold text-sm">Next Session</span>
+          {session?.nextSessionIsReschedule ? <RescheduleTag className="bg-white/25 border-white/40 text-white" /> : null}
         </div>
         {startsIn ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium shrink-0">

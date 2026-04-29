@@ -13,6 +13,8 @@ import '@/models/class-session';
 const bodySchema = z.object({
   newStartUtc: z.string(),
   newEndUtc: z.string(),
+  reservationId: z.string().min(1),
+  reservationToken: z.string().min(1),
 });
 
 async function postHandler(
@@ -39,6 +41,8 @@ async function postHandler(
     learnerId: context.userId,
     newStartUtc: newStart,
     newEndUtc: newEnd,
+    reservationId: parsed.data.reservationId,
+    reservationToken: parsed.data.reservationToken,
   });
 
   return apiResponse.success({ updated: true });
