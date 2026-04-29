@@ -1,42 +1,19 @@
-// POST /api/v1/learner/sessions/[sessionId]/reserve-slot — pessimistic hold on a reschedule time
+// POST /api/v1/learner/sessions/[sessionId]/reserve-slot — learners may not self-reschedule
 import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
-import { z } from 'zod';
 import { withRole } from '@/lib/api/middleware';
 import { withErrorHandler } from '@/lib/api/error-handler';
-import { connectToDatabase } from '@/lib/api/db';
 import { apiResponse } from '@/lib/api/response';
-import { parseRequestBody } from '@/lib/api/request-parser';
-import { RescheduleService } from '@/domain/classes/reschedule.service';
-import '@/models/class-slot-reservation';
-import '@/models/class-session';
 
-const bodySchema = z.object({
-  startUtc: z.string(),
-  endUtc: z.string(),
-});
+const FORBIDDEN_MSG =
+  'Only an administrator or the assigned tutor can change the session time.';
 
 async function postHandler(
-  req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
-  params: { sessionId: string },
+  _req: NextRequest,
+  _context: { userId: Types.ObjectId; userRole: string },
+  _params: { sessionId: string },
 ) {
-  await connectToDatabase();
-  const raw = await parseRequestBody(req);
-  const parsed = bodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return apiResponse.error('ValidationError', parsed.error.message, 400);
-  }
-
-  const svc = new RescheduleService();
-  const data = await svc.createLearnerRescheduleSlotReservation(
-    params.sessionId,
-    context.userId,
-    parsed.data.startUtc,
-    parsed.data.endUtc,
-  );
-
-  return apiResponse.success(data);
+  return apiResponse.error('Forbidden', FORBIDDEN_MSG, 403);
 }
 
 export async function POST(

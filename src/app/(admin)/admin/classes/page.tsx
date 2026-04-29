@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Filter,
@@ -12,12 +13,14 @@ import {
   User,
   Video,
   X,
+  RefreshCw,
 } from "lucide-react";
 import type { ClassStatus, ClassType, TeachingClass } from "./types";
 import { ClassDetailDrawer } from "./class-detail-drawer";
 import { ScheduleClassModal } from "./schedule-class-modal";
 import { useAdminClasses, useDeleteAdminClass } from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
+import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 
 function formatHeaderDate() {
@@ -71,9 +74,23 @@ function ClassTypeBadge({ type }: { type: ClassType }) {
 }
 
 export default function AdminClassesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
   const [tab, setTab] = useState<"today" | "upcoming" | "completed">("today");
   const [detailSession, setDetailSession] = useState<TeachingClass | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleTypeChoiceOpen, setScheduleTypeChoiceOpen] = useState(false);
+
+  useEffect(() => {
+    if (
+      tabFromUrl === "today" ||
+      tabFromUrl === "upcoming" ||
+      tabFromUrl === "completed"
+    ) {
+      setTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   const { data, isLoading, error } = useAdminClasses({ limit: 100 });
   const deleteClass = useDeleteAdminClass();
@@ -97,6 +114,15 @@ export default function AdminClassesPage() {
     const rows = data?.classes ?? [];
     return rows.map(adminDtoToTeachingClass);
   }, [data?.classes]);
+
+  const detailId = detailSession?.id;
+  useEffect(() => {
+    if (detailId == null) return;
+    const row = classes.find((c) => c.id === detailId);
+    if (row) {
+      setDetailSession(row);
+    }
+  }, [classes, detailId]);
 
   const todayCount = useMemo(
     () => classes.filter((c) => c.bucket === "today").length,
@@ -130,6 +156,69 @@ export default function AdminClassesPage() {
         onClose={() => setScheduleModalOpen(false)}
         onScheduled={(bucket) => setTab(bucket)}
       />
+      {scheduleTypeChoiceOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close schedule type dialog"
+            className="fixed inset-0 z-[60] cursor-default bg-black/40"
+            onClick={() => setScheduleTypeChoiceOpen(false)}
+          />
+          <div
+            className="fixed left-1/2 top-1/2 z-[70] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-labelledby="schedule-type-title"
+            aria-modal="true"
+          >
+            <h2
+              id="schedule-type-title"
+              className="text-lg font-bold text-gray-900"
+            >
+              Schedule a class
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Choose the type of schedule
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setScheduleTypeChoiceOpen(false);
+                  setScheduleModalOpen(true);
+                }}
+                className="flex flex-col items-start gap-2 rounded-2xl border-2 border-gray-200 p-4 text-left transition-colors hover:border-[#3d8c40] hover:bg-emerald-50/30"
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-slate-600">
+                  <RefreshCw className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <span className="font-bold text-slate-900">Recurring</span>
+                <span className="text-xs text-gray-500">Weekly pattern</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setScheduleTypeChoiceOpen(false);
+                  router.push("/admin/classes/schedule-one-time");
+                }}
+                className="flex flex-col items-start gap-2 rounded-2xl border-2 border-gray-200 p-4 text-left transition-colors hover:border-[#3d8c40] hover:bg-emerald-50/30"
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-slate-600">
+                  <Calendar className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <span className="font-bold text-slate-900">One-time</span>
+                <span className="text-xs text-gray-500">Single class session</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScheduleTypeChoiceOpen(false)}
+              className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-gray-500 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
@@ -139,11 +228,11 @@ export default function AdminClassesPage() {
         </div>
         <button
           type="button"
-          onClick={() => setScheduleModalOpen(true)}
+          onClick={() => setScheduleTypeChoiceOpen(true)}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#3d8c40] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#327035] focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/30"
         >
           <Plus className="h-4 w-4" />
-          Schedule Class
+          Schedule class
         </button>
       </div>
 
@@ -283,11 +372,12 @@ export default function AdminClassesPage() {
             session.totalSessions > 0
               ? Math.min(
                   100,
-                  (session.completedSessions / session.totalSessions) * 100,
+                  (session.programPosition / session.totalSessions) * 100,
                 )
               : 0;
           const joinUrl = session.meetingUrl?.trim();
           const canJoin = session.status === "active" && Boolean(joinUrl);
+          const scheduleBlock = getClassCardScheduleBlock(session);
 
           return (
             <article
@@ -342,11 +432,11 @@ export default function AdminClassesPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-start gap-2 text-slate-600">
                     <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" strokeWidth={2} />
-                    <span className="font-medium leading-snug">{session.scheduleDays}</span>
+                    <span className="font-medium leading-snug">{scheduleBlock.dayLabel}</span>
                   </div>
                   <div className="flex items-start gap-2 text-slate-600">
                     <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" strokeWidth={2} />
-                    <span className="font-medium leading-snug">{session.timeRange}</span>
+                    <span className="font-medium leading-snug">{scheduleBlock.timeLabel}</span>
                   </div>
                 </div>
               </div>
@@ -358,7 +448,7 @@ export default function AdminClassesPage() {
                     Progress
                   </span>
                   <span className="text-sm font-bold text-slate-900">
-                    {session.completedSessions} of {session.totalSessions} completed
+                    {session.programPosition} of {session.totalSessions}
                   </span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200/90">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -13,26 +14,23 @@ import {
   Calendar,
   ArrowLeft,
   ArrowRight,
-  Info,
-  RefreshCw,
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { adminAPI } from "@/lib/api";
 import { useCreateAdminClass } from "@/hooks/useClasses";
 import {
-  computeFirstSessionRange,
-  countSessionsThroughEndDate,
+  computeSessionRangeOnLocalDate,
   parseEndsOnDisplayToLocalDate,
+  weekdayShortLabelFromDate,
 } from "@/lib/classes/first-session";
 import type { CreateAdminClassBody } from "@/domain/classes/class.api.types";
 
 const STEP_LABELS = ["Students", "Tutor", "Schedule", "Review"] as const;
-
-/** Header stepper: one green for circles, labels, and connectors (matches review / confirm CTA) */
 const STEPPER_GREEN = "#388E3C";
-
 const REMINDER_OPTIONS = [
   "5 minutes before",
   "10 minutes before",
@@ -41,71 +39,12 @@ const REMINDER_OPTIONS = [
   "1 hour before",
 ] as const;
 
-/** Visual match for date pill: "DD   MM   YYYY" spacing from native date value */
+/** Same as schedule modal: native `type="date"` value to display pill */
 function formatIsoToDisplayDate(iso: string) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return "";
   return `${d.padStart(2, "0")}   ${m.padStart(2, "0")}   ${y}`;
-}
-
-function formatReviewUntilSuffix(
-  durationMode: "sessions" | "endDate",
-  endsOnDateText: string,
-  sessionCount: number,
-): string {
-  if (durationMode === "endDate" && endsOnDateText.trim()) {
-    const raw = endsOnDateText.trim().replace(/\s+/g, " ");
-    const parts = raw.split(" ").filter(Boolean);
-    if (parts.length === 3) {
-      const [d, m, y] = parts;
-      if (y?.length === 4 && d && m) {
-        return `Until ${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-      }
-    }
-    return `Until ${raw}`;
-  }
-  return `Until ${sessionCount} session${sessionCount !== 1 ? "s" : ""}`;
-}
-
-type DurationMode = "sessions" | "endDate";
-
-type PlannedSessionResult =
-  | { ok: true; total: number }
-  | { ok: false; reason: "invalid_end" | "count_zero" };
-
-/**
- * Single source of truth for total planned sessions (must match submit body).
- */
-function computePlannedSessionTotal(params: {
-  durationMode: DurationMode;
-  sessionCount: number;
-  endsOnDateText: string;
-  scheduleDays: string[];
-  scheduleStartTime: string;
-  scheduleEndTime: string;
-}): PlannedSessionResult {
-  if (params.durationMode === "sessions") {
-    return { ok: true, total: params.sessionCount };
-  }
-  const { start } = computeFirstSessionRange(
-    params.scheduleDays,
-    params.scheduleStartTime,
-    params.scheduleEndTime,
-  );
-  const parsedEnd = parseEndsOnDisplayToLocalDate(params.endsOnDateText);
-  if (!parsedEnd) {
-    return { ok: false, reason: "invalid_end" };
-  }
-  const n = countSessionsThroughEndDate(
-    params.scheduleDays,
-    start,
-    parsedEnd,
-  );
-  if (n < 1) {
-    return { ok: false, reason: "count_zero" };
-  }
-  return { ok: true, total: n };
 }
 
 interface PickerStudent {
@@ -176,31 +115,34 @@ function userToTutorOption(u: {
   };
 }
 
-interface ScheduleClassModalProps {
-  open: boolean;
-  onClose: () => void;
-  /** Called after successful API create; parent may switch tab. */
-  onScheduled?: (bucket: "today" | "upcoming") => void;
+const STEP_ADVANCE_MS = 600;
+
+function digitsOnly(s: string) {
+  return s.replace(/\D/g, "");
 }
 
-export function ScheduleClassModal({
-  open,
-  onClose,
-  onScheduled,
-}: ScheduleClassModalProps) {
+/** Parsed positive integer, or null if empty/invalid */
+function parseClassCount(s: string): number | null {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = Number.parseInt(t, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
+}
+
+export default function ScheduleOneTimePage() {
+  const router = useRouter();
   const createClass = useCreateAdminClass();
 
   const { data: learnersRes, isLoading: learnersLoading } = useQuery({
-    queryKey: ["admin", "learners", "schedule-class-modal"],
+    queryKey: ["admin", "learners", "schedule-one-time"],
     queryFn: () => adminAPI.getAllLearners({ limit: 200 }),
-    enabled: open,
     staleTime: 60_000,
   });
 
   const { data: tutorsRes, isLoading: tutorsLoading } = useQuery({
-    queryKey: ["admin", "users", "tutors", "schedule-class-modal"],
+    queryKey: ["admin", "users", "tutors", "schedule-one-time"],
     queryFn: () => adminAPI.getAllUsers({ role: "tutor", limit: 200 }),
-    enabled: open,
     staleTime: 60_000,
   });
 
@@ -225,75 +167,43 @@ export function ScheduleClassModal({
   const [tutorSearch, setTutorSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [tutorId, setTutorId] = useState<string | null>(null);
-  const [scheduleDays, setScheduleDays] = useState<string[]>(["Mon", "Thu"]);
+  const [classDateDisplayText, setClassDateDisplayText] = useState("");
+  const classDatePickerRef = useRef<HTMLInputElement>(null);
+  /** Editable class position (N of M) — no default so admins set values freely */
+  const [classSessionInput, setClassSessionInput] = useState("");
+  const [totalProgramInput, setTotalProgramInput] = useState("");
   const [scheduleStartTime, setScheduleStartTime] = useState("");
   const [scheduleEndTime, setScheduleEndTime] = useState("");
-  const [durationMode, setDurationMode] = useState<DurationMode>("sessions");
-  const [sessionCount, setSessionCount] = useState(12);
-  /** Shown in "Ends on" pill (typed or filled via calendar picker) */
-  const [endsOnDateText, setEndsOnDateText] = useState("");
-  const endsDatePickerRef = useRef<HTMLInputElement>(null);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
-  const [reminderBeforeSession, setReminderBeforeSession] =
-    useState<(typeof REMINDER_OPTIONS)[number]>("10 minutes before");
-  const [reminderSecondary, setReminderSecondary] =
-    useState<(typeof REMINDER_OPTIONS)[number]>("30 minutes before");
-  /** Index of connector segment animating fill (between step i and i+1) */
+  const [reminderBeforeSession, setReminderBeforeSession] = useState<
+    (typeof REMINDER_OPTIONS)[number]
+  >("10 minutes before");
+  const [reminderSecondary, setReminderSecondary] = useState<
+    (typeof REMINDER_OPTIONS)[number]
+  >("30 minutes before");
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number | null>(
     null,
   );
-  /** Tutor step circle pulse right after line fill completes */
   const [tutorStepPulse, setTutorStepPulse] = useState(false);
-  /** Review step circle pulse after Schedule → Review transition */
   const [reviewStepPulse, setReviewStepPulse] = useState(false);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const STEP_ADVANCE_MS = 600;
+  const classCountM = useMemo(
+    () => parseClassCount(totalProgramInput),
+    [totalProgramInput],
+  );
+  const classCountN = useMemo(
+    () => parseClassCount(classSessionInput),
+    [classSessionInput],
+  );
 
   useEffect(() => {
-    if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  /* eslint-disable react-hooks/set-state-in-effect -- full wizard reset when modal opens */
-  useEffect(() => {
-    if (advanceTimerRef.current) {
-      clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = null;
-    }
-    if (!open) return;
-    setStep(0);
-    setSearch("");
-    setTutorSearch("");
-    setSelectedIds(new Set());
-    setTutorId(null);
-    setScheduleDays(["Mon", "Thu"]);
-    setScheduleStartTime("");
-    setScheduleEndTime("");
-    setDurationMode("sessions");
-    setSessionCount(12);
-    setEndsOnDateText("");
-    setRemindersEnabled(true);
-    setReminderBeforeSession("10 minutes before");
-    setReminderSecondary("30 minutes before");
-    setAnimatingLineIndex(null);
-    setTutorStepPulse(false);
-    setReviewStepPulse(false);
-  }, [open]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const filteredStudents = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -328,6 +238,25 @@ export function ScheduleClassModal({
 
   const hasStudentSelection = selectedIds.size > 0;
 
+  const classLocalDate = useMemo(
+    () => parseEndsOnDisplayToLocalDate(classDateDisplayText),
+    [classDateDisplayText],
+  );
+
+  const scheduleStepComplete = (() => {
+    const m = parseClassCount(totalProgramInput);
+    const n = parseClassCount(classSessionInput);
+    return (
+      classLocalDate != null &&
+      scheduleStartTime.trim() !== "" &&
+      scheduleEndTime.trim() !== "" &&
+      m != null &&
+      n != null &&
+      n >= 1 &&
+      n <= m
+    );
+  })();
+
   const stepSubtitle = useMemo(() => {
     switch (step) {
       case 0:
@@ -335,7 +264,7 @@ export function ScheduleClassModal({
       case 1:
         return "Assign a tutor to this class";
       case 2:
-        return "Configure the class schedule.";
+        return "Set the class date, time, and session in program.";
       case 3:
         return "Review and confirm the class details";
       default:
@@ -349,15 +278,7 @@ export function ScheduleClassModal({
 
   const primaryLabelStep1 = tutorId
     ? "Continue to schedule"
-  : "Select a connected tutor to continue";
-
-  const scheduleStepComplete =
-    scheduleDays.length > 0 &&
-    scheduleStartTime.trim() !== "" &&
-    scheduleEndTime.trim() !== "" &&
-    (durationMode === "sessions"
-      ? sessionCount >= 1
-      : endsOnDateText.trim() !== "");
+    : "Select a connected tutor to continue";
 
   const primaryLabelStepSchedule = scheduleStepComplete
     ? "Continue to review"
@@ -370,31 +291,28 @@ export function ScheduleClassModal({
     return `${n} students - Group Class`;
   }, [selectedIds.size]);
 
-  const plannedSessionPreview = useMemo(
-    () =>
-      computePlannedSessionTotal({
-        durationMode,
-        sessionCount,
-        endsOnDateText,
-        scheduleDays,
-        scheduleStartTime,
-        scheduleEndTime,
-      }),
-    [
-      durationMode,
-      sessionCount,
-      endsOnDateText,
-      scheduleDays,
-      scheduleStartTime,
-      scheduleEndTime,
-    ],
-  );
-
   const canContinue = () => {
     if (step === 0) return hasStudentSelection;
     if (step === 1) return tutorId !== null;
     if (step === 2) return scheduleStepComplete;
     return true;
+  };
+
+  const onClose = useCallback(() => {
+    router.push("/admin/classes");
+  }, [router]);
+
+  const handleBack = () => {
+    if (animatingLineIndex !== null) {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = null;
+      }
+      setAnimatingLineIndex(null);
+      return;
+    }
+    if (step === 0) onClose();
+    else setStep((s) => s - 1);
   };
 
   const handlePrimary = async () => {
@@ -412,12 +330,8 @@ export function ScheduleClassModal({
         setAnimatingLineIndex(null);
         advanceTimerRef.current = null;
         if (from === 1) {
-          setScheduleStartTime((st) =>
-            st.trim() === "" ? "09:00" : st,
-          );
-          setScheduleEndTime((et) =>
-            et.trim() === "" ? "10:30" : et,
-          );
+          setScheduleStartTime((st) => (st.trim() === "" ? "09:00" : st));
+          setScheduleEndTime((et) => (et.trim() === "" ? "10:30" : et));
         }
         if (nextStep === 1) {
           setTutorStepPulse(true);
@@ -444,31 +358,27 @@ export function ScheduleClassModal({
       return;
     }
 
+    const localD = classLocalDate;
+    if (!localD) {
+      toast.error("Please enter a valid class date (DD   MM   YYYY).");
+      return;
+    }
+
+    const m = parseClassCount(totalProgramInput);
+    const n = parseClassCount(classSessionInput);
+    if (m == null || n == null || n < 1 || n > m) {
+      toast.error(
+        "Enter valid class numbers: session (1 to total) and program total.",
+      );
+      return;
+    }
+
     try {
-      const { start, end } = computeFirstSessionRange(
-        scheduleDays,
+      const { start, end } = computeSessionRangeOnLocalDate(
+        localD,
         scheduleStartTime,
         scheduleEndTime,
       );
-      const planned = computePlannedSessionTotal({
-        durationMode,
-        sessionCount,
-        endsOnDateText,
-        scheduleDays,
-        scheduleStartTime,
-        scheduleEndTime,
-      });
-      if (!planned.ok) {
-        if (planned.reason === "invalid_end") {
-          toast.error("Please enter a valid end date (DD MM YYYY).");
-        } else {
-          toast.error(
-            "End date must be on or after the first class. Adjust the end date or schedule days.",
-          );
-        }
-        return;
-      }
-      const totalPlanned = planned.total;
 
       const body: CreateAdminClassBody = {
         tutorId: t.id,
@@ -477,42 +387,27 @@ export function ScheduleClassModal({
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         firstSessionStart: start.toISOString(),
         firstSessionEnd: end.toISOString(),
-        recurrence: { rule: "weekly", totalSessions: totalPlanned },
-        scheduleDayLabels: scheduleDays,
+        recurrence: { rule: "none" },
+        scheduleDayLabels: [weekdayShortLabelFromDate(localD)],
         scheduleStartTime,
         scheduleEndTime,
-        totalSessionsPlanned: totalPlanned,
+        totalSessionsPlanned: m,
+        firstSessionSequenceNumber: n,
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;
-      const bucket: "today" | "upcoming" =
+      const b: "today" | "upcoming" =
         raw === "today" || raw === "upcoming" ? raw : "upcoming";
-      onScheduled?.(bucket);
-      onClose();
+      const tab = b === "today" ? "?tab=today" : "?tab=upcoming";
+      router.push(`/admin/classes${tab}`);
     } catch {
       /* useCreateAdminClass shows error toast */
     }
   };
 
-  const handleBack = () => {
-    if (animatingLineIndex !== null) {
-      if (advanceTimerRef.current) {
-        clearTimeout(advanceTimerRef.current);
-        advanceTimerRef.current = null;
-      }
-      setAnimatingLineIndex(null);
-      return;
-    }
-    if (step === 0) onClose();
-    else setStep((s) => s - 1);
-  };
-
-  if (!open) return null;
-
   const selectedStudents = apiLearners.filter((s) => selectedIds.has(s.id));
   const tutor = apiTutors.find((t) => t.id === tutorId);
   const studentCount = selectedIds.size;
-  /** Defense in depth: block confirm if tutor row is missing or not Google-connected */
   const scheduleBlockedNoGoogleCalendar =
     !!tutorId && (!tutor || !tutor.googleCalendarConnected);
   const reviewStepIndex = STEP_LABELS.length - 1;
@@ -520,20 +415,20 @@ export function ScheduleClassModal({
   return (
     <>
       <style>{`
-        @keyframes schedule-stepper-fill {
+        @keyframes schedule-stepper-fill-ot {
           from { transform: scaleX(0); }
           to { transform: scaleX(1); }
         }
-        @keyframes schedule-tutor-circle-pop {
+        @keyframes schedule-tutor-circle-pop-ot {
           0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(61, 140, 64, 0.35); }
           55% { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(61, 140, 64, 0.12); }
           100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(61, 140, 64, 0); }
         }
-        .animate-schedule-stepper-fill {
-          animation: schedule-stepper-fill 0.6s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+        .animate-schedule-stepper-fill-ot {
+          animation: schedule-stepper-fill-ot 0.6s cubic-bezier(0.33, 1, 0.68, 1) forwards;
         }
-        .animate-schedule-tutor-step {
-          animation: schedule-tutor-circle-pop 0.5s ease-out forwards;
+        .animate-schedule-tutor-step-ot {
+          animation: schedule-tutor-circle-pop-ot 0.5s ease-out forwards;
         }
       `}</style>
       <div
@@ -544,30 +439,47 @@ export function ScheduleClassModal({
         className="fixed inset-0 z-[90] flex items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="schedule-class-title"
+        aria-labelledby="schedule-one-time-title"
       >
         <div className="flex max-h-[min(92vh,760px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-2xl">
           <header className="shrink-0 border-b border-gray-100 px-6 pt-5 pb-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 pr-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <Link
+                    href="/admin/classes"
+                    className="text-[#2d6a32] transition-colors hover:underline"
+                  >
+                    Classes
+                  </Link>
+                  {" · One-time"}
+                </p>
                 <h2
-                  id="schedule-class-title"
+                  id="schedule-one-time-title"
                   className="text-xl font-bold leading-tight tracking-tight text-slate-900"
                 >
-                  Schedule New Class
+                  Schedule one-time class
                 </h2>
                 <p className="mt-1.5 text-sm leading-snug text-gray-500">
                   {stepSubtitle}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="-mr-1 -mt-0.5 shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-500"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" strokeWidth={2} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <Link
+                  href="/admin/classes"
+                  className="hidden rounded-lg p-1.5 text-sm font-bold text-gray-500 hover:bg-gray-100 sm:inline"
+                >
+                  Back to list
+                </Link>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="-mr-1 -mt-0.5 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-500"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" strokeWidth={2} />
+                </button>
+              </div>
             </div>
 
             <div
@@ -577,7 +489,6 @@ export function ScheduleClassModal({
               {STEP_LABELS.map((label, i) => {
                 const num = i + 1;
                 const last = i === STEP_LABELS.length - 1;
-                /** During line fill we haven't advanced `step` yet — mark current + prior steps complete */
                 const lineBusy =
                   animatingLineIndex !== null && step === animatingLineIndex;
                 const done =
@@ -595,7 +506,7 @@ export function ScheduleClassModal({
                           done || active
                             ? "text-white"
                             : "bg-gray-100 text-gray-400"
-                        } ${circlePulse ? "animate-schedule-tutor-step" : ""}`}
+                        } ${circlePulse ? "animate-schedule-tutor-step-ot" : ""}`}
                         style={
                           done || active
                             ? { backgroundColor: STEPPER_GREEN }
@@ -616,9 +527,7 @@ export function ScheduleClassModal({
                               ? "font-bold text-slate-900"
                               : "font-medium text-gray-400"
                         }`}
-                        style={
-                          done ? { color: STEPPER_GREEN } : undefined
-                        }
+                        style={done ? { color: STEPPER_GREEN } : undefined}
                       >
                         {label}
                       </span>
@@ -631,7 +540,7 @@ export function ScheduleClassModal({
                         <div
                           className={`absolute inset-y-0 left-0 w-full origin-left rounded-full ${
                             animatingLineIndex === i
-                              ? "scale-x-0 animate-schedule-stepper-fill"
+                              ? "scale-x-0 animate-schedule-stepper-fill-ot"
                               : ""
                           } ${
                             step > i && animatingLineIndex !== i
@@ -642,9 +551,7 @@ export function ScheduleClassModal({
                               ? "scale-x-0"
                               : ""
                           }`}
-                          style={{
-                            backgroundColor: STEPPER_GREEN,
-                          }}
+                          style={{ backgroundColor: STEPPER_GREEN }}
                         />
                       </div>
                     ) : null}
@@ -809,28 +716,6 @@ export function ScheduleClassModal({
                                   </p>
                                 ) : null}
                               </div>
-                              <div className="flex shrink-0 flex-col items-end gap-2">
-                                {t.recommended ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
-                                    <Info
-                                      className="h-3 w-3"
-                                      strokeWidth={2.5}
-                                    />
-                                    Recommended
-                                  </span>
-                                ) : null}
-                                {sel ? (
-                                  <span
-                                    className="flex h-4 w-4 items-center justify-center rounded-full bg-[#2d6a32] text-white shadow-sm"
-                                    aria-hidden
-                                  >
-                                    <Check
-                                      className="h-3 w-3"
-                                      strokeWidth={2.5}
-                                    />
-                                  </span>
-                                ) : null}
-                              </div>
                             </div>
                             <div className="mt-3 flex items-center gap-2">
                               <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-200">
@@ -855,73 +740,39 @@ export function ScheduleClassModal({
             {step === 2 ? (
               <>
                 <h3 className="text-base font-bold text-gray-900">
-                  Configure Schedule
+                  Configure schedule
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Set up recurring class schedule.
+                  Set start and end time, class position in the program, and the
+                  class date.
                 </p>
 
                 <div className="mt-5 space-y-5">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      Select Days
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                        (d) => {
-                          const on = scheduleDays.includes(d);
-                          return (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => {
-                                setScheduleDays((prev) =>
-                                  on
-                                    ? prev.filter((x) => x !== d)
-                                    : [...prev, d],
-                                );
-                              }}
-                              className={`rounded-full border px-3.5 py-2 text-xs font-bold transition-colors ${
-                                on
-                                  ? "border-[#2d6a32] bg-[#2d6a32] text-white"
-                                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                              }`}
-                            >
-                              {d}
-                            </button>
-                          );
-                        },
-                      )}
-                    </div>
-                  </div>
-
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label
-                        htmlFor="schedule-start"
+                        htmlFor="ot-schedule-start"
                         className="text-sm font-semibold text-gray-800"
                       >
-                        Start Time
+                        Start time
                       </label>
                       <input
-                        id="schedule-start"
+                        id="ot-schedule-start"
                         type="time"
                         value={scheduleStartTime}
-                        onChange={(e) =>
-                          setScheduleStartTime(e.target.value)
-                        }
+                        onChange={(e) => setScheduleStartTime(e.target.value)}
                         className="mt-2 w-full rounded-2xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-[#3d8c40]/50 focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/15"
                       />
                     </div>
                     <div>
                       <label
-                        htmlFor="schedule-end"
+                        htmlFor="ot-schedule-end"
                         className="text-sm font-semibold text-gray-800"
                       >
-                        End Time
+                        End time
                       </label>
                       <input
-                        id="schedule-end"
+                        id="ot-schedule-end"
                         type="time"
                         value={scheduleEndTime}
                         onChange={(e) => setScheduleEndTime(e.target.value)}
@@ -936,99 +787,65 @@ export function ScheduleClassModal({
                     </p>
                     <div
                       className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2"
-                      role="radiogroup"
-                      aria-label="How the class series ends"
+                      role="group"
+                      aria-label="Class in program and class date"
                     >
-                      <div
-                        role="radio"
-                        aria-checked={durationMode === "sessions"}
-                        tabIndex={0}
-                        onClick={() => setDurationMode("sessions")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setDurationMode("sessions");
+                      <div className="flex min-h-[3rem] flex-wrap items-center gap-2 rounded-[22px] border border-[#3d8c40] bg-white px-4 py-2.5 ring-1 ring-[#3d8c40]/35 sm:min-h-0 sm:flex-nowrap sm:items-center sm:gap-2">
+                        <span className="shrink-0 text-sm font-medium text-[#4A5568]">
+                          Class
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          name="class-session-occurred"
+                          value={classSessionInput}
+                          placeholder="—"
+                          onChange={(e) =>
+                            setClassSessionInput(
+                              digitsOnly(e.target.value).slice(0, 4),
+                            )
                           }
-                        }}
-                        className={`flex min-h-[3rem] cursor-pointer items-center gap-3 rounded-[22px] border bg-white px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#3d8c40]/40 ${
-                          durationMode === "sessions"
-                            ? "border-[#3d8c40] ring-1 ring-[#3d8c40]/35"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
+                          className="h-8 min-w-[2.75rem] max-w-[5.5rem] rounded-[10px] border border-slate-200 bg-white px-1.5 text-center text-sm font-semibold tabular-nums text-[#2D3748] placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/25"
+                          aria-label="Session number in program (class N of …)"
+                        />
                         <span className="shrink-0 text-sm font-medium text-[#4A5568]">
-                          Ends after
+                          of
                         </span>
-                        <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
-                          <div className="inline-flex items-center rounded-[10px] border border-slate-200 bg-white px-1">
-                            <input
-                              type="number"
-                              min={1}
-                              max={999}
-                              value={durationMode === "sessions" ? sessionCount : ""}
-                              placeholder="—"
-                              onFocus={() => setDurationMode("sessions")}
-                              onChange={(e) => {
-                                setDurationMode("sessions");
-                                setSessionCount(
-                                  Math.max(
-                                    1,
-                                    Number.parseInt(e.target.value, 10) || 1,
-                                  ),
-                                );
-                              }}
-                              className={`h-8 min-w-[3.5rem] max-w-[4.5rem] border-0 bg-transparent px-0.5 text-center text-sm font-semibold tabular-nums text-[#2D3748] focus:outline-none focus:ring-0 [appearance:auto] ${
-                                durationMode !== "sessions" ? "opacity-60" : ""
-                              }`}
-                              aria-label="Number of sessions"
-                            />
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-sm font-medium text-[#4A5568]">
-                          sessions
-                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          name="class-session-total"
+                          value={totalProgramInput}
+                          placeholder="—"
+                          onChange={(e) => {
+                            const d = digitsOnly(e.target.value).slice(0, 4);
+                            setTotalProgramInput(d);
+                          }}
+                          className="h-8 min-w-[2.75rem] max-w-[5.5rem] rounded-[10px] border border-slate-200 bg-white px-1.5 text-center text-sm font-semibold tabular-nums text-[#2D3748] placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/25"
+                          aria-label="Total classes in program (class … of M)"
+                        />
                       </div>
 
-                      <div
-                        role="radio"
-                        aria-checked={durationMode === "endDate"}
-                        tabIndex={0}
-                        onClick={() => setDurationMode("endDate")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setDurationMode("endDate");
-                          }
-                        }}
-                        className={`flex min-h-[3rem] cursor-pointer items-center gap-3 rounded-[22px] border bg-white px-4 py-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#3d8c40]/40 ${
-                          durationMode === "endDate"
-                            ? "border-[#3d8c40] ring-1 ring-[#3d8c40]/35"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
+                      <div className="flex min-h-[3rem] items-center gap-2 rounded-[22px] border border-[#3d8c40] bg-white px-4 py-2.5 ring-1 ring-[#3d8c40]/35">
                         <span className="shrink-0 text-sm font-medium text-[#4A5568]">
-                          Ends on
+                          Date
                         </span>
                         <div className="flex min-h-[2.25rem] min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-2.5 py-1">
                           <input
-                            id="ends-on-display"
+                            id="class-date-display"
                             type="text"
                             inputMode="numeric"
                             autoComplete="off"
                             placeholder="DD   MM   YYYY"
-                            value={endsOnDateText}
-                            onFocus={() => setDurationMode("endDate")}
-                            onChange={(e) => {
-                              setDurationMode("endDate");
-                              setEndsOnDateText(e.target.value);
-                            }}
-                            className={`min-w-0 flex-1 border-0 bg-transparent py-0.5 text-sm text-[#2D3748] placeholder:text-slate-400 focus:outline-none focus:ring-0 ${
-                              durationMode !== "endDate" ? "opacity-60" : ""
-                            }`}
-                            aria-label="End date"
+                            value={classDateDisplayText}
+                            onChange={(e) => setClassDateDisplayText(e.target.value)}
+                            className="min-w-0 flex-1 border-0 bg-transparent py-0.5 text-sm text-[#2D3748] placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                            aria-label="Class date"
                           />
                           <input
-                            ref={endsDatePickerRef}
+                            ref={classDatePickerRef}
                             type="date"
                             className="sr-only"
                             tabIndex={-1}
@@ -1036,8 +853,7 @@ export function ScheduleClassModal({
                             onChange={(e) => {
                               const v = e.target.value;
                               if (v) {
-                                setDurationMode("endDate");
-                                setEndsOnDateText(formatIsoToDisplayDate(v));
+                                setClassDateDisplayText(formatIsoToDisplayDate(v));
                               }
                             }}
                           />
@@ -1047,8 +863,7 @@ export function ScheduleClassModal({
                             aria-label="Open calendar"
                             onClick={(e) => {
                               e.preventDefault();
-                              setDurationMode("endDate");
-                              const el = endsDatePickerRef.current;
+                              const el = classDatePickerRef.current;
                               if (!el) return;
                               if (typeof el.showPicker === "function") {
                                 el.showPicker();
@@ -1162,9 +977,10 @@ export function ScheduleClassModal({
                     />
                   </div>
                   <div className="min-w-0 pt-0.5">
-                    <p className="font-bold text-slate-900">Ready to Schedule</p>
+                    <p className="font-bold text-slate-900">Ready to schedule</p>
                     <p className="mt-0.5 text-sm leading-snug text-gray-600">
-                      Review the details below and confirm to create the class
+                      This creates a single class session. Review and confirm
+                      below.
                     </p>
                   </div>
                 </div>
@@ -1173,9 +989,9 @@ export function ScheduleClassModal({
                   <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                     Students
                     {studentCount > 1
-                      ? " (Group Class)"
+                      ? " (Group class)"
                       : studentCount === 1
-                        ? " (Individual Class)"
+                        ? " (Individual class)"
                         : ""}
                   </p>
                   <ul className="mt-3 space-y-3">
@@ -1198,9 +1014,6 @@ export function ScheduleClassModal({
                               {formatLevelLabel(s.level)}
                             </p>
                           </div>
-                          <span className="shrink-0 text-sm text-gray-500">
-                            {s.sessionsLeft} left
-                          </span>
                         </li>
                       ))
                     )}
@@ -1233,41 +1046,31 @@ export function ScheduleClassModal({
                     Schedule
                   </p>
                   <div className="mt-3 flex gap-3">
-                    <RefreshCw
+                    <Calendar
                       className="mt-0.5 h-5 w-5 shrink-0 text-gray-400"
                       strokeWidth={2}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900">Recurring class</p>
-                      {scheduleDays.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {scheduleDays.map((d) => (
-                            <span
-                              key={d}
-                              className="rounded-full bg-[#E8F5E9] px-2.5 py-1 text-xs font-semibold text-[#2E7D32]"
-                            >
-                              {d}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
+                      <p className="font-bold text-slate-900">One-time class</p>
+                      <p className="mt-2 text-sm text-gray-700">
+                        {classCountN != null && classCountM != null
+                          ? `Class ${classCountN} of ${classCountM}`
+                          : "Class —"}
+                        {classLocalDate ? (
+                          <>
+                            {" "}
+                            ·{" "}
+                            {classLocalDate.toLocaleDateString("en-US", {
+                              dateStyle: "long",
+                            })}
+                          </>
+                        ) : null}
+                      </p>
                       <p className="mt-2 text-sm text-gray-500">
                         {scheduleStartTime && scheduleEndTime
-                          ? `${scheduleStartTime} - ${scheduleEndTime} · ${formatReviewUntilSuffix(durationMode, endsOnDateText, sessionCount)}`
+                          ? `${scheduleStartTime} - ${scheduleEndTime}`
                           : "—"}
                       </p>
-                      {plannedSessionPreview.ok ? (
-                        <p className="mt-2 text-base font-bold text-[#1B5E20]">
-                          Total planned sessions: {plannedSessionPreview.total}
-                        </p>
-                      ) : null}
-                      {!plannedSessionPreview.ok ? (
-                        <p className="mt-2 text-sm text-amber-800" role="status">
-                          Set a valid end date (DD MM YYYY) on the schedule
-                          step—the total is counted from the first class through
-                          that date.
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                 </div>

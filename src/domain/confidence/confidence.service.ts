@@ -22,6 +22,7 @@ import { logger } from '@/lib/api/logger';
 // ─────────────────────────────────────────────────────────────
 const DRILL_WEIGHTS: Record<string, number> = {
   vocabulary: 1.2,
+  pronunciation: 1.2,
   roleplay: 1.5,
   matching: 0.7,
   definition: 0.7,
@@ -34,7 +35,7 @@ const DRILL_WEIGHTS: Record<string, number> = {
 };
 
 // Speechace-based drills (higher signal for pronunciation confidence sub-score)
-const SPEECHACE_DRILLS = new Set(['vocabulary', 'roleplay']);
+const SPEECHACE_DRILLS = new Set(['vocabulary', 'pronunciation', 'roleplay']);
 
 // ─────────────────────────────────────────────────────────────
 // Word score: combines best, last, mean attempts
@@ -56,6 +57,14 @@ export function extractDrillQualityScore(attempt: any): number | null {
   // ── Vocabulary ──────────────────────────────────────────────
   if (type === 'vocabulary' && attempt.vocabularyResults?.wordScores?.length) {
     const scores = attempt.vocabularyResults.wordScores
+      .map((w: any) => w.pronunciationScore ?? w.score ?? 0)
+      .filter((s: number) => s > 0);
+    if (scores.length === 0) return attempt.score ?? null;
+    return scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
+  }
+
+  if (type === 'pronunciation' && attempt.pronunciationResults?.wordScores?.length) {
+    const scores = attempt.pronunciationResults.wordScores
       .map((w: any) => w.pronunciationScore ?? w.score ?? 0)
       .filter((s: number) => s > 0);
     if (scores.length === 0) return attempt.score ?? null;

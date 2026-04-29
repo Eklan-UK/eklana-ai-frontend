@@ -14,6 +14,7 @@ export interface CreateAttemptData {
   score: number;
   maxScore: number;
   vocabularyResults?: any;
+  pronunciationResults?: any;
   roleplayResults?: any;
   matchingResults?: any;
   definitionResults?: any;

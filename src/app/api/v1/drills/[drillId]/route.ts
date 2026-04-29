@@ -19,6 +19,7 @@ const updateDrillSchema = z.object({
 	title: z.string().min(1).max(200).optional(),
 	type: z.enum([
 		"vocabulary",
+		"pronunciation",
 		"roleplay",
 		"matching",
 		"definition",
@@ -47,9 +48,9 @@ const updateDrillSchema = z.object({
 		sentenceAudioUrl: z.string().optional(),
 	})).optional(),
 	pronunciation_items: z.array(z.object({
-		sound: z.string(),
-		word: z.string(),
-		sentence: z.string(),
+		sound: z.string().trim().min(1),
+		word: z.string().trim().min(1),
+		sentence: z.string().trim().min(1),
 		soundAudioUrl: z.string().optional(),
 		wordAudioUrl: z.string().optional(),
 		sentenceAudioUrl: z.string().optional(),
@@ -193,6 +194,38 @@ async function putHandler(
 	if (validated.article_content !== undefined) updateData.article_content = validated.article_content;
 	if (validated.article_audio_url !== undefined) updateData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) updateData.fill_blank_items = validated.fill_blank_items;
+
+	const existing = await drillRepo.findById(drillId);
+	if (!existing) {
+		return apiResponse.notFound("Drill");
+	}
+
+	const finalType = (validated.type !== undefined ? validated.type : existing.type) as string;
+	const mergedTarget =
+		validated.target_sentences !== undefined
+			? validated.target_sentences
+			: (existing as { target_sentences?: unknown[] }).target_sentences;
+	const mergedPron =
+		validated.pronunciation_items !== undefined
+			? validated.pronunciation_items
+			: (existing as { pronunciation_items?: unknown[] }).pronunciation_items;
+
+	if (finalType === "vocabulary" && (!mergedTarget || mergedTarget.length < 1)) {
+		return apiResponse.validationError(
+			"Vocabulary drills require at least one target sentence"
+		);
+	}
+	if (finalType === "pronunciation" && (!mergedPron || mergedPron.length < 1)) {
+		return apiResponse.validationError(
+			"Pronunciation drills require at least one pronunciation item"
+		);
+	}
+	if (finalType === "vocabulary") {
+		updateData.pronunciation_items = [];
+	}
+	if (finalType === "pronunciation") {
+		updateData.target_sentences = [];
+	}
 
 	// Update drill
 	const result = await drillService.updateDrill(

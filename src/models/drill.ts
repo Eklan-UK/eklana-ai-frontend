@@ -302,6 +302,7 @@ export interface IDrill extends Document {
   title: string;
   type:
     | "vocabulary"
+    | "pronunciation"
     | "roleplay"
     | "matching"
     | "definition"
@@ -318,7 +319,7 @@ export interface IDrill extends Document {
   context?: string;
   audio_example_url?: string;
 
-  // Vocabulary Drill Fields
+  // Vocabulary Drill Fields (word + sentence practice)
   target_sentences: Array<{
     word?: string;
     wordTranslation?: string;
@@ -327,6 +328,7 @@ export interface IDrill extends Document {
     wordAudioUrl?: string;
     sentenceAudioUrl?: string;
   }>;
+  /** Pronunciation drills only (sound / word / sentence per item) */
   pronunciation_items?: Array<{
     sound: string;
     word: string;
@@ -450,6 +452,7 @@ const drillSchema = new Schema<IDrill>(
       enum: {
         values: [
           "vocabulary",
+          "pronunciation",
           "roleplay",
           "matching",
           "definition",
@@ -527,7 +530,7 @@ const drillSchema = new Schema<IDrill>(
     pronunciation_items: {
       type: [PronunciationItemSchema],
       default: [],
-      description: "Pronunciation problems (sound, word, sentence) for vocabulary drills",
+      description: "Pronunciation drill items (sound, word, sentence per row)",
     },
 
     // Roleplay Drill Fields

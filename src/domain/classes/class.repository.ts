@@ -1,4 +1,5 @@
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
+import { connectToDatabase } from '@/lib/api/db';
 import ClassSeries, { type IClassSeries } from '@/models/class-series';
 import ClassEnrollment from '@/models/class-enrollment';
 import ClassSession, { type IClassSession } from '@/models/class-session';
@@ -9,7 +10,7 @@ import {
   getGoogleCalendarConnectionStatusForUser,
   getGoogleCalendarRefreshTokenForUser,
 } from '@/lib/api/google-calendar-connection';
-import { createGoogleCalendarEventWithMeetLink } from '@/lib/api/google-calendar-events';
+import { createGoogleCalendarEventWithMeetLink, deleteGoogleCalendarEvent } from '@/lib/api/google-calendar-events';
 import {
   applyTutorJoinPolicy,
   getNextSessionForList,
@@ -22,52 +23,7 @@ import type {
   LearnerPastSessionItemDTO,
 } from './class.api.types';
 import SessionAttendance from '@/models/session-attendance';
-import { getUserDisplayName } from '@/utils/user';
-
-/**
- * First session row when scheduling a new series — keep in sync with
- * `ClassSession.sequenceNumber` in `create()`.
- */
-const FIRST_SESSION_SEQUENCE_NUMBER = 1;
-
-/** Calendar month view + DB; truncate long rosters instead of overflowing. */
-const FALLBACK_CLASS_TITLE_MAX_LEN = 120;
-
-/** Single session index in the series (1 for the first scheduled session). */
-function buildFallbackTitlePrefix(sequenceNumber: number): string {
-	return `Class ${sequenceNumber}`;
-}
-
-function buildFallbackClassSeriesTitle(
-	sequenceNumber: number,
-	learnersOrdered: Array<{
-		email?: string;
-		firstName?: string;
-		lastName?: string;
-		name?: string;
-	}>,
-): string {
-	const prefix = buildFallbackTitlePrefix(sequenceNumber);
-
-	if (learnersOrdered.length === 0) {
-		return prefix;
-	}
-
-	const names = learnersOrdered.map((u) => getUserDisplayName(u));
-	for (let k = names.length; k >= 1; k--) {
-		const head = names.slice(0, k).join(', ');
-		const rest = names.length - k;
-		const inner = rest > 0 ? `${head} + ${rest} more` : head;
-		const candidate = `${prefix} (${inner})`;
-		if (candidate.length <= FALLBACK_CLASS_TITLE_MAX_LEN) return candidate;
-	}
-	const first = names[0] ?? 'Student';
-	const budget = Math.max(
-		12,
-		FALLBACK_CLASS_TITLE_MAX_LEN - prefix.length - 5,
-	);
-	return `${prefix} (${first.slice(0, budget)}…)`;
-}
+import { buildClassSessionCalendarTitle } from './class-calendar-titles';
 
 export function validationMessageForGoogleCalendarEventFailure(rawMessage: string): string {
   const m = rawMessage.toLowerCase();
@@ -118,7 +74,11 @@ export class ClassRepository {
   async create(
     body: CreateAdminClassBody,
     createdBy: Types.ObjectId,
-  ): Promise<{ series: IClassSeries; session: IClassSession }> {
+  ): Promise<{
+    series: IClassSeries;
+    session: IClassSession;
+    calendarSyncWarning?: string;
+  }> {
     if (!Types.ObjectId.isValid(body.tutorId)) {
       throw new ValidationError('Invalid tutor ID');
     }
@@ -179,11 +139,21 @@ export class ClassRepository {
       .filter((u): u is NonNullable<(typeof learnerRows)[number]> => u != null);
 
     const totalPlannedNorm = Math.max(1, totalPlanned);
+    const sequenceNumber =
+      body.firstSessionSequenceNumber != null
+        ? Math.trunc(body.firstSessionSequenceNumber)
+        : 1;
+    if (sequenceNumber < 1 || sequenceNumber > totalPlannedNorm) {
+      throw new ValidationError(
+        'firstSessionSequenceNumber must be between 1 and total sessions planned',
+      );
+    }
 
     const title =
       body.title?.trim() ||
-      buildFallbackClassSeriesTitle(
-        FIRST_SESSION_SEQUENCE_NUMBER,
+      buildClassSessionCalendarTitle(
+        sequenceNumber,
+        totalPlannedNorm,
         learnersOrdered,
       );
 
@@ -194,8 +164,9 @@ export class ClassRepository {
       );
     }
 
-    let meetingUrl: string;
-    let googleCalendarEventId: string;
+    let meetingUrl: string | undefined;
+    let googleCalendarEventId: string | undefined;
+    let calendarSyncWarning: string | undefined;
     try {
       const createdCalendarEvent = await createGoogleCalendarEventWithMeetLink({
         refreshToken,
@@ -214,16 +185,20 @@ export class ClassRepository {
       googleCalendarEventId = createdCalendarEvent.eventId;
     } catch (error: unknown) {
       const err = error as Error;
-      logger.error('ClassRepository.create.googleCalendarEvent', {
+      logger.warn('ClassRepository.create.googleCalendarEvent (class will be saved without Calendar/Meet)', {
         tutorId: body.tutorId,
         message: err.message,
       });
-      throw new ValidationError(
-        validationMessageForGoogleCalendarEventFailure(err.message ?? ''),
+      meetingUrl = undefined;
+      googleCalendarEventId = undefined;
+      calendarSyncWarning = validationMessageForGoogleCalendarEventFailure(
+        err.message ?? '',
       );
     }
 
-    const mongoSession = await mongoose.startSession();
+    /** Same Mongoose that performed `connect()`; avoids ClientSession from a different MongoClient. */
+    const m = await connectToDatabase();
+    const mongoSession = await m.startSession();
     mongoSession.startTransaction();
     try {
       const createdSeries = await ClassSeries.create(
@@ -266,10 +241,10 @@ export class ClassRepository {
             tutorId: new Types.ObjectId(body.tutorId),
             startUtc: start,
             endUtc: end,
-            meetingUrl,
-            googleCalendarEventId,
+            ...(meetingUrl ? { meetingUrl } : {}),
+            ...(googleCalendarEventId ? { googleCalendarEventId } : {}),
             status: 'scheduled' as const,
-            sequenceNumber: FIRST_SESSION_SEQUENCE_NUMBER,
+            sequenceNumber,
           },
         ],
         { session: mongoSession },
@@ -286,6 +261,7 @@ export class ClassRepository {
       return {
         series: fresh as unknown as IClassSeries,
         session: sFresh as unknown as IClassSession,
+        calendarSyncWarning,
       };
     } catch (e: unknown) {
       await mongoSession.abortTransaction();
@@ -805,11 +781,59 @@ export class ClassRepository {
     };
   }
 
-  /** Soft-delete: hide series from lists (admin/tutor). */
+  /** Soft-delete: hide series from lists (admin/tutor); best-effort remove session events from tutor Google Calendar. */
   async softDeleteSeries(classSeriesId: string): Promise<boolean> {
     if (!Types.ObjectId.isValid(classSeriesId)) {
       throw new ValidationError('Invalid class ID');
     }
+
+    const seriesOid = new Types.ObjectId(classSeriesId);
+    const series = await ClassSeries.findOne({ _id: seriesOid, isActive: true })
+      .select('tutorId')
+      .lean();
+    if (!series) {
+      return false;
+    }
+
+    const sessionRows = await ClassSession.find({
+      classSeriesId: seriesOid,
+    })
+      .select('googleCalendarEventId')
+      .lean();
+    const eventIdSet = new Set<string>();
+    for (const row of sessionRows) {
+      const eid = (row as { googleCalendarEventId?: string | undefined })
+        .googleCalendarEventId?.trim();
+      if (eid) {
+        eventIdSet.add(eid);
+      }
+    }
+
+    if (eventIdSet.size > 0) {
+      const refreshToken = await getGoogleCalendarRefreshTokenForUser(
+        series.tutorId.toString(),
+      );
+      if (refreshToken) {
+        for (const eventId of eventIdSet) {
+          try {
+            await deleteGoogleCalendarEvent(refreshToken, eventId);
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            logger.warn('ClassRepository.softDeleteSeries.googleCalendar', {
+              classSeriesId,
+              eventId,
+              message: msg,
+            });
+          }
+        }
+      } else {
+        logger.warn('ClassRepository.softDeleteSeries.noCalendarToken', {
+          classSeriesId,
+          eventCount: eventIdSet.size,
+        });
+      }
+    }
+
     const updated = await ClassSeries.findOneAndUpdate(
       { _id: classSeriesId, isActive: true },
       { $set: { isActive: false } },

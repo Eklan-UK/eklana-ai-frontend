@@ -23,7 +23,7 @@ const drillAttemptSchema = z.object({
   drillAttemptId: z.string().refine((id) => Types.ObjectId.isValid(id), {
     message: 'Drill attempt ID must be a valid MongoDB ObjectId',
   }).optional(),
-  drillType: z.enum(['vocabulary', 'roleplay', 'sentence', 'other']).optional(),
+  drillType: z.enum(['vocabulary', 'pronunciation', 'roleplay', 'sentence', 'other']).optional(),
   passingThreshold: z.number().min(0).max(100).optional().default(70),
 });
 

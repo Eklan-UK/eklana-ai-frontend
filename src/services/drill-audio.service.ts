@@ -99,7 +99,7 @@ export function extractVocabularyTexts(
 }
 
 /**
- * Pronunciation drill items (vocabulary) — sound, word, and sentence TTS
+ * Pronunciation drill items — sound, word, and sentence TTS
  */
 export function extractPronunciationTexts(
   items: Array<{ sound?: string; word?: string; sentence?: string }>
@@ -268,14 +268,11 @@ export function extractFillBlankTexts(
  * Unified extractor across all drill types
  */
 export function extractTextsForDrillType(drillData: any, drillType: string): AudioGenerationItem[] {
-  if (drillType === "vocabulary") {
-    const vocab = drillData.target_sentences?.length
-      ? extractVocabularyTexts(drillData.target_sentences)
-      : [];
-    const pron = drillData.pronunciation_items?.length
-      ? extractPronunciationTexts(drillData.pronunciation_items)
-      : [];
-    return [...vocab, ...pron];
+  if (drillType === "vocabulary" && drillData.target_sentences?.length) {
+    return extractVocabularyTexts(drillData.target_sentences);
+  }
+  if (drillType === "pronunciation" && drillData.pronunciation_items?.length) {
+    return extractPronunciationTexts(drillData.pronunciation_items);
   }
   if (drillType === "roleplay") {
     if (drillData.roleplay_scenes) {

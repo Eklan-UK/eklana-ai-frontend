@@ -26,6 +26,15 @@ export interface IDrillAttempt extends Document {
 		}>;
 	};
 
+	pronunciationResults?: {
+		wordScores: Array<{
+			word: string;
+			score: number;
+			attempts: number;
+			pronunciationScore?: number;
+		}>;
+	};
+
 	roleplayResults?: {
 		sceneScores: Array<{
 			sceneName: string;
@@ -217,6 +226,16 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			min: 0,
 		},
 		vocabularyResults: {
+			wordScores: [
+				{
+					word: String,
+					score: Number,
+					attempts: Number,
+					pronunciationScore: Number,
+				},
+			],
+		},
+		pronunciationResults: {
 			wordScores: [
 				{
 					word: String,

@@ -43,6 +43,7 @@ export interface CompleteDrillParams {
   timeSpent: number;
   results: {
     vocabularyResults?: any;
+    pronunciationResults?: any;
     roleplayResults?: any;
     matchingResults?: any;
     definitionResults?: any;

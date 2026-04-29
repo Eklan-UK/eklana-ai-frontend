@@ -12,8 +12,9 @@ async function handler(
     // Role already checked by withRole middleware
     const { type } = params;
     const validTypes = [
-      "vocabulary",
-      "roleplay",
+    "vocabulary",
+    "pronunciation",
+    "roleplay",
       "matching",
       "definition",
       "grammar",
@@ -79,6 +80,15 @@ function generateTemplate(type: string): { data: any[][] } {
             "Can you help me, please?",
             "¿Puedes ayudarme, por favor?",
           ],
+        ],
+      };
+
+    case "pronunciation":
+      return {
+        data: [
+          ["Sound", "Word", "Sentence"],
+          ["/ʃ/", "ship", "The ship sailed at dawn."],
+          ["/θ/", "think", "I think this is a good idea."],
         ],
       };
 

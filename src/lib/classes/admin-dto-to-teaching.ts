@@ -14,6 +14,7 @@ export function adminDtoToTeachingClass(d: AdminClassListItemDTO): TeachingClass
     scheduleDays: d.scheduleDays,
     timeRange: d.timeRange,
     completedSessions: d.completedSessions,
+    programPosition: d.programPosition,
     totalSessions: d.totalSessions,
     nextSessionLabel: d.nextSessionLabel,
     nextSessionId: d.nextSessionId,

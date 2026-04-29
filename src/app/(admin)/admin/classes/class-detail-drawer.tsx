@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import type { ClassStatus, ClassType, TeachingClass } from "./types";
 import { mergeClassDrawerDetail } from "./types";
 import { RescheduleTag } from "@/components/classes/RescheduleTag";
+import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 
 type AttendanceOverride = "present" | "late" | "absent" | null;
 
@@ -111,7 +112,9 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
   const canJoinMeet = isOngoing;
   const showMeetingLink = isOngoing || isUpcoming;
 
-  const schedulePattern = `${session.scheduleDays} · ${session.timeRange.split(/\u2013/)[0]?.trim() ?? session.timeRange.split("-")[0]?.trim() ?? session.timeRange}`;
+  const { dayLabel: scheduleDayLabel, timeLabel: scheduleTimeLabel } =
+    getClassCardScheduleBlock(session);
+  const schedulePattern = `${scheduleDayLabel} · ${scheduleTimeLabel.split(/\s*[\u2013\u2014\-]\s*/)[0]?.trim() ?? scheduleTimeLabel}`;
 
   const copyLink = async () => {
     try {
@@ -378,7 +381,7 @@ export function ClassDetailDrawer({ open, onClose, session }: ClassDetailDrawerP
                   />
                 </div>
                 <div className="mt-2 flex justify-between text-xs font-semibold text-gray-500">
-                  <span>{detail.blockCompleted} completed</span>
+                  <span>{session.completedSessions} completed</span>
                   <span>{remaining} remaining</span>
                 </div>
               </div>

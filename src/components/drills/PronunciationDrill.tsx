@@ -1,0 +1,774 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { TTSButton } from "@/components/ui/TTSButton";
+import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
+import { CheckCircle, Mic, Loader2, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { drillAPI, pronunciationAPI } from "@/lib/api";
+import type { TextScore } from "@/services/speechace.service";
+import { trackActivity } from "@/utils/activity-cache";
+import { speechaceService } from "@/services/speechace.service";
+import {
+  DrillCompletionScreen,
+  DrillLayout,
+  DrillProgress,
+  WordAnalytics,
+} from "./shared";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
+
+interface PronunciationDrillProps {
+  drill: any;
+  assignmentId?: string;
+}
+
+type Screen = "word" | "sentence";
+
+interface WordProgress {
+  wordPassed: boolean;
+  wordScore: number | null;
+  sentencePassed: boolean;
+  sentenceScore: number | null;
+}
+
+const MAX_RECORDING_SECONDS = 120;
+
+// Recording Button Component
+function RecordButton({
+  isRecording,
+  isAnalyzing,
+  disabled,
+  onStart,
+  onStop,
+  recordingSeconds = 0,
+}: {
+  isRecording: boolean;
+  isAnalyzing: boolean;
+  disabled: boolean;
+  onStart: () => void;
+  onStop: () => void;
+  recordingSeconds?: number;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-24 h-24">
+        {isRecording && (
+          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+            <circle
+              cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
+              strokeDasharray={2 * Math.PI * 44}
+              strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
+              strokeLinecap="round"
+              className="transition-[stroke-dashoffset] duration-1000 linear"
+            />
+          </svg>
+        )}
+        <button
+          onClick={isRecording ? onStop : onStart}
+          disabled={isAnalyzing || disabled}
+          className={`absolute inset-0 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+            isRecording
+              ? "bg-red-500 hover:bg-red-600"
+              : isAnalyzing
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          }`}
+        >
+          {isAnalyzing ? (
+            <Loader2 className="w-10 h-10 text-white animate-spin" />
+          ) : (
+            <Mic className="w-12 h-12 text-white" />
+          )}
+        </button>
+      </div>
+      {isRecording && (
+        <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
+          {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Screen Indicator Component
+function ScreenIndicator({
+  currentScreen,
+  isWordPassed,
+  isSentencePassed,
+}: {
+  currentScreen: Screen;
+  isWordPassed: boolean;
+  isSentencePassed: boolean;
+}) {
+  return (
+    <div className="mb-4 flex gap-2">
+      <div
+        className={`flex-1 p-3 rounded-lg text-center ${
+          currentScreen === "word"
+            ? "bg-blue-100 border-2 border-blue-500"
+            : isWordPassed
+            ? "bg-green-50 border border-green-300"
+            : "bg-gray-100 border border-gray-300"
+        }`}
+      >
+        <div className="flex items-center justify-center gap-2">
+          {isWordPassed && currentScreen !== "word" && (
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          )}
+          <span
+            className={`text-sm font-medium ${
+              currentScreen === "word"
+                ? "text-blue-700"
+                : isWordPassed
+                ? "text-green-700"
+                : "text-gray-600"
+            }`}
+          >
+            Word
+          </span>
+        </div>
+      </div>
+      <div
+        className={`flex-1 p-3 rounded-lg text-center ${
+          currentScreen === "sentence"
+            ? "bg-blue-100 border-2 border-blue-500"
+            : isSentencePassed
+            ? "bg-green-50 border border-green-300"
+            : !isWordPassed
+            ? "bg-gray-100 border border-gray-300 opacity-50"
+            : "bg-gray-100 border border-gray-300"
+        }`}
+      >
+        <div className="flex items-center justify-center gap-2">
+          {!isWordPassed && currentScreen !== "sentence" && (
+            <Lock className="w-4 h-4 text-gray-400" />
+          )}
+          {isSentencePassed && currentScreen !== "sentence" && (
+            <CheckCircle className="w-4 h-4 text-green-600" />
+          )}
+          <span
+            className={`text-sm font-medium ${
+              currentScreen === "sentence"
+                ? "text-blue-700"
+                : isSentencePassed
+                ? "text-green-700"
+                : !isWordPassed
+                ? "text-gray-400"
+                : "text-gray-600"
+            }`}
+          >
+            Sentence
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PronunciationDrill({
+  drill,
+  assignmentId,
+}: PronunciationDrillProps) {
+  const router = useRouter();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentScreen, setCurrentScreen] = useState<Screen>("word");
+  const [wordProgress, setWordProgress] = useState<
+    Record<number, WordProgress>
+  >({});
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [startTime] = useState(Date.now());
+
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pronunciationScore, setPronunciationScore] =
+    useState<TextScore | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const items = drill.pronunciation_items || [];
+  const currentItem = items[currentIndex];
+  const currentProgress = wordProgress[currentIndex] || {
+    wordPassed: false,
+    wordScore: null,
+    sentencePassed: false,
+    sentenceScore: null,
+  };
+
+  // Initialize progress tracking
+  useEffect(() => {
+    const initialProgress: Record<number, WordProgress> = {};
+    items.forEach((_: any, index: number) => {
+      initialProgress[index] = {
+        wordPassed: false,
+        wordScore: null,
+        sentencePassed: false,
+        sentenceScore: null,
+      };
+    });
+    setWordProgress(initialProgress);
+  }, [items.length]);
+
+  const clearRecordingTimers = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
+  };
+
+  // Recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+        audioBitsPerSecond: 32000,
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        setAudioBlob(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+        await analyzePronunciation(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      setPronunciationScore(null);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+
+      autoStopTimerRef.current = setTimeout(() => {
+        stopRecording();
+        toast.info("Recording stopped — 2 minute limit reached.");
+      }, MAX_RECORDING_SECONDS * 1000);
+    } catch (error: any) {
+      toast.error("Failed to access microphone: " + error.message);
+    }
+  };
+
+  const stopRecording = () => {
+    clearRecordingTimers();
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // Helper function to convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        const base64 = base64String.includes(',')
+          ? base64String.split(',')[1]
+          : base64String;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const analyzePronunciation = async (audioBlob: Blob) => {
+    if (!currentItem) return;
+
+    setIsAnalyzing(true);
+    setPronunciationScore(null);
+
+    try {
+      const textToAnalyze =
+        currentScreen === "word"
+          ? currentItem.word?.trim() || ""
+          : currentItem.sentence?.trim() || "";
+
+      const speechAceResponse = await speechaceService.scorePronunciation(
+        textToAnalyze,
+        audioBlob
+      );
+
+      const result = speechAceResponse.data as any;
+      let textScore: TextScore | null = null;
+
+      if (result?.textScore && typeof result.textScore === "object") {
+        textScore = result.textScore as TextScore;
+      } else if (result?.text_score && typeof result.text_score === "object") {
+        textScore = result.text_score as TextScore;
+      } else if (result?.data?.text_score) {
+        textScore = result.data.text_score as TextScore;
+      }
+
+      if (textScore) {
+        setPronunciationScore(textScore);
+        const score = textScore.speechace_score.pronunciation;
+        const passed = score >= 65;
+
+        setWordProgress((prev) => {
+          const current = prev[currentIndex] || {
+            wordPassed: false,
+            wordScore: null,
+            sentencePassed: false,
+            sentenceScore: null,
+          };
+
+          if (currentScreen === "word") {
+            return {
+              ...prev,
+              [currentIndex]: {
+                ...current,
+                wordPassed: passed,
+                wordScore: score,
+              },
+            };
+          } else {
+            return {
+              ...prev,
+              [currentIndex]: {
+                ...current,
+                sentencePassed: passed,
+                sentenceScore: score,
+              },
+            };
+          }
+        });
+
+        if (passed) {
+          toast.success(
+            `Great! You scored ${score.toFixed(0)}% - ${
+              currentScreen === "word" ? "Word" : "Sentence"
+            } passed!`
+          );
+        } else {
+          toast.warning(
+            `Score: ${score.toFixed(
+              0
+            )}%. You need at least 65% to pass. Try again!`
+          );
+        }
+
+        // Record pronunciation attempt
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          await pronunciationAPI.createDrillAttempt({
+            text: textToAnalyze,
+            audioBase64,
+            drillId: drill._id,
+            drillType: 'pronunciation',
+            passingThreshold: 65,
+          });
+        } catch (error) {
+          // Log but don't fail the drill if pronunciation recording fails
+          console.error('Failed to record pronunciation attempt:', error);
+        }
+      } else {
+        throw new Error("Invalid response from SpeechAce - missing textScore");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to analyze pronunciation");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleTryAgain = () => {
+    setPronunciationScore(null);
+    setAudioBlob(null);
+  };
+
+  const handleContinueToSentence = () => {
+    if (currentProgress.wordPassed) {
+      setCurrentScreen("sentence");
+      setPronunciationScore(null);
+      setAudioBlob(null);
+    } else {
+      toast.error(
+        "You must pass the word pronunciation (65%+) before proceeding to the sentence"
+      );
+    }
+  };
+
+  const handleNext = () => {
+    if (!currentProgress.wordPassed || !currentProgress.sentencePassed) {
+      toast.error(
+        "You must pass both word and sentence pronunciation before proceeding"
+      );
+      return;
+    }
+
+    if (currentIndex < items.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setCurrentScreen("word");
+      setPronunciationScore(null);
+      setAudioBlob(null);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!assignmentId) {
+      toast.error("Assignment ID is missing. Cannot submit drill.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      const totalItems = items.length;
+      const passedItems = Object.values(wordProgress).filter(
+        (p) => p.wordPassed && p.sentencePassed
+      ).length;
+      const score = Math.round((passedItems / totalItems) * 100);
+
+      const wordScores = items.map((row: any, index: number) => {
+        const progress = wordProgress[index] || {
+          wordPassed: false,
+          wordScore: null,
+          sentencePassed: false,
+          sentenceScore: null,
+        };
+
+        const wordScore = progress.wordScore || 0;
+        const sentenceScore = progress.sentenceScore || 0;
+        const overallScore =
+          progress.wordPassed && progress.sentencePassed
+            ? Math.round((wordScore + sentenceScore) / 2)
+            : 0;
+
+        return {
+          word: row.word?.trim() || `Item ${index + 1}`,
+          score: overallScore,
+          attempts: 1,
+          pronunciationScore: overallScore,
+        };
+      });
+
+      await drillAPI.complete(drill._id, {
+        drillAssignmentId: assignmentId,
+        score,
+        timeSpent,
+        pronunciationResults: { wordScores },
+        platform: "web",
+      });
+
+      setIsCompleted(true);
+      toast.success("Drill completed! Great job!");
+
+      // Track activity locally (no API call)
+      trackActivity("drill", drill._id, "completed", {
+        title: drill.title,
+        type: drill.type,
+        score,
+        });
+
+      // Refresh the page to update drill status
+      router.refresh();
+    } catch (error: any) {
+      toast.error(
+        "Failed to submit drill: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Completed state
+  if (isCompleted) {
+    return (
+      <DrillCompletionScreen
+        drillType="pronunciation"
+        returnPath="/account/drills"
+        returnLabel="Back to My Plan"
+        refreshOnMount={true}
+      />
+    );
+  }
+
+  // No content state
+  if (!currentItem) {
+    return (
+      <DrillLayout title={drill.title}>
+        <Card className="text-center py-8">
+          <p className="text-gray-600">
+            No pronunciation items found in this drill.
+          </p>
+        </Card>
+      </DrillLayout>
+    );
+  }
+
+  const currentWord = currentItem.word?.trim() || "";
+  const currentText =
+    currentScreen === "word" ? currentWord : currentItem.sentence?.trim() || "";
+  const isWordPassed = currentProgress.wordPassed;
+  const isSentencePassed = currentProgress.sentencePassed;
+  const canContinueToSentence = isWordPassed;
+  const canProceedToNext = isWordPassed && isSentencePassed;
+
+  return (
+    <DrillLayout title={drill.title}>
+      <div className="flex flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0">
+        <div className="shrink-0 space-y-4">
+          <DrillProgress
+            current={currentIndex + 1}
+            total={items.length}
+          />
+
+          <ScreenIndicator
+            currentScreen={currentScreen}
+            isWordPassed={isWordPassed}
+            isSentencePassed={isSentencePassed}
+          />
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 pb-4">
+          <Card className="mb-0">
+            <div className="text-center py-6">
+              {/* Word/Sentence Display */}
+              <div className="mb-6">
+            <h2 className="text-sm font-medium text-gray-700 mb-2">
+              {currentScreen === "word"
+                ? "Pronounce the Word"
+                : "Pronounce the Sentence"}
+            </h2>
+            {currentItem.sound?.trim() && (
+              <p className="text-sm text-gray-500 mb-3">
+                Sound focus: <span className="font-medium text-gray-700">{currentItem.sound}</span>
+              </p>
+            )}
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                {currentText}
+              </h1>
+              {currentScreen === "word" && (
+                <BookmarkButton
+                  itemId={currentWord}
+                  itemType="word"
+                  content={currentWord}
+                  sourceDrillId={drill._id}
+                  className="ml-2"
+                />
+              )}
+              {currentScreen === "sentence" && (
+                <BookmarkButton
+                  itemId={currentText}
+                  itemType="sentence"
+                  content={currentText}
+                  sourceDrillId={drill._id}
+                  className="ml-2"
+                />
+              )}
+            </div>
+            </div>
+
+          {/* Lock message for sentence screen */}
+          {currentScreen === "sentence" && !isWordPassed && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center justify-center gap-2 text-yellow-800">
+                <Lock className="w-4 h-4" />
+                <p className="text-sm font-medium">
+                  Complete word pronunciation first (65%+ required)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Listen Section */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">
+              Listen to the correct pronunciation
+            </h3>
+            <TTSButton
+              text={currentText}
+              size="lg"
+              variant="button"
+              autoPlay={false}
+              audioUrl={
+                currentScreen === "word"
+                  ? currentItem.wordAudioUrl
+                  : currentItem.sentenceAudioUrl
+              }
+            />
+          </div>
+
+          {/* Record Section */}
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">
+              Record your pronunciation
+            </h3>
+            <RecordButton
+              isRecording={isRecording}
+              isAnalyzing={isAnalyzing}
+              disabled={currentScreen === "sentence" && !isWordPassed}
+              onStart={startRecording}
+              onStop={stopRecording}
+              recordingSeconds={recordingSeconds}
+            />
+            {!isRecording && !isAnalyzing && !pronunciationScore && (
+              <p className="text-sm text-gray-500 mt-4">
+                Tap the microphone to start recording
+              </p>
+            )}
+            {isAnalyzing && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <p className="text-sm text-gray-600">
+                  Analyzing your pronunciation — longer recordings may take a moment...
+                </p>
+              </div>
+            )}
+            {pronunciationScore && !isAnalyzing && (
+              <p className="text-sm text-green-600 mt-4 font-medium">
+                ✓ Analysis complete! Your breakdown is below.
+              </p>
+            )}
+          </div>
+
+          {/* Auto-play toggle */}
+          <label className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-4">
+            <input
+              type="checkbox"
+              checked={autoPlayAudio}
+              onChange={(e) => setAutoPlayAudio(e.target.checked)}
+              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+            />
+            <span>Auto-play pronunciation</span>
+          </label>
+            </div>
+          </Card>
+
+          {/* Word Quality Analytics */}
+          {pronunciationScore && (
+            <>
+              <WordAnalytics pronunciationScore={pronunciationScore} />
+
+              {/* Letter-level Feedback for word screen */}
+              {currentScreen === "word" &&
+                pronunciationScore.word_score_list.length > 0 && (
+                  <LetterLevelFeedback
+                    word={currentWord}
+                    wordScore={pronunciationScore.word_score_list[0]}
+                  />
+                )}
+            </>
+          )}
+        </div>
+
+        {/* Sticky-style action bar: sibling of scroll region so CTAs stay in view */}
+        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/90 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-3">
+            {currentScreen === "word" && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={handleContinueToSentence}
+                disabled={!canContinueToSentence || isRecording || isAnalyzing}
+              >
+                {canContinueToSentence ? (
+                  "Continue to Sentence"
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Pass Word First (65%+)
+                  </>
+                )}
+              </Button>
+            )}
+
+            {currentScreen === "sentence" && (
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onClick={handleNext}
+                disabled={!canProceedToNext || isRecording || isAnalyzing}
+              >
+                {canProceedToNext ? (
+                  currentIndex === items.length - 1 ? (
+                    "Complete Drill"
+                  ) : (
+                    "Next Item"
+                  )
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Pass Sentence First (65%+)
+                  </>
+                )}
+              </Button>
+            )}
+
+            {pronunciationScore && (
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                onClick={handleTryAgain}
+                disabled={isRecording || isAnalyzing}
+              >
+                Try Again
+              </Button>
+            )}
+
+            {currentScreen === "sentence" && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setCurrentScreen("word");
+                  setPronunciationScore(null);
+                  setAudioBlob(null);
+                }}
+                disabled={isRecording || isAnalyzing}
+              >
+                Back to Word
+              </Button>
+            )}
+
+            {currentIndex > 0 && currentScreen === "word" && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setCurrentIndex(currentIndex - 1);
+                  setCurrentScreen("word");
+                  setPronunciationScore(null);
+                  setAudioBlob(null);
+                }}
+                disabled={isRecording || isAnalyzing}
+              >
+                Previous Item
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </DrillLayout>
+  );
+}
