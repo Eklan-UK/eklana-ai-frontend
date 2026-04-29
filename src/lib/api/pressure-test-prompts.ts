@@ -51,6 +51,7 @@ export function buildSystemPrompt(
   level: number,
   turnNumber: number,
   drill?: {
+    title?: string;
     roleplay_scenes?: unknown[];
     target_sentences?: unknown[];
     target_vocabulary?: unknown[];
@@ -67,25 +68,14 @@ export function buildSystemPrompt(
     `Current turn: ${turnNumber} of 3.`,
   ];
 
-  // Opening turn: set the scene with full context so the student knows exactly what to say
-  if (isOpening) {
-    parts.push(
-      "This is your OPENING message. You must set the scene fully:",
-      "1. In 1 sentence, describe who you are and the situation (e.g. 'I'm your manager and you're late to the morning briefing.').",
-      "2. In 1 sentence, state what just happened or what the student did.",
-      "3. Ask a direct, concrete question the student can answer in English right now.",
-      "Keep the whole opening under 50 words. Make it immersive and easy to understand.",
-    );
-  } else {
-    parts.push(
-      "Keep each follow-up prompt UNDER 20 words. Be direct. No small talk.",
-      "Act impatient but professional — like a demanding interviewer.",
-      "If the student hesitates or gives a slow/incomplete answer, interrupt with a sharp follow-up.",
-      levelBehavior(level),
-    );
-  }
-
+  // Put assigned drill content FIRST so it is not overridden by generic opening instructions below.
   if (drill) {
+    if (typeof drill.title === "string" && drill.title.trim()) {
+      parts.push(
+        `You are running the pressure test for this exact assigned drill: "${drill.title.trim()}". ` +
+          "Do not switch to a different topic, setting, or trope (e.g. do not default to a generic office, manager, or 'late for a meeting' unless the scenario text below clearly describes that).",
+      );
+    }
     if (Array.isArray(drill.roleplay_scenes) && drill.roleplay_scenes.length > 0) {
       const scene = drill.roleplay_scenes[0] as any;
       const sceneParts: string[] = [];
@@ -119,6 +109,25 @@ export function buildSystemPrompt(
     if (typeof drill.context === "string" && drill.context.trim()) {
       parts.push(`Drill context: ${drill.context.trim()}.`);
     }
+  }
+
+  // Opening turn: set the scene with full context so the student knows exactly what to say
+  if (isOpening) {
+    parts.push(
+      "This is your OPENING message. You must set the scene fully, using ONLY the assigned drill and scenario information above (when present).",
+      "1. In 1 sentence, state who you are and the situation so it matches the roleplay scene and drill context — not a different made-up scene.",
+      "2. In 1 sentence, state what just happened or what the student did, consistent with that same scenario.",
+      "3. Ask a direct, concrete question the student can answer in English right now.",
+      "Keep the whole opening under 50 words. Make it immersive and easy to understand.",
+    );
+  } else {
+    parts.push(
+      "Keep each follow-up prompt UNDER 20 words. Be direct. No small talk.",
+      "Act impatient but professional — like a demanding interviewer.",
+      "If the student hesitates or gives a slow/incomplete answer, interrupt with a sharp follow-up.",
+      "Stay consistent with the same roleplay scene and drill topic from your opening — do not change setting or topic mid-test.",
+      levelBehavior(level),
+    );
   }
 
   return parts.join(" ");

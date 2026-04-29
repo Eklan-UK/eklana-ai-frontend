@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+} from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -33,28 +41,72 @@ interface TurnDraft {
   aiPrompt: string;
   studentResponseText: string;
   latencyMs: number;
+  /** True when mental-translation gap (stream end → first speech or record start) is strictly &lt; PRESSURE_SPEED_MS. */
+  speedSuccess: boolean;
+  scenarioId: string;
   audioDurationMs: number;
   audioBase64: string;
 }
 
 interface PressureTestDrillProps {
   drillId: string;
+  /** Changes for each new run (URL `run`, bfcache); restarts the scenario from the intro. */
+  sessionRunId: string;
 }
 
 const TOTAL_TURNS = 3;
 const MAX_AUDIO_SIZE = 5 * 1024 * 1024;
+/** Namespaced client keys for this drill; cleared on exit / analyze so a new run never reuses cached turn data. */
+const PT_DRILL_CACHE_PREFIX = "eklana:pt:";
+
+function clearPressureTestDrillClientCache(drillId: string) {
+  if (typeof window === "undefined") return;
+  const strip = (store: Storage) => {
+    for (let i = store.length - 1; i >= 0; i--) {
+      const k = store.key(i);
+      if (k && k.startsWith(PT_DRILL_CACHE_PREFIX) && k.includes(drillId)) {
+        try {
+          store.removeItem(k);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  };
+  try {
+    strip(localStorage);
+    strip(sessionStorage);
+  } catch {
+    /* private mode / quota */
+  }
+}
+/** Mental-translation gap target: under this many ms = fast (client-only rule; 2000 = not fast). */
+const PRESSURE_SPEED_MS = 2000;
+
+function PressureTestAiThinkingBubble() {
+  return (
+    <div className="flex justify-start" role="status" aria-live="polite" aria-label="Eklan is thinking">
+      <div className="inline-flex max-w-[85%] items-center gap-1.5 rounded-2xl border border-[#ebebeb] bg-[#f4f5f4] px-4 py-3 min-h-[2.5rem] shadow-sm">
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse [animation-delay:150ms]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse [animation-delay:300ms]" />
+      </div>
+    </div>
+  );
+}
 
 function getInitialPrompt(drill: any): string {
   if (Array.isArray(drill?.roleplay_scenes) && drill.roleplay_scenes.length > 0) {
     const scene = drill.roleplay_scenes[0];
-    // Prefer scene context, then the first AI dialogue line, then scene_name
-    if (typeof scene?.context === "string" && scene.context.trim()) return scene.context.trim();
+    // Prefer a real line of dialogue over `context` (often a short curriculum label like "🔁 Re-entry & …")
     const aiLine = (scene?.dialogue as any[] | undefined)?.find(
       (d: any) => d.speaker !== "student" && typeof d.text === "string",
     );
-    if (aiLine) return aiLine.text.trim();
-    if (typeof scene?.scene_name === "string" && scene.scene_name.trim())
+    if (aiLine) return String(aiLine.text).trim();
+    if (typeof scene?.scene_name === "string" && scene.scene_name.trim()) {
       return `Scene: ${scene.scene_name.trim()}. What would you say in this situation?`;
+    }
+    if (typeof scene?.context === "string" && scene.context.trim()) return scene.context.trim();
   }
   if (Array.isArray(drill?.target_sentences) && drill.target_sentences.length > 0) {
     const s = drill.target_sentences[0];
@@ -82,15 +134,26 @@ async function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
+export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillProps) {
   const router = useRouter();
   const { user } = useAuthStore();
   const { data: drill } = useDrill(drillId);
+  const drillRef = useRef(drill);
+  drillRef.current = drill;
 
   const [studentLevel, setStudentLevel] = useState<number>(1);
+  const studentLevelRef = useRef(studentLevel);
+  studentLevelRef.current = studentLevel;
   const [messages, setMessages] = useState<Message[]>([]);
+  /** One id per mount; sent on every /pressure-test/chat call so the server can correlate a single attempt. */
+  const [chatSessionId] = useState(() => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  });
   const [turnNumber, setTurnNumber] = useState(1);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  /** True once the first character of the current in-flight model reply is received (SSE text). */
+  const [isAiStreaming, setIsAiStreaming] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
@@ -104,24 +167,50 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   const [showMenu, setShowMenu] = useState(false);
 
   const [isTranscribing, setIsTranscribing] = useState(false);
+  /** Local only: &lt; 2s mental gap; null before first completed gap this prompt. */
+  const [isSpeedSuccess, setIsSpeedSuccess] = useState<boolean | null>(null);
+  const [lastGapMs, setLastGapMs] = useState<number | null>(null);
 
-  const {
-    playAudio: playTTS,
-    stopAudio: stopTTS,
-    isGenerating: isTTSGenerating,
-    isPlaying: isTTSPlaying,
-  } = useTTS({
-    onError: () => {}, // silent — TTS is best-effort
-    apiPath: "/api/v1/pressure-test/tts",
-  });
+  /** Text of the last TTS attempt — used if `onError` needs the browser speechSynthesis fallback. */
+  const lastTtsAttemptTextRef = useRef<string>("");
+  /** `onPlayStart` and backup: only set follow-up flags for stream TTS after a user turn, not intro or replay. */
+  const lastTtsCallWasFollowUpRef = useRef(false);
+  const followUpTtsHtmlAudioStartedRef = useRef(false);
+  const followUpWebSpeechFromOnErrorRef = useRef(false);
+
+  /** Always use latest messages when building the chat API payload (avoids stale closure on submit). */
+  const messagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /** For follow-up TTS backup: `useTTS` state is stale inside setTimeout without refs. */
+  const ttsHookStateRef = useRef({ generating: false, playing: false });
+
+  const followUpTtsBackupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Bump to invalidate in-flight TTS; cleared when stopping playback. */
+  const ttsStreamGenerationRef = useRef(0);
+  /** If true, the next `onPlayEnd` (HTML) or `onend` (Web Speech) will call `armPromptReady()`. */
+  const armPromptOnTtsPlayEndRef = useRef(false);
+  /**
+   * After `isAiTyping` goes false, play one TTS for the last assistant line (set just before
+   * `setIsAiTyping(false)` in intro / `streamAiReply` completion paths).
+   */
+  const pendingPostStreamTtsRef = useRef<{ full: string; isFollowUp: boolean } | null>(null);
+  const ttsOnPlayEndDispatcherRef = useRef<() => void>(() => {});
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const aiDoneAtRef = useRef<number | null>(null);
+  /** `performance.now()` when the latest AI reply finished streaming; listening window for this user turn. */
+  const promptReadyAtRef = useRef<number | null>(null);
+  const speechFirstAtRef = useRef<number | null>(null);
+  const recordStartAtRef = useRef<number | null>(null);
   const pendingLatencyRef = useRef<number>(0);
+  const pendingSpeedSuccessRef = useRef<boolean>(false);
 
   // Web Speech API for client-side transcription (no quota / no API key needed)
   const recognitionRef = useRef<any>(null);
@@ -135,13 +224,204 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
   const analyzeAbortRef = useRef<AbortController | null>(null);
   const isExitingRef = useRef(false);
+  /** Drop stale intro stream results if `sessionRunId` changes or Strict Mode remounts during fetch. */
+  const introEffectGenRef = useRef(0);
+  /** True when intro effect cleanup aborts the fetch (navigation); false for slow-response timeout. */
+  const introAbortFromUnmountRef = useRef(false);
+
+  /** Dev Strict Mode runs unmount cleanup (which sets `isExitingRef` via `stopAllActivity`) then remounts; reset before paint. */
+  useLayoutEffect(() => {
+    isExitingRef.current = false;
+  }, []);
 
   const firstName = useMemo(
     () => String(user?.firstName || user?.name || "there").trim().split(" ")[0],
     [user],
   );
 
+  /**
+   * Stable id for the loaded drill (not the query `data` reference) — intro effect depends on this
+   * so React Query refetches do not retrigger the intro and abort the SSE.
+   */
+  const drillDocumentId = useMemo(() => {
+    if (!drill) return null;
+    const d = drill as { _id?: unknown; id?: unknown };
+    const id = d._id ?? d.id;
+    if (id != null && id !== "") return String(id);
+    return String(drillId);
+  }, [drill?._id, (drill as { id?: unknown } | null)?.id, drillId]);
+
   const progressWidth = `${(turnNumber / TOTAL_TURNS) * 100}%`;
+
+  const scenarioId = useMemo(() => {
+    if (!drill) return drillId;
+    const scene = (drill as { roleplay_scenes?: Array<{ _id?: unknown; id?: unknown }> })?.roleplay_scenes?.[0];
+    if (scene) {
+      const id = scene._id ?? scene.id;
+      if (id != null && String(id) !== "") return String(id);
+    }
+    return drillId;
+  }, [drill, drillId]);
+
+  /**
+   * Mental-translation / prompt window: `armPromptReady()` runs when the model’s full-message
+   * TTS **finishes** (HTML5 `onended` or Web Speech `onend`), so the 2s clock starts after
+   * playback, not at play start. Manual replay of a line can opt out via `armPromptWhenAudioEnds`.
+   */
+  const armPromptReady = useCallback(() => {
+    promptReadyAtRef.current = performance.now();
+    speechFirstAtRef.current = null;
+    recordStartAtRef.current = null;
+  }, []);
+
+  const scheduleFollowUpWebSpeechBackup = useCallback((fullText: string) => {
+    if (followUpTtsBackupTimeoutRef.current) {
+      clearTimeout(followUpTtsBackupTimeoutRef.current);
+      followUpTtsBackupTimeoutRef.current = null;
+    }
+    followUpTtsBackupTimeoutRef.current = setTimeout(() => {
+      followUpTtsBackupTimeoutRef.current = null;
+      if (!lastTtsCallWasFollowUpRef.current) return;
+      if (followUpTtsHtmlAudioStartedRef.current) return;
+      if (followUpWebSpeechFromOnErrorRef.current) return;
+      const { generating, playing } = ttsHookStateRef.current;
+      if (generating || playing) return;
+      if (typeof window === "undefined" || !window.speechSynthesis) return;
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) return;
+      const t = fullText.trim();
+      if (!t) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = "en-US";
+        u.rate = 1.0;
+        u.onend = () => {
+          if (armPromptOnTtsPlayEndRef.current) {
+            armPromptOnTtsPlayEndRef.current = false;
+            armPromptReady();
+          }
+        };
+        window.speechSynthesis.speak(u);
+      } catch {
+        /* ignore */
+      }
+    }, 2500);
+  }, [armPromptReady]);
+
+  const {
+    playAudio: playTTS,
+    stopAudio: stopTTS,
+    isGenerating: isTTSGenerating,
+    isPlaying: isTTSPlaying,
+  } = useTTS({
+    onPlayStart: () => {
+      if (lastTtsCallWasFollowUpRef.current) {
+        followUpTtsHtmlAudioStartedRef.current = true;
+      }
+    },
+    onPlayEnd: () => {
+      ttsOnPlayEndDispatcherRef.current();
+      if (armPromptOnTtsPlayEndRef.current) {
+        armPromptOnTtsPlayEndRef.current = false;
+        armPromptReady();
+      }
+    },
+    onError: () => {
+      const t = lastTtsAttemptTextRef.current.trim();
+      if (!t || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+      followUpWebSpeechFromOnErrorRef.current = true;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = "en-US";
+        u.rate = 1;
+        u.onend = () => {
+          if (armPromptOnTtsPlayEndRef.current) {
+            armPromptOnTtsPlayEndRef.current = false;
+            armPromptReady();
+          }
+          ttsOnPlayEndDispatcherRef.current();
+        };
+        window.speechSynthesis.speak(u);
+      } catch {
+        /* ignore */
+      }
+    },
+    apiPath: "/api/v1/pressure-test/tts",
+  });
+
+  useLayoutEffect(() => {
+    ttsHookStateRef.current = { generating: isTTSGenerating, playing: isTTSPlaying };
+  }, [isTTSGenerating, isTTSPlaying]);
+
+  const clearStreamingTts = useCallback(() => {
+    ttsStreamGenerationRef.current += 1;
+    pendingPostStreamTtsRef.current = null;
+    armPromptOnTtsPlayEndRef.current = false;
+    stopTTS();
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* ignore */
+    }
+    if (followUpTtsBackupTimeoutRef.current) {
+      clearTimeout(followUpTtsBackupTimeoutRef.current);
+      followUpTtsBackupTimeoutRef.current = null;
+    }
+  }, [stopTTS]);
+
+  const clearStreamingTtsRef = useRef(clearStreamingTts);
+  clearStreamingTtsRef.current = clearStreamingTts;
+
+  useLayoutEffect(() => {
+    ttsOnPlayEndDispatcherRef.current = () => {
+      /* single full-message clip; no queue to drain */
+    };
+  }, []);
+
+  /**
+   * One-shot TTS: `clearStreamingTts` first, then a full `playTTS`. By default the 2s clock
+   * **arms in `onPlayEnd`**; set `armPromptWhenAudioEnds: false` for e.g. manual line replay.
+   */
+  const speakMessage = useCallback(
+    (raw: string, options?: { isFollowUp?: boolean; role?: ChatRole; armPromptWhenAudioEnds?: boolean }) => {
+      if (options?.role === "user") return;
+      if (isExitingRef.current || showReview) return;
+      const t = String(raw ?? "").trim();
+      if (!t) return;
+
+      clearStreamingTts();
+
+      const isFollowUp = options?.isFollowUp === true;
+      if (isFollowUp) {
+        followUpTtsHtmlAudioStartedRef.current = false;
+        followUpWebSpeechFromOnErrorRef.current = false;
+      }
+      lastTtsCallWasFollowUpRef.current = isFollowUp;
+      lastTtsAttemptTextRef.current = t;
+      armPromptOnTtsPlayEndRef.current = options?.armPromptWhenAudioEnds !== false;
+      void playTTS(t);
+
+      if (isFollowUp) {
+        scheduleFollowUpWebSpeechBackup(t);
+      }
+    },
+    [clearStreamingTts, playTTS, showReview, scheduleFollowUpWebSpeechBackup],
+  );
+
+  const speakMessageRef = useRef(speakMessage);
+  speakMessageRef.current = speakMessage;
+
+  /** When `isAiTyping` goes false, speak the full last assistant line after streaming (set via `pendingPostStreamTtsRef`). */
+  useEffect(() => {
+    if (isAiTyping) return;
+    const p = pendingPostStreamTtsRef.current;
+    if (!p) return;
+    pendingPostStreamTtsRef.current = null;
+    const t = String(p.full ?? "").trim();
+    if (!t) return;
+    speakMessageRef.current(t, { isFollowUp: p.isFollowUp, role: "ai" });
+  }, [isAiTyping]);
 
   // Fetch the student's current pressureTestLevel from their profile
   useEffect(() => {
@@ -167,12 +447,16 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   const stopAllActivity = useCallback(() => {
     isExitingRef.current = true;
 
+    if (followUpTtsBackupTimeoutRef.current) {
+      clearTimeout(followUpTtsBackupTimeoutRef.current);
+      followUpTtsBackupTimeoutRef.current = null;
+    }
+
     // Cancel any in-flight analysis request
     analyzeAbortRef.current?.abort();
     analyzeAbortRef.current = null;
 
-    // Stop TTS playback
-    stopTTS();
+    clearStreamingTts();
 
     // Clear the recording timer
     if (timerRef.current) {
@@ -203,7 +487,11 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
     // Cancel the waveform animation frame and close the AudioContext
     stopVisualizer();
-  }, [stopTTS, stopVisualizer]);
+  }, [clearStreamingTts, stopVisualizer]);
+
+  /** Always call the latest `stopAllActivity` from unmount cleanup (no dependency churn). */
+  const stopAllActivityRef = useRef(stopAllActivity);
+  stopAllActivityRef.current = stopAllActivity;
 
   const startVisualizer = useCallback((stream: MediaStream) => {
     const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -230,38 +518,52 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     render();
   }, []);
 
-  // Track whether we've already kicked off the intro fetch so re-renders don't repeat it.
-  const chatInitialisedRef = useRef(false);
-
+  // Turn 1 intro: one run per `sessionRunId` when drill + name are ready (aborts + ignores stale fetches on remount).
+  // Use `drillDocumentId` (not `drill`) in deps so React Query refetches that replace the `drill` object
+  // do not retrigger this effect and abort the in-flight intro stream.
+  // Do not depend on `speakMessage` / `armPromptReady` (their identity changes would abort the stream and, with a "ran once" ref, could block the intro entirely).
   useEffect(() => {
-    if (!drill || !firstName || chatInitialisedRef.current) return;
-    chatInitialisedRef.current = true;
+    const drill = drillRef.current;
+    if (!drill || !firstName) return;
+    const introGen = ++introEffectGenRef.current;
+    introAbortFromUnmountRef.current = false;
+
+    setTurnNumber(1);
+    setTurns([]);
+    setReviewData(null);
+    setIsSpeedSuccess(null);
+    setLastGapMs(null);
+    setShowReview(false);
+    clearStreamingTtsRef.current();
 
     const intro = `Hello ${firstName} 👋 The pressure test is to help you respond naturally in day-to-day conversation. Let's get started.`;
 
-    // Show the intro immediately + an empty typing bubble for the AI scenario
+    // Show the intro immediately; the empty second row stays hidden until the first stream token
+    // (dedicated `PressureTestAiThinkingBubble` at list end while `!isAiStreaming`).
     setMessages([
       { role: "ai", text: intro },
       { role: "ai", text: "" },
     ]);
     setIsAiTyping(true);
+    setIsAiStreaming(false);
 
     const fallback = getInitialPrompt(drill);
 
     const showFallback = () => {
+      if (introGen !== introEffectGenRef.current) return;
       setMessages([
         { role: "ai", text: intro },
         { role: "ai", text: fallback },
       ]);
       setIsAiTyping(false);
-      aiDoneAtRef.current = Date.now();
-      // TTS reads both intro and fallback scenario
-      void playTTS(`${intro} ${fallback}`);
+      setIsAiStreaming(false);
+      speakMessageRef.current(`${intro} ${fallback}`, { isFollowUp: false, role: "ai" });
     };
 
-    // Abort if the server takes more than 6 seconds
+    // Abort if headers/stream never start (safety); slow LLMs can take 15s+ to first byte
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const INTRO_REQUEST_TIMEOUT_MS = 30000;
+    const timeoutId = setTimeout(() => controller.abort(), INTRO_REQUEST_TIMEOUT_MS);
 
     fetch("/api/v1/pressure-test/chat", {
       method: "POST",
@@ -271,18 +573,23 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
       body: JSON.stringify({
         // A hidden "begin" turn — never shown in the UI
         messages: [{ role: "user", content: "begin" }],
-        level: studentLevel,
+        level: studentLevelRef.current,
         turnNumber: 1,
         drillId,
+        sessionId: chatSessionId,
+        isNewSession: true,
+        reset: true,
       }),
     })
       .then(async (res) => {
+        if (introGen !== introEffectGenRef.current) return;
         if (!res.ok || !res.body) { showFallback(); return; }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = "";
         let text = "";
         while (true) {
+          if (introGen !== introEffectGenRef.current) return;
           const { done, value } = await reader.read();
           if (done) break;
           buf += decoder.decode(value, { stream: true });
@@ -295,6 +602,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
                 const p = JSON.parse(evt.slice(6));
                 if (p.type === "text" && typeof p.data === "string") {
                   text += p.data;
+                  if (p.data) setIsAiStreaming(true);
                   setMessages((prev) => {
                     const copy = [...prev];
                     copy[copy.length - 1] = { role: "ai", text };
@@ -311,37 +619,79 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
             end = buf.indexOf("\n\n");
           }
         }
+        if (introGen !== introEffectGenRef.current) return;
         if (!text) showFallback();
         else {
+          pendingPostStreamTtsRef.current = {
+            full: text.trim() ? `${intro} ${text}` : intro,
+            isFollowUp: false,
+          };
           setIsAiTyping(false);
-          aiDoneAtRef.current = Date.now();
-          // Speak intro + scenario together so display and audio match
-          void playTTS(`${intro} ${text}`);
+          setIsAiStreaming(false);
         }
       })
-      .catch(() => showFallback())
+      .catch((err: unknown) => {
+        if (introGen !== introEffectGenRef.current) return;
+        const name = err && typeof err === "object" && "name" in err ? (err as { name?: string }).name : "";
+        if (name === "AbortError" && introAbortFromUnmountRef.current) return;
+        showFallback();
+      })
       .finally(() => clearTimeout(timeoutId));
 
-    return () => { controller.abort(); clearTimeout(timeoutId); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drill, firstName]);
+    return () => {
+      introAbortFromUnmountRef.current = true;
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [drillDocumentId, drillId, firstName, sessionRunId, chatSessionId]);
 
   useEffect(() => {
     return () => {
-      stopAllActivity();
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, [stopAllActivity, previewUrl]);
+  }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      clearPressureTestDrillClientCache(drillId);
+      stopAllActivityRef.current();
+    };
+  // Unmount only — do not add deps (e.g. `previewUrl`) or cleanup will run mid-session and set `isExitingRef`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startRecording = useCallback(async () => {
     if (isRecording || isAnalyzing || isAiTyping) return;
-    // Stop any AI voice so it doesn't bleed into the student's microphone
-    stopTTS();
+
+    // Capture *before* stopping: interrupt = student recorded while our voice was still going.
+    const hadHtmlTts =
+      ttsHookStateRef.current.generating || ttsHookStateRef.current.playing;
+    const hadWebSpeech =
+      typeof window !== "undefined" &&
+      "speechSynthesis" in window &&
+      (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+
+    clearStreamingTts();
+
+    if (hadHtmlTts || hadWebSpeech) {
+      // New window for the 2s clock: the moment of tap, not when Gemini TTS had started.
+      armPromptReady();
+    }
+
     try {
+      /**
+       * Capture the moment the student chose to start answering (synchronous), before
+       * `getUserMedia` / device open latency, so the pressure gap (prompt → speech or record) is
+       * not unfairly enlarged by mic permission and device open time.
+       */
+      const recordIntentAt = promptReadyAtRef.current != null ? performance.now() : null;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
-      pendingLatencyRef.current = aiDoneAtRef.current ? Date.now() - aiDoneAtRef.current : 0;
+      if (promptReadyAtRef.current != null) {
+        speechFirstAtRef.current = null;
+        recordStartAtRef.current = recordIntentAt ?? performance.now();
+      }
 
       const recorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -394,6 +744,16 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
           speechReadyRef.current = new Promise<string>((res) => { resolveSpeech = res; });
 
           recognition.onresult = (event: any) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const piece = (event.results[i][0].transcript || "").trim();
+              if (
+                piece &&
+                promptReadyAtRef.current != null &&
+                speechFirstAtRef.current == null
+              ) {
+                speechFirstAtRef.current = performance.now();
+              }
+            }
             let finalChunk = "";
             for (let i = event.resultIndex; i < event.results.length; i++) {
               if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript;
@@ -409,7 +769,16 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     } catch (error: any) {
       toast.error(error?.message || "Unable to access microphone.");
     }
-  }, [isAiTyping, isAnalyzing, isRecording, previewUrl, recordingMs, startVisualizer, stopTTS]);
+  }, [
+    armPromptReady,
+    isAiTyping,
+    isAnalyzing,
+    isRecording,
+    previewUrl,
+    recordingMs,
+    startVisualizer,
+    clearStreamingTts,
+  ]);
 
   const stopRecording = useCallback(() => {
     if (!isRecording) return;
@@ -419,6 +788,22 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     }
     // Capture actual duration here (not in onstop closure which has stale state)
     setRecordedDurationMs(Date.now() - startedAtRef.current);
+    const t0 = promptReadyAtRef.current;
+    let gapMs = 0;
+    if (t0 != null) {
+      const tCandidates: number[] = [];
+      if (speechFirstAtRef.current != null) tCandidates.push(speechFirstAtRef.current);
+      if (recordStartAtRef.current != null) tCandidates.push(recordStartAtRef.current);
+      if (tCandidates.length > 0) {
+        gapMs = Math.max(0, Math.round(Math.min(...tCandidates) - t0));
+      }
+    }
+    pendingLatencyRef.current = gapMs;
+    const under = gapMs < PRESSURE_SPEED_MS;
+    pendingSpeedSuccessRef.current = under;
+    setLastGapMs(gapMs);
+    setIsSpeedSuccess(under);
+
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
     stopVisualizer();
@@ -427,9 +812,14 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     try { recognitionRef.current?.stop(); } catch (_) {}
   }, [isRecording, stopVisualizer]);
 
-  const resetRecording = useCallback(() => {
+  const resetRecording = useCallback((options?: { clearSpeedFeedback?: boolean }) => {
+    const clearSpeed = options?.clearSpeedFeedback !== false;
     setRecordedAudio(null);
     setRecordedDurationMs(0);
+    if (clearSpeed) {
+      setIsSpeedSuccess(null);
+      setLastGapMs(null);
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl("");
   }, [previewUrl]);
@@ -440,24 +830,76 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
   };
 
   const streamAiReply = useCallback(
-    async (nextMessages: Message[], level = studentLevel) => {
-      const payloadMessages = nextMessages.map((m) => ({
-        role: m.role === "ai" ? "model" : "user",
-        content: m.text,
-      }));
+    async (
+      nextMessages: Message[],
+      level = studentLevel,
+      opts?: {
+        userTurnMetadata: {
+          latency_ms: number;
+          is_pressure_test: true;
+          scenario_id: string;
+        };
+      },
+    ) => {
+      setIsSpeedSuccess(null);
+      setLastGapMs(null);
+      // Prepend a user turn so Gemini `history` always starts with `user` and includes prior model turns
+      // (rawHistory was only [model, model, …] before, which made firstUserIdx = -1 and history empty).
+      const payloadMessages = [
+        { role: "user" as const, content: "begin" },
+        ...nextMessages.map((m) => ({
+          role: m.role === "ai" ? ("model" as const) : ("user" as const),
+          content: m.text,
+        })),
+      ];
 
-      const response = await fetch("/api/v1/pressure-test/chat", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: payloadMessages,
-          level,
-          turnNumber: Math.min(turnNumber + 1, TOTAL_TURNS),
-          drillId,
-        }),
-      });
+      const body: Record<string, unknown> = {
+        messages: payloadMessages,
+        level,
+        turnNumber: Math.min(turnNumber + 1, TOTAL_TURNS),
+        drillId,
+        sessionId: chatSessionId,
+        isNewSession: false,
+      };
+      if (opts?.userTurnMetadata) {
+        body.metadata = opts.userTurnMetadata;
+      }
+
+      /** Show "thinking" immediately, before headers / first stream byte (turns 2+). */
+      pendingPostStreamTtsRef.current = null;
+      clearStreamingTts();
+      setIsAiStreaming(false);
+      setIsAiTyping(true);
+      setMessages((prev) => [...prev, { role: "ai", text: "" }]);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/v1/pressure-test/chat", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } catch {
+        setIsAiTyping(false);
+        setIsAiStreaming(false);
+        setMessages((prev) => {
+          if (prev.length > 0 && prev[prev.length - 1].role === "ai" && prev[prev.length - 1].text === "") {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+        throw new Error("Failed to stream pressure test response");
+      }
       if (!response.ok || !response.body) {
+        setIsAiTyping(false);
+        setIsAiStreaming(false);
+        setMessages((prev) => {
+          if (prev.length > 0 && prev[prev.length - 1].role === "ai" && prev[prev.length - 1].text === "") {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
         throw new Error("Failed to stream pressure test response");
       }
 
@@ -465,8 +907,6 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
       const decoder = new TextDecoder();
       let buffer = "";
       let finalText = "";
-      setIsAiTyping(true);
-      setMessages((prev) => [...prev, { role: "ai", text: "" }]);
 
       const updateLastAi = (text: string) => {
         setMessages((prev) => {
@@ -477,50 +917,117 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
         });
       };
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let end = buffer.indexOf("\n\n");
-        while (end !== -1) {
-          const evt = buffer.slice(0, end);
-          buffer = buffer.slice(end + 2);
-          if (evt.startsWith("data: ")) {
-            const parsed = JSON.parse(evt.slice(6));
-            if (parsed.type === "text" && typeof parsed.data === "string") {
-              finalText += parsed.data;
-              updateLastAi(finalText);
+      const applySsePayload = (parsed: { type?: string; data?: unknown }) => {
+        if (parsed.type === "error") {
+          const d = parsed.data;
+          const message =
+            d &&
+            typeof d === "object" &&
+            d !== null &&
+            "message" in d &&
+            typeof (d as { message: string }).message === "string"
+              ? (d as { message: string }).message
+              : "Stream failed";
+          throw new Error(message);
+        }
+        if (parsed.type === "text" && typeof parsed.data === "string") {
+          if (parsed.data) setIsAiStreaming(true);
+          finalText += parsed.data;
+          updateLastAi(finalText);
+        }
+      };
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let end = buffer.indexOf("\n\n");
+          while (end !== -1) {
+            const evt = buffer.slice(0, end);
+            buffer = buffer.slice(end + 2);
+            if (evt.startsWith("data: ")) {
+              try {
+                const parsed = JSON.parse(evt.slice(6)) as { type?: string; data?: unknown };
+                applySsePayload(parsed);
+              } catch (e) {
+                if (e instanceof SyntaxError) {
+                  /* skip malformed chunk */
+                } else {
+                  throw e;
+                }
+              }
+            }
+            end = buffer.indexOf("\n\n");
+          }
+        }
+
+        if (buffer.length > 0) {
+          for (const line of buffer.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            try {
+              const parsed = JSON.parse(trimmed.slice(6)) as { type?: string; data?: unknown };
+              applySsePayload(parsed);
+            } catch (e) {
+              if (e instanceof SyntaxError) {
+                /* ignore partial line */
+              } else {
+                throw e;
+              }
             }
           }
-          end = buffer.indexOf("\n\n");
         }
-      }
 
-      if (!finalText) {
-        // Gemini returned no text (rate-limit / quota). Replace the empty bubble with
-        // a neutral prompt so the student can still complete their turns.
-        const fallbackPrompts = [
-          "Good effort! Now respond to this: What would you say next?",
-          "Keep going — describe what happens after that.",
-          "Your turn again — how would you reply in this situation?",
-        ];
-        const fallback = fallbackPrompts[(turnNumber - 1) % fallbackPrompts.length];
-        setMessages((prev) => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { role: "ai", text: fallback };
-          return copy;
-        });
+        if (!finalText) {
+          // Gemini returned no text (rate-limit / empty stream). Replace the empty bubble with
+          // a neutral prompt so the student can still complete their turns.
+          const fallbackPrompts = [
+            "Good effort! Now respond to this: What would you say next?",
+            "Keep going — describe what happens after that.",
+            "Your turn again — how would you reply in this situation?",
+          ];
+          const fallback = fallbackPrompts[(turnNumber - 1) % fallbackPrompts.length];
+          setMessages((prev) => {
+            const copy = [...prev];
+            copy[copy.length - 1] = { role: "ai", text: fallback };
+            return copy;
+          });
+          setIsAiTyping(false);
+          setIsAiStreaming(false);
+          speakMessage(fallback, { isFollowUp: true, role: "ai" });
+          return fallback;
+        }
+        pendingPostStreamTtsRef.current = { full: finalText, isFollowUp: true };
+        setIsAiTyping(false);
+        setIsAiStreaming(false);
+        return finalText;
+      } catch (e) {
+        pendingPostStreamTtsRef.current = null;
+        setIsAiTyping(false);
+        setIsAiStreaming(false);
+        setMessages((prev) =>
+          prev.length > 0 && prev[prev.length - 1].role === "ai" ? prev.slice(0, -1) : prev,
+        );
+        clearStreamingTts();
+        throw e;
       }
-      setIsAiTyping(false);
-      aiDoneAtRef.current = Date.now();
-      return finalText;
     },
-    [drillId, studentLevel, turnNumber],
+    [
+      clearStreamingTts,
+      chatSessionId,
+      drillId,
+      speakMessage,
+      studentLevel,
+      turnNumber,
+    ],
   );
 
   const submitTurn = useCallback(async () => {
     if (!recordedAudio || isAiTyping || isAnalyzing || isTranscribing) return;
 
+    let turnSnapshot: TurnDraft[] = [];
+    let didAppendUserToThread = false;
     try {
       setIsTranscribing(true);
 
@@ -552,23 +1059,30 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
       setIsTranscribing(false);
       const latestAiPrompt =
-        [...messages].reverse().find((m) => m.role === "ai")?.text || "Prompt unavailable";
+        [...messagesRef.current].reverse().find((m) => m.role === "ai")?.text || "Prompt unavailable";
       const audioBase64 = await blobToBase64(recordedAudio);
       const turnDraft: TurnDraft = {
         turnNumber,
         aiPrompt: latestAiPrompt,
         studentResponseText: userText,
         latencyMs: pendingLatencyRef.current,
+        speedSuccess: pendingSpeedSuccessRef.current,
+        scenarioId,
         audioDurationMs: recordedDurationMs,
         audioBase64,
       };
       const nextTurns = [...turns, turnDraft];
+      turnSnapshot = turns;
       setTurns(nextTurns);
-      resetRecording();
+      resetRecording({ clearSpeedFeedback: false });
       setMessages((prev) => [...prev, { role: "user", text: userText }]);
+      didAppendUserToThread = true;
 
       if (turnNumber >= TOTAL_TURNS) {
+        clearPressureTestDrillClientCache(drillId);
         setIsAnalyzing(true);
+        setLastGapMs(null);
+        setIsSpeedSuccess(null);
         const analyzeAc = new AbortController();
         analyzeAbortRef.current = analyzeAc;
         let resultRes: Response;
@@ -597,15 +1111,30 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
         return;
       }
 
-      const historyWithUser = [...messages, { role: "user" as const, text: userText }];
-      const aiText = await streamAiReply(historyWithUser, studentLevel);
+      const historyWithUser = [...messagesRef.current, { role: "user" as const, text: userText }];
+      await streamAiReply(historyWithUser, studentLevel, {
+        userTurnMetadata: {
+          latency_ms: turnDraft.latencyMs,
+          is_pressure_test: true,
+          scenario_id: turnDraft.scenarioId,
+        },
+      });
       if (isExitingRef.current) return;
       setTurnNumber((prev) => prev + 1);
-      // Speak the AI's follow-up prompt aloud
-      if (aiText) void playTTS(aiText);
     } catch (error: any) {
       toast.error(error?.message || "Failed to process this turn.");
+      if (didAppendUserToThread) {
+        setTurns(turnSnapshot);
+        setMessages((prev) => {
+          let p = prev;
+          if (p.length > 0 && p[p.length - 1].role === "ai") p = p.slice(0, -1);
+          if (p.length > 0 && p[p.length - 1].role === "user") p = p.slice(0, -1);
+          return p;
+        });
+        resetRecording({ clearSpeedFeedback: true });
+      }
       setIsAiTyping(false);
+      setIsAiStreaming(false);
       setIsAnalyzing(false);
       setIsTranscribing(false);
     }
@@ -614,11 +1143,10 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
     isAiTyping,
     isAnalyzing,
     isTranscribing,
-    messages,
-    playTTS,
     recordedAudio,
     recordedDurationMs,
     resetRecording,
+    scenarioId,
     streamAiReply,
     studentLevel,
     turnNumber,
@@ -688,6 +1216,10 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
             let aiIdx = 0;
             return messages.map((msg, idx) => {
               if (msg.role === "ai") {
+                const isLast = idx === messages.length - 1;
+                if (isLast && !msg.text && isAiTyping && !isAiStreaming) {
+                  return <Fragment key={`ai-thinking-skip-${idx}`} />;
+                }
                 const currentAiIdx = aiIdx++;
                 return (
                   <section key={`ai-${idx}`} className="bg-[#f4f5f4] border border-[#ebebeb] rounded-2xl p-4">
@@ -702,16 +1234,9 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
                           {msg.text.replace(/^Hello\s+\S+\s*👋\s*/i, "")}
                         </>
                       ) : msg.text ? (
-                        // Scenario bubble
+                        // Scenario bubble (streams in from first token)
                         <span className="font-semibold text-emerald-700">{msg.text}</span>
-                      ) : (
-                        // Typing indicator while AI is streaming
-                        <span className="inline-flex gap-1 items-center text-gray-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
-                        </span>
-                      )}
+                      ) : null}
                     </p>
                     <div className="flex items-center gap-3 mt-3 text-gray-700">
                       <Languages className="w-4 h-4" />
@@ -721,7 +1246,11 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
                           if (isTTSGenerating || isTTSPlaying) {
                             stopTTS();
                           } else {
-                            void playTTS(msg.text);
+                            speakMessage(msg.text, {
+                              isFollowUp: false,
+                              role: "ai",
+                              armPromptWhenAudioEnds: false,
+                            });
                           }
                         }}
                         aria-label={(isTTSGenerating || isTTSPlaying) ? "Stop audio" : "Play AI message"}
@@ -743,6 +1272,8 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
               );
             });
           })()}
+
+          {isAiTyping && !isAiStreaming && <PressureTestAiThinkingBubble />}
 
           {isAnalyzing && (
             <div className="fixed inset-0 z-40 bg-gray-50/95 flex flex-col items-center justify-center px-8">
@@ -790,6 +1321,14 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
               <p className="text-center text-xs text-gray-400 mb-2">
                 preview your recording using the play button
               </p>
+              {lastGapMs != null && isSpeedSuccess != null && (
+                <p className="text-center text-sm text-slate-600 mb-2" aria-live="polite">
+                  <span className="mr-1" aria-hidden>
+                    {isSpeedSuccess ? "⚡" : "🐢"}
+                  </span>
+                  {lastGapMs}ms to first response
+                </p>
+              )}
               <div className="bg-[#f6f7f6] border border-[#ebedeb] rounded-full px-3 py-2 mb-4 flex items-center gap-2">
                 <button
                   type="button"
@@ -814,7 +1353,7 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
                 <span className="text-xs text-gray-500 tabular-nums">{formatDuration(recordedDurationMs)}</span>
                 <button
                   type="button"
-                  onClick={resetRecording}
+                  onClick={() => resetRecording()}
                   className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-slate-500" />
@@ -825,9 +1364,19 @@ export function PressureTestDrill({ drillId }: PressureTestDrillProps) {
 
           {/* ── Idle hint ─── */}
           {!isRecording && !recordedAudio && (
-            <p className="text-center text-xs text-gray-400 mb-3">
-              {isAiTyping ? "Eklan is thinking…" : isTranscribing ? "Processing…" : "Tap to speak"}
-            </p>
+            <>
+              {lastGapMs != null && isSpeedSuccess != null && (
+                <p className="text-center text-sm text-slate-600 mb-1" aria-live="polite">
+                  <span className="mr-1" aria-hidden>
+                    {isSpeedSuccess ? "⚡" : "🐢"}
+                  </span>
+                  {lastGapMs}ms to first response
+                </p>
+              )}
+              <p className="text-center text-xs text-gray-400 mb-3">
+                {isAiTyping ? "Eklan is thinking…" : isTranscribing ? "Processing…" : "Tap to speak"}
+              </p>
+            </>
           )}
 
           {/* ── Main action button ─── */}

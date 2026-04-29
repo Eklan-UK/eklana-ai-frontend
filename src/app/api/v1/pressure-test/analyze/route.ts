@@ -23,6 +23,8 @@ function wordQuality(score: number): "correct" | "mispronounced" | "missing" {
   return "missing";
 }
 
+const PRESSURE_MENTAL_MS = 2000;
+
 const analyzeSchema = z.object({
   level: z.number().int().min(1).max(20).default(1),
   drillId: z.string().optional(),
@@ -33,12 +35,20 @@ const analyzeSchema = z.object({
         aiPrompt: z.string().min(1),
         studentResponseText: z.string().min(1),
         latencyMs: z.number().min(0),
+        /** Strict &lt; PRESSURE_MENTAL_MS = fast. Backfilled from latency if omitted. */
+        speedSuccess: z.boolean().optional(),
+        scenarioId: z.string().min(1).optional(),
         audioDurationMs: z.number().min(0).default(0),
         audioBase64: z.string().min(10),
       }),
     )
     .min(1),
 });
+
+function resolveSpeedSuccess(turn: { latencyMs: number; speedSuccess?: boolean }): boolean {
+  if (typeof turn.speedSuccess === "boolean") return turn.speedSuccess;
+  return turn.latencyMs < PRESSURE_MENTAL_MS;
+}
 
 function labelFromScore(score: number): string {
   if (score >= 85) return "Excellent";
@@ -286,6 +296,8 @@ async function handler(
         aiPrompt: turn.aiPrompt,
         studentResponseText: turn.studentResponseText,
         latencyMs: turn.latencyMs,
+        speedSuccess: resolveSpeedSuccess(turn),
+        ...(turn.scenarioId != null && turn.scenarioId !== "" ? { scenarioId: turn.scenarioId } : {}),
       })),
     });
 
@@ -316,6 +328,8 @@ async function handler(
           aiPrompt: turn.aiPrompt,
           studentTranscript: turn.studentResponseText,
           latencyMs: turn.latencyMs,
+          speedSuccess: resolveSpeedSuccess(turn),
+          ...(turn.scenarioId != null && turn.scenarioId !== "" ? { scenarioId: turn.scenarioId } : {}),
           audioBase64: turn.audioBase64,
           audioMimeType: "audio/webm",
           audioDurationMs: turn.audioDurationMs ?? 0,

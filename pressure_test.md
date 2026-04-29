@@ -1,5 +1,17 @@
 # Eklan Pressure Test — Backend Implementation Plan
 
+## How the Pressure Test works (user perspective)
+
+The Pressure Test is a **fixed three-turn** spoken exercise built on a **roleplay drill** the student has already **completed in Free Talk** (only those drills are **unlocked** on the selection page).
+
+1. **Start a session** — The student opens a drill and lands on the chat screen. They see a **greeting** plus an AI “typing” state while the first scenario **streams in** word by word. When the stream **finishes**, a **2s mental-translation** clock starts (used for on-device speed feedback: time until their **first speech** or **tap to record**). The full AI text is **read aloud automatically** (server TTS, with a **browser speech fallback** if playback or the TTS request fails).
+2. **Each turn** — The bottom control shows **“Eklan is thinking…”** while the AI is generating, **“Processing…”** while the last reply is being transcribed, and **“Tap to speak”** when it is the student’s turn. The student **records** (live **waveform** + timer), can **play back** or **discard** the take, then **sends** it. Their line appears; the **next AI line streams in** and is **read aloud the same way** when streaming completes. The header shows **turn 1 of 3 → 2 of 3 → 3 of 3**.
+3. **After turn 3** — An **analyzing** state runs, then a **review** overlay with scores, qualitative feedback, and (where implemented) level progression. The student can return to practice or their **history** from the Pressure Test area.
+
+A longer, step-by-step **student experience** (selection, history, review cards) is in [`pressure-test-student-experience.md`](./pressure-test-student-experience.md).
+
+---
+
 ## Current Status
 
 ### What exists today

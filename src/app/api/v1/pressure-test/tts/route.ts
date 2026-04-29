@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
+import { logger } from '@/lib/api/logger';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
 
 const requestWindowMs = 60_000;
@@ -68,6 +69,10 @@ async function postHandler(
       },
     });
   } catch (error: any) {
+    logger.error('pressure-test TTS request failed', {
+      message: error?.message,
+      stack: error?.stack,
+    });
     return NextResponse.json(
       { code: 'ServerError', message: 'Failed to generate speech', error: error.message },
       { status: 500 },

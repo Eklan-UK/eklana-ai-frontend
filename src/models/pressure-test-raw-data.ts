@@ -15,6 +15,8 @@ export interface IRawTurnData {
   aiPrompt: string;
   studentTranscript: string;
   latencyMs: number;
+  speedSuccess?: boolean;
+  scenarioId?: string;
   audioBase64: string;
   audioMimeType: string;
   audioDurationMs: number;
@@ -62,6 +64,8 @@ const rawTurnSchema = new Schema<IRawTurnData>(
     aiPrompt: { type: String, required: true },
     studentTranscript: { type: String, required: true },
     latencyMs: { type: Number, required: true },
+    speedSuccess: { type: Boolean, required: false },
+    scenarioId: { type: String, required: false },
     audioBase64: { type: String, required: true },
     audioMimeType: { type: String, default: "audio/webm" },
     audioDurationMs: { type: Number, default: 0 },

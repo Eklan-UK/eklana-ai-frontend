@@ -104,6 +104,14 @@ export const config = {
 	GEMINI_SUMMARY_FALLBACK_MODEL:
 		process.env.GEMINI_SUMMARY_FALLBACK_MODEL?.trim() ||
 		'gemini-2.5-flash-lite',
+	/**
+	 * Native Gemini TTS (pressure-test, etc.). Prefer a lighter / preview model first
+	 * to keep latency and quota lower; 3.1 TTS is often a separate, tighter daily cap.
+	 */
+	GEMINI_TTS_MODEL_PRIMARY:
+		process.env.GEMINI_TTS_MODEL_PRIMARY?.trim() || 'gemini-2.5-flash-preview-tts',
+	GEMINI_TTS_MODEL_FALLBACK:
+		process.env.GEMINI_TTS_MODEL_FALLBACK?.trim() || 'gemini-3.1-flash-tts-preview',
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||

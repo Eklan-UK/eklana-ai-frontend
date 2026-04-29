@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Header } from "@/components/layout/Header";
 import { useLearnerDrills } from "@/hooks/useDrills";
@@ -199,8 +198,24 @@ function SessionHistoryRow({ session }: { session: PTSession }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+/** True for plain drill documents (excludes `null`, Arrays, and Date, which have typeof "object" in JS). */
+function isPlainDrillObject(d: unknown): d is Record<string, unknown> {
+  if (d == null || typeof d !== "object") return false;
+  if (Array.isArray(d) || d instanceof Date) return false;
+  return true;
+}
+
+function isPressureTestScenarioDrill(drill: unknown): boolean {
+  if (!isPlainDrillObject(drill)) return false;
+  const t = String(drill.type ?? "")
+    .trim()
+    .toLowerCase();
+  if (t === "roleplay" || t === "scenario" || t === "role_play") return true;
+  if (Array.isArray(drill.roleplay_scenes) && drill.roleplay_scenes.length > 0) return true;
+  return false;
+}
+
 export default function PressureTestSelectionPage() {
-  const router = useRouter();
   const { data: drillsData, isLoading } = useLearnerDrills();
   const [history, setHistory] = useState<PTHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -227,7 +242,7 @@ export default function PressureTestSelectionPage() {
   const scenarioAssignments = (drillsData ?? [])
     .filter((a: any) => {
       const drill = a?.drill;
-      return drill && (drill.type === "roleplay" || drill.type === "scenario");
+      return drill && isPressureTestScenarioDrill(drill);
     })
     .map((a: any) => {
       const drill = a.drill;
@@ -313,7 +328,9 @@ export default function PressureTestSelectionPage() {
               ) : visible.length === 0 ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-center">
                   <p className="text-sm font-satoshi text-gray-600">
-                    Complete a scenario drill to unlock the pressure test.
+                    {Array.isArray(drillsData) && drillsData.length > 0
+                      ? "You have assigned drills, but none are roleplay-style scenarios. The pressure test only lists roleplay drills (or drills with a roleplay scene). Complete a roleplay assignment or ask your tutor to assign one."
+                      : "Complete a scenario drill to unlock the pressure test."}
                   </p>
                 </div>
               ) : (
@@ -324,9 +341,15 @@ export default function PressureTestSelectionPage() {
                       title={item.title}
                       isUnlocked={item.status === "completed"}
                       onClick={() => {
-                        router.push(
-                          `/account/practice/ai/pressure-test/chat?drillId=${encodeURIComponent(item.drillId)}`,
-                        );
+                        const run =
+                          typeof crypto !== "undefined" && "randomUUID" in crypto
+                            ? crypto.randomUUID()
+                            : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+                        // Full navigation so the chat route always cold-loads (no stale client state / bfcache from SPA).
+                        if (typeof window !== "undefined") {
+                          const url = `/account/practice/ai/pressure-test/chat?drillId=${encodeURIComponent(item.drillId)}&run=${encodeURIComponent(run)}`;
+                          window.location.assign(url);
+                        }
                       }}
                     />
                   ))}

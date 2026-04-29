@@ -5,7 +5,12 @@ export interface ITestTurn {
   turnNumber: number;
   aiPrompt: string;
   studentResponseText: string;
+  /** Milliseconds from end of previous AI stream to first speech or record start (mental-translation gap). */
   latencyMs: number;
+  /** True if latencyMs is strictly &lt; 2000. Optional on legacy sessions. */
+  speedSuccess?: boolean;
+  /** Roleplay scene or drill id from the client; optional. */
+  scenarioId?: string;
 }
 
 export interface ITurnFeedback {
@@ -40,6 +45,8 @@ const testTurnSchema = new Schema<ITestTurn>(
     aiPrompt: { type: String, required: true, trim: true },
     studentResponseText: { type: String, required: true, trim: true },
     latencyMs: { type: Number, required: true, min: 0 },
+    speedSuccess: { type: Boolean, required: false },
+    scenarioId: { type: String, required: false, trim: true },
   },
   { _id: false },
 );

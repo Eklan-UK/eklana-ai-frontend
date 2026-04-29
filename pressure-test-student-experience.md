@@ -33,15 +33,16 @@ When the student opens the Pressure Test, they see:
 When the student taps an unlocked drill:
 
 - The `PressureTestDrill` component mounts.
-- It silently fetches the student's `pressureTestLevel` from their profile. This is the difficulty setting for the entire session — the student never sees or changes it directly.
-- The component shows the drill title, a progress bar (`1 of 3`), and a greeting message from the AI: "Hello [First Name] 👋 The pressure test is to help you respond naturally in day-to-day conversation. Let's get started."
-- Simultaneously, the component makes its first call to the chat API with a hidden `"begin"` message. The AI generates Turn 1 — the opening scenario — and it streams in character by character as if the AI is typing.
-- A text-to-speech voice reads both the greeting and the scenario aloud so the student can listen without reading if they prefer.
+- It fetches the student's `pressureTestLevel` from their profile (via `/api/v1/users/current`). This difficulty applies for the **whole session** — the student does not change it in the UI.
+- The app shows a **greeting** (e.g. “Hello [First Name] 👋 … Let’s get started.”) and an empty “typing” bubble for the first scenario, then streams Turn 1 from the API using a hidden **`"begin"`** user message.
+- The scenario text appears in the last bubble as it **streams in** (like typing). The main control at the bottom shows **“Eklan is thinking…”** while the stream is active; after it **finishes**, the label becomes **“Tap to speak”** (unless a transcript is still being processed, then **“Processing…”**).
+- **When the AI is ready to listen again (prompt-ready)**: the **mental-translation** window and any **“gap”** (ms) line for that turn are anchored to when the **read-aloud for that AI line is finished** (end of the last TTS audio clip in the server/Gemini path, or the browser speech fallback for that line). The UI can stop the “typing / thinking” state as soon as the **text** finishes streaming, but the **2s** rule measures time until first speech or record **after the voice** for that line, not only after the last character appears. (Fallback prompts that are not stream-read may still arm the timer when the line is set, before one-shot TTS, so behavior matches those paths.) A small inline line can show the gap in **milliseconds** and a **⚡** (under 2s) or **🐢** (2s or more) for that line.
+- **TTS (voice)**: For streamed replies, the app **enqueues and plays the AI line sentence-by-sentence** as the stream grows (server TTS via `/api/v1/pressure-test/tts`, with **Web Speech** as a **fallback** if a clip fails, plus the existing delayed backup for follow-up turns if HTML audio never starts). The student can use the **speaker** control to replay a full line (that clears any in-progress stream TTS). Starting a new recording or leaving the page **stops** playback and cancels the queue.
 
 **What the AI says in Turn 1 (example):**
 > "I'm your manager and you were 20 minutes late to the morning briefing. Your colleagues had to wait. Why were you late?"
 
-The AI always sets the full scene in Turn 1 — who it is, the situation, what happened — and ends with a direct question. It keeps this under 50 words so it is easy to absorb quickly.
+The full scene and question in Turn 1 are guided by the drill; length is tuned in the system prompt. If the model returns nothing, the client shows a short **fallback prompt** and still runs TTS and the same **prompt-ready** / mental-gap timing.
 
 ---
 
@@ -61,9 +62,10 @@ After the AI finishes typing (and speaking), the student sees a microphone butto
 - If they are not happy with it, they tap the trash icon and re-record.
 
 **Tap the send button:**
-- The component transcribes the audio (Web Speech API result first, then server-side fallback if empty).
-- The student's transcribed text appears as a chat bubble on the right side of the screen.
-- The system captures `latencyMs` — the number of milliseconds between when the AI finished its message and when the student started recording. This is used in scoring.
+- The main control shows **“Processing…”** while the reply is being transcribed.
+- The student’s message appears on the right.
+- The app then requests the next AI line; while it is streaming, the control shows **“Eklan is thinking…”** again. When the line is complete, **TTS runs automatically** and the **mental-gap** clock applies for the **next** student turn, same as for Turn 1.
+- The system records **latency** for the session (e.g. time from AI stream end to student action) for scoring and, where shown, the **ms** + ⚡/🐢 line for the student’s own feedback.
 
 ---
 
@@ -71,10 +73,9 @@ After the AI finishes typing (and speaking), the student sees a microphone butto
 
 After the student submits their first response:
 
-- The AI's follow-up streams in immediately, reacting to what the student said.
-- At higher levels, the AI may challenge the student's answer, ask a harder follow-up question, or switch the topic.
-- The progress bar advances (`2 of 3`, then `3 of 3`).
-- The student records and submits again.
+- The AI’s next line **streams in**; **TTS** reads it incrementally, and the next turn’s **mental-gap** / prompt-ready behavior follows the **end of voice** for that line (see Turn 1). When the line is **complete in text** and the control shows **“Tap to speak”**, the student is past streaming text and, for stream-read paths, through the TTS for that line.
+- At higher levels, the system prompt can make the AI **challenge** the answer, ask a harder follow-up, or shift the topic; the student still **records → sends** each time.
+- The progress text advances (`2 of 3`, then `3 of 3`).
 
 The 3-turn structure is intentional:
 - **Short enough** that it feels manageable and urgent, not exhausting.
@@ -180,8 +181,8 @@ The student never has to manually adjust their level. The system automatically m
 The core design principle of the Pressure Test is that **discomfort is the point**. The AI is not trying to be helpful or forgiving — it is simulating a real conversational partner who expects a timely, coherent response.
 
 Key design choices that create this effect:
-- **Latency is measured** — the moment the AI finishes, a clock starts. Every second of hesitation reduces the speed score.
-- **The AI reads the scene aloud** via text-to-speech — the student cannot skip ahead or read at their own pace.
+- **Latency and mental gap are measured** from when the **AI’s text has finished streaming** to when the student **starts** recording or (where applicable) their first browser speech. That clock is **not** delayed by how long the **TTS** audio runs.
+- **TTS** reads each AI line out loud as soon as its text is final — the student can’t “skip” listening by reading ahead without also hearing the line (and can **replay** via the speaker control on a bubble).
 - **Turn count is fixed at 3** — there is no "just one more try." The student must commit to their answer.
 - **The recording is visible** — the student can hear themselves before submitting, but they cannot hide from the fact that they said what they said.
 - **Feedback is specific** — Gemini references the student's actual words, not generic advice. "You paused 3 seconds before Turn 2" is more useful than "work on fluency."
