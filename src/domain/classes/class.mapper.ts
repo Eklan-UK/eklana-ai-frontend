@@ -162,6 +162,16 @@ export function mapSeriesToListItem(
 
   const completedSessions = sorted.filter((s) => s.status === 'completed').length;
   const totalSessions = series.totalSessionsPlanned || sorted.length || 1;
+  const nonCancelled = sorted.filter((s) => s.status !== 'cancelled');
+  const lastNonCancelled = nonCancelled.length
+    ? nonCancelled[nonCancelled.length - 1]
+    : null;
+  const rawProgramPosition = next
+    ? next.sequenceNumber
+    : lastNonCancelled
+      ? lastNonCancelled.sequenceNumber
+      : Math.min(completedSessions + 1, totalSessions);
+  const programPosition = Math.max(1, Math.min(rawProgramPosition, totalSessions));
 
   const primary = learnerUsers[0];
   const studentLabel = primary ? userDisplayName(primary) : 'Class';
@@ -200,10 +210,12 @@ export function mapSeriesToListItem(
     scheduleDays,
     timeRange,
     completedSessions,
+    programPosition,
     totalSessions,
     nextSessionLabel,
     nextSessionId: next?._id.toString(),
     nextSessionStartUtc: next ? new Date(next.startUtc).toISOString() : undefined,
+    nextSessionIsReschedule: Boolean(next?.isReschedule),
     status,
     bucket,
     meetingUrl: next?.meetingUrl,
@@ -211,9 +223,9 @@ export function mapSeriesToListItem(
       recurring: series.recurrenceRule === 'weekly',
       sessionTimeRange:
         trStart && trEnd ? `${trStart} - ${trEnd}` : undefined,
-      sessionNumber: Math.min(completedSessions + 1, totalSessions),
+      sessionNumber: programPosition,
       sessionTotal: totalSessions,
-      blockCompleted: completedSessions,
+      blockCompleted: programPosition,
       blockTotal: totalSessions,
       meetingUrl: next?.meetingUrl,
     },

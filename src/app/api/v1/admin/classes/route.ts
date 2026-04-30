@@ -16,26 +16,42 @@ import '@/models/class-series';
 import '@/models/class-enrollment';
 import '@/models/class-session';
 
-const createSchema = z.object({
-  tutorId: z.string(),
-  learnerIds: z.array(z.string()).min(1),
-  title: z.string().max(200).optional(),
-  classType: z.enum(['group', 'individual']),
-  timezone: z.string().min(1),
-  firstSessionStart: z.string(),
-  firstSessionEnd: z.string(),
-  recurrence: z
-    .object({
-      rule: z.enum(['weekly', 'none']),
-      daysOfWeek: z.array(z.number()).optional(),
-      totalSessions: z.number().int().min(1).optional(),
-    })
-    .optional(),
-  scheduleDayLabels: z.array(z.string()).optional(),
-  scheduleStartTime: z.string().optional(),
-  scheduleEndTime: z.string().optional(),
-  totalSessionsPlanned: z.number().int().min(1).optional(),
-});
+const createSchema = z
+  .object({
+    tutorId: z.string(),
+    learnerIds: z.array(z.string()).min(1),
+    title: z.string().max(200).optional(),
+    classType: z.enum(['group', 'individual']),
+    timezone: z.string().min(1),
+    firstSessionStart: z.string(),
+    firstSessionEnd: z.string(),
+    recurrence: z
+      .object({
+        rule: z.enum(['weekly', 'none']),
+        daysOfWeek: z.array(z.number()).optional(),
+        totalSessions: z.number().int().min(1).optional(),
+      })
+      .optional(),
+    scheduleDayLabels: z.array(z.string()).optional(),
+    scheduleStartTime: z.string().optional(),
+    scheduleEndTime: z.string().optional(),
+    totalSessionsPlanned: z.number().int().min(1).optional(),
+    firstSessionSequenceNumber: z.number().int().min(1).optional(),
+  })
+  .superRefine((val, ctx) => {
+    const m = Math.max(
+      1,
+      val.totalSessionsPlanned ?? val.recurrence?.totalSessions ?? 1,
+    );
+    const n = val.firstSessionSequenceNumber ?? 1;
+    if (n > m) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['firstSessionSequenceNumber'],
+        message: `firstSessionSequenceNumber must be at most the total planned sessions (${m})`,
+      });
+    }
+  });
 
 async function getHandler(req: NextRequest) {
   await connectToDatabase();
@@ -92,7 +108,10 @@ async function postHandler(
   }
 
   const repo = new ClassRepository();
-  const { series, session } = await repo.create(parsed.data, context.userId);
+  const { series, session, calendarSyncWarning } = await repo.create(
+    parsed.data,
+    context.userId,
+  );
 
   const learnerObjectIds = parsed.data.learnerIds.map(
     (id) => new Types.ObjectId(id),
@@ -138,6 +157,9 @@ async function postHandler(
       classSeriesId: series._id.toString(),
       sessionIds: [session._id.toString()],
       class: listItem,
+      ...(calendarSyncWarning
+        ? { calendarSyncWarning }
+        : {}),
     },
     201,
   );

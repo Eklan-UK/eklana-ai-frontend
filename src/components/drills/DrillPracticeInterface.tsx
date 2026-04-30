@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import VocabularyDrill from "./VocabularyDrill";
+import PronunciationDrill from "./PronunciationDrill";
 import RoleplayDrill from "./RoleplayDrill";
 import MatchingDrill from "./MatchingDrill";
 import DefinitionDrill from "./DefinitionDrill";
@@ -81,6 +82,8 @@ export default function DrillPracticeInterface({
     switch (drill.type) {
       case "vocabulary":
         return <VocabularyDrill {...commonProps} />;
+      case "pronunciation":
+        return <PronunciationDrill {...commonProps} />;
       case "roleplay":
         return <RoleplayDrill {...commonProps} />;
       case "matching":

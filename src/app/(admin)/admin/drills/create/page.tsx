@@ -40,6 +40,12 @@ interface VocabularyItem {
   translation?: string;
 }
 
+interface PronunciationItem {
+  sound: string;
+  word: string;
+  sentence: string;
+}
+
 interface MatchingPair {
   left: string;
   right: string;
@@ -79,6 +85,9 @@ const DrillBuilder: React.FC = () => {
   const [vocabularyItems, setVocabularyItems] = useState<VocabularyItem[]>([
     { word: "", wordTranslation: "", text: "", translation: "" },
   ]);
+  const [pronunciationItems, setPronunciationItems] = useState<
+    PronunciationItem[]
+  >([{ sound: "", word: "", sentence: "" }]);
 
   // Roleplay
   const [studentCharacterName, setStudentCharacterName] = useState("");
@@ -236,6 +245,16 @@ const DrillBuilder: React.FC = () => {
             }))
             : [{ word: "", wordTranslation: "", text: "", translation: "" }]
         );
+      } else if (drill.type === "pronunciation" && drill.pronunciation_items) {
+        setPronunciationItems(
+          drill.pronunciation_items.length > 0
+            ? drill.pronunciation_items.map((p: any) => ({
+              sound: p.sound || "",
+              word: p.word || "",
+              sentence: p.sentence || "",
+            }))
+            : [{ sound: "", word: "", sentence: "" }]
+        );
       } else if (drill.type === "roleplay") {
         setStudentCharacterName(drill.student_character_name || "");
         setAiCharacterNames(
@@ -365,7 +384,30 @@ const DrillBuilder: React.FC = () => {
     setVocabularyItems(updated);
   };
 
-  // Roleplay helpers
+  const addPronunciationItem = () => {
+    setPronunciationItems([
+      ...pronunciationItems,
+      { sound: "", word: "", sentence: "" },
+    ]);
+  };
+
+  const removePronunciationItem = (index: number) => {
+    if (pronunciationItems.length <= 1) {
+      setPronunciationItems([{ sound: "", word: "", sentence: "" }]);
+      return;
+    }
+    setPronunciationItems(pronunciationItems.filter((_, i) => i !== index));
+  };
+
+  const updatePronunciationItem = (
+    index: number,
+    field: keyof PronunciationItem,
+    value: string
+  ) => {
+    const updated = [...pronunciationItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setPronunciationItems(updated);
+  };
   const addRoleplayScene = () => {
     setRoleplayScenes([
       ...roleplayScenes,
@@ -666,6 +708,17 @@ const DrillBuilder: React.FC = () => {
         toast.error("Please add at least one vocabulary item with a sentence");
         return;
       }
+    } else if (drillType === "pronunciation") {
+      if (pronunciationItems.length === 0) {
+        toast.error("Add at least one pronunciation item");
+        return;
+      }
+      for (const p of pronunciationItems) {
+        if (!p.sound.trim() || !p.word.trim() || !p.sentence.trim()) {
+          toast.error("Each pronunciation item needs Sound, Word, and Sentence");
+          return;
+        }
+      }
     } else if (drillType === "roleplay") {
       if (!context.trim()) {
         toast.error("Please provide a context/scenario for the roleplay");
@@ -787,6 +840,16 @@ const DrillBuilder: React.FC = () => {
             wordTranslation: v.wordTranslation?.trim() || undefined,
             text: v.text.trim(),
             translation: v.translation?.trim() || undefined,
+          }));
+        drillData.pronunciation_items = [];
+      } else if (drillType === "pronunciation") {
+        drillData.target_sentences = [];
+        drillData.pronunciation_items = pronunciationItems
+          .filter((p) => p.sound.trim() && p.word.trim() && p.sentence.trim())
+          .map((p) => ({
+            sound: p.sound.trim(),
+            word: p.word.trim(),
+            sentence: p.sentence.trim(),
           }));
       } else if (drillType === "roleplay") {
         drillData.student_character_name = studentCharacterName.trim();
@@ -1082,6 +1145,102 @@ const DrillBuilder: React.FC = () => {
                           className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                         />
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {drillType === "pronunciation" && (
+            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  Pronunciation Items<span className="text-red-500">*</span>
+                </h2>
+                <button
+                  type="button"
+                  onClick={addPronunciationItem}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#3d8c40] text-[#3d8c40] font-bold text-sm rounded-xl hover:bg-emerald-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Item
+                </button>
+              </div>
+              <div className="space-y-6">
+                {pronunciationItems.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="p-6 bg-gray-50/50 rounded-2xl relative border border-gray-100"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => removePronunciationItem(idx)}
+                      className="absolute top-4 right-4 text-red-400 hover:text-red-600 transition-colors"
+                      aria-label="Remove item"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <h4 className="text-sm font-bold text-gray-900 mb-4 pr-8">
+                      Item {idx + 1}
+                    </h4>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Sound
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={p.sound}
+                          onChange={(e) =>
+                            updatePronunciationItem(
+                              idx,
+                              "sound",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. /ʃ/ or sh"
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Word
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={p.word}
+                          onChange={(e) =>
+                            updatePronunciationItem(
+                              idx,
+                              "word",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Target word"
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                        Sentence
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={p.sentence}
+                        onChange={(e) =>
+                          updatePronunciationItem(
+                            idx,
+                            "sentence",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Practice sentence"
+                        className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
                     </div>
                   </div>
                 ))}
@@ -1954,6 +2113,7 @@ const DrillBuilder: React.FC = () => {
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="vocabulary">Vocabulary</option>
+                      <option value="pronunciation">Pronunciation</option>
                       <option value="roleplay">Roleplay</option>
                       <option value="matching">Matching</option>
                       <option value="grammar">Grammar</option>

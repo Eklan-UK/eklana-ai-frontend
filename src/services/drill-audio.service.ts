@@ -99,6 +99,36 @@ export function extractVocabularyTexts(
 }
 
 /**
+ * Pronunciation drill items — sound, word, and sentence TTS
+ */
+export function extractPronunciationTexts(
+  items: Array<{ sound?: string; word?: string; sentence?: string }>
+): AudioGenerationItem[] {
+  const texts: AudioGenerationItem[] = [];
+  items.forEach((item, index) => {
+    if (item.sound && item.sound.trim()) {
+      texts.push({
+        id: `pronunciation_${index}_sound`,
+        text: item.sound.trim(),
+      });
+    }
+    if (item.word && item.word.trim()) {
+      texts.push({
+        id: `pronunciation_${index}_word`,
+        text: item.word.trim(),
+      });
+    }
+    if (item.sentence && item.sentence.trim()) {
+      texts.push({
+        id: `pronunciation_${index}_sentence`,
+        text: item.sentence.trim(),
+      });
+    }
+  });
+  return texts;
+}
+
+/**
  * Helper to extract texts from roleplay dialogue
  */
 export function extractRoleplayTexts(
@@ -238,8 +268,11 @@ export function extractFillBlankTexts(
  * Unified extractor across all drill types
  */
 export function extractTextsForDrillType(drillData: any, drillType: string): AudioGenerationItem[] {
-  if (drillType === "vocabulary" && drillData.target_sentences) {
+  if (drillType === "vocabulary" && drillData.target_sentences?.length) {
     return extractVocabularyTexts(drillData.target_sentences);
+  }
+  if (drillType === "pronunciation" && drillData.pronunciation_items?.length) {
+    return extractPronunciationTexts(drillData.pronunciation_items);
   }
   if (drillType === "roleplay") {
     if (drillData.roleplay_scenes) {
@@ -301,6 +334,17 @@ export function applyAudioUrls(
         ...item,
         wordAudioUrl: urlMap.get(`vocab_${index}_word`) || "",
         sentenceAudioUrl: urlMap.get(`vocab_${index}_sentence`) || "",
+      })
+    );
+  }
+
+  if (updated.pronunciation_items?.length) {
+    updated.pronunciation_items = updated.pronunciation_items.map(
+      (item: any, index: number) => ({
+        ...item,
+        soundAudioUrl: urlMap.get(`pronunciation_${index}_sound`) || item.soundAudioUrl || "",
+        wordAudioUrl: urlMap.get(`pronunciation_${index}_word`) || item.wordAudioUrl || "",
+        sentenceAudioUrl: urlMap.get(`pronunciation_${index}_sentence`) || item.sentenceAudioUrl || "",
       })
     );
   }

@@ -21,10 +21,14 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { adminAPI } from "@/lib/api";
 import { useCreateAdminClass } from "@/hooks/useClasses";
-import { computeFirstSessionRange } from "@/lib/classes/first-session";
+import {
+  computeFirstSessionRange,
+  countSessionsThroughEndDate,
+  parseEndsOnDisplayToLocalDate,
+} from "@/lib/classes/first-session";
 import type { CreateAdminClassBody } from "@/domain/classes/class.api.types";
 
-const STEP_LABELS = ["Students", "Tutor", "Type", "Schedule", "Review"] as const;
+const STEP_LABELS = ["Students", "Tutor", "Schedule", "Review"] as const;
 
 /** Header stepper: one green for circles, labels, and connectors (matches review / confirm CTA) */
 const STEPPER_GREEN = "#388E3C";
@@ -62,6 +66,46 @@ function formatReviewUntilSuffix(
     return `Until ${raw}`;
   }
   return `Until ${sessionCount} session${sessionCount !== 1 ? "s" : ""}`;
+}
+
+type DurationMode = "sessions" | "endDate";
+
+type PlannedSessionResult =
+  | { ok: true; total: number }
+  | { ok: false; reason: "invalid_end" | "count_zero" };
+
+/**
+ * Single source of truth for total planned sessions (must match submit body).
+ */
+function computePlannedSessionTotal(params: {
+  durationMode: DurationMode;
+  sessionCount: number;
+  endsOnDateText: string;
+  scheduleDays: string[];
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+}): PlannedSessionResult {
+  if (params.durationMode === "sessions") {
+    return { ok: true, total: params.sessionCount };
+  }
+  const { start } = computeFirstSessionRange(
+    params.scheduleDays,
+    params.scheduleStartTime,
+    params.scheduleEndTime,
+  );
+  const parsedEnd = parseEndsOnDisplayToLocalDate(params.endsOnDateText);
+  if (!parsedEnd) {
+    return { ok: false, reason: "invalid_end" };
+  }
+  const n = countSessionsThroughEndDate(
+    params.scheduleDays,
+    start,
+    parsedEnd,
+  );
+  if (n < 1) {
+    return { ok: false, reason: "count_zero" };
+  }
+  return { ok: true, total: n };
 }
 
 interface PickerStudent {
@@ -132,10 +176,6 @@ function userToTutorOption(u: {
   };
 }
 
-type ClassTypeOption = "one-time" | "recurring";
-
-type DurationMode = "sessions" | "endDate";
-
 interface ScheduleClassModalProps {
   open: boolean;
   onClose: () => void;
@@ -185,7 +225,6 @@ export function ScheduleClassModal({
   const [tutorSearch, setTutorSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [tutorId, setTutorId] = useState<string | null>(null);
-  const [classType, setClassType] = useState<ClassTypeOption | null>(null);
   const [scheduleDays, setScheduleDays] = useState<string[]>(["Mon", "Thu"]);
   const [scheduleStartTime, setScheduleStartTime] = useState("");
   const [scheduleEndTime, setScheduleEndTime] = useState("");
@@ -241,7 +280,6 @@ export function ScheduleClassModal({
     setTutorSearch("");
     setSelectedIds(new Set());
     setTutorId(null);
-    setClassType(null);
     setScheduleDays(["Mon", "Thu"]);
     setScheduleStartTime("");
     setScheduleEndTime("");
@@ -297,10 +335,8 @@ export function ScheduleClassModal({
       case 1:
         return "Assign a tutor to this class";
       case 2:
-        return "Choose between one-time or recurring class";
-      case 3:
         return "Configure the class schedule.";
-      case 4:
+      case 3:
         return "Review and confirm the class details";
       default:
         return "";
@@ -312,12 +348,8 @@ export function ScheduleClassModal({
     : "Select a student";
 
   const primaryLabelStep1 = tutorId
-    ? "Continue to type"
-  : "Select a connected tutor to continue";
-
-  const primaryLabelStep2 = classType
     ? "Continue to schedule"
-    : "Select a class type";
+  : "Select a connected tutor to continue";
 
   const scheduleStepComplete =
     scheduleDays.length > 0 &&
@@ -327,7 +359,7 @@ export function ScheduleClassModal({
       ? sessionCount >= 1
       : endsOnDateText.trim() !== "");
 
-  const primaryLabelStep3 = scheduleStepComplete
+  const primaryLabelStepSchedule = scheduleStepComplete
     ? "Continue to review"
     : "Complete schedule to continue";
 
@@ -338,11 +370,30 @@ export function ScheduleClassModal({
     return `${n} students - Group Class`;
   }, [selectedIds.size]);
 
+  const plannedSessionPreview = useMemo(
+    () =>
+      computePlannedSessionTotal({
+        durationMode,
+        sessionCount,
+        endsOnDateText,
+        scheduleDays,
+        scheduleStartTime,
+        scheduleEndTime,
+      }),
+    [
+      durationMode,
+      sessionCount,
+      endsOnDateText,
+      scheduleDays,
+      scheduleStartTime,
+      scheduleEndTime,
+    ],
+  );
+
   const canContinue = () => {
     if (step === 0) return hasStudentSelection;
     if (step === 1) return tutorId !== null;
-    if (step === 2) return classType !== null;
-    if (step === 3) return scheduleStepComplete;
+    if (step === 2) return scheduleStepComplete;
     return true;
   };
 
@@ -360,7 +411,7 @@ export function ScheduleClassModal({
         setStep(nextStep);
         setAnimatingLineIndex(null);
         advanceTimerRef.current = null;
-        if (from === 2) {
+        if (from === 1) {
           setScheduleStartTime((st) =>
             st.trim() === "" ? "09:00" : st,
           );
@@ -372,7 +423,7 @@ export function ScheduleClassModal({
           setTutorStepPulse(true);
           window.setTimeout(() => setTutorStepPulse(false), 500);
         }
-        if (nextStep === 4) {
+        if (nextStep === 3) {
           setReviewStepPulse(true);
           window.setTimeout(() => setReviewStepPulse(false), 500);
         }
@@ -382,7 +433,7 @@ export function ScheduleClassModal({
 
     const students = apiLearners.filter((s) => selectedIds.has(s.id));
     const t = apiTutors.find((x) => x.id === tutorId);
-    if (!t || students.length === 0 || classType === null) {
+    if (!t || students.length === 0) {
       toast.error("Could not create class — missing selections.");
       onClose();
       return;
@@ -399,6 +450,26 @@ export function ScheduleClassModal({
         scheduleStartTime,
         scheduleEndTime,
       );
+      const planned = computePlannedSessionTotal({
+        durationMode,
+        sessionCount,
+        endsOnDateText,
+        scheduleDays,
+        scheduleStartTime,
+        scheduleEndTime,
+      });
+      if (!planned.ok) {
+        if (planned.reason === "invalid_end") {
+          toast.error("Please enter a valid end date (DD MM YYYY).");
+        } else {
+          toast.error(
+            "End date must be on or after the first class. Adjust the end date or schedule days.",
+          );
+        }
+        return;
+      }
+      const totalPlanned = planned.total;
+
       const body: CreateAdminClassBody = {
         tutorId: t.id,
         learnerIds: students.map((s) => s.id),
@@ -406,15 +477,11 @@ export function ScheduleClassModal({
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         firstSessionStart: start.toISOString(),
         firstSessionEnd: end.toISOString(),
-        recurrence:
-          classType === "recurring"
-            ? { rule: "weekly", totalSessions: sessionCount }
-            : { rule: "none" },
+        recurrence: { rule: "weekly", totalSessions: totalPlanned },
         scheduleDayLabels: scheduleDays,
         scheduleStartTime,
         scheduleEndTime,
-        totalSessionsPlanned:
-          durationMode === "sessions" ? sessionCount : 12,
+        totalSessionsPlanned: totalPlanned,
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;
@@ -519,7 +586,7 @@ export function ScheduleClassModal({
                 const active = i === step && !done;
                 const circlePulse =
                   (step === 1 && i === 1 && tutorStepPulse && !lineBusy) ||
-                  (step === 4 && i === 4 && reviewStepPulse && !lineBusy);
+                  (step === 3 && i === 3 && reviewStepPulse && !lineBusy);
                 return (
                   <React.Fragment key={label}>
                     <div className="flex shrink-0 items-center gap-2">
@@ -787,67 +854,11 @@ export function ScheduleClassModal({
 
             {step === 2 ? (
               <>
-                <h3 className="text-base font-bold text-gray-900">Class Type</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Choose between a one-time session or recurring classes
-                </p>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {(
-                    [
-                      {
-                        id: "one-time" as const,
-                        title: "One-time",
-                        desc: "Single session",
-                        icon: Calendar,
-                      },
-                      {
-                        id: "recurring" as const,
-                        title: "Recurring",
-                        desc: "Multiple sessions",
-                        icon: RefreshCw,
-                      },
-                    ] as const
-                  ).map((opt) => {
-                    const sel = classType === opt.id;
-                    const Icon = opt.icon;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setClassType(opt.id)}
-                        className={`rounded-2xl border-2 p-5 text-left transition-colors ${
-                          sel
-                            ? "border-[#3d8c40] bg-emerald-50/40"
-                            : "border-gray-200 bg-white hover:border-gray-300"
-                        }`}
-                      >
-                        <div
-                          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-full ${
-                            sel
-                              ? "bg-[#2d6a32] text-white"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" strokeWidth={2} />
-                        </div>
-                        <p className="font-bold text-slate-900">{opt.title}</p>
-                        <p className="mt-1 text-sm text-gray-500">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            ) : null}
-
-            {step === 3 ? (
-              <>
                 <h3 className="text-base font-bold text-gray-900">
                   Configure Schedule
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {classType === "recurring"
-                    ? "Set up recurring class schedule."
-                    : "Set up your class session schedule."}
+                  Set up recurring class schedule.
                 </p>
 
                 <div className="mt-5 space-y-5">
@@ -954,7 +965,8 @@ export function ScheduleClassModal({
                               type="number"
                               min={1}
                               max={999}
-                              value={sessionCount}
+                              value={durationMode === "sessions" ? sessionCount : ""}
+                              placeholder="—"
                               onFocus={() => setDurationMode("sessions")}
                               onChange={(e) => {
                                 setDurationMode("sessions");
@@ -1130,7 +1142,7 @@ export function ScheduleClassModal({
               </>
             ) : null}
 
-            {step === 4 ? (
+            {step === 3 ? (
               <div className="space-y-4">
                 {scheduleBlockedNoGoogleCalendar ? (
                   <div
@@ -1221,25 +1233,12 @@ export function ScheduleClassModal({
                     Schedule
                   </p>
                   <div className="mt-3 flex gap-3">
-                    {classType === "recurring" ? (
-                      <RefreshCw
-                        className="mt-0.5 h-5 w-5 shrink-0 text-gray-400"
-                        strokeWidth={2}
-                      />
-                    ) : (
-                      <Calendar
-                        className="mt-0.5 h-5 w-5 shrink-0 text-gray-400"
-                        strokeWidth={2}
-                      />
-                    )}
+                    <RefreshCw
+                      className="mt-0.5 h-5 w-5 shrink-0 text-gray-400"
+                      strokeWidth={2}
+                    />
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900">
-                        {classType === "recurring"
-                          ? "Recurring Class"
-                          : classType === "one-time"
-                            ? "One-time Class"
-                            : "Class"}
-                      </p>
+                      <p className="font-bold text-slate-900">Recurring class</p>
                       {scheduleDays.length > 0 ? (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {scheduleDays.map((d) => (
@@ -1257,6 +1256,18 @@ export function ScheduleClassModal({
                           ? `${scheduleStartTime} - ${scheduleEndTime} · ${formatReviewUntilSuffix(durationMode, endsOnDateText, sessionCount)}`
                           : "—"}
                       </p>
+                      {plannedSessionPreview.ok ? (
+                        <p className="mt-2 text-base font-bold text-[#1B5E20]">
+                          Total planned sessions: {plannedSessionPreview.total}
+                        </p>
+                      ) : null}
+                      {!plannedSessionPreview.ok ? (
+                        <p className="mt-2 text-sm text-amber-800" role="status">
+                          Set a valid end date (DD MM YYYY) on the schedule
+                          step—the total is counted from the first class through
+                          that date.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1303,22 +1314,15 @@ export function ScheduleClassModal({
                 : step === 1
                   ? primaryLabelStep1
                   : step === 2
-                    ? primaryLabelStep2
-                    : step === 3
-                      ? primaryLabelStep3
-                      : step === STEP_LABELS.length - 1
-                        ? "Confirm & Schedule"
-                        : "Continue"}
+                    ? primaryLabelStepSchedule
+                    : "Confirm & schedule"}
               {step === 0 && hasStudentSelection ? (
                 <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />
               ) : null}
               {step === 1 && tutorId ? (
                 <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />
               ) : null}
-              {step === 2 && classType ? (
-                <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />
-              ) : null}
-              {step === 3 && scheduleStepComplete ? (
+              {step === 2 && scheduleStepComplete ? (
                 <ArrowRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />
               ) : null}
               {step === STEP_LABELS.length - 1 ? (

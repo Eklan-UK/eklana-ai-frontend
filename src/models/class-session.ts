@@ -9,6 +9,10 @@ export interface IClassSession extends Document {
   startUtc: Date;
   endUtc: Date;
   meetingUrl?: string;
+  /** Google Calendar event id for delete/replace on reschedule (new series only). */
+  googleCalendarEventId?: string;
+  /** Set when this session was created by rescheduling (sticky). */
+  isReschedule?: boolean;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   sequenceNumber: number;
   createdAt: Date;
@@ -32,6 +36,8 @@ const classSessionSchema = new Schema<IClassSession>(
     startUtc: { type: Date, required: true, index: true },
     endUtc: { type: Date, required: true },
     meetingUrl: { type: String, trim: true },
+    googleCalendarEventId: { type: String, trim: true },
+    isReschedule: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],

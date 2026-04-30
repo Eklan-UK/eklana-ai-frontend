@@ -45,11 +45,18 @@ export interface AdminClassListItemDTO {
   scheduleDays: string;
   timeRange: string;
   completedSessions: number;
+  /**
+   * 1-based place in the program (from the relevant session’s sequence), for “N of M”
+   * progress. Differs from completed session count (e.g. one-time class 2 of 10 may have 0 completed).
+   */
+  programPosition: number;
   totalSessions: number;
   nextSessionLabel: string;
   /** Next session Mongo id (for learner deep links). */
   nextSessionId?: string;
   nextSessionStartUtc?: string;
+  /** True when the list "next" session was created via reschedule (Google + flag). */
+  nextSessionIsReschedule?: boolean;
   status: ApiClassStatus;
   bucket: ClassBucket;
   meetingUrl?: string;
@@ -97,6 +104,8 @@ export interface CreateAdminClassBody {
   scheduleEndTime?: string;
   /** Overrides recurrence.totalSessions when set. */
   totalSessionsPlanned?: number;
+  /** 1-based session index in the program; must be ≤ totalSessionsPlanned. Defaults to 1. */
+  firstSessionSequenceNumber?: number;
 }
 
 export interface CreateAdminClassResponse {
@@ -106,6 +115,8 @@ export interface CreateAdminClassResponse {
     classSeriesId: string;
     sessionIds: string[];
     class: AdminClassListItemDTO;
+    /** Present when the class was saved but Google Calendar / Meet could not be created. */
+    calendarSyncWarning?: string;
   };
 }
 
@@ -189,6 +200,8 @@ export interface LearnerPastSessionItemDTO {
   sessionStatus: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   /** `none` = no attendance row (treated as missed for UI when session has ended). */
   learnerAttendance: LearnerPastAttendance;
+  /** True if this session was rescheduled (moved) at least once. */
+  isReschedule?: boolean;
 }
 
 export interface LearnerPastSessionsResponse {

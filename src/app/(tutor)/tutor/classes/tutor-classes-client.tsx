@@ -12,12 +12,15 @@ import {
   Video,
   ChevronRight,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 import type { ClassStatus, ClassType } from "@/app/(admin)/admin/classes/types";
 import { useTutorClasses } from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
+import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 function formatHeaderDate() {
   return new Date().toLocaleDateString("en-US", {
@@ -236,17 +239,23 @@ export function TutorClassesClient() {
               session.totalSessions > 0
                 ? Math.min(
                     100,
-                    (session.completedSessions / session.totalSessions) * 100,
+                    (session.programPosition / session.totalSessions) * 100,
                   )
                 : 0;
             const joinUrl = session.meetingUrl?.trim();
             const canJoin = Boolean(joinUrl);
+            const scheduleBlock = getClassCardScheduleBlock(session);
 
             return (
               <article
                 key={session.id}
                 className="flex flex-col rounded-[18px] border border-gray-200/80 bg-white p-6 shadow-sm"
               >
+                {session.nextSessionIsReschedule ? (
+                  <div className="mb-2">
+                    <RescheduleTag />
+                  </div>
+                ) : null}
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <h2 className="text-base font-bold leading-tight text-slate-900">
                     {session.studentLabel}
@@ -279,11 +288,11 @@ export function TutorClassesClient() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="flex items-start gap-2 text-slate-600">
                       <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" strokeWidth={2} />
-                      <span className="font-medium leading-snug">{session.scheduleDays}</span>
+                      <span className="font-medium leading-snug">{scheduleBlock.dayLabel}</span>
                     </div>
                     <div className="flex items-start gap-2 text-slate-600">
                       <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" strokeWidth={2} />
-                      <span className="font-medium leading-snug">{session.timeRange}</span>
+                      <span className="font-medium leading-snug">{scheduleBlock.timeLabel}</span>
                     </div>
                   </div>
                 </div>
@@ -294,7 +303,7 @@ export function TutorClassesClient() {
                       Progress
                     </span>
                     <span className="text-sm font-bold text-slate-900">
-                      {session.completedSessions} of {session.totalSessions} completed
+                      {session.programPosition} of {session.totalSessions}
                     </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200/90">
@@ -313,6 +322,16 @@ export function TutorClassesClient() {
                 </div>
 
                 <div className="mt-auto space-y-2 pt-0.5">
+                  {session.nextSessionId ? (
+                    <Link
+                      href={`/tutor/classes/session/${session.nextSessionId}/reschedule`}
+                      className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-bold text-slate-800 transition-colors hover:bg-gray-50"
+                    >
+                      <RefreshCw className="h-4 w-4 shrink-0" strokeWidth={2} />
+                      Session time
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  ) : null}
                   {session.nextSessionId ? (
                     <Link
                       href={`/tutor/classes/session/${session.nextSessionId}`}

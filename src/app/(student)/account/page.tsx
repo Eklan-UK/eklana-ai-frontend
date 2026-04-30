@@ -53,7 +53,7 @@ export default async function HomePage() {
               className="border-primary/30 text-primary hover:bg-primary/10"
             >
               <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
-              View your classes
+              View your sessions
             </Button>
           </Link>
         </div>

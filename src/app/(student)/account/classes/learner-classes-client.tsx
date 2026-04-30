@@ -27,6 +27,7 @@ import {
   tabForSessionRow,
 } from "@/lib/classes/my-sessions";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
 const TAB_LABEL: Record<MySessionsTab, string> = {
   thisWeek: "This Week",
@@ -71,6 +72,11 @@ function SessionCard({ session }: { session: TeachingClass }) {
 
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      {session.nextSessionIsReschedule ? (
+        <div className="mb-2">
+          <RescheduleTag />
+        </div>
+      ) : null}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
@@ -118,7 +124,7 @@ function SessionCard({ session }: { session: TeachingClass }) {
             href={`/account/classes/${session.nextSessionId}`}
             className="flex flex-1 items-center justify-center rounded-full border border-border bg-card py-3 text-sm font-bold text-text-secondary transition-colors hover:bg-muted"
           >
-            Reschedule
+            Session details
           </Link>
         ) : null}
       </div>
@@ -147,6 +153,11 @@ function PastSessionCard({ row }: { row: LearnerPastSessionItemDTO }) {
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <p className="mb-1 text-sm font-bold text-foreground">{row.classTitle}</p>
+      {row.isReschedule ? (
+        <div className="mb-2">
+          <RescheduleTag />
+        </div>
+      ) : null}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />

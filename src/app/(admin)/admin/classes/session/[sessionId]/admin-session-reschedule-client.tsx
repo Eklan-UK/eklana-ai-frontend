@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Clock3, Info } from "lucide-react";
-import {
-  useAdminRescheduleOptions,
-  useAdminRescheduleSession,
-  useAdminSession,
-} from "@/hooks/useClasses";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { ArrowLeft, CalendarDays, Clock3 } from "lucide-react";
+import { useAdminRescheduleSessionDirect, useAdminSession } from "@/hooks/useClasses";
+import { RescheduleTag } from "@/components/classes/RescheduleTag";
+
+function toDateInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toTimeInputValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function formatTimeOnly(date: Date) {
   return date.toLocaleTimeString(undefined, {
@@ -33,19 +41,27 @@ export function AdminSessionRescheduleClient({
   const canReschedule =
     !!data &&
     (data.session.status === "scheduled" ||
-      data.session.status === "in_progress");
-  const { data: optionsData, isLoading: optionsLoading } =
-    useAdminRescheduleOptions(sessionId, { enabled: canReschedule });
-  const reschedule = useAdminRescheduleSession(sessionId);
-  const [selectedSlot, setSelectedSlot] = useState<string>("");
+      data.session.status === "in_progress" ||
+      data.session.status === "completed");
+  const rescheduleDirect = useAdminRescheduleSessionDirect(sessionId);
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
 
-  const slotChoices = useMemo(
-    () =>
-      [...(optionsData?.slots ?? [])].sort(
-        (a, b) => new Date(a.startUtc).getTime() - new Date(b.startUtc).getTime(),
-      ),
-    [optionsData?.slots],
-  );
+  const sessionDurationMs = useMemo(() => {
+    if (!data?.session) return 0;
+    return (
+      new Date(data.session.endUtc).getTime() -
+      new Date(data.session.startUtc).getTime()
+    );
+  }, [data?.session]);
+
+  useEffect(() => {
+    if (data?.session) {
+      const d = new Date(data.session.startUtc);
+      setCustomDate(toDateInputValue(d));
+      setCustomTime(toTimeInputValue(d));
+    }
+  }, [data?.session]);
 
   return (
     <div className="space-y-6 pb-8">
@@ -72,7 +88,10 @@ export function AdminSessionRescheduleClient({
           {canReschedule ? (
             <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-100 px-4 py-4">
-                <h1 className="text-xl font-bold text-slate-900">Reschedule session</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-bold text-slate-900">Reschedule session</h1>
+                  {data.session.isReschedule ? <RescheduleTag /> : null}
+                </div>
                 <p className="mt-1 text-sm text-gray-500">{data.classTitle}</p>
               </div>
 
@@ -82,87 +101,121 @@ export function AdminSessionRescheduleClient({
                   <p className="mt-1 text-lg font-semibold text-slate-900">
                     {data.tutorName}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1.5">
-                      <CalendarDays className="h-4 w-4" />
-                      <span>
-                        {formatShortDate(new Date(data.session.startUtc))}
-                      </span>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-gray-200/90 bg-white px-3.5 py-3 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Date
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                        <CalendarDays className="h-4 w-4 shrink-0 text-slate-500" />
+                        <span>
+                          {formatShortDate(new Date(data.session.startUtc))}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock3 className="h-4 w-4" />
-                      <span>
-                        {formatTimeOnly(new Date(data.session.startUtc))} –{" "}
-                        {formatTimeOnly(new Date(data.session.endUtc))}
-                      </span>
+                    <div className="rounded-xl border border-gray-200/90 bg-white px-3.5 py-3 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Time
+                      </p>
+                      <div className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-900">
+                        <Clock3 className="h-4 w-4 shrink-0 text-slate-500" />
+                        <span>
+                          {formatTimeOnly(new Date(data.session.startUtc))} –{" "}
+                          {formatTimeOnly(new Date(data.session.endUtc))}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                  <Info className="h-4 w-4 shrink-0" />
-                  <span>
-                    You can only move this session to another time within the same
-                    UTC week, matching tutor availability and avoiding conflicts.
-                  </span>
-                </div>
-
-                <div className="space-y-3">
+                <div className="space-y-3 rounded-2xl border border-[#2d6a32]/30 bg-emerald-50/40 p-4">
                   <h2 className="text-base font-bold text-slate-900">
-                    Choose a new time
+                    New time (any day)
                   </h2>
-
-                  {optionsLoading ? (
-                    <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-600">
-                      Loading options…
-                    </p>
-                  ) : slotChoices.length === 0 ? (
-                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                      No alternative slots in this week with current rules. Adjust
-                      tutor availability or try again later.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {slotChoices.map((slot) => {
-                        const slotKey = `${slot.startUtc}|${slot.endUtc}`;
-                        const startDate = new Date(slot.startUtc);
-                        const isSelected = selectedSlot === slotKey;
-                        return (
-                          <button
-                            key={slotKey}
-                            type="button"
-                            onClick={() => setSelectedSlot(slotKey)}
-                            className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
-                              isSelected
-                                ? "border-[#2d6a32] bg-emerald-50/80"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            }`}
-                          >
-                            <p className="text-base font-semibold text-slate-900">
-                              {formatShortDate(startDate)}
-                            </p>
-                            <p className="mt-0.5 text-sm text-gray-600">
-                              {formatTimeOnly(startDate)}
-                            </p>
-                          </button>
-                        );
-                      })}
+                  <p className="text-sm text-gray-600">
+                    The previous Google Calendar event is removed and a new one is
+                    created. Session length stays{" "}
+                    {sessionDurationMs > 0
+                      ? ` ${Math.round(sessionDurationMs / 60000)} minutes`
+                      : " the same"}
+                    .
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:max-w-2xl sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/50 bg-white/60 px-3.5 py-3 shadow-sm">
+                      <label
+                        className="block text-xs font-semibold uppercase tracking-wide text-gray-600"
+                        htmlFor="admin-new-date"
+                      >
+                        New start — date
+                      </label>
+                      <input
+                        id="admin-new-date"
+                        type="date"
+                        className="mt-2 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        value={customDate}
+                        onChange={(e) => setCustomDate(e.target.value)}
+                      />
                     </div>
-                  )}
+                    <div className="rounded-xl border border-white/50 bg-white/60 px-3.5 py-3 shadow-sm">
+                      <label
+                        className="block text-xs font-semibold uppercase tracking-wide text-gray-600"
+                        htmlFor="admin-new-time"
+                      >
+                        New start — time
+                      </label>
+                      <input
+                        id="admin-new-time"
+                        type="time"
+                        className="mt-2 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                        value={customTime}
+                        onChange={(e) => setCustomTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={rescheduleDirect.isPending}
+                    onClick={() => {
+                      if (!data?.session || sessionDurationMs <= 0) return;
+                      const dateParts = customDate.split("-").map((s) => parseInt(s, 10));
+                      const timeParts = customTime.split(":").map((s) => parseInt(s, 10));
+                      const y = dateParts[0];
+                      const mo = dateParts[1];
+                      const day = dateParts[2];
+                      const h = timeParts[0];
+                      const min = timeParts[1];
+                      if (
+                        !customDate ||
+                        !customTime ||
+                        [y, mo, day, h, min].some(
+                          (n) => n === undefined || Number.isNaN(n),
+                        )
+                      ) {
+                        toast.error("Pick a valid date and time");
+                        return;
+                      }
+                      const start = new Date(y, mo - 1, day, h, min, 0, 0);
+                      if (Number.isNaN(start.getTime())) {
+                        toast.error("Pick a valid date and time");
+                        return;
+                      }
+                      if (start.getTime() <= Date.now()) {
+                        toast.error("Start time must be in the future");
+                        return;
+                      }
+                      const end = new Date(start.getTime() + sessionDurationMs);
+                      rescheduleDirect.mutate({
+                        newStartUtc: start.toISOString(),
+                        newEndUtc: end.toISOString(),
+                      });
+                    }}
+                    className="w-full max-w-md rounded-2xl bg-[#2d6a32] py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#245528] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {rescheduleDirect.isPending
+                      ? "Saving…"
+                      : "Apply this time"}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  disabled={!selectedSlot || reschedule.isPending}
-                  onClick={() => {
-                    const [newStartUtc, newEndUtc] = selectedSlot.split("|");
-                    if (!newStartUtc || !newEndUtc) return;
-                    reschedule.mutate({ newStartUtc, newEndUtc });
-                  }}
-                  className="w-full rounded-2xl bg-[#2d6a32] py-3.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#245528] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {reschedule.isPending ? "Saving…" : "Apply new time"}
-                </button>
               </div>
             </section>
           ) : (

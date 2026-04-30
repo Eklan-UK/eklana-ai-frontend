@@ -87,7 +87,7 @@ const pronunciationAttemptSchema = new Schema<IPronunciationAttempt>(
 		},
 		drillType: {
 			type: String,
-			enum: ['vocabulary', 'roleplay', 'sentence', 'other'],
+			enum: ['vocabulary', 'pronunciation', 'roleplay', 'sentence', 'other'],
 		},
 		learnerId: {
 			type: Schema.Types.ObjectId,

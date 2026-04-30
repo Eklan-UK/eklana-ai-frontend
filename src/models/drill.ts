@@ -93,6 +93,42 @@ const TargetSentenceSchema = new Schema(
   { _id: false }
 );
 
+const PronunciationItemSchema = new Schema(
+  {
+    sound: {
+      type: String,
+      default: "",
+      description: "Target sound / phonetic sample for pronunciation practice",
+    },
+    word: {
+      type: String,
+      default: "",
+      description: "Word to practice",
+    },
+    sentence: {
+      type: String,
+      default: "",
+      description: "Sentence containing the target sound/word",
+    },
+    soundAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sound",
+    },
+    wordAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the word",
+    },
+    sentenceAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the sentence",
+    },
+  },
+  { _id: false }
+);
+
 const MatchingPairSchema = new Schema(
   {
     left: {
@@ -266,6 +302,7 @@ export interface IDrill extends Document {
   title: string;
   type:
     | "vocabulary"
+    | "pronunciation"
     | "roleplay"
     | "matching"
     | "definition"
@@ -282,12 +319,21 @@ export interface IDrill extends Document {
   context?: string;
   audio_example_url?: string;
 
-  // Vocabulary Drill Fields
+  // Vocabulary Drill Fields (word + sentence practice)
   target_sentences: Array<{
     word?: string;
     wordTranslation?: string;
     text: string;
     translation?: string;
+    wordAudioUrl?: string;
+    sentenceAudioUrl?: string;
+  }>;
+  /** Pronunciation drills only (sound / word / sentence per item) */
+  pronunciation_items?: Array<{
+    sound: string;
+    word: string;
+    sentence: string;
+    soundAudioUrl?: string;
     wordAudioUrl?: string;
     sentenceAudioUrl?: string;
   }>;
@@ -406,6 +452,7 @@ const drillSchema = new Schema<IDrill>(
       enum: {
         values: [
           "vocabulary",
+          "pronunciation",
           "roleplay",
           "matching",
           "definition",
@@ -478,6 +525,12 @@ const drillSchema = new Schema<IDrill>(
       type: [TargetSentenceSchema],
       default: [],
       description: "Array of sentences/words for vocabulary drills",
+    },
+
+    pronunciation_items: {
+      type: [PronunciationItemSchema],
+      default: [],
+      description: "Pronunciation drill items (sound, word, sentence per row)",
     },
 
     // Roleplay Drill Fields

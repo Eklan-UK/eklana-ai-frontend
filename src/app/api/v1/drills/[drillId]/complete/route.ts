@@ -31,6 +31,14 @@ const completeSchema = z.object({
 			pronunciationScore: z.number().optional(),
 		})),
 	}).optional(),
+	pronunciationResults: z.object({
+		wordScores: z.array(z.object({
+			word: z.string(),
+			score: z.number(),
+			attempts: z.number(),
+			pronunciationScore: z.number().optional(),
+		})),
+	}).optional(),
 	roleplayResults: z.object({
 		sceneScores: z.array(z.object({
 			sceneName: z.string(),
@@ -182,6 +190,7 @@ async function handler(
 		timeSpent: validated.timeSpent,
 		results: {
 			vocabularyResults: validated.vocabularyResults,
+			pronunciationResults: validated.pronunciationResults,
 			roleplayResults: validated.roleplayResults,
 			matchingResults: validated.matchingResults,
 			definitionResults: validated.definitionResults,
