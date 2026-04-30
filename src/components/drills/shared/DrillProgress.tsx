@@ -9,6 +9,9 @@ interface DrillProgressProps {
   gradientFrom?: string;
   gradientTo?: string;
   textColor?: string;
+  /** Omit Card wrapper — use inside a unified parent (no extra border). */
+  embedded?: boolean;
+  className?: string;
 }
 
 /**
@@ -22,14 +25,16 @@ export function DrillProgress({
   gradientFrom = "green-600",
   gradientTo = "green-600",
   textColor = "green-600",
+  embedded = false,
+  className = "",
 }: DrillProgressProps) {
   const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
   const gradient = gradientFrom === gradientTo 
     ? `bg-${gradientFrom}` 
     : `bg-gradient-to-r from-${gradientFrom} to-${gradientTo}`;
 
-  return (
-    <Card className="mb-4 bg-white/80 backdrop-blur-sm">
+  const inner = (
+    <>
       <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
         <span>
           {label} {current} of {total}
@@ -42,6 +47,16 @@ export function DrillProgress({
           style={{ width: `${percentage}%` }}
         />
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className={className}>{inner}</div>;
+  }
+
+  return (
+    <Card className={`mb-4 bg-white/80 backdrop-blur-sm ${className}`}>
+      {inner}
     </Card>
   );
 }

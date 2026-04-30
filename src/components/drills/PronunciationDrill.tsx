@@ -18,6 +18,7 @@ import {
   DrillProgress,
   WordAnalytics,
 } from "./shared";
+import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface PronunciationDrillProps {
@@ -26,6 +27,13 @@ interface PronunciationDrillProps {
 }
 
 type Screen = "word" | "sentence";
+
+interface PronunciationTranscriptEntry {
+  itemIndex: number;
+  screen: Screen;
+  expected: string;
+  transcript: string;
+}
 
 interface WordProgress {
   wordPassed: boolean;
@@ -188,7 +196,13 @@ export default function PronunciationDrill({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] =
     useState<TextScore | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [pendingSubmitBlob, setPendingSubmitBlob] = useState<Blob | null>(null);
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(
+    null
+  );
+  const [sessionTranscripts, setSessionTranscripts] = useState<
+    PronunciationTranscriptEntry[]
+  >([]);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -196,6 +210,29 @@ export default function PronunciationDrill({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const revokeRecordingPreview = () => {
+    setRecordingPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const discardPendingRecording = () => {
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+  };
+
+  useEffect(() => {
+    discardPendingRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset when drill step changes
+  }, [currentIndex, currentScreen]);
+
+  useEffect(() => {
+    return () => {
+      revokeRecordingPreview();
+    };
+  }, []);
 
   const items = drill.pronunciation_items || [];
   const currentItem = items[currentIndex];
@@ -242,13 +279,16 @@ export default function PronunciationDrill({
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        setAudioBlob(audioBlob);
         stream.getTracks().forEach((track) => track.stop());
-        await analyzePronunciation(audioBlob);
+        setPendingSubmitBlob(blob);
+        setRecordingPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
       };
 
       mediaRecorder.start();
@@ -275,6 +315,14 @@ export default function PronunciationDrill({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
+  };
+
+  const submitPendingForAnalysis = async () => {
+    if (!pendingSubmitBlob) return;
+    const blob = pendingSubmitBlob;
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+    await analyzePronunciation(blob);
   };
 
   // Helper function to convert blob to base64
@@ -369,6 +417,22 @@ export default function PronunciationDrill({
           );
         }
 
+        setSessionTranscripts((prev) => {
+          const rest = prev.filter(
+            (e) =>
+              !(e.itemIndex === currentIndex && e.screen === currentScreen)
+          );
+          return [
+            ...rest,
+            {
+              itemIndex: currentIndex,
+              screen: currentScreen,
+              expected: textToAnalyze,
+              transcript: transcriptFromTextScore(textScore),
+            },
+          ];
+        });
+
         // Record pronunciation attempt
         try {
           const audioBase64 = await blobToBase64(audioBlob);
@@ -395,14 +459,14 @@ export default function PronunciationDrill({
 
   const handleTryAgain = () => {
     setPronunciationScore(null);
-    setAudioBlob(null);
+    discardPendingRecording();
   };
 
   const handleContinueToSentence = () => {
     if (currentProgress.wordPassed) {
       setCurrentScreen("sentence");
       setPronunciationScore(null);
-      setAudioBlob(null);
+      discardPendingRecording();
     } else {
       toast.error(
         "You must pass the word pronunciation (65%+) before proceeding to the sentence"
@@ -422,7 +486,7 @@ export default function PronunciationDrill({
       setCurrentIndex(currentIndex + 1);
       setCurrentScreen("word");
       setPronunciationScore(null);
-      setAudioBlob(null);
+      discardPendingRecording();
     } else {
       handleSubmit();
     }
@@ -503,6 +567,32 @@ export default function PronunciationDrill({
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
         refreshOnMount={true}
+        extraContent={
+          sessionTranscripts.length > 0 ? (
+            <Card className="border-gray-200 text-left p-4 shadow-none">
+              <p className="text-sm font-semibold text-gray-900 mb-3">
+                What we heard from your recordings
+              </p>
+              <ul className="space-y-3 text-sm text-gray-700">
+                {sessionTranscripts.map((row, i) => (
+                  <li
+                    key={`${row.itemIndex}-${row.screen}-${i}`}
+                    className="border-b border-gray-100 last:border-0 pb-3 last:pb-0"
+                  >
+                    <div className="text-xs text-gray-500 mb-1">
+                      Item {row.itemIndex + 1} ·{" "}
+                      {row.screen === "word" ? "Word" : "Sentence"}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-0.5">Target</p>
+                    <p className="mb-2">{row.expected}</p>
+                    <p className="text-xs text-gray-500 mb-0.5">Transcript</p>
+                    <p className="text-gray-900">{row.transcript || "—"}</p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : undefined
+        }
       />
     );
   }
@@ -527,6 +617,8 @@ export default function PronunciationDrill({
   const isSentencePassed = currentProgress.sentencePassed;
   const canContinueToSentence = isWordPassed;
   const canProceedToNext = isWordPassed && isSentencePassed;
+  const awaitingSubmit =
+    !!pendingSubmitBlob && !isAnalyzing && !pronunciationScore;
 
   return (
     <DrillLayout title={drill.title}>
@@ -622,12 +714,47 @@ export default function PronunciationDrill({
             <RecordButton
               isRecording={isRecording}
               isAnalyzing={isAnalyzing}
-              disabled={currentScreen === "sentence" && !isWordPassed}
+              disabled={
+                (currentScreen === "sentence" && !isWordPassed) ||
+                awaitingSubmit
+              }
               onStart={startRecording}
               onStop={stopRecording}
               recordingSeconds={recordingSeconds}
             />
-            {!isRecording && !isAnalyzing && !pronunciationScore && (
+            {awaitingSubmit && recordingPreviewUrl && (
+              <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+                <p className="text-sm font-medium text-gray-800">
+                  Listen to your recording, then submit for feedback or re-record.
+                </p>
+                <audio
+                  controls
+                  src={recordingPreviewUrl}
+                  className="w-full max-w-md mx-auto block"
+                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    fullWidth
+                    className="sm:max-w-xs"
+                    onClick={() => void submitPendingForAnalysis()}
+                  >
+                    Submit for feedback
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    fullWidth
+                    className="sm:max-w-xs"
+                    onClick={discardPendingRecording}
+                  >
+                    Re-record
+                  </Button>
+                </div>
+              </div>
+            )}
+            {!isRecording && !isAnalyzing && !pronunciationScore && !awaitingSubmit && (
               <p className="text-sm text-gray-500 mt-4">
                 Tap the microphone to start recording
               </p>
@@ -641,9 +768,15 @@ export default function PronunciationDrill({
               </div>
             )}
             {pronunciationScore && !isAnalyzing && (
-              <p className="text-sm text-green-600 mt-4 font-medium">
-                ✓ Analysis complete! Your breakdown is below.
-              </p>
+              <>
+                <p className="text-sm text-green-600 mt-4 font-medium">
+                  ✓ Analysis complete! Your breakdown is below.
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  <span className="font-medium text-gray-700">Transcript: </span>
+                  {transcriptFromTextScore(pronunciationScore) || "—"}
+                </p>
+              </>
             )}
           </div>
 
@@ -686,7 +819,7 @@ export default function PronunciationDrill({
                 size="lg"
                 fullWidth
                 onClick={handleContinueToSentence}
-                disabled={!canContinueToSentence || isRecording || isAnalyzing}
+                disabled={!canContinueToSentence || isRecording || isAnalyzing || awaitingSubmit}
               >
                 {canContinueToSentence ? (
                   "Continue to Sentence"
@@ -705,7 +838,7 @@ export default function PronunciationDrill({
                 size="lg"
                 fullWidth
                 onClick={handleNext}
-                disabled={!canProceedToNext || isRecording || isAnalyzing}
+                disabled={!canProceedToNext || isRecording || isAnalyzing || awaitingSubmit}
               >
                 {canProceedToNext ? (
                   currentIndex === items.length - 1 ? (
@@ -728,7 +861,7 @@ export default function PronunciationDrill({
                 size="lg"
                 fullWidth
                 onClick={handleTryAgain}
-                disabled={isRecording || isAnalyzing}
+                disabled={isRecording || isAnalyzing || awaitingSubmit}
               >
                 Try Again
               </Button>
@@ -742,9 +875,9 @@ export default function PronunciationDrill({
                 onClick={() => {
                   setCurrentScreen("word");
                   setPronunciationScore(null);
-                  setAudioBlob(null);
+                  discardPendingRecording();
                 }}
-                disabled={isRecording || isAnalyzing}
+                disabled={isRecording || isAnalyzing || awaitingSubmit}
               >
                 Back to Word
               </Button>
@@ -759,9 +892,9 @@ export default function PronunciationDrill({
                   setCurrentIndex(currentIndex - 1);
                   setCurrentScreen("word");
                   setPronunciationScore(null);
-                  setAudioBlob(null);
+                  discardPendingRecording();
                 }}
-                disabled={isRecording || isAnalyzing}
+                disabled={isRecording || isAnalyzing || awaitingSubmit}
               >
                 Previous Item
               </Button>
