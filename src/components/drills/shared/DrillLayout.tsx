@@ -46,13 +46,13 @@ export function DrillLayout({
 }: DrillLayoutProps) {
   return (
     <div
-      className={`min-h-screen ${backgroundGradient} ${
+      className={`flex min-h-screen flex-col ${backgroundGradient} ${
         hideNavigation ? 'pb-6' : 'pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]'
       }`}
     >
       <div className="h-6"></div>
       <Header title={title} showBack={showBack} />
-      <div className={`max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6 ${className}`}>
+      <div className={`max-w-md md:max-w-2xl mx-auto flex flex-1 flex-col px-4 md:px-8 py-6 ${className}`}>
         {children}
       </div>
       {!hideNavigation && <BottomNav />}
