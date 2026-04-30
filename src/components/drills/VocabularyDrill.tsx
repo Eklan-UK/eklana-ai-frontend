@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
@@ -17,8 +16,8 @@ import {
   DrillLayout,
   DrillProgress,
   DrillPerformanceReview,
+  DrillLineReviewAccordion,
   RecordingPreviewBar,
-  WordAnalytics,
   type PerformanceReviewAnalyticsRow,
   type PerformanceReviewGroup,
 } from "./shared";
@@ -573,6 +572,34 @@ export default function VocabularyDrill({
     return `${passedItems} of ${targetSentences.length} items passed · ${n} scored attempts`;
   }, [wordProgress, sessionReviewAnalytics.length, targetSentences.length]);
 
+  const inDrillReviewRow: PerformanceReviewAnalyticsRow | null = useMemo(() => {
+    if (!pronunciationScore) return null;
+    const sentence = targetSentences[currentIndex];
+    if (!sentence) return null;
+    const turnIdx = currentScreen === "word" ? 0 : 1;
+    const textForRow =
+      currentScreen === "word"
+        ? sentence.word || sentence.text.split(" ")[0]
+        : sentence.text;
+    const match = sessionReviewAnalytics.find(
+      (r) => r.sceneIndex === currentIndex && r.turnIndex === turnIdx
+    );
+    return {
+      sceneIndex: currentIndex,
+      turnIndex: turnIdx,
+      text: textForRow,
+      score: pronunciationScore.speechace_score.pronunciation,
+      textScore: pronunciationScore,
+      attempts: match?.attempts ?? 1,
+    };
+  }, [
+    pronunciationScore,
+    targetSentences,
+    currentIndex,
+    currentScreen,
+    sessionReviewAnalytics,
+  ]);
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
@@ -774,17 +801,16 @@ export default function VocabularyDrill({
             </div>
           </Card>
 
-          {pronunciationScore && (
-            <>
-              <WordAnalytics pronunciationScore={pronunciationScore} />
-              {currentScreen === "word" &&
-                pronunciationScore.word_score_list.length > 0 && (
-                  <LetterLevelFeedback
-                    word={currentWord}
-                    wordScore={pronunciationScore.word_score_list[0]}
-                  />
-                )}
-            </>
+          {inDrillReviewRow && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-gray-900 px-1">Your performance</h3>
+              <DrillLineReviewAccordion
+                key={`${inDrillReviewRow.sceneIndex}-${inDrillReviewRow.turnIndex}-${inDrillReviewRow.attempts}`}
+                row={inDrillReviewRow}
+                passThreshold={PASS_THRESHOLD}
+                lineLabel={currentScreen === "word" ? "Word" : "Sentence"}
+              />
+            </div>
           )}
 
           <div className="flex flex-col gap-3 pt-1">
