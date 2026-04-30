@@ -12,6 +12,7 @@ import {
   User,
   Bot,
   Mic,
+  Send,
   Square,
   Volume2,
   RotateCcw,
@@ -26,7 +27,14 @@ import { drillAPI, pronunciationAPI } from "@/lib/api";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
-import { DrillCompletionScreen, DrillLayout, DrillProgress, WordAnalytics } from "./shared";
+import {
+  DrillCompletionScreen,
+  DrillLayout,
+  DrillProgress,
+  RecordingPreviewBar,
+  RoleplayPerformanceReview,
+} from "./shared";
+import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface RoleplayDrillProps {
@@ -80,9 +88,26 @@ interface CompletedMessage {
   translation?: string;
   score?: number;
   timestamp: Date;
+  /** Transcript from pronunciation scoring for this spoken line. */
+  transcript?: string;
 }
 
 const PASS_THRESHOLD = 65;
+
+/** Prefer formats the browser can both record and play back in `<audio>`. */
+function pickRoleplayRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ] as const;
+  for (const t of candidates) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return undefined;
+}
 
 // Trigger confetti celebration
 const triggerConfetti = () => {
@@ -123,6 +148,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [pendingSubmitBlob, setPendingSubmitBlob] = useState<Blob | null>(null);
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null);
   const MAX_RECORDING_SECONDS = 120;
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -137,9 +164,24 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Audio player ref for pre-generated audio
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const revokeRecordingPreview = () => {
+    setRecordingPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const discardPendingRecording = () => {
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+  };
+
+  useEffect(() => {
+    discardPendingRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
+  }, [currentSceneIndex, currentTurnIndex]);
 
   // TTS for AI characters (fallback if no pre-generated audio)
   const {
@@ -206,6 +248,47 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
     return n;
   }, [turnProgress, scenes, roleMode]);
+
+  /** Best score per line, grouped by scene for the review screen. */
+  const reviewSceneGroups = useMemo(() => {
+    const deduped = sessionAnalytics
+      .filter(
+        (a, index, arr) =>
+          arr.findIndex(
+            (b) =>
+              b.sceneIndex === a.sceneIndex &&
+              b.turnIndex === a.turnIndex &&
+              b.score >= a.score,
+          ) === index,
+      )
+      .sort((a, b) => a.sceneIndex - b.sceneIndex || a.turnIndex - b.turnIndex);
+
+    const map = new Map<number, TurnAnalytics[]>();
+    for (const row of deduped) {
+      const list = map.get(row.sceneIndex) ?? [];
+      list.push(row);
+      map.set(row.sceneIndex, list);
+    }
+
+    return [...map.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([sceneIndex, rows]) => ({
+        sceneIndex,
+        sceneTitle:
+          (scenes[sceneIndex] as { scene_name?: string } | undefined)?.scene_name?.trim() ||
+          (scenes.length > 1 ? `Scene ${sceneIndex + 1}` : "Scene 1"),
+        rows: rows
+          .sort((x, y) => x.turnIndex - y.turnIndex)
+          .map((r) => ({
+            sceneIndex: r.sceneIndex,
+            turnIndex: r.turnIndex,
+            text: r.text,
+            score: r.score,
+            textScore: r.textScore,
+            attempts: r.attempts,
+          })),
+      }));
+  }, [sessionAnalytics, scenes]);
 
   // Get character name for the role the student is currently playing
   const currentStudentRole = roleMode === "original"
@@ -362,10 +445,13 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-        audioBitsPerSecond: 32000,
-      });
+      const chosenMime = pickRoleplayRecorderMimeType();
+      const mediaRecorder = new MediaRecorder(
+        stream,
+        chosenMime
+          ? { mimeType: chosenMime, audioBitsPerSecond: 32000 }
+          : { audioBitsPerSecond: 32000 }
+      );
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -376,9 +462,27 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach((track) => track.stop());
-        await analyzePronunciation(audioBlob);
+        const blobType =
+          mediaRecorder.mimeType || chosenMime || "audio/webm";
+        // Brief pause helps some mobile browsers after closing the mic track.
+        await new Promise((r) => setTimeout(r, 120));
+        const totalBytes = audioChunksRef.current.reduce((n, c) => n + c.size, 0);
+        if (totalBytes === 0) {
+          toast.error("No audio was captured. Try recording again.");
+          setPendingSubmitBlob(null);
+          setRecordingPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+          });
+          return;
+        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        setPendingSubmitBlob(audioBlob);
+        setRecordingPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(audioBlob);
+        });
       };
 
       mediaRecorder.start();
@@ -405,6 +509,14 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
+  };
+
+  const submitPendingForAnalysis = async () => {
+    if (!pendingSubmitBlob) return;
+    const blob = pendingSubmitBlob;
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+    await analyzePronunciation(blob);
   };
 
   // Helper function to convert blob to base64
@@ -524,6 +636,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       translation: currentTurn.translation,
       score: currentProgress.score || 0,
       timestamp: new Date(),
+      transcript: pronunciationScore
+        ? transcriptFromTextScore(pronunciationScore)
+        : undefined,
     };
     setCompletedMessages(prev => [...prev, studentMessage]);
 
@@ -534,6 +649,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   /** Clears scoring UI and unlocks mic so the student can redo the line (before or after passing). */
   const handleRetrySpeaking = () => {
+    discardPendingRecording();
     setPronunciationScore(null);
     setTurnProgress((prev) => ({
       ...prev,
@@ -553,6 +669,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   /** Same role: restart entire roleplay from scene 1 / first line (after completion screen). */
   const handleRestartDrill = () => {
+    discardPendingRecording();
     setCurrentSceneIndex(0);
     setCurrentTurnIndex(0);
     setCompletedMessages([]);
@@ -579,6 +696,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   // Switch roles - student becomes AI character and vice versa
   const handleSwitchRoles = () => {
+    discardPendingRecording();
     // Save current progress to the appropriate role progress state
     if (roleMode === "original") {
       setOriginalRoleProgress(turnProgress);
@@ -692,6 +810,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   useEffect(() => {
     return () => {
       clearRecordingTimers();
+      setRecordingPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       if (preGenAudioRef.current) {
         preGenAudioRef.current.pause();
         preGenAudioRef.current = null;
@@ -701,127 +823,122 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopTTSAudio]);
 
+  const awaitingSubmit =
+    !!pendingSubmitBlob &&
+    !isAnalyzing &&
+    !pronunciationScore &&
+    !currentProgress.passed;
+
+  const readyToSubmitPreview = awaitingSubmit && Boolean(recordingPreviewUrl);
+  const dockMainDisabled =
+    isAnalyzing ||
+    currentProgress.passed ||
+    (awaitingSubmit && !recordingPreviewUrl);
+
+  const handleDockMainClick = () => {
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    if (readyToSubmitPreview) {
+      void submitPendingForAnalysis();
+      return;
+    }
+    startRecording();
+  };
+
   if (isCompleted) {
+    const linesWithTranscript = completedMessages.filter((m) =>
+      Boolean(m.transcript?.trim())
+    );
     return (
       <DrillCompletionScreen
         drillType="roleplay"
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
         refreshOnMount={true}
+        extraContent={
+          linesWithTranscript.length > 0 ? (
+            <Card className="border-gray-200 text-left p-4 shadow-none">
+              <p className="text-sm font-semibold text-gray-900 mb-3">
+                What we heard from your lines
+              </p>
+              <ul className="space-y-3 text-sm text-gray-700">
+                {linesWithTranscript.map((m) => (
+                  <li
+                    key={m.id}
+                    className="border-b border-gray-100 last:border-0 pb-3 last:pb-0"
+                  >
+                    <p className="text-xs text-gray-500 mb-0.5">Script line</p>
+                    <p className="mb-2">{m.text}</p>
+                    <p className="text-xs text-gray-500 mb-0.5">Transcript</p>
+                    <p className="text-gray-900">{m.transcript}</p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : undefined
+        }
       />
     );
   }
 
   // Review Screen - Shows all analytics collected during the session
   if (showReview) {
-    const studentScores = Object.values(turnProgress).filter(p => p.score !== null);
-    const avgScore = studentScores.length > 0
-      ? Math.round(studentScores.reduce((sum, p) => sum + (p.score || 0), 0) / studentScores.length)
-      : 0;
+    const studentScores = Object.values(turnProgress).filter((p) => p.score !== null);
+    const avgScore =
+      studentScores.length > 0
+        ? Math.round(
+            studentScores.reduce((sum, p) => sum + (p.score || 0), 0) / studentScores.length,
+          )
+        : 0;
     const totalAttempts = Object.values(turnProgress).reduce((sum, p) => sum + p.attempts, 0);
+    const statsLine = `${completedStudentTurns} lines completed · ${totalAttempts} total attempts`;
 
     return (
       <DrillLayout title="Review Performance" hideNavigation>
-        {/* Overall Score */}
-        <Card className="mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-          <div className="text-center py-6">
-            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4">
-              <span className="text-3xl font-bold text-white">{avgScore}%</span>
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">Overall Score</h2>
-            <p className="text-sm text-gray-600">
-              {completedStudentTurns} lines completed • {totalAttempts} total attempts
-            </p>
-          </div>
-        </Card>
-
-        {/* Per-Turn Analytics */}
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Line-by-Line Analysis</h3>
-        <div className="space-y-4 mb-6">
-          {sessionAnalytics
-            .filter((a, index, arr) =>
-              arr.findIndex(
-                (b) =>
-                  b.sceneIndex === a.sceneIndex &&
-                  b.turnIndex === a.turnIndex &&
-                  b.score >= a.score
-              ) === index
-            )
-            .sort((a, b) => a.sceneIndex - b.sceneIndex || a.turnIndex - b.turnIndex)
-            .map((analytics, idx) => (
-              <Card key={`${analytics.sceneIndex}-${analytics.turnIndex}-${idx}`} className="border-gray-200">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-500 mb-1">
-                      {scenes.length > 1
-                        ? `Scene ${analytics.sceneIndex + 1} · Line ${analytics.turnIndex + 1}`
-                        : `Line ${analytics.turnIndex + 1}`}
-                    </p>
-                    <p className="text-base text-gray-900">{analytics.text}</p>
-                  </div>
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold ${analytics.score >= PASS_THRESHOLD
-                      ? "bg-green-100 text-green-600"
-                      : "bg-amber-100 text-amber-600"
-                    }`}>
-                    {analytics.score.toFixed(0)}%
-                  </div>
-                </div>
-                {analytics.textScore && (
-                  <WordAnalytics pronunciationScore={analytics.textScore} />
-                )}
-                <div className="text-xs text-gray-500 mt-2">
-                  Attempts: {analytics.attempts}
-                </div>
-              </Card>
-            ))}
-        </div>
-
-        {/* Submit Button */}
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Complete Drill
-            </>
-          )}
-        </Button>
+        <RoleplayPerformanceReview
+          avgScore={avgScore}
+          statsLine={statsLine}
+          sceneGroups={reviewSceneGroups}
+          passThreshold={PASS_THRESHOLD}
+          onDone={() => void handleSubmit()}
+          onPracticeAgain={handleRestartDrill}
+          isSubmitting={isSubmitting}
+        />
       </DrillLayout>
     );
   }
 
   return (
     <DrillLayout title={drill.title} hideNavigation>
-      {/* Role Mode Indicator - only show when in swapped mode */}
+      <div
+        className={`rounded-2xl bg-muted/30 p-4 md:p-6 shadow-sm space-y-5 ${
+          isStudentTurn && !isEntireDrillComplete && currentTurn
+            ? awaitingSubmit
+              ? "pb-48 md:pb-56"
+              : "pb-24 md:pb-28"
+            : ""
+        }`}
+      >
       {roleMode === "swapped" && (
-        <div className="mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-primary-50 border border-primary-200 rounded-xl">
-          <ArrowLeftRight className="w-4 h-4 text-primary-600" />
-          <span className="text-sm text-primary-700">
+        <div className="flex items-center justify-center gap-2 px-1 py-1">
+          <ArrowLeftRight className="w-4 h-4 text-primary-600 shrink-0" />
+          <span className="text-sm text-primary-700 text-center">
             <strong>Role Swapped:</strong> You're playing as <strong>{currentStudentRole}</strong>
           </span>
         </div>
       )}
 
-      {/* Progress */}
       <DrillProgress
+        embedded
         current={completedStudentTurns}
         total={totalStudentTurns}
         label="Your lines"
       />
 
-      {/* Context */}
       {drill.context && (
-        <Card className="mb-4 bg-emerald-50 border-emerald-200">
+        <div className="px-0.5 py-1">
           <div className="flex items-start gap-2">
             <MessageCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
             <div>
@@ -829,12 +946,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               <p className="text-sm text-emerald-800">{drill.context}</p>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Scene Info */}
       {currentScene?.scene_name && (
-        <Card className="mb-4 bg-white/80">
+        <div className="px-0.5 py-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-500 mb-1">Current Scene</p>
@@ -846,11 +962,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               </div>
             )}
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Conversation History */}
-      <Card className="mb-4 max-h-64 overflow-y-auto">
+      <div className="max-h-64 overflow-y-auto py-2">
         <div className="space-y-3">
           {completedMessages.length === 0 ? (
             <div className="text-center py-4 text-gray-500 text-sm">
@@ -911,11 +1026,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           )}
           <div ref={messagesEndRef} />
         </div>
-      </Card>
+      </div>
 
-      {/* Current Turn Interface */}
       {!isEntireDrillComplete && currentTurn && (
-        <Card className="mb-4">
+        <div className="py-2">
           {/* AI Turn - Show loading/playing state */}
           {isAITurn && (
             <div className="text-center py-8">
@@ -945,9 +1059,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
             <div className="py-6">
               {/* Character Label */}
               <div className="text-center mb-4">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-                  <User className="w-4 h-4" />
-                  Your turn as {currentStudentRole}
+                <div className="inline-flex items-center gap-2 px-1 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                  Your turn !
                   {roleMode === "swapped" && (
                     <span className="ml-1 px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">
                       Switched
@@ -987,65 +1100,34 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
               </div>
 
-              {/* Recording Button */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative w-24 h-24">
-                  {isRecording && (
-                    <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
-                      <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
-                      <circle
-                        cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
-                        strokeDasharray={2 * Math.PI * 44}
-                        strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
-                        strokeLinecap="round"
-                        className="transition-[stroke-dashoffset] duration-1000 linear"
-                      />
-                    </svg>
-                  )}
-                  <button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isAnalyzing || currentProgress.passed}
-                    className={`absolute inset-0 rounded-full flex items-center justify-center transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${currentProgress.passed
-                        ? "bg-green-500 cursor-default"
-                        : isRecording
-                          ? "bg-red-500 hover:bg-red-600"
-                          : isAnalyzing
-                            ? "bg-gray-300 cursor-not-allowed"
-                            : "bg-blue-500 hover:bg-blue-600"
-                      }`}
-                  >
-                    {currentProgress.passed ? (
-                      <CheckCircle className="w-12 h-12 text-white" />
-                    ) : isRecording ? (
-                      <Square className="w-10 h-10 text-white" />
-                    ) : isAnalyzing ? (
-                      <Loader2 className="w-10 h-10 text-white animate-spin" />
-                    ) : (
-                      <Mic className="w-12 h-12 text-white" />
-                    )}
-                  </button>
-                </div>
-
+              <div className="mb-4 flex flex-col items-center">
                 {isRecording && (
-                  <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
-                    {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
+                  <div className="mb-2 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
+                    {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap the mic below to stop
                   </div>
                 )}
 
                 {!isRecording && (
-                  <p className="text-sm text-gray-600 mt-3 text-center">
+                  <p className="text-sm text-gray-600 text-center px-2">
                     {currentProgress.passed ? (
                       <span className="text-green-600 font-medium">Line passed! ✓</span>
                     ) : isAnalyzing ? (
-                      <span className="text-blue-600">Analyzing your pronunciation — longer recordings may take a moment...</span>
+                      <span className="text-blue-600">
+                        Analyzing your pronunciation — longer recordings may take a moment...
+                      </span>
+                    ) : awaitingSubmit ? (
+                      <span className="text-gray-700">
+                        Listen in the player, then tap the green send button to submit, or trash to
+                        re-record.
+                      </span>
                     ) : (
-                      <span>Tap to record your line</span>
+                      <span>Use the microphone fixed at the bottom of the screen to record.</span>
                     )}
                   </p>
                 )}
 
                 {currentProgress.attempts > 0 && !currentProgress.passed && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-2">
                     Attempt {currentProgress.attempts} • Need {PASS_THRESHOLD}%+ to pass
                   </p>
                 )}
@@ -1054,8 +1136,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               {/* Simple Score Display - Analytics shown on review screen */}
               {pronunciationScore && !currentProgress.passed && (
                 <div className={`rounded-xl p-4 mb-4 ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                    ? "bg-green-50 border border-green-200"
-                    : "bg-amber-50 border border-amber-200"
+                    ? "bg-green-50/90"
+                    : "bg-amber-50/90"
                   }`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">Your Score</span>
@@ -1081,26 +1163,33 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                       You need {PASS_THRESHOLD}% or higher to continue
                     </p>
                   )}
+                  <p className="text-sm text-gray-600 mt-3">
+                    <span className="font-medium text-gray-700">Transcript: </span>
+                    {transcriptFromTextScore(pronunciationScore) || "—"}
+                  </p>
                 </div>
               )}
 
               {/* Confetti celebration shown when passed - no analytics here */}
               {currentProgress.passed && pronunciationScore && (
-                <div className="rounded-xl p-4 mb-4 bg-green-50 border border-green-200 text-center">
+                <div className="rounded-xl p-4 mb-4 bg-green-50/90 text-center">
                   <PartyPopper className="w-8 h-8 text-green-500 mx-auto mb-2" />
                   <p className="text-lg font-bold text-green-700">
                     {pronunciationScore.speechace_score.pronunciation.toFixed(0)}% - Passed!
                   </p>
                   <p className="text-sm text-green-600">Click Continue to proceed</p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    <span className="font-medium text-gray-700">Transcript: </span>
+                    {transcriptFromTextScore(pronunciationScore) || "—"}
+                  </p>
                 </div>
               )}
             </div>
           )}
-        </Card>
+        </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="space-y-3">
+      <div className="space-y-3 pt-1">
         {/* Student turn actions */}
         {isStudentTurn && !isEntireDrillComplete && (
           <>
@@ -1119,7 +1208,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   type="button"
                   className={retrySpeakingButtonClass}
                   onClick={handleRetrySpeaking}
-                  disabled={isRecording || isAnalyzing}
+                  disabled={isRecording || isAnalyzing || awaitingSubmit}
                 >
                   <RotateCcw className="w-5 h-5 shrink-0" />
                   Retry speaking
@@ -1133,7 +1222,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 type="button"
                 className={retrySpeakingButtonClass}
                 onClick={handleRetrySpeaking}
-                disabled={isRecording || isAnalyzing}
+                disabled={isRecording || isAnalyzing || awaitingSubmit}
               >
                 <RotateCcw className="w-5 h-5 shrink-0" />
                 Retry speaking
@@ -1144,8 +1233,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
         {/* Conversation complete - Show Review and Role Switch options */}
         {isEntireDrillComplete && (
-          <Card className="mb-4 bg-green-50 border-green-200">
-            <div className="text-center py-4">
+          <div className="-mx-4 bg-green-50/55 px-4 py-5 text-center md:-mx-6 md:px-6">
               <PartyPopper className="w-12 h-12 text-green-500 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-gray-900 mb-2">
                 Conversation Complete!
@@ -1195,10 +1283,83 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   Start from the first line again as {currentStudentRole} — same role, scores reset for this run.
                 </p>
               </div>
-            </div>
-          </Card>
+          </div>
         )}
       </div>
+      </div>
+
+      {isStudentTurn && !isEntireDrillComplete && currentTurn ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-3">
+            {awaitingSubmit && recordingPreviewUrl ? (
+              <RecordingPreviewBar
+                key={recordingPreviewUrl}
+                src={recordingPreviewUrl}
+                onDiscard={discardPendingRecording}
+                onAudioError={() => {
+                  toast.error(
+                    "Preview cannot play in this browser. You can still submit for feedback."
+                  );
+                }}
+              />
+            ) : null}
+            <div className="relative h-20 w-20 shrink-0 rounded-full">
+              {isRecording && (
+                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="44"
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="4"
+                    strokeDasharray={2 * Math.PI * 44}
+                    strokeDashoffset={
+                      2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)
+                    }
+                    strokeLinecap="round"
+                    className="transition-[stroke-dashoffset] duration-1000 linear"
+                  />
+                </svg>
+              )}
+              <button
+                type="button"
+                onClick={handleDockMainClick}
+                disabled={dockMainDisabled}
+                className={`absolute inset-0 flex items-center justify-center rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  currentProgress.passed
+                    ? "bg-emerald-600 cursor-default"
+                    : isRecording
+                      ? "bg-red-500 hover:bg-red-600"
+                      : isAnalyzing
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+                aria-label={
+                  isRecording
+                    ? "Stop recording"
+                    : readyToSubmitPreview
+                      ? "Submit recording for feedback"
+                      : "Start recording"
+                }
+              >
+                {currentProgress.passed ? (
+                  <CheckCircle className="h-8 w-8 text-white" />
+                ) : isRecording ? (
+                  <Square className="h-7 w-7 text-white" />
+                ) : isAnalyzing ? (
+                  <Loader2 className="h-7 w-7 animate-spin text-white" />
+                ) : readyToSubmitPreview ? (
+                  <Send className="h-8 w-8 text-white" strokeWidth={2} />
+                ) : (
+                  <Mic className="h-8 w-8 text-white" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </DrillLayout>
   );
 }
