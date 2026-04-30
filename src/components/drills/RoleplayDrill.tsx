@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -15,6 +16,7 @@ import {
   Send,
   Square,
   Volume2,
+  VolumeX,
   RotateCcw,
   ChevronRight,
   AlertCircle,
@@ -93,6 +95,27 @@ interface CompletedMessage {
 }
 
 const PASS_THRESHOLD = 65;
+
+const PRESTART_INTRO_PLACEHOLDER =
+  "When you're ready, tap Let's Get Started.";
+
+/** Avoid stacked intro TTS when React re-runs effects (Strict Mode / deps churn). */
+const prestartTtsLastStartByDrillMs = new Map<string, number>();
+const PRESTART_TTS_DEBOUNCE_MS = 2000;
+
+function consumePrestartTtsDebounceSlot(drillId: string): boolean {
+  const key = drillId || "_";
+  const now = Date.now();
+  const last = prestartTtsLastStartByDrillMs.get(key) ?? 0;
+  if (now - last < PRESTART_TTS_DEBOUNCE_MS) return false;
+  prestartTtsLastStartByDrillMs.set(key, now);
+  return true;
+}
+
+function clearPrestartTtsDebounce(drillId: string) {
+  const key = drillId || "_";
+  prestartTtsLastStartByDrillMs.delete(key);
+}
 
 /** Prefer formats the browser can both record and play back in `<audio>`. */
 function pickRoleplayRecorderMimeType(): string | undefined {
@@ -195,6 +218,17 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   } = useTTS({
     autoPlay: false,
   });
+
+  // Cut any leftover TTS / streamed clip from another screen when this drill loads.
+  useEffect(() => {
+    stopTTSAudio();
+    if (preGenAudioRef.current) {
+      preGenAudioRef.current.pause();
+      preGenAudioRef.current.currentTime = 0;
+      preGenAudioRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: silence stale audio
+  }, []);
 
   // Drill data — memoize so scene-advance effects do not re-fire every render in legacy single-scene path
   const scenes = useMemo(
@@ -300,6 +334,56 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const currentAIRole = roleMode === "original"
     ? aiCharacters[0] || "AI"
     : studentCharacter;
+
+  const prestartIntro = useMemo(() => {
+    const raw = (drill as { drill_intro?: string }).drill_intro;
+    const t = typeof raw === "string" ? raw.trim() : "";
+    if (t) return t;
+    return PRESTART_INTRO_PLACEHOLDER;
+  }, [drill]);
+
+  const prestartRolesLine = useMemo(() => {
+    const partners = aiCharacters.filter(Boolean);
+    const partnerStr =
+      partners.length <= 1 ? partners[0] || "your partner" : partners.join(", ");
+    return `You'll play ${currentStudentRole}. Your partner voices: ${partnerStr}.`;
+  }, [aiCharacters, currentStudentRole]);
+
+  const prestartTtsText = useMemo(
+    () => `${prestartIntro} ${prestartRolesLine}`,
+    [prestartIntro, prestartRolesLine],
+  );
+
+  const drillIdStr = drill._id != null ? String(drill._id) : "";
+
+  // Auto-read intro + roles when the learner lands on the pre-start screen (browser may block until a tap).
+  useEffect(() => {
+    if (sessionStarted) {
+      stopTTSAudio();
+      if (drillIdStr) clearPrestartTtsDebounce(drillIdStr);
+      return;
+    }
+    if (isCompleted || showReview) return;
+
+    const d = scenes[currentSceneIndex]?.dialogue;
+    const turn = d?.[currentTurnIndex];
+    if (!turn) return;
+
+    if (!consumePrestartTtsDebounceSlot(drillIdStr)) return;
+
+    void playTTSAudio(prestartTtsText);
+    // playTTSAudio / stopTTSAudio are stable from useTTS; omit to avoid effect churn double-firing TTS.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sessionStarted,
+    isCompleted,
+    showReview,
+    currentSceneIndex,
+    currentTurnIndex,
+    scenes,
+    prestartTtsText,
+    drillIdStr,
+  ]);
 
   // Get speaker display name
   const getSpeakerName = (speaker: string) => {
@@ -691,6 +775,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     setShowReview(false);
     setIsPlayingAI(false);
     stopTTSAudio();
+    if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
     if (preGenAudioRef.current) {
       preGenAudioRef.current.pause();
       preGenAudioRef.current = null;
@@ -731,6 +816,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     // Clear session analytics for fresh round
     setSessionAnalytics([]);
 
+    stopTTSAudio();
+    if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
     setSessionStarted(false);
     toast.success(`Switched roles! You are now playing as ${newMode === "original" ? studentCharacter : aiCharacters[0] || "AI"}`);
   };
@@ -922,18 +1009,20 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   return (
     <DrillLayout title={drill.title} hideNavigation>
       <div
-        className={`rounded-2xl bg-muted/30 p-4 md:p-6 shadow-sm space-y-5 ${
-          !isCompleted && !showReview && currentTurn
-            ? !sessionStarted
-              ? "pb-28 md:pb-32"
-              : isStudentTurn && !isEntireDrillComplete
-                ? awaitingSubmit
-                  ? "pb-48 md:pb-56"
-                  : "pb-24 md:pb-28"
-                : ""
-            : ""
+        className={`rounded-2xl bg-muted/30 p-4 md:p-6 shadow-sm ${
+          !isCompleted && !showReview && currentTurn && !sessionStarted
+            ? "flex flex-1 min-h-0 flex-col pb-28 md:pb-32"
+            : `space-y-5 ${
+                !isCompleted && !showReview && currentTurn && sessionStarted && isStudentTurn && !isEntireDrillComplete
+                  ? awaitingSubmit
+                    ? "pb-48 md:pb-56"
+                    : "pb-24 md:pb-28"
+                  : ""
+              }`
         }`}
       >
+      {sessionStarted ? (
+      <>
       {roleMode === "swapped" && (
         <div className="flex items-center justify-center gap-2 px-1 py-1">
           <ArrowLeftRight className="w-4 h-4 text-primary-600 shrink-0" />
@@ -1047,9 +1136,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           {isAITurn && (
             <div className="text-center py-8">
               <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mb-4">
-                {!sessionStarted ? (
-                  <Bot className="w-10 h-10 text-blue-600" />
-                ) : isTTSGenerating ? (
+                {isTTSGenerating ? (
                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                 ) : isPlayingAI || isTTSPlaying ? (
                   <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
@@ -1058,19 +1145,12 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
               </div>
               <p className="text-lg font-semibold text-gray-900 mb-2">
-                {!sessionStarted
-                  ? `${getSpeakerName(currentTurn.speaker)} will speak first`
-                  : `${getSpeakerName(currentTurn.speaker)} is speaking...`}
+                {getSpeakerName(currentTurn.speaker)} is speaking...
               </p>
               <div className="bg-blue-50 rounded-xl p-4 max-w-md mx-auto">
                 <p className="text-gray-900">{currentTurn.text}</p>
                 {currentTurn.translation && (
                   <p className="text-sm text-gray-500 mt-2 italic">{currentTurn.translation}</p>
-                )}
-                {!sessionStarted && (
-                  <p className="text-sm text-blue-800 mt-3 font-medium">
-                    Tap &quot;Let&apos;s Get Started&quot; below to begin.
-                  </p>
                 )}
               </div>
             </div>
@@ -1141,11 +1221,6 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                       <span className="text-gray-700">
                         Listen in the player, then tap the green send button to submit, or trash to
                         re-record.
-                      </span>
-                    ) : !sessionStarted ? (
-                      <span className="text-gray-700">
-                        Tap &quot;Let&apos;s Get Started&quot; below, then use the microphone to record
-                        your line.
                       </span>
                     ) : (
                       <span>Use the microphone fixed at the bottom of the screen to record.</span>
@@ -1313,6 +1388,56 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           </div>
         )}
       </div>
+      </>
+      ) : (
+        <div className="flex flex-1 w-full flex-col items-stretch justify-start px-0.5 pt-0 pb-2 min-h-0">
+          <div className="flex w-full max-w-lg flex-col items-start gap-4">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-200/80 bg-white shadow-sm">
+              <Image
+                src="/icon.png"
+                alt="Eklana"
+                width={36}
+                height={36}
+                className="object-contain"
+              />
+            </div>
+            <div className="min-w-0 w-full">
+              <div className="rounded-2xl rounded-tl-md bg-gray-100 px-4 py-3 shadow-sm">
+                <p className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                  {prestartIntro}
+                </p>
+                <p className="mt-3 text-sm text-emerald-800/95 leading-snug">{prestartRolesLine}</p>
+              </div>
+              <div className="mt-2 flex items-center gap-3 pl-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    isTTSPlaying || isTTSGenerating
+                      ? stopTTSAudio()
+                      : void playTTSAudio(prestartTtsText)
+                  }
+                  disabled={isTTSGenerating}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isTTSPlaying
+                      ? "bg-red-100 text-red-600 hover:bg-red-200"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                  title={isTTSPlaying ? "Stop audio" : "Play audio again"}
+                  aria-label={isTTSPlaying ? "Stop audio" : "Play audio"}
+                >
+                  {isTTSGenerating ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : isTTSPlaying ? (
+                    <VolumeX className="h-3 w-3" />
+                  ) : (
+                    <Volume2 className="h-3 w-3" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       {!isCompleted && !showReview && currentTurn && !sessionStarted ? (

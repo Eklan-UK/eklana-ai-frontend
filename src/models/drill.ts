@@ -358,6 +358,8 @@ export interface IDrill extends Document {
   student_character_name?: string;
   ai_character_name?: string;
   ai_character_names?: string[];
+  /** Shown to learners on the roleplay pre-start screen before "Let's Get Started" */
+  drill_intro?: string;
 
   // Matching Drill Fields
   matching_pairs: Array<{
@@ -562,6 +564,12 @@ const drillSchema = new Schema<IDrill>(
       type: [String],
       default: [],
       description: "Array of AI character names",
+    },
+
+    drill_intro: {
+      type: String,
+      default: "",
+      description: "Intro copy shown on the roleplay pre-start screen",
     },
 
     // Matching Drill Fields
