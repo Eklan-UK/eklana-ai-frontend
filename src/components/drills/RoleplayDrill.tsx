@@ -158,6 +158,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   const playedAITurnsRef = useRef<Set<string>>(new Set());
   const [isPlayingAI, setIsPlayingAI] = useState(false);
 
+  /** Gate: AI auto-play and student mic dock wait until the learner taps "Let's Get Started". */
+  const [sessionStarted, setSessionStarted] = useState(false);
+
   // Silent analytics collection during the session
   const [sessionAnalytics, setSessionAnalytics] = useState<TurnAnalytics[]>([]);
 
@@ -387,19 +390,23 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     }
   }, [playTTSAudio, moveToNextTurn, currentSceneIndex]);
 
-  // Auto-play AI turns - only if not already played
+  // Auto-play AI turns - only after session start and if not already played
   useEffect(() => {
-    if (
-      isAITurn &&
-      currentTurn &&
-      !playedAITurnsRef.current.has(makeTurnKey(currentSceneIndex, currentTurnIndex)) &&
-      !isPlayingAI &&
-      !isTTSGenerating &&
-      !isTTSPlaying
-    ) {
-      playAITurn(currentTurn, currentTurnIndex);
-    }
-  }, [currentSceneIndex, currentTurnIndex, currentTurn, isAITurn, isPlayingAI, isTTSGenerating, isTTSPlaying, playAITurn]);
+    if (!sessionStarted || !isAITurn || !currentTurn) return;
+    if (playedAITurnsRef.current.has(makeTurnKey(currentSceneIndex, currentTurnIndex))) return;
+    if (isPlayingAI || isTTSGenerating || isTTSPlaying) return;
+    playAITurn(currentTurn, currentTurnIndex);
+  }, [
+    sessionStarted,
+    currentSceneIndex,
+    currentTurnIndex,
+    currentTurn,
+    isAITurn,
+    isPlayingAI,
+    isTTSGenerating,
+    isTTSPlaying,
+    playAITurn,
+  ]);
 
   // Skip scenes with no dialogue
   useEffect(() => {
@@ -688,6 +695,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       preGenAudioRef.current.pause();
       preGenAudioRef.current = null;
     }
+    setSessionStarted(false);
     toast.success(`Starting over from the beginning as ${currentStudentRole}.`);
   };
 
@@ -723,6 +731,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     // Clear session analytics for fresh round
     setSessionAnalytics([]);
 
+    setSessionStarted(false);
     toast.success(`Switched roles! You are now playing as ${newMode === "original" ? studentCharacter : aiCharacters[0] || "AI"}`);
   };
 
@@ -914,10 +923,14 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
     <DrillLayout title={drill.title} hideNavigation>
       <div
         className={`rounded-2xl bg-muted/30 p-4 md:p-6 shadow-sm space-y-5 ${
-          isStudentTurn && !isEntireDrillComplete && currentTurn
-            ? awaitingSubmit
-              ? "pb-48 md:pb-56"
-              : "pb-24 md:pb-28"
+          !isCompleted && !showReview && currentTurn
+            ? !sessionStarted
+              ? "pb-28 md:pb-32"
+              : isStudentTurn && !isEntireDrillComplete
+                ? awaitingSubmit
+                  ? "pb-48 md:pb-56"
+                  : "pb-24 md:pb-28"
+                : ""
             : ""
         }`}
       >
@@ -1034,7 +1047,9 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           {isAITurn && (
             <div className="text-center py-8">
               <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mb-4">
-                {isTTSGenerating ? (
+                {!sessionStarted ? (
+                  <Bot className="w-10 h-10 text-blue-600" />
+                ) : isTTSGenerating ? (
                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                 ) : isPlayingAI || isTTSPlaying ? (
                   <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
@@ -1043,12 +1058,19 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
               </div>
               <p className="text-lg font-semibold text-gray-900 mb-2">
-                {getSpeakerName(currentTurn.speaker)} is speaking...
+                {!sessionStarted
+                  ? `${getSpeakerName(currentTurn.speaker)} will speak first`
+                  : `${getSpeakerName(currentTurn.speaker)} is speaking...`}
               </p>
               <div className="bg-blue-50 rounded-xl p-4 max-w-md mx-auto">
                 <p className="text-gray-900">{currentTurn.text}</p>
                 {currentTurn.translation && (
                   <p className="text-sm text-gray-500 mt-2 italic">{currentTurn.translation}</p>
+                )}
+                {!sessionStarted && (
+                  <p className="text-sm text-blue-800 mt-3 font-medium">
+                    Tap &quot;Let&apos;s Get Started&quot; below to begin.
+                  </p>
                 )}
               </div>
             </div>
@@ -1119,6 +1141,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                       <span className="text-gray-700">
                         Listen in the player, then tap the green send button to submit, or trash to
                         re-record.
+                      </span>
+                    ) : !sessionStarted ? (
+                      <span className="text-gray-700">
+                        Tap &quot;Let&apos;s Get Started&quot; below, then use the microphone to record
+                        your line.
                       </span>
                     ) : (
                       <span>Use the microphone fixed at the bottom of the screen to record.</span>
@@ -1288,7 +1315,19 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       </div>
       </div>
 
-      {isStudentTurn && !isEntireDrillComplete && currentTurn ? (
+      {!isCompleted && !showReview && currentTurn && !sessionStarted ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto w-full max-w-md">
+            <button
+              type="button"
+              onClick={() => setSessionStarted(true)}
+              className="w-full rounded-full bg-[#388E3C] px-8 py-4 text-center text-base font-bold text-white shadow-md transition-colors hover:bg-[#2f7a33] active:scale-[0.99]"
+            >
+              Let&apos;s Get Started
+            </button>
+          </div>
+        </div>
+      ) : sessionStarted && isStudentTurn && !isEntireDrillComplete && currentTurn ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-3">
             {awaitingSubmit && recordingPreviewUrl ? (
