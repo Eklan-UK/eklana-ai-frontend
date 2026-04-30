@@ -77,24 +77,63 @@ function OverallScoreDonut({ score, statsLine }: { score: number; statsLine: str
   );
 }
 
-function LineBreakdownBlock({
+/** Word-level breakdown, transcript, attempts — shown inside the per-line analysis accordion. */
+function LineAnalysisPanel({ row }: { row: RoleplayReviewAnalyticsRow }) {
+  const words = row.textScore?.word_score_list ?? [];
+
+  if (row.textScore && words.length > 0) {
+    return (
+      <div className="space-y-4">
+        {words.map((wordScore, widx) => (
+          <div key={widx} className="space-y-2">
+            <PronunciationWordBreakdown
+              wordScore={wordScore}
+              variant="review"
+              showWordLabel={words.length > 1}
+            />
+          </div>
+        ))}
+        <p className="text-xs text-gray-500 pt-1 border-t border-gray-100">
+          <span className="font-medium text-gray-600">Transcript: </span>
+          {transcriptFromTextScore(row.textScore) || "—"}
+        </p>
+        <p className="text-[11px] text-gray-400">Attempts: {row.attempts}</p>
+      </div>
+    );
+  }
+
+  if (row.textScore) {
+    return <p className="text-xs text-gray-500">No word-level breakdown for this line.</p>;
+  }
+
+  return <p className="text-xs text-amber-700">No detailed score stored for this line.</p>;
+}
+
+function LineReviewAccordionRow({
   row,
   passThreshold,
   lineLabel,
+  isAnalysisOpen,
+  onToggleAnalysis,
 }: {
   row: RoleplayReviewAnalyticsRow;
   passThreshold: number;
   lineLabel: string;
+  isAnalysisOpen: boolean;
+  onToggleAnalysis: () => void;
 }) {
-  const words = row.textScore?.word_score_list ?? [];
+  const transcript = transcriptFromTextScore(row.textScore)?.trim() ?? "";
+  const spokenDisplay = transcript || row.text;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-gray-500 mb-1">{lineLabel}</p>
-          <p className="text-sm text-gray-900 leading-snug">{row.text}</p>
-        </div>
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">{lineLabel}</p>
+        <p className="text-sm text-gray-900 leading-snug whitespace-pre-wrap">{spokenDisplay}</p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-4 py-2.5 bg-gray-50/50">
+        <span className="text-sm font-semibold text-gray-800">Performance score</span>
         <div
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
             row.score >= passThreshold ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
@@ -104,28 +143,23 @@ function LineBreakdownBlock({
         </div>
       </div>
 
-      {row.textScore && words.length > 0 ? (
-        <div className="space-y-4 pt-1 border-t border-gray-100">
-          {words.map((wordScore, widx) => (
-            <div key={widx} className="space-y-2">
-              <PronunciationWordBreakdown
-                wordScore={wordScore}
-                variant="review"
-                showWordLabel={words.length > 1}
-              />
-            </div>
-          ))}
-          <p className="text-xs text-gray-500 pt-1">
-            <span className="font-medium text-gray-600">Transcript: </span>
-            {transcriptFromTextScore(row.textScore) || "—"}
-          </p>
-          <p className="text-[11px] text-gray-400">Attempts: {row.attempts}</p>
+      <button
+        type="button"
+        onClick={onToggleAnalysis}
+        aria-expanded={isAnalysisOpen}
+        className="flex w-full items-center justify-between gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm font-semibold text-emerald-900 hover:bg-emerald-50/50 transition-colors"
+      >
+        <span>Breakdown of the analysis</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-gray-600 transition-transform ${isAnalysisOpen ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {isAnalysisOpen ? (
+        <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-3">
+          <LineAnalysisPanel row={row} />
         </div>
-      ) : row.textScore ? (
-        <p className="text-xs text-gray-500">No word-level breakdown for this line.</p>
-      ) : (
-        <p className="text-xs text-amber-700">No detailed score stored for this line.</p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -140,6 +174,7 @@ export function RoleplayPerformanceReview({
   isSubmitting,
 }: RoleplayPerformanceReviewProps) {
   const [expandedListIndex, setExpandedListIndex] = useState(0);
+  const [expandedLineKey, setExpandedLineKey] = useState<string | null>(null);
 
   const hasData = sceneGroups.length > 0;
 
@@ -147,6 +182,11 @@ export function RoleplayPerformanceReview({
     !hasData || expandedListIndex < 0
       ? -1
       : Math.min(expandedListIndex, sceneGroups.length - 1);
+
+  const toggleScene = (listIdx: number, isOpen: boolean) => {
+    setExpandedListIndex(isOpen ? -1 : listIdx);
+    setExpandedLineKey(null);
+  };
 
   return (
     <>
@@ -175,7 +215,7 @@ export function RoleplayPerformanceReview({
                   >
                     <button
                       type="button"
-                      onClick={() => setExpandedListIndex(isOpen ? -1 : listIdx)}
+                      onClick={() => toggleScene(listIdx, isOpen)}
                       className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50/80 transition-colors"
                       aria-expanded={isOpen}
                     >
@@ -189,17 +229,27 @@ export function RoleplayPerformanceReview({
                       />
                     </button>
                     {isOpen && (
-                      <div className="border-t border-gray-100 px-4 py-3 space-y-4 bg-gray-50/40">
-                        <p className="text-xs text-gray-500">Here is a breakdown of your performance</p>
+                      <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50/40">
+                        <h3 className="text-sm font-bold text-gray-900">
+                          Here is a Breakdown of your performance
+                        </h3>
                         <div className="space-y-3">
-                          {group.rows.map((row) => (
-                            <LineBreakdownBlock
-                              key={`${row.sceneIndex}-${row.turnIndex}`}
-                              row={row}
-                              passThreshold={passThreshold}
-                              lineLabel={`Line ${row.turnIndex + 1}`}
-                            />
-                          ))}
+                          {group.rows.map((row) => {
+                            const lineKey = `${row.sceneIndex}-${row.turnIndex}`;
+                            const isLineAnalysisOpen = expandedLineKey === lineKey;
+                            return (
+                              <LineReviewAccordionRow
+                                key={lineKey}
+                                row={row}
+                                passThreshold={passThreshold}
+                                lineLabel={`Line ${row.turnIndex + 1}`}
+                                isAnalysisOpen={isLineAnalysisOpen}
+                                onToggleAnalysis={() =>
+                                  setExpandedLineKey((k) => (k === lineKey ? null : lineKey))
+                                }
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                     )}

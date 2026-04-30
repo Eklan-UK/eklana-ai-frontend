@@ -344,10 +344,15 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
   const prestartRolesLine = useMemo(() => {
     const partners = aiCharacters.filter(Boolean);
-    const partnerStr =
+    const aiCastStr =
       partners.length <= 1 ? partners[0] || "your partner" : partners.join(", ");
-    return `You'll play ${currentStudentRole}. Your partner voices: ${partnerStr}.`;
-  }, [aiCharacters, currentStudentRole]);
+
+    if (roleMode === "original") {
+      return `You'll play ${studentCharacter}. Your partner voices: ${aiCastStr}.`;
+    }
+    // Swapped: you speak the scripted AI lines; the app voices the student role.
+    return `You'll play ${aiCastStr}. Your partner voices: ${studentCharacter}.`;
+  }, [aiCharacters, studentCharacter, roleMode]);
 
   const prestartTtsText = useMemo(
     () => `${prestartIntro} ${prestartRolesLine}`,
@@ -1407,6 +1412,12 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   {prestartIntro}
                 </p>
                 <p className="mt-3 text-sm text-emerald-800/95 leading-snug">{prestartRolesLine}</p>
+                {roleMode === "swapped" && (
+                  <p className="mt-2 text-xs font-medium text-emerald-800/90">
+                    Roles reversed — you&apos;ll speak the AI side; your partner speaks{" "}
+                    <span className="font-semibold">{studentCharacter}</span>.
+                  </p>
+                )}
               </div>
               <div className="mt-2 flex items-center gap-3 pl-1">
                 <button
