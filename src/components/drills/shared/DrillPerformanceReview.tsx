@@ -165,6 +165,33 @@ function LineReviewAccordionRow({
   );
 }
 
+/**
+ * Single-line review accordion for use inside vocabulary / pronunciation drills
+ * (mirrors “Breakdown of the analysis” on the end-of-drill review screen).
+ * Remount with a new `key` when the attempt changes so the breakdown starts expanded again.
+ */
+export function DrillLineReviewAccordion({
+  row,
+  passThreshold,
+  lineLabel,
+}: {
+  row: PerformanceReviewAnalyticsRow;
+  passThreshold: number;
+  lineLabel: string;
+}) {
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(true);
+
+  return (
+    <LineReviewAccordionRow
+      row={row}
+      passThreshold={passThreshold}
+      lineLabel={lineLabel}
+      isAnalysisOpen={isAnalysisOpen}
+      onToggleAnalysis={() => setIsAnalysisOpen((v) => !v)}
+    />
+  );
+}
+
 export function DrillPerformanceReview({
   avgScore,
   statsLine,
