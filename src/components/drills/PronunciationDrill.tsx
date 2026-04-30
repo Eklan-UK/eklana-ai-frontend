@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
 import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
-import { CheckCircle, Mic, Loader2, Lock } from "lucide-react";
+import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
 import type { TextScore } from "@/services/speechace.service";
@@ -16,7 +16,11 @@ import {
   DrillCompletionScreen,
   DrillLayout,
   DrillProgress,
+  DrillPerformanceReview,
+  RecordingPreviewBar,
   WordAnalytics,
+  type PerformanceReviewAnalyticsRow,
+  type PerformanceReviewGroup,
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
@@ -43,64 +47,7 @@ interface WordProgress {
 }
 
 const MAX_RECORDING_SECONDS = 120;
-
-// Recording Button Component
-function RecordButton({
-  isRecording,
-  isAnalyzing,
-  disabled,
-  onStart,
-  onStop,
-  recordingSeconds = 0,
-}: {
-  isRecording: boolean;
-  isAnalyzing: boolean;
-  disabled: boolean;
-  onStart: () => void;
-  onStop: () => void;
-  recordingSeconds?: number;
-}) {
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-24 h-24">
-        {isRecording && (
-          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
-            <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
-            <circle
-              cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
-              strokeDasharray={2 * Math.PI * 44}
-              strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
-              strokeLinecap="round"
-              className="transition-[stroke-dashoffset] duration-1000 linear"
-            />
-          </svg>
-        )}
-        <button
-          onClick={isRecording ? onStop : onStart}
-          disabled={isAnalyzing || disabled}
-          className={`absolute inset-0 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-            isRecording
-              ? "bg-red-500 hover:bg-red-600"
-              : isAnalyzing
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600"
-          }`}
-        >
-          {isAnalyzing ? (
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
-          ) : (
-            <Mic className="w-12 h-12 text-white" />
-          )}
-        </button>
-      </div>
-      {isRecording && (
-        <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
-          {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
-        </div>
-      )}
-    </div>
-  );
-}
+const PASS_THRESHOLD = 65;
 
 // Screen Indicator Component
 function ScreenIndicator({
@@ -190,6 +137,10 @@ export default function PronunciationDrill({
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showReview, setShowReview] = useState(false);
+  const [sessionReviewAnalytics, setSessionReviewAnalytics] = useState<
+    PerformanceReviewAnalyticsRow[]
+  >([]);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -211,17 +162,17 @@ export default function PronunciationDrill({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const revokeRecordingPreview = () => {
+  const revokeRecordingPreview = useCallback(() => {
     setRecordingPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
-  };
+  }, []);
 
-  const discardPendingRecording = () => {
+  const discardPendingRecording = useCallback(() => {
     setPendingSubmitBlob(null);
     revokeRecordingPreview();
-  };
+  }, [revokeRecordingPreview]);
 
   useEffect(() => {
     discardPendingRecording();
@@ -232,9 +183,12 @@ export default function PronunciationDrill({
     return () => {
       revokeRecordingPreview();
     };
-  }, []);
+  }, [revokeRecordingPreview]);
 
-  const items = drill.pronunciation_items || [];
+  const items = useMemo(
+    () => drill.pronunciation_items || [],
+    [drill.pronunciation_items]
+  );
   const currentItem = items[currentIndex];
   const currentProgress = wordProgress[currentIndex] || {
     wordPassed: false,
@@ -255,6 +209,7 @@ export default function PronunciationDrill({
       };
     });
     setWordProgress(initialProgress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when item count changes
   }, [items.length]);
 
   const clearRecordingTimers = () => {
@@ -372,7 +327,29 @@ export default function PronunciationDrill({
       if (textScore) {
         setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
-        const passed = score >= 65;
+        const passed = score >= PASS_THRESHOLD;
+        const turnIdx = currentScreen === "word" ? 0 : 1;
+
+        setSessionReviewAnalytics((prev) => {
+          const existing = prev.find(
+            (r) => r.sceneIndex === currentIndex && r.turnIndex === turnIdx
+          );
+          const attempts = existing ? existing.attempts + 1 : 1;
+          const row: PerformanceReviewAnalyticsRow = {
+            sceneIndex: currentIndex,
+            turnIndex: turnIdx,
+            text: textToAnalyze,
+            score,
+            textScore,
+            attempts,
+          };
+          return [
+            ...prev.filter(
+              (r) => !(r.sceneIndex === currentIndex && r.turnIndex === turnIdx)
+            ),
+            row,
+          ];
+        });
 
         setWordProgress((prev) => {
           const current = prev[currentIndex] || {
@@ -413,7 +390,7 @@ export default function PronunciationDrill({
           toast.warning(
             `Score: ${score.toFixed(
               0
-            )}%. You need at least 65% to pass. Try again!`
+            )}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`
           );
         }
 
@@ -441,7 +418,7 @@ export default function PronunciationDrill({
             audioBase64,
             drillId: drill._id,
             drillType: 'pronunciation',
-            passingThreshold: 65,
+            passingThreshold: PASS_THRESHOLD,
           });
         } catch (error) {
           // Log but don't fail the drill if pronunciation recording fails
@@ -464,9 +441,9 @@ export default function PronunciationDrill({
 
   const handleContinueToSentence = () => {
     if (currentProgress.wordPassed) {
+      discardPendingRecording();
       setCurrentScreen("sentence");
       setPronunciationScore(null);
-      discardPendingRecording();
     } else {
       toast.error(
         "You must pass the word pronunciation (65%+) before proceeding to the sentence"
@@ -488,7 +465,9 @@ export default function PronunciationDrill({
       setPronunciationScore(null);
       discardPendingRecording();
     } else {
-      handleSubmit();
+      discardPendingRecording();
+      setPronunciationScore(null);
+      setShowReview(true);
     }
   };
 
@@ -538,6 +517,7 @@ export default function PronunciationDrill({
         platform: "web",
       });
 
+      setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
@@ -558,6 +538,97 @@ export default function PronunciationDrill({
       setIsSubmitting(false);
     }
   };
+
+  const handlePracticeAgainFromReview = () => {
+    setShowReview(false);
+    setCurrentIndex(0);
+    setCurrentScreen("word");
+    setSessionReviewAnalytics([]);
+    setSessionTranscripts([]);
+    setPronunciationScore(null);
+    discardPendingRecording();
+    setIsRecording(false);
+    clearRecordingTimers();
+    const initialProgress: Record<number, WordProgress> = {};
+    items.forEach((_: any, index: number) => {
+      initialProgress[index] = {
+        wordPassed: false,
+        wordScore: null,
+        sentencePassed: false,
+        sentenceScore: null,
+      };
+    });
+    setWordProgress(initialProgress);
+  };
+
+  const reviewGroups: PerformanceReviewGroup[] = useMemo(() => {
+    const map = new Map<number, PerformanceReviewAnalyticsRow[]>();
+    for (const row of sessionReviewAnalytics) {
+      const list = map.get(row.sceneIndex) ?? [];
+      list.push(row);
+      map.set(row.sceneIndex, list);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([sceneIndex, rows]) => {
+        const item = items[sceneIndex];
+        const preview =
+          (item?.word?.trim() || item?.sentence?.trim() || `Item ${sceneIndex + 1}`).slice(
+            0,
+            48
+          ) +
+          ((item?.word?.trim() || item?.sentence?.trim() || "").length > 48 ? "…" : "");
+        return {
+          sceneIndex,
+          sceneTitle: `Item ${sceneIndex + 1}: ${preview}`,
+          rows: rows.sort((x, y) => x.turnIndex - y.turnIndex),
+        };
+      });
+  }, [sessionReviewAnalytics, items]);
+
+  const reviewAvgScore = useMemo(() => {
+    if (sessionReviewAnalytics.length > 0) {
+      return Math.round(
+        sessionReviewAnalytics.reduce((s, r) => s + r.score, 0) /
+          sessionReviewAnalytics.length
+      );
+    }
+    const scores: number[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const p = wordProgress[i];
+      if (p?.wordScore != null && p?.sentenceScore != null) {
+        scores.push((p.wordScore + p.sentenceScore) / 2);
+      }
+    }
+    return scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0;
+  }, [sessionReviewAnalytics, wordProgress, items.length]);
+
+  const reviewStatsLine = useMemo(() => {
+    const passedItems = Object.values(wordProgress).filter(
+      (p) => p.wordPassed && p.sentencePassed
+    ).length;
+    const n = sessionReviewAnalytics.length;
+    return `${passedItems} of ${items.length} items passed · ${n} scored attempts`;
+  }, [wordProgress, sessionReviewAnalytics.length, items.length]);
+
+  if (showReview) {
+    return (
+      <DrillLayout title="Review Performance" hideNavigation>
+        <DrillPerformanceReview
+          avgScore={reviewAvgScore}
+          statsLine={reviewStatsLine}
+          groups={reviewGroups}
+          passThreshold={PASS_THRESHOLD}
+          sectionHeading="Item-by-Item Analysis"
+          onDone={() => void handleSubmit()}
+          onPracticeAgain={handlePracticeAgainFromReview}
+          isSubmitting={isSubmitting}
+        />
+      </DrillLayout>
+    );
+  }
 
   // Completed state
   if (isCompleted) {
@@ -619,10 +690,27 @@ export default function PronunciationDrill({
   const canProceedToNext = isWordPassed && isSentencePassed;
   const awaitingSubmit =
     !!pendingSubmitBlob && !isAnalyzing && !pronunciationScore;
+  const readyToSubmitPreview = awaitingSubmit && Boolean(recordingPreviewUrl);
+  const dockMainDisabled =
+    isAnalyzing ||
+    (currentScreen === "sentence" && !isWordPassed) ||
+    (awaitingSubmit && !recordingPreviewUrl);
+
+  const handleDockMainClick = () => {
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    if (readyToSubmitPreview) {
+      void submitPendingForAnalysis();
+      return;
+    }
+    void startRecording();
+  };
 
   return (
     <DrillLayout title={drill.title}>
-      <div className="flex flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0">
+      <div className="relative flex min-h-0 flex-1 flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)]">
         <div className="shrink-0 space-y-4">
           <DrillProgress
             current={currentIndex + 1}
@@ -636,7 +724,11 @@ export default function PronunciationDrill({
           />
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 pb-4">
+        <div
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 ${
+            awaitingSubmit ? "pb-48 sm:pb-52" : "pb-28 sm:pb-32"
+          }`}
+        >
           <Card className="mb-0">
             <div className="text-center py-6">
               {/* Word/Sentence Display */}
@@ -711,57 +803,13 @@ export default function PronunciationDrill({
             <h3 className="text-sm font-medium text-gray-700 mb-4">
               Record your pronunciation
             </h3>
-            <RecordButton
-              isRecording={isRecording}
-              isAnalyzing={isAnalyzing}
-              disabled={
-                (currentScreen === "sentence" && !isWordPassed) ||
-                awaitingSubmit
-              }
-              onStart={startRecording}
-              onStop={stopRecording}
-              recordingSeconds={recordingSeconds}
-            />
-            {awaitingSubmit && recordingPreviewUrl && (
-              <div className="mt-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
-                <p className="text-sm font-medium text-gray-800">
-                  Listen to your recording, then submit for feedback or re-record.
-                </p>
-                <audio
-                  controls
-                  src={recordingPreviewUrl}
-                  className="w-full max-w-md mx-auto block"
-                />
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    fullWidth
-                    className="sm:max-w-xs"
-                    onClick={() => void submitPendingForAnalysis()}
-                  >
-                    Submit for feedback
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="md"
-                    fullWidth
-                    className="sm:max-w-xs"
-                    onClick={discardPendingRecording}
-                  >
-                    Re-record
-                  </Button>
-                </div>
-              </div>
-            )}
-            {!isRecording && !isAnalyzing && !pronunciationScore && !awaitingSubmit && (
-              <p className="text-sm text-gray-500 mt-4">
-                Tap the microphone to start recording
-              </p>
-            )}
+            <p className="text-sm text-gray-500">
+              Use the microphone at the bottom — tap to record, then submit or re-record from the
+              preview.
+            </p>
             {isAnalyzing && (
               <div className="flex items-center justify-center gap-2 mt-4">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
                 <p className="text-sm text-gray-600">
                   Analyzing your pronunciation — longer recordings may take a moment...
                 </p>
@@ -808,18 +856,20 @@ export default function PronunciationDrill({
                 )}
             </>
           )}
-        </div>
 
-        {/* Sticky-style action bar: sibling of scroll region so CTAs stay in view */}
-        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/90 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 pt-1">
             {currentScreen === "word" && (
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
                 onClick={handleContinueToSentence}
-                disabled={!canContinueToSentence || isRecording || isAnalyzing || awaitingSubmit}
+                disabled={
+                  !canContinueToSentence ||
+                  isRecording ||
+                  isAnalyzing ||
+                  awaitingSubmit
+                }
               >
                 {canContinueToSentence ? (
                   "Continue to Sentence"
@@ -838,7 +888,9 @@ export default function PronunciationDrill({
                 size="lg"
                 fullWidth
                 onClick={handleNext}
-                disabled={!canProceedToNext || isRecording || isAnalyzing || awaitingSubmit}
+                disabled={
+                  !canProceedToNext || isRecording || isAnalyzing || awaitingSubmit
+                }
               >
                 {canProceedToNext ? (
                   currentIndex === items.length - 1 ? (
@@ -861,7 +913,7 @@ export default function PronunciationDrill({
                 size="lg"
                 fullWidth
                 onClick={handleTryAgain}
-                disabled={isRecording || isAnalyzing || awaitingSubmit}
+                disabled={isRecording || isAnalyzing}
               >
                 Try Again
               </Button>
@@ -877,7 +929,7 @@ export default function PronunciationDrill({
                   setPronunciationScore(null);
                   discardPendingRecording();
                 }}
-                disabled={isRecording || isAnalyzing || awaitingSubmit}
+                disabled={isRecording || isAnalyzing}
               >
                 Back to Word
               </Button>
@@ -894,11 +946,87 @@ export default function PronunciationDrill({
                   setPronunciationScore(null);
                   discardPendingRecording();
                 }}
-                disabled={isRecording || isAnalyzing || awaitingSubmit}
+                disabled={isRecording || isAnalyzing}
               >
                 Previous Item
               </Button>
             )}
+          </div>
+        </div>
+
+        {/* Floating recording dock (centered): no full-width sheet */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:bottom-5 md:px-8">
+          <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
+            {awaitingSubmit && recordingPreviewUrl ? (
+              <RecordingPreviewBar
+                key={recordingPreviewUrl}
+                className="w-full"
+                src={recordingPreviewUrl}
+                onDiscard={discardPendingRecording}
+                onAudioError={() => {
+                  toast.error(
+                    "Preview cannot play in this browser. You can still submit for feedback."
+                  );
+                }}
+              />
+            ) : null}
+            <div className="flex flex-col items-center gap-1">
+              <div className="relative h-[5.25rem] w-[5.25rem] shrink-0 rounded-full ring-4 ring-white/90 shadow-lg">
+                {isRecording && (
+                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+                    <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="44"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="4"
+                      strokeDasharray={2 * Math.PI * 44}
+                      strokeDashoffset={
+                        2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)
+                      }
+                      strokeLinecap="round"
+                      className="transition-[stroke-dashoffset] duration-1000 linear"
+                    />
+                  </svg>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDockMainClick}
+                  disabled={dockMainDisabled}
+                  className={`absolute inset-0 flex items-center justify-center rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isRecording
+                      ? "bg-red-500 hover:bg-red-600"
+                      : isAnalyzing
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                  aria-label={
+                    isRecording
+                      ? "Stop recording"
+                      : readyToSubmitPreview
+                        ? "Submit recording for feedback"
+                        : "Start recording"
+                  }
+                >
+                  {isRecording ? (
+                    <Square className="h-7 w-7 text-white" />
+                  ) : isAnalyzing ? (
+                    <Loader2 className="h-7 w-7 animate-spin text-white" />
+                  ) : readyToSubmitPreview ? (
+                    <Send className="h-8 w-8 text-white" strokeWidth={2} />
+                  ) : (
+                    <Mic className="h-8 w-8 text-white" />
+                  )}
+                </button>
+              </div>
+              {isRecording && (
+                <p className="max-w-[16rem] text-center text-xs font-medium leading-snug text-red-600 sm:text-sm">
+                  {MAX_RECORDING_SECONDS - recordingSeconds}s left · tap to stop
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

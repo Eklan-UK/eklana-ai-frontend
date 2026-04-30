@@ -5,5 +5,10 @@ export { DrillProgress } from './DrillProgress';
 export { WordAnalytics } from './WordAnalytics';
 export { PronunciationWordBreakdown } from './PronunciationWordBreakdown';
 export { RoleplayPerformanceReview } from './RoleplayPerformanceReview';
+export {
+  DrillPerformanceReview,
+  type PerformanceReviewAnalyticsRow,
+  type PerformanceReviewGroup,
+} from './DrillPerformanceReview';
 export { RecordingPreviewBar } from './RecordingPreviewBar';
 

@@ -19,7 +19,7 @@ interface Bookmark {
   type: 'word' | 'sentence';
 }
 
-// Reusing the RecordButton style from VocabularyDrill for consistency
+// Reusing drill dock mic colors (emerald idle, red recording, gray analyzing)
 function RecordButton({
   isRecording,
   isAnalyzing,
@@ -42,7 +42,9 @@ function RecordButton({
         className={`relative w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 ${
           isRecording
             ? "bg-red-500 hover:bg-red-600 ring-4 ring-red-100"
-            : "bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+            : isAnalyzing
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-emerald-600 hover:bg-emerald-700 ring-4 ring-emerald-100"
         }`}
       >
         {isAnalyzing ? (
