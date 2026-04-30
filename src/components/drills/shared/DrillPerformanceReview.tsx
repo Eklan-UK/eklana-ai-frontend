@@ -168,7 +168,8 @@ function LineReviewAccordionRow({
 /**
  * Single-line review accordion for use inside vocabulary / pronunciation drills
  * (mirrors “Breakdown of the analysis” on the end-of-drill review screen).
- * Remount with a new `key` when the attempt changes so the breakdown starts expanded again.
+ * Remount with a new `key` when the attempt changes. Breakdown starts collapsed so the
+ * student opens it when they want.
  */
 export function DrillLineReviewAccordion({
   row,
@@ -179,7 +180,7 @@ export function DrillLineReviewAccordion({
   passThreshold: number;
   lineLabel: string;
 }) {
-  const [isAnalysisOpen, setIsAnalysisOpen] = useState(true);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
   return (
     <LineReviewAccordionRow
@@ -202,7 +203,7 @@ export function DrillPerformanceReview({
   onPracticeAgain,
   isSubmitting,
 }: DrillPerformanceReviewProps) {
-  const [expandedListIndex, setExpandedListIndex] = useState(0);
+  const [expandedListIndex, setExpandedListIndex] = useState(-1);
   const [expandedLineKey, setExpandedLineKey] = useState<string | null>(null);
 
   const hasData = groups.length > 0;
