@@ -479,6 +479,15 @@ export default function VocabularyDrill({
         score,
         timeSpent,
         vocabularyResults: { wordScores },
+        performanceReviewSnapshot: {
+          version: 1,
+          ui: "drillPerformance",
+          avgScore: reviewAvgScore,
+          statsLine: reviewStatsLine,
+          passThreshold: PASS_THRESHOLD,
+          sectionHeading: "Item-by-Item Analysis",
+          groups: JSON.parse(JSON.stringify(reviewGroups)),
+        },
         platform: "web",
       });
 

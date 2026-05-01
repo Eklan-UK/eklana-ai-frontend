@@ -14,6 +14,8 @@ interface RoleplayPerformanceReviewProps {
   statsLine: string;
   sceneGroups: RoleplayReviewSceneGroup[];
   passThreshold: number;
+  viewMode?: "student" | "viewer";
+  onClose?: () => void;
   onDone: () => void;
   onPracticeAgain: () => void;
   isSubmitting: boolean;
@@ -24,6 +26,8 @@ export function RoleplayPerformanceReview({
   statsLine,
   sceneGroups,
   passThreshold,
+  viewMode = "student",
+  onClose,
   onDone,
   onPracticeAgain,
   isSubmitting,
@@ -35,6 +39,8 @@ export function RoleplayPerformanceReview({
       groups={sceneGroups}
       passThreshold={passThreshold}
       sectionHeading="Scene-by-Scene Analysis"
+      viewMode={viewMode}
+      onClose={onClose}
       onDone={onDone}
       onPracticeAgain={onPracticeAgain}
       isSubmitting={isSubmitting}

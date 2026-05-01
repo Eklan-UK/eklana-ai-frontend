@@ -20,6 +20,7 @@ import Link from "next/link";
 import { apiRequest } from "@/lib/api";
 import { formatDate, getDrillTypeInfo } from "@/utils/drill";
 import { useQuery } from "@tanstack/react-query";
+import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
 
 interface DrillAttempt {
   _id: string;
@@ -27,6 +28,14 @@ interface DrillAttempt {
   timeSpent: number;
   completedAt?: string;
   vocabularyResults?: {
+    wordScores: Array<{
+      word: string;
+      score: number;
+      attempts: number;
+      pronunciationScore?: number;
+    }>;
+  };
+  pronunciationResults?: {
     wordScores: Array<{
       word: string;
       score: number;
@@ -345,76 +354,23 @@ export default function DrillCompletedPage() {
 
     switch (drillType) {
       case "vocabulary":
-        if (attempt.vocabularyResults?.wordScores) {
+      case "pronunciation":
+      case "roleplay": {
+        const hasSpeakingBreakdown =
+          (drillType === "vocabulary" &&
+            !!attempt.vocabularyResults?.wordScores?.length) ||
+          (drillType === "pronunciation" &&
+            !!attempt.pronunciationResults?.wordScores?.length) ||
+          (drillType === "roleplay" && !!attempt.roleplayResults?.sceneScores?.length);
+        if (hasSpeakingBreakdown) {
           return (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Word Scores
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {attempt.vocabularyResults.wordScores.map((wordScore, idx) => (
-                  <Card key={idx} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {wordScore.word}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Attempts: {wordScore.attempts}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-[#22c55e]">
-                          {wordScore.score}%
-                        </p>
-                        {wordScore.pronunciationScore !== undefined && (
-                          <p className="text-xs text-gray-500">
-                            Pronunciation: {wordScore.pronunciationScore}%
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+              <SpeakingPracticeAttemptDetails drillType={drillType} attempt={attempt} />
             </div>
           );
         }
         break;
-
-      case "roleplay":
-        if (attempt.roleplayResults?.sceneScores) {
-          return (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Scene Scores
-              </h3>
-              <div className="space-y-3">
-                {attempt.roleplayResults.sceneScores.map((scene, idx) => (
-                  <Card key={idx} className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-semibold text-gray-900">
-                        {scene.sceneName}
-                      </p>
-                      <p className="text-lg font-bold text-[#22c55e]">
-                        {scene.score}%
-                      </p>
-                    </div>
-                    <div className="flex gap-4 text-sm text-gray-600">
-                      {scene.fluencyScore !== undefined && (
-                        <span>Fluency: {scene.fluencyScore}%</span>
-                      )}
-                      {scene.pronunciationScore !== undefined && (
-                        <span>Pronunciation: {scene.pronunciationScore}%</span>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          );
-        }
-        break;
+      }
 
       case "matching":
         if (attempt.matchingResults) {

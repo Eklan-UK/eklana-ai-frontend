@@ -878,12 +878,27 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         };
       });
 
+      const totalAttemptsForSnapshot = Object.values(turnProgress).reduce(
+        (sum, p) => sum + p.attempts,
+        0,
+      );
+      const statsLineForSnapshot = `${completedStudentTurns} lines completed · ${totalAttemptsForSnapshot} total attempts`;
+
       await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
         score: avgScore,
         timeSpent,
         roleplayResults: {
           sceneScores,
+        },
+        performanceReviewSnapshot: {
+          version: 1,
+          ui: "roleplay",
+          avgScore,
+          statsLine: statsLineForSnapshot,
+          passThreshold: PASS_THRESHOLD,
+          sectionHeading: "Scene-by-Scene Analysis",
+          groups: JSON.parse(JSON.stringify(reviewSceneGroups)),
         },
         platform: "web",
       });

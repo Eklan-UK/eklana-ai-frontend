@@ -27,6 +27,7 @@ import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { LearnerAiSessionsSection } from "@/components/admin/learner-ai-sessions";
+import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
 
 // ── Pressure Test types ────────────────────────────────────────────────────
 
@@ -814,6 +815,15 @@ export default function StudentDetailPage() {
         {/* ── Drill sections (hidden when on Pressure Test tab) ── */}
         {activeTab === "drills" && (
           <>
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">
+            Drill assignments &amp; results
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Expand a completed speaking drill to see the same word- and scene-level breakdown the student sees after submit.
+          </p>
+          <DrillSubmissionsComponent learnerId={studentId} learnerName={student.name} />
+        </div>
 
         {/* Assigned Drills (Pending/In Progress) */}
         {student.assignedDrills && student.assignedDrills.length > 0 && (

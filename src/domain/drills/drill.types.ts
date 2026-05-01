@@ -53,6 +53,7 @@ export interface CompleteDrillParams {
     summaryResults?: any;
     listeningResults?: any;
     fillBlankResults?: any;
+    performanceReviewSnapshot?: Record<string, unknown>;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';
   };

@@ -23,6 +23,7 @@ export interface CreateAttemptData {
   sentenceResults?: any;
   summaryResults?: any;
   listeningResults?: any;
+  performanceReviewSnapshot?: Record<string, unknown>;
   deviceInfo?: string;
   platform?: 'web' | 'ios' | 'android';
 }

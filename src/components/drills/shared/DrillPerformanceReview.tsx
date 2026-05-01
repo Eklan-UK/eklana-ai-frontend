@@ -29,6 +29,9 @@ export interface DrillPerformanceReviewProps {
   groups: PerformanceReviewGroup[];
   passThreshold: number;
   sectionHeading: string;
+  /** Default `student`: submit + practice again. `viewer`: single Close (admin/tutor replay). */
+  viewMode?: "student" | "viewer";
+  onClose?: () => void;
   onDone: () => void;
   onPracticeAgain: () => void;
   isSubmitting: boolean;
@@ -199,10 +202,13 @@ export function DrillPerformanceReview({
   groups,
   passThreshold,
   sectionHeading,
+  viewMode = "student",
+  onClose,
   onDone,
   onPracticeAgain,
   isSubmitting,
 }: DrillPerformanceReviewProps) {
+  const isViewer = viewMode === "viewer";
   const [expandedListIndex, setExpandedListIndex] = useState(-1);
   const [expandedLineKey, setExpandedLineKey] = useState<string | null>(null);
 
@@ -220,15 +226,19 @@ export function DrillPerformanceReview({
 
   return (
     <>
-      <div className="pb-40 max-w-md mx-auto w-full">
+      <div className={`${isViewer ? "pb-6" : "pb-40"} max-w-md mx-auto w-full`}>
         {hasData ? (
           <OverallScoreDonut score={avgScore} statsLine={statsLine} />
         ) : (
           <div className="text-center py-8 px-4">
-            <p className="text-sm text-gray-600 mb-2">No pronunciation breakdown yet</p>
-            <p className="text-xs text-gray-500">
-              Complete your spoken lines with a successful analysis to see scores here.
+            <p className="text-sm text-gray-600 mb-2">
+              {isViewer ? "No performance data in this snapshot." : "No pronunciation breakdown yet"}
             </p>
+            {!isViewer ? (
+              <p className="text-xs text-gray-500">
+                Complete your spoken lines with a successful analysis to see scores here.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -291,37 +301,54 @@ export function DrillPerformanceReview({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-        <div className="max-w-md mx-auto w-full px-4 space-y-2.5">
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            className="!rounded-full"
-            onClick={onDone}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>Done for today</>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            fullWidth
-            disabled={isSubmitting}
-            onClick={onPracticeAgain}
-            className="!rounded-full border-[#3B883E] text-[#3B883E] hover:bg-emerald-50/80"
-          >
-            Practice again
-          </Button>
+      {isViewer ? (
+        <div className="border-t border-gray-200 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-md mx-auto w-full">
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="!rounded-full"
+              type="button"
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+          <div className="max-w-md mx-auto w-full px-4 space-y-2.5">
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="!rounded-full"
+              onClick={onDone}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>Done for today</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              disabled={isSubmitting}
+              onClick={onPracticeAgain}
+              className="!rounded-full border-[#3B883E] text-[#3B883E] hover:bg-emerald-50/80"
+            >
+              Practice again
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
