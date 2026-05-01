@@ -174,6 +174,9 @@ export interface IDrillAttempt extends Document {
 		score?: number;
 	};
 
+	/** Frozen copy of in-drill Review Performance (Speechace groups) for admin/tutor replay */
+	performanceReviewSnapshot?: Record<string, unknown>;
+
 	// Metadata
 	deviceInfo?: string;
 	platform?: 'web' | 'ios' | 'android';
@@ -427,6 +430,10 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			totalBlanks: Number,
 			correctBlanks: Number,
 			score: Number,
+		},
+		performanceReviewSnapshot: {
+			type: Schema.Types.Mixed,
+			default: undefined,
 		},
 		deviceInfo: {
 			type: String,

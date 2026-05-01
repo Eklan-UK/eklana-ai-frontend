@@ -157,6 +157,18 @@ const completeSchema = z.object({
 	}).optional(),
 	deviceInfo: z.string().optional(),
 	platform: z.enum(['web', 'ios', 'android']).optional(),
+	performanceReviewSnapshot: z
+		.object({
+			version: z.literal(1),
+			ui: z.enum(['drillPerformance', 'roleplay']),
+			avgScore: z.number(),
+			statsLine: z.string(),
+			passThreshold: z.number(),
+			sectionHeading: z.string(),
+			groups: z.array(z.any()),
+		})
+		.passthrough()
+		.optional(),
 });
 
 async function handler(
@@ -200,6 +212,7 @@ async function handler(
 			summaryResults: validated.summaryResults,
 			listeningResults: validated.listeningResults,
 			fillBlankResults: validated.fillBlankResults,
+			performanceReviewSnapshot: validated.performanceReviewSnapshot,
 			deviceInfo: validated.deviceInfo,
 			platform: validated.platform,
 		},
