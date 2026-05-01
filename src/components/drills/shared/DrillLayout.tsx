@@ -16,6 +16,10 @@ interface DrillLayoutProps {
   minimalHeader?: boolean;
   /** Show back button in header */
   showBack?: boolean;
+  /** Header progress: “current of total” + thin bar (e.g. matching pairs locked). */
+  progress?: { current: number; total: number };
+  /** Optional control on the right side of the header (e.g. bookmark). */
+  headerRight?: ReactNode;
 }
 
 const maxWidthClasses = {
@@ -43,6 +47,8 @@ export function DrillLayout({
   hideNavigation = true, // Default to hiding nav during drills
   minimalHeader = false,
   showBack = true, // Default to showing back button
+  progress,
+  headerRight,
 }: DrillLayoutProps) {
   return (
     <div
@@ -51,7 +57,12 @@ export function DrillLayout({
       }`}
     >
       <div className="h-6"></div>
-      <Header title={title} showBack={showBack} />
+      <Header
+        title={title}
+        showBack={showBack}
+        progress={progress}
+        rightAction={headerRight}
+      />
       <div className={`max-w-md md:max-w-2xl mx-auto flex flex-1 flex-col px-4 md:px-8 py-6 ${className}`}>
         {children}
       </div>
