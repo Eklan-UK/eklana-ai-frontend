@@ -88,8 +88,7 @@ export function LearnerNextSessionCard({
         </>
       ) : (
         <p className="text-sm text-white/90 mb-5">
-          No upcoming session scheduled. When your school adds one, it will
-          appear here.
+          No upcoming session scheduled. When your tutor adds one, it will appear here.
         </p>
       )}
 
