@@ -44,7 +44,9 @@ async function handler(
 		const attempts = assignmentIds.length > 0 ? await DrillAttempt.find({
 			drillAssignmentId: { $in: assignmentIds },
 		})
-			.select('drillAssignmentId score completedAt startedAt timeSpent requiresReview')
+			.select(
+				'drillAssignmentId score completedAt startedAt timeSpent requiresReview vocabularyResults pronunciationResults roleplayResults performanceReviewSnapshot'
+			)
 			.sort({ completedAt: -1 })
 			.lean()
 			.exec() : [];
@@ -77,12 +79,18 @@ async function handler(
 				completedAt: assignment.completedAt,
 				assignedBy: assignment.assignedBy,
 				attemptsCount: assignmentAttempts.length,
-				latestAttempt: latestAttempt ? {
-					score: latestAttempt.score,
-					completedAt: latestAttempt.completedAt,
-					startedAt: latestAttempt.startedAt,
-					timeSpent: latestAttempt.timeSpent,
-				} : null,
+				latestAttempt: latestAttempt
+					? {
+							score: latestAttempt.score,
+							completedAt: latestAttempt.completedAt,
+							startedAt: latestAttempt.startedAt,
+							timeSpent: latestAttempt.timeSpent,
+							vocabularyResults: latestAttempt.vocabularyResults,
+							pronunciationResults: latestAttempt.pronunciationResults,
+							roleplayResults: latestAttempt.roleplayResults,
+							performanceReviewSnapshot: latestAttempt.performanceReviewSnapshot,
+						}
+					: null,
 				bestScore: bestAttempt?.score || assignment.score || null,
 				requiresReview: assignmentAttempts.some((a: any) => a.requiresReview),
 			};

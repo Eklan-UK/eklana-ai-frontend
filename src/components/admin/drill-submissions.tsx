@@ -10,8 +10,36 @@ import {
   BarChart3,
   FileText,
   Zap,
+  X,
 } from "lucide-react";
 import { useLearnerDrillAssignments } from "@/hooks/useAdmin";
+import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
+import {
+  DrillPerformanceReview,
+  type PerformanceReviewGroup,
+} from "@/components/drills/shared/DrillPerformanceReview";
+import { RoleplayPerformanceReview } from "@/components/drills/shared/RoleplayPerformanceReview";
+
+type PerformanceReviewSnapshotV1 = {
+  version: 1;
+  ui: "drillPerformance" | "roleplay";
+  avgScore: number;
+  statsLine: string;
+  passThreshold: number;
+  sectionHeading: string;
+  groups: PerformanceReviewGroup[];
+};
+
+function parsePerformanceReviewSnapshot(raw: unknown): PerformanceReviewSnapshotV1 | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (o.version !== 1) return null;
+  if (o.ui !== "drillPerformance" && o.ui !== "roleplay") return null;
+  if (typeof o.avgScore !== "number" || typeof o.statsLine !== "string") return null;
+  if (typeof o.passThreshold !== "number" || typeof o.sectionHeading !== "string") return null;
+  if (!Array.isArray(o.groups)) return null;
+  return o as PerformanceReviewSnapshotV1;
+}
 
 interface DrillSubmissionsComponentProps {
   learnerId: string;
@@ -43,6 +71,8 @@ export function DrillSubmissionsComponent({
     "all" | "pending" | "in-progress" | "completed" | "review"
   >("all");
   const [expandedDrill, setExpandedDrill] = useState<string | null>(null);
+  const [fullReviewSnapshot, setFullReviewSnapshot] =
+    useState<PerformanceReviewSnapshotV1 | null>(null);
 
   // Memoize categorized drills to avoid recalculating on every render
   // Must be called before any conditional returns
@@ -184,6 +214,71 @@ export function DrillSubmissionsComponent({
 
   return (
     <div className="space-y-6">
+      {fullReviewSnapshot ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="performance-review-modal-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            aria-label="Close performance analysis"
+            onClick={() => setFullReviewSnapshot(null)}
+          />
+          <div
+            className="relative z-[101] flex max-h-[min(92vh,900px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl md:max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+              <h2
+                id="performance-review-modal-title"
+                className="text-base font-bold text-gray-900"
+              >
+                Review performance
+              </h2>
+              <button
+                type="button"
+                onClick={() => setFullReviewSnapshot(null)}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {fullReviewSnapshot.ui === "roleplay" ? (
+                <RoleplayPerformanceReview
+                  avgScore={fullReviewSnapshot.avgScore}
+                  statsLine={fullReviewSnapshot.statsLine}
+                  sceneGroups={fullReviewSnapshot.groups}
+                  passThreshold={fullReviewSnapshot.passThreshold}
+                  viewMode="viewer"
+                  onClose={() => setFullReviewSnapshot(null)}
+                  onDone={() => setFullReviewSnapshot(null)}
+                  onPracticeAgain={() => {}}
+                  isSubmitting={false}
+                />
+              ) : (
+                <DrillPerformanceReview
+                  avgScore={fullReviewSnapshot.avgScore}
+                  statsLine={fullReviewSnapshot.statsLine}
+                  groups={fullReviewSnapshot.groups}
+                  passThreshold={fullReviewSnapshot.passThreshold}
+                  sectionHeading={fullReviewSnapshot.sectionHeading}
+                  viewMode="viewer"
+                  onClose={() => setFullReviewSnapshot(null)}
+                  onDone={() => setFullReviewSnapshot(null)}
+                  onPracticeAgain={() => {}}
+                  isSubmitting={false}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
@@ -474,20 +569,61 @@ export function DrillSubmissionsComponent({
                       </div>
                     )}
 
-                    {/* Type-specific info */}
-                    {drill.latestAttempt?.vocabularyResults && (
-                      <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                        <p className="text-xs font-semibold text-blue-700 mb-2">
-                          Vocabulary Results
-                        </p>
-                        <p className="text-xs text-blue-600">
-                          {drill.latestAttempt.vocabularyResults.wordScores
-                            ?.length || 0}{" "}
-                          words practiced
-                        </p>
-                      </div>
-                    )}
+                    {(() => {
+                      const snap = parsePerformanceReviewSnapshot(
+                        drill.latestAttempt?.performanceReviewSnapshot,
+                      );
+                      const dt = drill.drill?.type || drill.type || "";
+                      const isSpeaking =
+                        dt === "vocabulary" || dt === "pronunciation" || dt === "roleplay";
+                      if (!isSpeaking || !drill.latestAttempt) return null;
+                      if (!snap) {
+                        return (
+                          <p className="text-xs text-gray-500">
+                            Full line-by-line analysis is not available for this older submission
+                            (only newer attempts store the review snapshot).
+                          </p>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFullReviewSnapshot(snap);
+                          }}
+                          className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-left text-sm font-semibold text-emerald-900 transition-colors hover:bg-emerald-100"
+                        >
+                          View full performance analysis
+                        </button>
+                      );
+                    })()}
 
+                    {/* Speaking drills: same per-word / per-scene breakdown as student sees */}
+                    {(() => {
+                      const dt = drill.drill?.type || drill.type || "";
+                      const att = drill.latestAttempt;
+                      const hasSpeakingBreakdown =
+                        att &&
+                        ((dt === "vocabulary" && att.vocabularyResults?.wordScores?.length) ||
+                          (dt === "pronunciation" && att.pronunciationResults?.wordScores?.length) ||
+                          (dt === "roleplay" && att.roleplayResults?.sceneScores?.length));
+                      if (!hasSpeakingBreakdown) return null;
+                      return (
+                        <div className="rounded-lg border border-gray-200 bg-white p-3">
+                          <p className="text-xs font-semibold text-gray-700 mb-2">
+                            Performance breakdown
+                          </p>
+                          <SpeakingPracticeAttemptDetails
+                            drillType={dt}
+                            attempt={att}
+                            variant="compact"
+                          />
+                        </div>
+                      );
+                    })()}
+
+                    {/* Type-specific info (non-speaking) */}
                     {drill.latestAttempt?.grammarResults && (
                       <div className="bg-green-50 rounded-lg p-3 border border-green-100">
                         <p className="text-xs font-semibold text-green-700 mb-2">

@@ -153,6 +153,7 @@ export const drillAPI = {
     sentenceResults?: any;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';
+    performanceReviewSnapshot?: Record<string, unknown>;
   }) => {
     return apiRequest<{
       code: string;
