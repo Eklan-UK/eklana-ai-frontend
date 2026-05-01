@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { LetterLevelFeedback } from "@/components/ui/LetterLevelFeedback";
-import { CheckCircle, Mic, Loader2, Lock } from "lucide-react";
+import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
 import type { TextScore } from "@/services/speechace.service";
@@ -16,7 +15,11 @@ import {
   DrillCompletionScreen,
   DrillLayout,
   DrillProgress,
-  WordAnalytics,
+  DrillPerformanceReview,
+  DrillLineReviewAccordion,
+  RecordingPreviewBar,
+  type PerformanceReviewAnalyticsRow,
+  type PerformanceReviewGroup,
 } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
@@ -35,66 +38,8 @@ interface WordProgress {
 }
 
 const MAX_RECORDING_SECONDS = 120;
+const PASS_THRESHOLD = 65;
 
-// Recording Button Component
-function RecordButton({
-  isRecording,
-  isAnalyzing,
-  disabled,
-  onStart,
-  onStop,
-  recordingSeconds = 0,
-}: {
-  isRecording: boolean;
-  isAnalyzing: boolean;
-  disabled: boolean;
-  onStart: () => void;
-  onStop: () => void;
-  recordingSeconds?: number;
-}) {
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-24 h-24">
-        {isRecording && (
-          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
-            <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
-            <circle
-              cx="48" cy="48" r="44" fill="none" stroke="#ef4444" strokeWidth="4"
-              strokeDasharray={2 * Math.PI * 44}
-              strokeDashoffset={2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)}
-              strokeLinecap="round"
-              className="transition-[stroke-dashoffset] duration-1000 linear"
-            />
-          </svg>
-        )}
-        <button
-          onClick={isRecording ? onStop : onStart}
-          disabled={isAnalyzing || disabled}
-          className={`absolute inset-0 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-            isRecording
-              ? "bg-red-500 hover:bg-red-600"
-              : isAnalyzing
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600"
-          }`}
-        >
-          {isAnalyzing ? (
-            <Loader2 className="w-10 h-10 text-white animate-spin" />
-          ) : (
-            <Mic className="w-12 h-12 text-white" />
-          )}
-        </button>
-      </div>
-      {isRecording && (
-        <div className="mt-3 bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold inline-block">
-          {MAX_RECORDING_SECONDS - recordingSeconds}s remaining · Tap to stop
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Screen Indicator Component
 function ScreenIndicator({
   currentScreen,
   isWordPassed,
@@ -111,8 +56,8 @@ function ScreenIndicator({
           currentScreen === "word"
             ? "bg-blue-100 border-2 border-blue-500"
             : isWordPassed
-            ? "bg-green-50 border border-green-300"
-            : "bg-gray-100 border border-gray-300"
+              ? "bg-green-50 border border-green-300"
+              : "bg-gray-100 border border-gray-300"
         }`}
       >
         <div className="flex items-center justify-center gap-2">
@@ -124,8 +69,8 @@ function ScreenIndicator({
               currentScreen === "word"
                 ? "text-blue-700"
                 : isWordPassed
-                ? "text-green-700"
-                : "text-gray-600"
+                  ? "text-green-700"
+                  : "text-gray-600"
             }`}
           >
             Word
@@ -137,10 +82,10 @@ function ScreenIndicator({
           currentScreen === "sentence"
             ? "bg-blue-100 border-2 border-blue-500"
             : isSentencePassed
-            ? "bg-green-50 border border-green-300"
-            : !isWordPassed
-            ? "bg-gray-100 border border-gray-300 opacity-50"
-            : "bg-gray-100 border border-gray-300"
+              ? "bg-green-50 border border-green-300"
+              : !isWordPassed
+                ? "bg-gray-100 border border-gray-300 opacity-50"
+                : "bg-gray-100 border border-gray-300"
         }`}
       >
         <div className="flex items-center justify-center gap-2">
@@ -155,10 +100,10 @@ function ScreenIndicator({
               currentScreen === "sentence"
                 ? "text-blue-700"
                 : isSentencePassed
-                ? "text-green-700"
-                : !isWordPassed
-                ? "text-gray-400"
-                : "text-gray-600"
+                  ? "text-green-700"
+                  : !isWordPassed
+                    ? "text-gray-400"
+                    : "text-gray-600"
             }`}
           >
             Sentence
@@ -182,13 +127,16 @@ export default function VocabularyDrill({
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showReview, setShowReview] = useState(false);
+  const [sessionReviewAnalytics, setSessionReviewAnalytics] = useState<
+    PerformanceReviewAnalyticsRow[]
+  >([]);
 
-  // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [pronunciationScore, setPronunciationScore] =
-    useState<TextScore | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
+  const [pendingSubmitBlob, setPendingSubmitBlob] = useState<Blob | null>(null);
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -197,7 +145,10 @@ export default function VocabularyDrill({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const targetSentences = drill.target_sentences || [];
+  const targetSentences = useMemo(
+    () => drill.target_sentences || [],
+    [drill.target_sentences]
+  );
   const currentSentence = targetSentences[currentIndex];
   const currentProgress = wordProgress[currentIndex] || {
     wordPassed: false,
@@ -206,7 +157,6 @@ export default function VocabularyDrill({
     sentenceScore: null,
   };
 
-  // Initialize progress tracking
   useEffect(() => {
     const initialProgress: Record<number, WordProgress> = {};
     targetSentences.forEach((_: any, index: number) => {
@@ -218,14 +168,43 @@ export default function VocabularyDrill({
       };
     });
     setWordProgress(initialProgress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when sentence count changes
   }, [targetSentences.length]);
 
+  const revokeRecordingPreview = useCallback(() => {
+    setRecordingPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const discardPendingRecording = useCallback(() => {
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+  }, [revokeRecordingPreview]);
+
+  useEffect(() => {
+    discardPendingRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, currentScreen]);
+
+  useEffect(() => {
+    return () => {
+      revokeRecordingPreview();
+    };
+  }, [revokeRecordingPreview]);
+
   const clearRecordingTimers = () => {
-    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
-    if (autoStopTimerRef.current) { clearTimeout(autoStopTimerRef.current); autoStopTimerRef.current = null; }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
   };
 
-  // Recording functions
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -242,13 +221,16 @@ export default function VocabularyDrill({
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        setAudioBlob(audioBlob);
         stream.getTracks().forEach((track) => track.stop());
-        await analyzePronunciation(audioBlob);
+        setPendingSubmitBlob(blob);
+        setRecordingPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
       };
 
       mediaRecorder.start();
@@ -277,14 +259,21 @@ export default function VocabularyDrill({
     }
   };
 
-  // Helper function to convert blob to base64
+  const submitPendingForAnalysis = async () => {
+    if (!pendingSubmitBlob) return;
+    const blob = pendingSubmitBlob;
+    setPendingSubmitBlob(null);
+    revokeRecordingPreview();
+    await analyzePronunciation(blob);
+  };
+
   const blobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        const base64 = base64String.includes(',')
-          ? base64String.split(',')[1]
+        const base64 = base64String.includes(",")
+          ? base64String.split(",")[1]
           : base64String;
         resolve(base64);
       };
@@ -324,7 +313,29 @@ export default function VocabularyDrill({
       if (textScore) {
         setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
-        const passed = score >= 65;
+        const passed = score >= PASS_THRESHOLD;
+        const turnIdx = currentScreen === "word" ? 0 : 1;
+
+        setSessionReviewAnalytics((prev) => {
+          const existing = prev.find(
+            (r) => r.sceneIndex === currentIndex && r.turnIndex === turnIdx
+          );
+          const attempts = existing ? existing.attempts + 1 : 1;
+          const row: PerformanceReviewAnalyticsRow = {
+            sceneIndex: currentIndex,
+            turnIndex: turnIdx,
+            text: textToAnalyze,
+            score,
+            textScore,
+            attempts,
+          };
+          return [
+            ...prev.filter(
+              (r) => !(r.sceneIndex === currentIndex && r.turnIndex === turnIdx)
+            ),
+            row,
+          ];
+        });
 
         setWordProgress((prev) => {
           const current = prev[currentIndex] || {
@@ -343,16 +354,15 @@ export default function VocabularyDrill({
                 wordScore: score,
               },
             };
-          } else {
-            return {
-              ...prev,
-              [currentIndex]: {
-                ...current,
-                sentencePassed: passed,
-                sentenceScore: score,
-              },
-            };
           }
+          return {
+            ...prev,
+            [currentIndex]: {
+              ...current,
+              sentencePassed: passed,
+              sentenceScore: score,
+            },
+          };
         });
 
         if (passed) {
@@ -363,25 +373,21 @@ export default function VocabularyDrill({
           );
         } else {
           toast.warning(
-            `Score: ${score.toFixed(
-              0
-            )}%. You need at least 65% to pass. Try again!`
+            `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`
           );
         }
 
-        // Record pronunciation attempt
         try {
           const audioBase64 = await blobToBase64(audioBlob);
           await pronunciationAPI.createDrillAttempt({
             text: textToAnalyze,
             audioBase64,
             drillId: drill._id,
-            drillType: 'vocabulary',
-            passingThreshold: 65,
+            drillType: "vocabulary",
+            passingThreshold: PASS_THRESHOLD,
           });
         } catch (error) {
-          // Log but don't fail the drill if pronunciation recording fails
-          console.error('Failed to record pronunciation attempt:', error);
+          console.error("Failed to record pronunciation attempt:", error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce - missing textScore");
@@ -395,14 +401,14 @@ export default function VocabularyDrill({
 
   const handleTryAgain = () => {
     setPronunciationScore(null);
-    setAudioBlob(null);
+    discardPendingRecording();
   };
 
   const handleContinueToSentence = () => {
     if (currentProgress.wordPassed) {
+      discardPendingRecording();
       setCurrentScreen("sentence");
       setPronunciationScore(null);
-      setAudioBlob(null);
     } else {
       toast.error(
         "You must pass the word pronunciation (65%+) before proceeding to the sentence"
@@ -422,9 +428,11 @@ export default function VocabularyDrill({
       setCurrentIndex(currentIndex + 1);
       setCurrentScreen("word");
       setPronunciationScore(null);
-      setAudioBlob(null);
+      discardPendingRecording();
     } else {
-      handleSubmit();
+      discardPendingRecording();
+      setPronunciationScore(null);
+      setShowReview(true);
     }
   };
 
@@ -474,17 +482,16 @@ export default function VocabularyDrill({
         platform: "web",
       });
 
+      setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
-      // Track activity locally (no API call)
       trackActivity("drill", drill._id, "completed", {
         title: drill.title,
         type: drill.type,
         score,
-        });
+      });
 
-      // Refresh the page to update drill status
       router.refresh();
     } catch (error: any) {
       toast.error(
@@ -495,7 +502,104 @@ export default function VocabularyDrill({
     }
   };
 
-  // Completed state
+  const handlePracticeAgainFromReview = () => {
+    setShowReview(false);
+    setCurrentIndex(0);
+    setCurrentScreen("word");
+    setSessionReviewAnalytics([]);
+    setPronunciationScore(null);
+    discardPendingRecording();
+    setIsRecording(false);
+    clearRecordingTimers();
+    const initialProgress: Record<number, WordProgress> = {};
+    targetSentences.forEach((_: any, index: number) => {
+      initialProgress[index] = {
+        wordPassed: false,
+        wordScore: null,
+        sentencePassed: false,
+        sentenceScore: null,
+      };
+    });
+    setWordProgress(initialProgress);
+  };
+
+  const reviewGroups: PerformanceReviewGroup[] = useMemo(() => {
+    const map = new Map<number, PerformanceReviewAnalyticsRow[]>();
+    for (const row of sessionReviewAnalytics) {
+      const list = map.get(row.sceneIndex) ?? [];
+      list.push(row);
+      map.set(row.sceneIndex, list);
+    }
+    return [...map.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([sceneIndex, rows]) => {
+        const sentence = targetSentences[sceneIndex];
+        const preview =
+          (sentence?.word || sentence?.text || `Item ${sceneIndex + 1}`).slice(0, 48) +
+          ((sentence?.word || sentence?.text || "").length > 48 ? "…" : "");
+        return {
+          sceneIndex,
+          sceneTitle: `Item ${sceneIndex + 1}: ${preview}`,
+          rows: rows.sort((x, y) => x.turnIndex - y.turnIndex),
+        };
+      });
+  }, [sessionReviewAnalytics, targetSentences]);
+
+  const reviewAvgScore = useMemo(() => {
+    if (sessionReviewAnalytics.length > 0) {
+      return Math.round(
+        sessionReviewAnalytics.reduce((s, r) => s + r.score, 0) /
+          sessionReviewAnalytics.length
+      );
+    }
+    const scores: number[] = [];
+    for (let i = 0; i < targetSentences.length; i++) {
+      const p = wordProgress[i];
+      if (p?.wordScore != null && p?.sentenceScore != null) {
+        scores.push((p.wordScore + p.sentenceScore) / 2);
+      }
+    }
+    return scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0;
+  }, [sessionReviewAnalytics, wordProgress, targetSentences.length]);
+
+  const reviewStatsLine = useMemo(() => {
+    const passedItems = Object.values(wordProgress).filter(
+      (p) => p.wordPassed && p.sentencePassed
+    ).length;
+    const n = sessionReviewAnalytics.length;
+    return `${passedItems} of ${targetSentences.length} items passed · ${n} scored attempts`;
+  }, [wordProgress, sessionReviewAnalytics.length, targetSentences.length]);
+
+  const inDrillReviewRow: PerformanceReviewAnalyticsRow | null = useMemo(() => {
+    if (!pronunciationScore) return null;
+    const sentence = targetSentences[currentIndex];
+    if (!sentence) return null;
+    const turnIdx = currentScreen === "word" ? 0 : 1;
+    const textForRow =
+      currentScreen === "word"
+        ? sentence.word || sentence.text.split(" ")[0]
+        : sentence.text;
+    const match = sessionReviewAnalytics.find(
+      (r) => r.sceneIndex === currentIndex && r.turnIndex === turnIdx
+    );
+    return {
+      sceneIndex: currentIndex,
+      turnIndex: turnIdx,
+      text: textForRow,
+      score: pronunciationScore.speechace_score.pronunciation,
+      textScore: pronunciationScore,
+      attempts: match?.attempts ?? 1,
+    };
+  }, [
+    pronunciationScore,
+    targetSentences,
+    currentIndex,
+    currentScreen,
+    sessionReviewAnalytics,
+  ]);
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
@@ -507,7 +611,23 @@ export default function VocabularyDrill({
     );
   }
 
-  // No content state
+  if (showReview) {
+    return (
+      <DrillLayout title="Review Performance" hideNavigation>
+        <DrillPerformanceReview
+          avgScore={reviewAvgScore}
+          statsLine={reviewStatsLine}
+          groups={reviewGroups}
+          passThreshold={PASS_THRESHOLD}
+          sectionHeading="Item-by-Item Analysis"
+          onDone={() => void handleSubmit()}
+          onPracticeAgain={handlePracticeAgainFromReview}
+          isSubmitting={isSubmitting}
+        />
+      </DrillLayout>
+    );
+  }
+
   if (!currentSentence) {
     return (
       <DrillLayout title={drill.title}>
@@ -529,9 +649,31 @@ export default function VocabularyDrill({
   const canContinueToSentence = isWordPassed;
   const canProceedToNext = isWordPassed && isSentencePassed;
 
+  const awaitingSubmit =
+    !!pendingSubmitBlob &&
+    !isAnalyzing &&
+    !pronunciationScore;
+  const readyToSubmitPreview = awaitingSubmit && Boolean(recordingPreviewUrl);
+  const dockMainDisabled =
+    isAnalyzing ||
+    (currentScreen === "sentence" && !isWordPassed) ||
+    (awaitingSubmit && !recordingPreviewUrl);
+
+  const handleDockMainClick = () => {
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    if (readyToSubmitPreview) {
+      void submitPendingForAnalysis();
+      return;
+    }
+    void startRecording();
+  };
+
   return (
     <DrillLayout title={drill.title}>
-      <div className="flex flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0">
+      <div className="relative flex min-h-0 flex-1 flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)]">
         <div className="shrink-0 space-y-4">
           <DrillProgress
             current={currentIndex + 1}
@@ -545,167 +687,145 @@ export default function VocabularyDrill({
           />
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 pb-4">
+        <div
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 ${
+            awaitingSubmit ? "pb-48 sm:pb-52" : "pb-28 sm:pb-32"
+          }`}
+        >
           <Card className="mb-0">
             <div className="text-center py-6">
-              {/* Word/Sentence Display */}
               <div className="mb-6">
-            <h2 className="text-sm font-medium text-gray-700 mb-2">
-              {currentScreen === "word"
-                ? "Pronounce the Word"
-                : "Pronounce the Sentence"}
-            </h2>
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                {currentText}
-              </h1>
-              {/* <TTSButton
-                text={currentText}
-                size="lg"
-                autoPlay={autoPlayAudio && !pronunciationScore}
-                audioUrl={
-                  currentScreen === "word"
-                    ? currentSentence.wordAudioUrl
-                    : currentSentence.sentenceAudioUrl
-                }
-              /> */}
-              {currentScreen === "word" && (
-                <BookmarkButton
-                  itemId={currentWord}
-                  itemType="word"
-                  content={currentWord}
-                  translation={currentSentence.wordTranslation}
-                  context={currentSentence.text}
-                  sourceDrillId={drill._id}
-                  className="ml-2"
-                />
-              )}
-              {currentScreen === "sentence" && (
-                <BookmarkButton
-                  itemId={currentText}
-                  itemType="sentence"
-                  content={currentText}
-                  translation={currentSentence.translation}
-                  sourceDrillId={drill._id}
-                  className="ml-2"
-                />
-              )}
-            </div>
-            {currentScreen === "word" && currentSentence.wordTranslation && (
-              <p className="text-sm text-gray-500 mt-2">
-                {currentSentence.wordTranslation}
-              </p>
-            )}
-            {currentScreen === "sentence" && currentSentence.translation && (
-              <p className="text-sm text-gray-500 mt-2">
-                {currentSentence.translation}
-              </p>
-            )}
-          </div>
-
-          {/* Lock message for sentence screen */}
-          {currentScreen === "sentence" && !isWordPassed && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center justify-center gap-2 text-yellow-800">
-                <Lock className="w-4 h-4" />
-                <p className="text-sm font-medium">
-                  Complete word pronunciation first (65%+ required)
-                </p>
+                <h2 className="text-sm font-medium text-gray-700 mb-2">
+                  {currentScreen === "word"
+                    ? "Pronounce the Word"
+                    : "Pronounce the Sentence"}
+                </h2>
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                    {currentText}
+                  </h1>
+                  {currentScreen === "word" && (
+                    <BookmarkButton
+                      itemId={currentWord}
+                      itemType="word"
+                      content={currentWord}
+                      translation={currentSentence.wordTranslation}
+                      context={currentSentence.text}
+                      sourceDrillId={drill._id}
+                      className="ml-2"
+                    />
+                  )}
+                  {currentScreen === "sentence" && (
+                    <BookmarkButton
+                      itemId={currentText}
+                      itemType="sentence"
+                      content={currentText}
+                      translation={currentSentence.translation}
+                      sourceDrillId={drill._id}
+                      className="ml-2"
+                    />
+                  )}
+                </div>
+                {currentScreen === "word" && currentSentence.wordTranslation && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    {currentSentence.wordTranslation}
+                  </p>
+                )}
+                {currentScreen === "sentence" && currentSentence.translation && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    {currentSentence.translation}
+                  </p>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* Listen Section */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
-              Listen to the correct pronunciation
-            </h3>
-            <TTSButton
-              text={currentText}
-              size="lg"
-              variant="button"
-              autoPlay={false}
-              audioUrl={
-                currentScreen === "word"
-                  ? currentSentence.wordAudioUrl
-                  : currentSentence.sentenceAudioUrl
-              }
-            />
-          </div>
+              {currentScreen === "sentence" && !isWordPassed && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center justify-center gap-2 text-yellow-800">
+                    <Lock className="w-4 h-4" />
+                    <p className="text-sm font-medium">
+                      Complete word pronunciation first (65%+ required)
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          {/* Record Section */}
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">
-              Record your pronunciation
-            </h3>
-            <RecordButton
-              isRecording={isRecording}
-              isAnalyzing={isAnalyzing}
-              disabled={currentScreen === "sentence" && !isWordPassed}
-              onStart={startRecording}
-              onStop={stopRecording}
-              recordingSeconds={recordingSeconds}
-            />
-            {!isRecording && !isAnalyzing && !pronunciationScore && (
-              <p className="text-sm text-gray-500 mt-4">
-                Tap the microphone to start recording
-              </p>
-            )}
-            {isAnalyzing && (
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <p className="text-sm text-gray-600">
-                  Analyzing your pronunciation — longer recordings may take a moment...
-                </p>
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  Listen to the correct pronunciation
+                </h3>
+                <TTSButton
+                  text={currentText}
+                  size="lg"
+                  variant="button"
+                  autoPlay={false}
+                  audioUrl={
+                    currentScreen === "word"
+                      ? currentSentence.wordAudioUrl
+                      : currentSentence.sentenceAudioUrl
+                  }
+                />
               </div>
-            )}
-            {pronunciationScore && !isAnalyzing && (
-              <p className="text-sm text-green-600 mt-4 font-medium">
-                ✓ Analysis complete! Your breakdown is below.
-              </p>
-            )}
-          </div>
 
-          {/* Auto-play toggle */}
-          <label className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-4">
-            <input
-              type="checkbox"
-              checked={autoPlayAudio}
-              onChange={(e) => setAutoPlayAudio(e.target.checked)}
-              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-            />
-            <span>Auto-play pronunciation</span>
-          </label>
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-4">
+                  Record your pronunciation
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Use the microphone at the bottom — tap to record, then submit or re-record from
+                  the preview.
+                </p>
+                {isAnalyzing && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                    <p className="text-sm text-gray-600">
+                      Analyzing your pronunciation — longer recordings may take a moment...
+                    </p>
+                  </div>
+                )}
+                {pronunciationScore && !isAnalyzing && (
+                  <p className="text-sm text-green-600 mt-4 font-medium">
+                    ✓ Analysis complete! Your breakdown is below.
+                  </p>
+                )}
+              </div>
+
+              <label className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-4">
+                <input
+                  type="checkbox"
+                  checked={autoPlayAudio}
+                  onChange={(e) => setAutoPlayAudio(e.target.checked)}
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+                <span>Auto-play pronunciation</span>
+              </label>
             </div>
           </Card>
 
-          {/* Word Quality Analytics */}
-          {pronunciationScore && (
-            <>
-              <WordAnalytics pronunciationScore={pronunciationScore} />
-
-              {/* Letter-level Feedback for word screen */}
-              {currentScreen === "word" &&
-                pronunciationScore.word_score_list.length > 0 && (
-                  <LetterLevelFeedback
-                    word={currentWord}
-                    wordScore={pronunciationScore.word_score_list[0]}
-                  />
-                )}
-            </>
+          {inDrillReviewRow && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-gray-900 px-1">Your performance</h3>
+              <DrillLineReviewAccordion
+                key={`${inDrillReviewRow.sceneIndex}-${inDrillReviewRow.turnIndex}-${inDrillReviewRow.attempts}`}
+                row={inDrillReviewRow}
+                passThreshold={PASS_THRESHOLD}
+                lineLabel={currentScreen === "word" ? "Word" : "Sentence"}
+              />
+            </div>
           )}
-        </div>
 
-        {/* Sticky-style action bar: sibling of scroll region so CTAs stay in view */}
-        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/90 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 pt-1">
             {currentScreen === "word" && (
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
                 onClick={handleContinueToSentence}
-                disabled={!canContinueToSentence || isRecording || isAnalyzing}
+                disabled={
+                  !canContinueToSentence ||
+                  isRecording ||
+                  isAnalyzing ||
+                  awaitingSubmit
+                }
               >
                 {canContinueToSentence ? (
                   "Continue to Sentence"
@@ -724,7 +844,9 @@ export default function VocabularyDrill({
                 size="lg"
                 fullWidth
                 onClick={handleNext}
-                disabled={!canProceedToNext || isRecording || isAnalyzing}
+                disabled={
+                  !canProceedToNext || isRecording || isAnalyzing || awaitingSubmit
+                }
               >
                 {canProceedToNext ? (
                   currentIndex === targetSentences.length - 1 ? (
@@ -761,7 +883,7 @@ export default function VocabularyDrill({
                 onClick={() => {
                   setCurrentScreen("word");
                   setPronunciationScore(null);
-                  setAudioBlob(null);
+                  discardPendingRecording();
                 }}
                 disabled={isRecording || isAnalyzing}
               >
@@ -778,13 +900,89 @@ export default function VocabularyDrill({
                   setCurrentIndex(currentIndex - 1);
                   setCurrentScreen("word");
                   setPronunciationScore(null);
-                  setAudioBlob(null);
+                  discardPendingRecording();
                 }}
                 disabled={isRecording || isAnalyzing}
               >
                 Previous Item
               </Button>
             )}
+          </div>
+        </div>
+
+        {/* Floating recording dock (centered): no full-width sheet */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:bottom-5 md:px-8">
+          <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
+            {awaitingSubmit && recordingPreviewUrl ? (
+              <RecordingPreviewBar
+                key={recordingPreviewUrl}
+                className="w-full"
+                src={recordingPreviewUrl}
+                onDiscard={discardPendingRecording}
+                onAudioError={() => {
+                  toast.error(
+                    "Preview cannot play in this browser. You can still submit for feedback."
+                  );
+                }}
+              />
+            ) : null}
+            <div className="flex flex-col items-center gap-1">
+              <div className="relative h-[5.25rem] w-[5.25rem] shrink-0 rounded-full ring-4 ring-white/90 shadow-lg">
+                {isRecording && (
+                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96">
+                    <circle cx="48" cy="48" r="44" fill="none" stroke="#fecaca" strokeWidth="4" />
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="44"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="4"
+                      strokeDasharray={2 * Math.PI * 44}
+                      strokeDashoffset={
+                        2 * Math.PI * 44 * (1 - recordingSeconds / MAX_RECORDING_SECONDS)
+                      }
+                      strokeLinecap="round"
+                      className="transition-[stroke-dashoffset] duration-1000 linear"
+                    />
+                  </svg>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDockMainClick}
+                  disabled={dockMainDisabled}
+                  className={`absolute inset-0 flex items-center justify-center rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isRecording
+                      ? "bg-red-500 hover:bg-red-600"
+                      : isAnalyzing
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                  aria-label={
+                    isRecording
+                      ? "Stop recording"
+                      : readyToSubmitPreview
+                        ? "Submit recording for feedback"
+                        : "Start recording"
+                  }
+                >
+                  {isRecording ? (
+                    <Square className="h-7 w-7 text-white" />
+                  ) : isAnalyzing ? (
+                    <Loader2 className="h-7 w-7 animate-spin text-white" />
+                  ) : readyToSubmitPreview ? (
+                    <Send className="h-8 w-8 text-white" strokeWidth={2} />
+                  ) : (
+                    <Mic className="h-8 w-8 text-white" />
+                  )}
+                </button>
+              </div>
+              {isRecording && (
+                <p className="max-w-[16rem] text-center text-xs font-medium leading-snug text-red-600 sm:text-sm">
+                  {MAX_RECORDING_SECONDS - recordingSeconds}s left · tap to stop
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

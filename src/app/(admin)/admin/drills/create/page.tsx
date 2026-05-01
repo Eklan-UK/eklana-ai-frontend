@@ -92,6 +92,7 @@ const DrillBuilder: React.FC = () => {
   // Roleplay
   const [studentCharacterName, setStudentCharacterName] = useState("");
   const [aiCharacterNames, setAiCharacterNames] = useState<string[]>([""]);
+  const [drillIntro, setDrillIntro] = useState("");
   const [roleplayScenes, setRoleplayScenes] = useState<RoleplayScene[]>([
     {
       scene_name: "Scene 1",
@@ -263,6 +264,9 @@ const DrillBuilder: React.FC = () => {
             : drill.ai_character_name
               ? [drill.ai_character_name]
               : [""]
+        );
+        setDrillIntro(
+          typeof drill.drill_intro === "string" ? drill.drill_intro : ""
         );
         setRoleplayScenes(
           drill.roleplay_scenes && drill.roleplay_scenes.length > 0
@@ -856,6 +860,7 @@ const DrillBuilder: React.FC = () => {
         drillData.ai_character_names = aiCharacterNames.filter((name) =>
           name.trim()
         );
+        drillData.drill_intro = drillIntro.trim();
         drillData.roleplay_scenes = roleplayScenes.map((scene) => ({
           scene_name: scene.scene_name.trim(),
           context: scene.context?.trim() || undefined,
@@ -1312,6 +1317,23 @@ const DrillBuilder: React.FC = () => {
                     )}
                   </div>
                 ))}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                  Drill intro
+                </label>
+                <textarea
+                  value={drillIntro}
+                  onChange={(e) => setDrillIntro(e.target.value)}
+                  placeholder="What learners see in the chat before they tap Let's Get Started…"
+                  rows={5}
+                  maxLength={5000}
+                  className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-y min-h-[100px]"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Shown on the roleplay pre-start screen. If left empty, learners
+                  see a short default message there instead.
+                </p>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-4">

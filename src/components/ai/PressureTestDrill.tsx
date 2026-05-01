@@ -536,7 +536,7 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
     setShowReview(false);
     clearStreamingTtsRef.current();
 
-    const intro = `Hello ${firstName} 👋 The pressure test is to help you respond naturally in day-to-day conversation. Let's get started.`;
+    const intro = `Hello ${firstName} 👋 The pressure test is to help you respond clearly and naturally when under pressure as a professional nurse. Let's get started.`;
 
     // Show the intro immediately; the empty second row stays hidden until the first stream token
     // (dedicated `PressureTestAiThinkingBubble` at list end while `!isAiStreaming`).
