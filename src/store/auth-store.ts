@@ -273,7 +273,7 @@ export const useAuthStore = create<AuthState>()(
             }
           }
 
-          const applySession = (sessionResult: { data?: { user?: unknown } } | null) => {
+          const applySession = (sessionResult: Awaited<ReturnType<typeof authClient.getSession>>) => {
             if (!sessionResult?.data?.user) return;
             const prevHas = get().hasProfile;
             const merged = withMergedProfileUser(sessionResult.data, prevHas);
