@@ -1,59 +1,70 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import Image from 'next/image';
+import React, { useMemo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import Image from "next/image";
+import { useTranslations } from "next-intl";
 
-interface NavItem {
-  name: string;
+const HOME_HREF = "/home";
+
+type NavDef = {
+  nameKey: "home" | "practice" | "myPlan" | "profile";
   href: string;
   iconActive: string;
   iconInactive: string;
-}
+};
 
-const HOME_HREF = '/home';
-
-const navItems: NavItem[] = [
+const navDefs: NavDef[] = [
   {
-    name: 'Home',
+    nameKey: "home",
     href: HOME_HREF,
-    iconActive: '/icons/home-fill.svg',
-    iconInactive: '/icons/home.svg',
+    iconActive: "/icons/home-fill.svg",
+    iconInactive: "/icons/home.svg",
   },
   {
-    name: 'Practice',
-    href: '/account/practice',
-    iconActive: '/icons/practice.svg',
-    iconInactive: '/icons/practice-grey.svg',
+    nameKey: "practice",
+    href: "/account/practice",
+    iconActive: "/icons/practice.svg",
+    iconInactive: "/icons/practice-grey.svg",
   },
   {
-    name: 'My Plan',
-    href: '/account/drills',
-    iconActive: '/icons/target-arrow-green.svg',
-    iconInactive: '/icons/target-arrow.svg',
+    nameKey: "myPlan",
+    href: "/account/drills",
+    iconActive: "/icons/target-arrow-green.svg",
+    iconInactive: "/icons/target-arrow.svg",
   },
   {
-    name: 'Profile',
-    href: '/account/profile',
-    iconActive: '/icons/user-fill.svg',
-    iconInactive: '/icons/user.svg',
+    nameKey: "profile",
+    href: "/account/profile",
+    iconActive: "/icons/user-fill.svg",
+    iconInactive: "/icons/user.svg",
   },
 ];
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+
+  const navItems = useMemo(
+    () =>
+      navDefs.map((d) => ({
+        ...d,
+        name: t(d.nameKey),
+      })),
+    [t]
+  );
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="max-w-md mx-auto px-1 py-1 grid grid-cols-4 items-center gap-0">
         {navItems.map((item) => {
           const isHomeTab = item.href === HOME_HREF;
           const isActive = isHomeTab
-            ? pathname === '/home' || pathname === '/account'
+            ? pathname === "/home" || pathname === "/account"
             : pathname === item.href ||
               (item.href !== HOME_HREF && pathname?.startsWith(item.href));
 
@@ -64,28 +75,31 @@ export const BottomNav: React.FC = () => {
               prefetch={true}
               className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0"
             >
-              {/* Active pill indicator */}
               {isActive && (
-                <span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]"
-                />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]" />
               )}
 
-              {/* Icon */}
-              <div className={`w-6 h-6 flex items-center justify-center transition-all duration-200 ${isActive ? 'scale-110' : ''}`}>
+              <div
+                className={`w-6 h-6 flex items-center justify-center transition-all duration-200 ${
+                  isActive ? "scale-110" : ""
+                }`}
+              >
                 <Image
                   src={isActive ? item.iconActive : item.iconInactive}
                   alt={item.name}
                   width={24}
                   height={24}
-                  className={isActive ? '[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]' : 'opacity-50'}
+                  className={
+                    isActive
+                      ? "[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]"
+                      : "opacity-50"
+                  }
                 />
               </div>
 
-              {/* Label */}
               <span
                 className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
-                  isActive ? 'text-[#3B883E]' : 'text-muted-foreground'
+                  isActive ? "text-[#3B883E]" : "text-muted-foreground"
                 }`}
               >
                 {item.name}

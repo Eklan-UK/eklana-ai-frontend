@@ -63,6 +63,20 @@ export const profileService = {
   },
 
   /**
+   * Set avatar to a preset URL (no file upload needed)
+   */
+  async setPresetAvatar(avatarUrl: string) {
+    const response = await userAPI.setPresetAvatar(avatarUrl);
+
+    const authStore = useAuthStore.getState();
+    if (authStore.user) {
+      authStore.setUser({ ...authStore.user, avatar: avatarUrl });
+    }
+
+    return response.data;
+  },
+
+  /**
    * Delete user account
    */
   async deleteAccount() {

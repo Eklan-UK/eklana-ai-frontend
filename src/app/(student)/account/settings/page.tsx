@@ -1,23 +1,6 @@
 "use client";
 
 import { Header } from "@/components/layout/Header";
-import {
-  Globe,
-  Languages,
-  Target,
-  Bell,
-  BookOpen,
-  HelpCircle,
-  CreditCard,
-  Shield,
-  FileText,
-  ChevronRight,
-  Lock,
-  Mail,
-  CheckCircle,
-  XCircle,
-  Loader2,
-} from "lucide-react";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserInitials, getUserDisplayName } from "@/utils/user";
@@ -26,18 +9,15 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { authService } from "@/services/auth.service";
 import { useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import {
-  formatProfileLearningGoalsShort,
-} from "@/lib/learner-learning-goals";
+import { formatProfileLearningGoalsShort } from "@/lib/learner-learning-goals";
 
-// Types
 interface SettingItemProps {
   label: string;
   value?: string;
   href?: string;
   onClick?: () => void;
-  icon?: React.ReactNode;
   isDanger?: boolean;
 }
 
@@ -51,81 +31,77 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-// Constants
-const SECURITY_SETTINGS: SettingItemProps[] = [
-  {
-    label: "Change Password",
-    href: "/account/settings/password",
-    icon: <Lock className="w-5 h-5 text-text-secondary" />,
-  },
-];
+function useSecuritySettings(): SettingItemProps[] {
+  const t = useTranslations("settings");
+  return useMemo(
+    (): SettingItemProps[] => [
+      {
+        label: t("changePassword"),
+        href: "/account/settings/password",
+      },
+    ],
+    [t]
+  );
+}
 
 function usePreferenceSettings(): SettingItemProps[] {
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const { data: me, isLoading } = useUserCurrent();
   const profile = me?.profile;
 
   return useMemo((): SettingItemProps[] => {
-    const valueSuffix = isLoading && !me ? "…" : undefined;
+    const valueSuffix = isLoading && !me ? tCommon("loadingEllipsis") : undefined;
     return [
       {
-        label: "Nationality",
+        label: t("nationality"),
         value:
           valueSuffix ??
-          (profile?.nationality?.trim() || "Not set"),
+          (profile?.nationality?.trim() || tCommon("notSet")),
         href: "/account/settings/nationality",
-        icon: <Globe className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "App language",
+        label: t("appLanguage"),
         value:
-          valueSuffix ??
-          (profile?.language?.trim() || "Not set"),
+          valueSuffix ?? (profile?.language?.trim() || tCommon("notSet")),
         href: "/account/settings/language",
-        icon: <Languages className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Learning goals",
+        label: t("learningGoals"),
         value:
           valueSuffix ?? formatProfileLearningGoalsShort(profile || {}),
         href: "/account/settings/goals",
-        icon: <Target className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Notifications",
+        label: t("notifications"),
         href: "/account/settings/notifications",
-        icon: <Bell className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Lesson",
+        label: t("lesson"),
         href: "/account/settings/lesson",
-        icon: <BookOpen className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Help",
+        label: t("help"),
         href: "/account/settings/help",
-        icon: <HelpCircle className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Subscriptions",
+        label: t("subscriptions"),
         href: "/account/settings/subscriptions",
-        icon: <CreditCard className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Privacy policy",
+        label: t("privacyPolicy"),
         href: "/account/settings/privacy",
-        icon: <Shield className="w-5 h-5 text-text-secondary" />,
       },
       {
-        label: "Terms of use",
+        label: t("termsOfUse"),
         href: "/account/settings/terms",
-        icon: <FileText className="w-5 h-5 text-text-secondary" />,
       },
     ];
-  }, [isLoading, me, profile]);
+  }, [isLoading, me, profile, t, tCommon]);
 }
 
-// Components
 function UserProfileSection() {
+  const t = useTranslations("settings");
   const { user } = useAuthStore();
   const initials = getUserInitials(user);
   const displayName = getUserDisplayName(user);
@@ -153,9 +129,9 @@ function UserProfileSection() {
         </h3>
         <Link
           href="/account/profile/edit"
-          className="text-sm text-primary font-medium"
+          className="text-sm text-primary font-medium no-underline hover:no-underline"
         >
-          Edit profile
+          {t("editProfile")}
         </Link>
       </div>
     </div>
@@ -167,41 +143,46 @@ const SettingItem: React.FC<SettingItemProps> = ({
   value,
   href,
   onClick,
-  icon,
   isDanger = false,
 }) => {
   const content = (
     <div
-      className={`flex items-center justify-between py-4 border-b border-border ${isDanger ? "text-accent-red" : ""
-        }`}
+      className={`flex items-center justify-between py-4 border-b border-border ${
+        isDanger ? "text-accent-red" : ""
+      }`}
     >
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="text-base font-medium">{label}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        {value && <span className="text-sm text-muted-foreground">{value}</span>}
-        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+      <span className="text-base font-medium">{label}</span>
+      <div className="flex items-center gap-2 shrink-0">
+        {value && (
+          <span className="text-sm text-muted-foreground text-right max-w-[55%]">
+            {value}
+          </span>
+        )}
       </div>
     </div>
   );
 
   if (href) {
     return (
-      <Link href={href} className="block">
+      <Link href={href} className="block no-underline hover:no-underline">
         {content}
       </Link>
     );
   }
 
   return (
-    <button onClick={onClick} className="block w-full text-left">
+    <button
+      type="button"
+      onClick={onClick}
+      className="block w-full text-left no-underline"
+    >
       {content}
     </button>
   );
 };
 
 function EmailVerificationSection() {
+  const t = useTranslations("settings");
   const { user } = useAuthStore();
   const [isSending, setIsSending] = useState(false);
   const isEmailVerified = user?.isEmailVerified || user?.emailVerified;
@@ -210,9 +191,11 @@ function EmailVerificationSection() {
     setIsSending(true);
     try {
       await authService.sendVerificationEmail();
-      toast.success("Verification email sent! Please check your inbox.");
+      toast.success(t("verificationEmailSent"));
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to send verification email"));
+      toast.error(
+        getErrorMessage(error, t("verificationEmailFailed"))
+      );
     } finally {
       setIsSending(false);
     }
@@ -220,48 +203,33 @@ function EmailVerificationSection() {
 
   return (
     <div className="py-4 border-b border-border">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <Mail className="w-5 h-5 text-text-secondary" />
-          <div className="flex-1">
-            <span className="text-base font-medium text-foreground">
-              Email Verification
-            </span>
-            <div className="flex items-center gap-2 mt-1">
-              {isEmailVerified ? (
-                <>
-                  <CheckCircle className="w-4 h-4 text-primary" />
-                  <span className="text-sm text-primary">Verified</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 text-accent-red" />
-                  <span className="text-sm text-accent-red">Not Verified</span>
-                </>
-              )}
-            </div>
-          </div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <span className="text-base font-medium text-foreground block">
+            {t("emailVerification")}
+          </span>
+          <span
+            className={`text-sm mt-1 block ${
+              isEmailVerified ? "text-primary" : "text-accent-red"
+            }`}
+          >
+            {isEmailVerified ? t("verified") : t("notVerified")}
+          </span>
         </div>
         {!isEmailVerified && (
           <button
+            type="button"
             onClick={handleSendVerification}
             disabled={isSending}
-            className="text-sm text-primary font-medium hover:underline disabled:opacity-50 flex items-center gap-2"
+            className="text-sm text-primary font-medium shrink-0 disabled:opacity-50 no-underline hover:no-underline"
           >
-            {isSending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              "Verify"
-            )}
+            {isSending ? t("sendingEllipsis") : t("verify")}
           </button>
         )}
       </div>
       {!isEmailVerified && (
-        <p className="text-xs text-muted-foreground mt-2 ml-8">
-          Verify your email to secure your account
+        <p className="text-xs text-muted-foreground mt-2">
+          {t("verifyEmailHint")}
         </p>
       )}
     </div>
@@ -282,72 +250,67 @@ function SettingsSection({ title, items }: SettingSection) {
 }
 
 function LogoutButton() {
+  const t = useTranslations("settings");
   const { logout, isLoading } = useAuthStore();
   const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await logout();
-      toast.success("Logged out successfully");
+      toast.success(t("loggedOutSuccess"));
       router.push("/auth/login");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to logout"));
+      toast.error(getErrorMessage(error, t("logoutFailed")));
     }
   };
 
   return (
     <div className="pt-4">
       <button
+        type="button"
         onClick={handleLogout}
         disabled={isLoading}
         className="w-full text-center py-4 text-accent-red font-semibold disabled:opacity-50"
       >
-        {isLoading ? "Logging out..." : "Logout"}
+        {isLoading ? t("loggingOutEllipsis") : t("logout")}
       </button>
     </div>
   );
 }
 
 function VersionInfo() {
+  const t = useTranslations("settings");
   return (
     <div className="pt-8 pb-4 text-center">
-      <div className="flex flex-col items-center justify-center gap-2">
-        <Image
-          src="/logo2.png"
-          alt="eklan Logo"
-          width={32}
-          height={32}
-          className="rounded-lg opacity-50"
-        />
-        <span className="text-sm text-muted-foreground">eklan version 1.0</span>
-      </div>
+      <span className="text-sm text-muted-foreground">{t("version")}</span>
     </div>
   );
 }
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
   const preferenceItems = usePreferenceSettings();
+  const securityItems = useSecuritySettings();
+
   return (
     <div className="min-h-screen bg-background pb-6">
       <div className="h-6"></div>
-      <Header showBack title="Settings" />
+      <Header showBack title={t("pageTitle")} />
 
       <div className="max-w-md mx-auto px-4 md:max-w-2xl md:px-8">
         <UserProfileSection />
 
-        {/* Security Section with Email Verification */}
         <div className="py-4">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
-            Security
+            {t("security")}
           </h3>
           <EmailVerificationSection />
-          {SECURITY_SETTINGS.map((item, index) => (
+          {securityItems.map((item, index) => (
             <SettingItem key={`security-${index}`} {...item} />
           ))}
         </div>
 
-        {/* Preferences Section */}
-        <SettingsSection title="Preferences" items={preferenceItems} />
+        <SettingsSection title={t("preferences")} items={preferenceItems} />
 
         <LogoutButton />
         <VersionInfo />

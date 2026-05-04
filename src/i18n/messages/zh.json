@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "保存中…",
+    "notSet": "未设置",
+    "loadingEllipsis": "…"
+  },
+  "settings": {
+    "pageTitle": "设置",
+    "preferences": "偏好设置",
+    "security": "安全",
+    "nationality": "国籍",
+    "appLanguage": "应用语言",
+    "learningGoals": "学习目标",
+    "notifications": "通知",
+    "lesson": "课程",
+    "help": "帮助",
+    "subscriptions": "订阅",
+    "privacyPolicy": "隐私政策",
+    "termsOfUse": "使用条款",
+    "changePassword": "更改密码",
+    "editProfile": "编辑资料",
+    "emailVerification": "邮箱验证",
+    "verified": "已验证",
+    "notVerified": "未验证",
+    "verify": "验证",
+    "sendingEllipsis": "发送中…",
+    "verifyEmailHint": "验证邮箱以保护您的账户",
+    "logout": "退出登录",
+    "loggingOutEllipsis": "正在退出...",
+    "loggedOutSuccess": "已成功退出",
+    "logoutFailed": "退出失败",
+    "version": "eklan 版本 1.0",
+    "loadProfileError": "无法加载您的资料",
+    "saveFailed": "保存失败",
+    "saved": "已保存",
+    "verificationEmailSent": "验证邮件已发送，请查收收件箱。",
+    "verificationEmailFailed": "发送验证邮件失败",
+    "theme": "主题"
+  },
+  "settingsLanguage": {
+    "pageTitle": "应用语言",
+    "description": "选择应用界面的首选语言。"
+  },
+  "account": {
+    "viewSessions": "查看我的课程",
+    "yourProgress": "您的进度",
+    "savedDrills": "已保存的练习",
+    "hello": "你好，{name}！👋",
+    "goodToSeeYou": "很高兴再次见到你",
+    "guestName": "用户",
+    "assignedDrills": "分配的练习",
+    "seeAll": "查看全部",
+    "noDrillsYet": "暂无分配的练习"
+  },
+  "nav": {
+    "home": "首页",
+    "practice": "练习",
+    "myPlan": "我的计划",
+    "profile": "个人资料"
+  },
+  "nationalityLanguageModal": {
+    "lineStart": "嗨",
+    "lineMid": "👋，您选择的国籍是",
+    "lineEnd": "。是否要将应用语言切换为 {language}？",
+    "switchPrimary": "是的，切换到 {language}",
+    "keepSecondary": "保留 {currentLanguage}",
+    "closeBackdrop": "关闭"
+  },
+  "settingsTheme": {
+    "pageTitle": "主题",
+    "themeColour": "主题颜色",
+    "description": "开启深色模式或让eklan与您的设备设置视觉匹配",
+    "system": "系统",
+    "light": "浅色",
+    "dark": "深色",
+    "saveSettings": "保存设置"
+  }
+}

@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { checkAuthFlowStatus, getAuthRedirectPath } from "@/utils/auth-flow";
 import { authService } from "@/services/auth.service";
 
@@ -18,6 +18,7 @@ export default function LoginPage() {
     useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -265,14 +266,29 @@ export default function LoginPage() {
           />
 
           <Input
-            type="password"
+            type={showPassword ? "text" : "password"}
             label="Password"
             placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isSubmitting || isLoading}
             required
+            autoComplete="current-password"
             icon={<Lock className="w-5 h-5 text-gray-400" />}
+            rightIcon={
+              <button
+                type="button"
+                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" aria-hidden />
+                ) : (
+                  <Eye className="w-5 h-5" aria-hidden />
+                )}
+              </button>
+            }
           />
 
           <div className="flex items-center justify-between">

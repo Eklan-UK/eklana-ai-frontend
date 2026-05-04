@@ -1,33 +1,72 @@
 "use client";
 
-import { useState } from "react";
-import { Header } from "@/components/layout/Header";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Check, Globe } from "lucide-react";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { NATIONALITY_OPTIONS } from "@/lib/nationalities";
+import {
+  nationalityLabelToAppLanguage,
+  shouldOfferLanguageSwitchForNationality,
+} from "@/lib/nationality-language";
+import { NationalityOptionRow } from "@/components/account/NationalityOptionRow";
+import { NationalityLanguageConfirmSheet } from "@/components/account/NationalityLanguageConfirmSheet";
+import { useOnboardingStore } from "@/store/onboarding-store";
+import { useAuthStore } from "@/store/auth-store";
+import { getUserDisplayName } from "@/utils/user";
+import { useTranslations } from "next-intl";
 
 export default function OnboardingNationalityPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState("Korean");
+  const tAccount = useTranslations("account");
+  const { user } = useAuthStore();
+  const [modalOpen, setModalOpen] = useState(false);
+  const revertRef = useRef<string | null>(null);
 
-  const nationalities = [
-    { id: "korean", label: "Korean", native: "한국인", flag: "🇰🇷" },
-    { id: "spanish", label: "Spanish", native: "Español", flag: "🇪🇸" },
-    { id: "chinese", label: "Chinese", native: "中国人", flag: "🇨🇳" },
-    { id: "german", label: "German", native: "Deutsch", flag: "🇩🇪" },
-    { id: "russian", label: "Russian", native: "Русский", flag: "🇷🇺" },
-    { id: "french", label: "French", native: "Français", flag: "🇫🇷" },
-    { id: "english", label: "English", native: "English", flag: "🇺🇸" },
-    { id: "japanese", label: "Japanese", native: "日本語", flag: "🇯🇵" },
-  ];
+  const {
+    nationality,
+    language,
+    name,
+    setNationality,
+    setLanguage,
+  } = useOnboardingStore();
+
+  const displayName =
+    name?.trim() || getUserDisplayName(user)?.trim() || tAccount("guestName");
+
+  const handlePick = (label: string) => {
+    const previous = nationality;
+    setNationality(label);
+    if (shouldOfferLanguageSwitchForNationality(label, language)) {
+      revertRef.current = previous;
+      setModalOpen(true);
+    }
+  };
+
+  const onDismiss = () => {
+    setModalOpen(false);
+    setNationality(revertRef.current);
+    revertRef.current = null;
+  };
+
+  const onSwitch = () => {
+    if (nationality) {
+      setLanguage(nationalityLabelToAppLanguage(nationality));
+    }
+    setModalOpen(false);
+    revertRef.current = null;
+  };
+
+  const onKeep = () => {
+    setModalOpen(false);
+    revertRef.current = null;
+  };
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
       <div className="h-6"></div>
 
-      {/* Progress Indicator */}
       <div className="flex items-center justify-center gap-2 py-4">
         <div className="w-8 h-2 bg-green-600 rounded-full"></div>
         <div className="w-8 h-2 bg-green-600 rounded-full"></div>
@@ -48,37 +87,30 @@ export default function OnboardingNationalityPage() {
         </div>
 
         <div className="space-y-2 mb-8 max-h-96 overflow-y-auto">
-          {nationalities.map((nationality) => (
+          {NATIONALITY_OPTIONS.map((option) => (
             <button
-              key={nationality.id}
-              onClick={() => setSelected(nationality.label)}
+              key={option.id}
+              type="button"
+              onClick={() => handlePick(option.label)}
               className="w-full text-left"
             >
               <Card
                 className={`transition-all ${
-                  selected === nationality.label
+                  nationality === option.label
                     ? "bg-green-50 ring-2 ring-green-600"
                     : "hover:shadow-md"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl">{nationality.flag}</span>
-                    <div>
-                      <p className="text-base font-semibold text-gray-900">
-                        {nationality.label}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {nationality.native}
-                      </p>
-                    </div>
-                  </div>
-                  {selected === nationality.label && (
-                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
+                <NationalityOptionRow
+                  option={option}
+                  trailing={
+                    nationality === option.label ? (
+                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    ) : undefined
+                  }
+                />
               </Card>
             </button>
           ))}
@@ -88,12 +120,23 @@ export default function OnboardingNationalityPage() {
           variant="primary"
           size="lg"
           fullWidth
+          disabled={!nationality}
           onClick={() => router.push("/account/onboarding/language")}
         >
           Done
         </Button>
       </div>
+
+      <NationalityLanguageConfirmSheet
+        open={modalOpen}
+        displayName={displayName}
+        nationalityLabel={nationality ?? ""}
+        suggestedLanguage={nationalityLabelToAppLanguage(nationality ?? "")}
+        currentLanguage={language}
+        onSwitch={onSwitch}
+        onKeep={onKeep}
+        onDismiss={onDismiss}
+      />
     </div>
   );
 }
-

@@ -1,46 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import {
-  Briefcase,
-  MessageCircle,
-  Plane,
-  FileText,
-  Check,
-  ArrowLeft,
-  ArrowRight,
-  Loader2,
-} from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOnboardingStore } from "@/store/onboarding-store";
 import { useAuthStore } from "@/store/auth-store";
 import { userAPI } from "@/lib/api";
 import { markProfileComplete } from "@/utils/auth-flow";
 import { toast } from "sonner";
+import { NATIONALITY_OPTIONS } from "@/lib/nationalities";
+import {
+  nationalityLabelToAppLanguage,
+  shouldOfferLanguageSwitchForNationality,
+} from "@/lib/nationality-language";
+import { NationalityOptionRow } from "@/components/account/NationalityOptionRow";
+import { NationalityLanguageConfirmSheet } from "@/components/account/NationalityLanguageConfirmSheet";
+import { useTranslations } from "next-intl";
+import { getUserDisplayName } from "@/utils/user";
+import { LearningGoalCards } from "@/components/onboarding/LearningGoalCards";
 
 const TOTAL_STEPS = 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const tAccount = useTranslations("account");
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nationalityModalOpen, setNationalityModalOpen] = useState(false);
+  const nationalityRevertRef = useRef<string | null>(null);
   const { user } = useAuthStore();
 
   const {
     name,
     learningGoals,
     nationality,
+    language,
     setName,
     setUserType,
     setLearningGoals,
     setNationality,
+    setLanguage,
     getFormattedData,
     reset,
   } = useOnboardingStore();
+
+  const displayName =
+    name?.trim() || getUserDisplayName(user)?.trim() || tAccount("guestName");
 
   // Initialize name from user if available and set userType to student
   useEffect(() => {
@@ -56,50 +65,47 @@ export default function OnboardingPage() {
     }
   }, [user, name, setName, setUserType]);
 
-  const goals = [
-    {
-      id: "conversations",
-      label: "Speak naturally in conversations",
-      Icon: MessageCircle,
-      description: "Improve your everyday speaking skills",
-    },
-    {
-      id: "professional",
-      label: "Sound professional at work",
-      Icon: Briefcase,
-      description: "Enhance your workplace communication",
-    },
-    {
-      id: "travel",
-      label: "Travel confidently",
-      Icon: Plane,
-      description: "Master travel-related conversations",
-    },
-    {
-      id: "interviews",
-      label: "Prepare for Interviews",
-      Icon: FileText,
-      description: "Ace your job interviews",
-    },
-  ];
+  /** Migrate persisted multi-select to single-select for learning goals. */
+  useEffect(() => {
+    const goals = useOnboardingStore.getState().learningGoals;
+    if (goals.length > 1) {
+      setLearningGoals([goals[0]]);
+    }
+  }, [setLearningGoals]);
 
-  const nationalities = [
-    { id: "korean", label: "Korean", native: "한국인", flag: "🇰🇷" },
-    { id: "spanish", label: "Spanish", native: "Español", flag: "🇪🇸" },
-    { id: "chinese", label: "Chinese", native: "中国人", flag: "🇨🇳" },
-    { id: "german", label: "German", native: "Deutsch", flag: "🇩🇪" },
-    { id: "russian", label: "Russian", native: "Русский", flag: "🇷🇺" },
-    { id: "french", label: "French", native: "Français", flag: "🇫🇷" },
-    { id: "english", label: "English", native: "English", flag: "🇺🇸" },
-    { id: "japanese", label: "Japanese", native: "日本語", flag: "🇯🇵" },
-  ];
-
-  const toggleGoal = (goalId: string) => {
-    const newGoals = learningGoals.includes(goalId)
-      ? learningGoals.filter((id) => id !== goalId)
-      : [...learningGoals, goalId];
-    setLearningGoals(newGoals);
+  const handlePickNationality = (label: string) => {
+    const previous = nationality;
+    setNationality(label);
+    if (shouldOfferLanguageSwitchForNationality(label, language)) {
+      nationalityRevertRef.current = previous;
+      setNationalityModalOpen(true);
+    }
   };
+
+  const dismissNationalityModal = () => {
+    setNationalityModalOpen(false);
+    setNationality(nationalityRevertRef.current);
+    nationalityRevertRef.current = null;
+  };
+
+  const confirmNationalityLanguageSwitch = () => {
+    if (nationality) {
+      setLanguage(nationalityLabelToAppLanguage(nationality));
+    }
+    setNationalityModalOpen(false);
+    nationalityRevertRef.current = null;
+  };
+
+  const keepNationalityLanguage = () => {
+    setNationalityModalOpen(false);
+    nationalityRevertRef.current = null;
+  };
+
+  const selectLearningGoal = (goalId: string) => {
+    setLearningGoals([goalId]);
+  };
+
+  const selectedGoalId = learningGoals[0] ?? null;
 
   const canProceed = () => {
     switch (currentStep) {
@@ -152,14 +158,19 @@ export default function OnboardingPage() {
       // Mark profile as complete in auth store (cached locally)
       markProfileComplete();
 
+      // Refresh session from the server so Better Auth user.hasProfile matches the DB
+      await useAuthStore.getState().checkSession(true);
+
       // Small delay to show success message
       setTimeout(() => {
         // Redirect to home
         router.push("/account");
       }, 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.message || "Failed to complete onboarding. Please try again."
+        error instanceof Error
+          ? error.message
+          : "Failed to complete onboarding. Please try again."
       );
     } finally {
       setIsSubmitting(false);
@@ -190,67 +201,13 @@ export default function OnboardingPage() {
       case 2:
         return (
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
               Why are you learning English?
             </h1>
-            <p className="text-base text-gray-600 mb-8">
-              Select all that apply to personalize your learning experience
-            </p>
-            <div className="space-y-3">
-              {goals.map((goal) => {
-                const Icon = goal.Icon;
-                const isSelected = learningGoals.includes(goal.id);
-
-                return (
-                  <button
-                    key={goal.id}
-                    onClick={() => toggleGoal(goal.id)}
-                    className="w-full text-left"
-                  >
-                    <Card
-                      className={`transition-all ${
-                        isSelected
-                          ? "bg-green-50 ring-2 ring-green-600"
-                          : "hover:shadow-md"
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                            isSelected ? "bg-green-100" : "bg-blue-100"
-                          }`}
-                        >
-                          <Icon
-                            className={`w-6 h-6 ${
-                              isSelected ? "text-green-600" : "text-blue-600"
-                            }`}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-base font-semibold text-gray-900 mb-1">
-                            {goal.label}
-                          </h3>
-                          <p className="text-xs text-gray-500">
-                            {goal.description}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  </button>
-                );
-              })}
-            </div>
-            {/* Selected count indicator */}
-            {learningGoals.length > 0 && (
-              <p className="text-sm text-gray-500 text-center mt-4">
-                {learningGoals.length} goal{learningGoals.length > 1 ? "s" : ""} selected
-              </p>
-            )}
+            <LearningGoalCards
+              selectedId={selectedGoalId}
+              onSelect={selectLearningGoal}
+            />
           </div>
         );
 
@@ -264,10 +221,11 @@ export default function OnboardingPage() {
               This helps us personalize your learning experience
             </p>
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {nationalities.map((nat) => (
+              {NATIONALITY_OPTIONS.map((nat) => (
                 <button
                   key={nat.id}
-                  onClick={() => setNationality(nat.label)}
+                  type="button"
+                  onClick={() => handlePickNationality(nat.label)}
                   className="w-full text-left"
                 >
                   <Card
@@ -277,22 +235,16 @@ export default function OnboardingPage() {
                         : "hover:shadow-md"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-2xl">{nat.flag}</span>
-                        <div>
-                          <p className="text-base font-semibold text-gray-900">
-                            {nat.label}
-                          </p>
-                          <p className="text-sm text-gray-500">{nat.native}</p>
-                        </div>
-                      </div>
-                      {nationality === nat.label && (
-                        <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                    </div>
+                    <NationalityOptionRow
+                      option={nat}
+                      trailing={
+                        nationality === nat.label ? (
+                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        ) : undefined
+                      }
+                    />
                   </Card>
                 </button>
               ))}
@@ -379,6 +331,17 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
+
+      <NationalityLanguageConfirmSheet
+        open={nationalityModalOpen}
+        displayName={displayName}
+        nationalityLabel={nationality ?? ""}
+        suggestedLanguage={nationalityLabelToAppLanguage(nationality ?? "")}
+        currentLanguage={language}
+        onSwitch={confirmNationalityLanguageSwitch}
+        onKeep={keepNationalityLanguage}
+        onDismiss={dismissNationalityModal}
+      />
     </div>
   );
 }
