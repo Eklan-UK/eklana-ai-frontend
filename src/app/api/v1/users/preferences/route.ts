@@ -14,6 +14,18 @@ const preferencesSchema = z.object({
 	language: z.string().optional(),
 	learningGoal: z.string().optional(),
 	learningGoals: z.array(z.string()).optional(),
+	notificationPreferences: z.object({
+		learningReminders: z.boolean(),
+		specialOffers: z.boolean(),
+		subscriptionExpires: z.boolean(),
+	}).optional(),
+	lessonPreferences: z.object({
+		eklanTalks: z.boolean().optional(),
+		chatTranslation: z.boolean().optional(),
+		englishAccent: z.string().optional(),
+		voiceTone: z.string().optional(),
+		speakingSpeed: z.string().optional(),
+	}).optional(),
 });
 
 async function handler(
@@ -57,6 +69,8 @@ async function handler(
 					language: profile.language,
 					learningGoal: profile.learningGoal,
 					learningGoals: profile.learningGoals,
+					notificationPreferences: profile.notificationPreferences,
+					lessonPreferences: profile.lessonPreferences,
 				},
 			},
 			{ status: 200 }

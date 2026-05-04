@@ -1,0 +1,91 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving…",
+    "notSet": "Not set",
+    "loadingEllipsis": "…"
+  },
+  "settings": {
+    "pageTitle": "Settings",
+    "preferences": "Preferences",
+    "security": "Security",
+    "nationality": "Nationality",
+    "appLanguage": "App language",
+    "learningGoals": "Learning goals",
+    "notifications": "Notifications",
+    "lesson": "Lesson",
+    "theme": "Theme",
+    "help": "Help",
+    "subscriptions": "Subscriptions",
+    "privacyPolicy": "Privacy policy",
+    "termsOfUse": "Terms of use",
+    "changePassword": "Change Password",
+    "editProfile": "Edit profile",
+    "emailVerification": "Email Verification",
+    "verified": "Verified",
+    "notVerified": "Not verified",
+    "verify": "Verify",
+    "sendingEllipsis": "Sending…",
+    "verifyEmailHint": "Verify your email to secure your account",
+    "logout": "Logout",
+    "loggingOutEllipsis": "Logging out...",
+    "loggedOutSuccess": "Logged out successfully",
+    "logoutFailed": "Failed to logout",
+    "version": "eklan version 1.0",
+    "loadProfileError": "Could not load your profile",
+    "saveFailed": "Failed to save",
+    "saved": "Saved",
+    "verificationEmailSent": "Verification email sent! Please check your inbox.",
+    "verificationEmailFailed": "Failed to send verification email"
+  },
+  "settingsLanguage": {
+    "pageTitle": "App Language",
+    "description": "Choose your preferred language for the app interface."
+  },
+  "settingsTheme": {
+    "pageTitle": "Theme",
+    "themeColour": "Theme colour",
+    "description": "Turn on dark mode or let eklan visually match your device settings",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "saveSettings": "Save settings"
+  },
+  "settingsGoals": {
+    "heading": "Why are you learning English?",
+    "subheading": "",
+    "continue": "Continue",
+    "saving": "Saving…",
+    "options": {
+      "conversations": "Speak naturally in conversations",
+      "professional": "Sound professional at work",
+      "travel": "Travel confidently",
+      "interviews": "Prepare for Interviews"
+    }
+  },
+  "account": {
+    "viewSessions": "View your sessions",
+    "yourProgress": "Your Progress",
+    "savedDrills": "Saved Drills",
+    "hello": "Hello, {name}! 👋",
+    "goodToSeeYou": "Good to see you again",
+    "guestName": "User",
+    "assignedDrills": "Assigned Drills",
+    "seeAll": "See All",
+    "noDrillsYet": "No drills assigned yet"
+  },
+  "nav": {
+    "home": "Home",
+    "practice": "Practice",
+    "myPlan": "My Plan",
+    "profile": "Profile"
+  },
+  "nationalityLanguageModal": {
+    "lineStart": "Hi",
+    "lineMid": "👋, I see you selected",
+    "lineEnd": "as your nationality. Would you like to switch the app language to {language}?",
+    "switchPrimary": "Yes, switch to {language}",
+    "keepSecondary": "Keep {currentLanguage}",
+    "closeBackdrop": "Close"
+  }
+}

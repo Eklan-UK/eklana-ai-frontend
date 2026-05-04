@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock, User } from "lucide-react";
+import { Loader2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { authService } from "@/services/auth.service";
 
 export default function RegisterPage() {
@@ -23,6 +23,8 @@ export default function RegisterPage() {
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -162,7 +164,7 @@ export default function RegisterPage() {
           />
 
           <Input
-            type="password"
+            type={showPassword ? "text" : "password"}
             name="password"
             label="Password *"
             placeholder="Create a password (min. 8 characters)"
@@ -171,11 +173,26 @@ export default function RegisterPage() {
             disabled={isSubmitting || isLoading}
             required
             minLength={8}
+            autoComplete="new-password"
             icon={<Lock className="w-5 h-5 text-gray-400" />}
+            rightIcon={
+              <button
+                type="button"
+                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" aria-hidden />
+                ) : (
+                  <Eye className="w-5 h-5" aria-hidden />
+                )}
+              </button>
+            }
           />
 
           <Input
-            type="password"
+            type={showConfirmPassword ? "text" : "password"}
             name="confirmPassword"
             label="Confirm Password *"
             placeholder="Confirm your password"
@@ -183,7 +200,24 @@ export default function RegisterPage() {
             onChange={handleChange}
             disabled={isSubmitting || isLoading}
             required
+            autoComplete="new-password"
             icon={<Lock className="w-5 h-5 text-gray-400" />}
+            rightIcon={
+              <button
+                type="button"
+                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label={
+                  showConfirmPassword ? "Hide confirm password" : "Show confirm password"
+                }
+                onClick={() => setShowConfirmPassword((v) => !v)}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-5 h-5" aria-hidden />
+                ) : (
+                  <Eye className="w-5 h-5" aria-hidden />
+                )}
+              </button>
+            }
           />
 
           <div className="flex items-start gap-2">

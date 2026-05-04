@@ -35,16 +35,12 @@ export async function checkAuthFlowStatus(user: any): Promise<AuthFlowStatus> {
     hasOnboarding = true;
     shouldOnboard = false;
   } else if (userRole === 'user' || !userRole) {
-    // For users, check hasProfile from user object (no API call needed!)
-    // hasProfile is now part of the user object returned from Better Auth
-    hasOnboarding = user?.hasProfile === true;
-    shouldOnboard = !hasOnboarding;
-    
-    // Update auth store cache for consistency
+    // User object from Better Auth can lag the DB (session cookie cache); the
+    // store may already reflect onboarding via markProfileComplete / check-profile.
     const authState = useAuthStore.getState();
-    if (authState.hasProfile !== hasOnboarding) {
-      authState.setHasProfile(hasOnboarding);
-    }
+    hasOnboarding =
+      user?.hasProfile === true || authState.hasProfile === true;
+    shouldOnboard = !hasOnboarding;
   } else {
     // Unknown role - assume needs onboarding
     hasOnboarding = false;
@@ -95,7 +91,11 @@ export function getCachedProfileStatus(): boolean | null {
  * Mark profile as completed (call after onboarding)
  */
 export function markProfileComplete() {
-  useAuthStore.getState().setHasProfile(true);
+  const { user, setUser, setHasProfile } = useAuthStore.getState();
+  setHasProfile(true);
+  if (user) {
+    setUser({ ...user, hasProfile: true });
+  }
 }
 
 /**

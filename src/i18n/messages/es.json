@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "notSet": "Sin definir",
+    "loadingEllipsis": "…"
+  },
+  "settings": {
+    "pageTitle": "Ajustes",
+    "preferences": "Preferencias",
+    "security": "Seguridad",
+    "nationality": "Nacionalidad",
+    "appLanguage": "Idioma de la app",
+    "learningGoals": "Objetivos de aprendizaje",
+    "notifications": "Notificaciones",
+    "lesson": "Lección",
+    "theme": "Tema",
+    "help": "Ayuda",
+    "subscriptions": "Suscripciones",
+    "privacyPolicy": "Política de privacidad",
+    "termsOfUse": "Términos de uso",
+    "changePassword": "Cambiar contraseña",
+    "editProfile": "Editar perfil",
+    "emailVerification": "Verificación de correo",
+    "verified": "Verificado",
+    "notVerified": "No verificado",
+    "verify": "Verificar",
+    "sendingEllipsis": "Enviando…",
+    "verifyEmailHint": "Verifica tu correo para proteger tu cuenta",
+    "logout": "Cerrar sesión",
+    "loggingOutEllipsis": "Cerrando sesión...",
+    "loggedOutSuccess": "Sesión cerrada correctamente",
+    "logoutFailed": "No se pudo cerrar la sesión",
+    "version": "eklan versión 1.0",
+    "loadProfileError": "No se pudo cargar tu perfil",
+    "saveFailed": "Error al guardar",
+    "saved": "Guardado",
+    "verificationEmailSent": "¡Correo de verificación enviado! Revisa tu bandeja de entrada.",
+    "verificationEmailFailed": "No se pudo enviar el correo de verificación"
+  },
+  "settingsLanguage": {
+    "pageTitle": "Idioma de la app",
+    "description": "Elige el idioma preferido para la interfaz de la aplicación."
+  },
+  "settingsTheme": {
+    "pageTitle": "Tema",
+    "themeColour": "Color del tema",
+    "description": "Activa el modo oscuro o deja que eklan coincida visualmente con los ajustes de tu dispositivo",
+    "system": "Sistema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "saveSettings": "Guardar ajustes"
+  },
+  "account": {
+    "viewSessions": "Ver tus sesiones",
+    "yourProgress": "Tu progreso",
+    "savedDrills": "Ejercicios guardados",
+    "hello": "¡Hola, {name}! 👋",
+    "goodToSeeYou": "Qué bueno verte de nuevo",
+    "guestName": "Usuario",
+    "assignedDrills": "Ejercicios asignados",
+    "seeAll": "Ver todo",
+    "noDrillsYet": "Aún no hay ejercicios asignados"
+  },
+  "nav": {
+    "home": "Inicio",
+    "practice": "Práctica",
+    "myPlan": "Mi plan",
+    "profile": "Perfil"
+  },
+  "nationalityLanguageModal": {
+    "lineStart": "Hola",
+    "lineMid": "👋, veo que elegiste",
+    "lineEnd": "como nacionalidad. ¿Quieres cambiar el idioma de la app a {language}?",
+    "switchPrimary": "Sí, cambiar a {language}",
+    "keepSecondary": "Mantener {currentLanguage}",
+    "closeBackdrop": "Cerrar"
+  }
+}

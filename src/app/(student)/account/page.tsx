@@ -1,9 +1,6 @@
 // Server Component - Home Page with ISR + streaming Suspense
 import { Suspense } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Button } from "@/components/ui/Button";
-import { ChevronRight, CalendarDays } from "lucide-react";
-import Link from "next/link";
 import { generateMetadata } from "@/utils/seo";
 import { TodaysFocusCard } from "@/components/daily-focus/TodaysFocusCard";
 import { PushNotificationPrompt } from "@/components/notifications/PushNotificationPrompt";
@@ -19,6 +16,7 @@ import {
   HomeGreetingHeader,
   AssignedDrillsSection,
 } from "./home-sections";
+import { AccountHomeContentClient } from "./account-home-content-client";
 
 // Revalidate every 30 seconds (ISR)
 export const revalidate = 30;
@@ -44,46 +42,12 @@ export default async function HomePage() {
 
         <TodaysFocusCard />
 
-        <div className="mb-4 md:mb-6">
-          <Link href="/account/classes">
-            <Button
-              variant="outline"
-              size="lg"
-              fullWidth
-              className="border-primary/30 text-primary hover:bg-primary/10"
-            >
-              <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
-              View your sessions
-            </Button>
-          </Link>
-        </div>
-
-        <div className="mb-4 md:mb-6">
-          <h3 className="text-lg md:text-xl font-bold font-nunito text-foreground mb-4">
-            Your Progress
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <HomeConfidenceCard />
-            <HomePronunciationCard />
-            <HomeAccurateSentenceCard />
-            <HomeResponseSpeedCard />
-          </div>
-
-          <Link
-            href="/account/bookmarks"
-            className="mt-3 flex items-center justify-between w-full border border-border rounded-full px-4 py-3 hover:bg-muted transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
-                <span className="text-base">📘</span>
-              </div>
-              <span className="text-sm font-semibold font-satoshi text-foreground">
-                Saved Drills
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-text-secondary transition-colors" />
-          </Link>
-        </div>
+        <AccountHomeContentClient>
+          <HomeConfidenceCard />
+          <HomePronunciationCard />
+          <HomeAccurateSentenceCard />
+          <HomeResponseSpeedCard />
+        </AccountHomeContentClient>
 
         <Suspense fallback={<AssignedDrillsSkeleton />}>
           <AssignedDrillsSection />

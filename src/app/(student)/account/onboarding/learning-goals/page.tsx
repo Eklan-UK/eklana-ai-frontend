@@ -1,147 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { MessageCircle, Briefcase, Plane, FileText, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOnboardingStore } from "@/store/onboarding-store";
+import { LearningGoalCards } from "@/components/onboarding/LearningGoalCards";
 
 export default function OnboardingLearningGoalsPage() {
   const router = useRouter();
-  const { setLearningGoals } = useOnboardingStore();
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const learningGoals = useOnboardingStore((s) => s.learningGoals);
+  const setLearningGoals = useOnboardingStore((s) => s.setLearningGoals);
 
-  const goals = [
-    {
-      id: "conversations",
-      label: "Speak naturally in conversations",
-      Icon: MessageCircle,
-      description: "Improve your everyday speaking skills",
-    },
-    {
-      id: "professional",
-      label: "Sound professional at work",
-      Icon: Briefcase,
-      description: "Enhance your workplace communication",
-    },
-    {
-      id: "travel",
-      label: "Travel confidently",
-      Icon: Plane,
-      description: "Master travel-related conversations",
-    },
-    {
-      id: "interviews",
-      label: "Prepare for Interviews",
-      Icon: FileText,
-      description: "Ace your job interviews",
-    },
-  ];
+  const migrateOnceRef = useRef(false);
+  useEffect(() => {
+    if (migrateOnceRef.current) return;
+    migrateOnceRef.current = true;
+    const g = useOnboardingStore.getState().learningGoals;
+    if (g.length > 1) setLearningGoals([g[0]]);
+  }, [setLearningGoals]);
 
-  const toggleGoal = (goalId: string) => {
-    setSelectedGoals((prev) =>
-      prev.includes(goalId)
-        ? prev.filter((id) => id !== goalId)
-        : [...prev, goalId]
-    );
-  };
+  const selectedId = learningGoals[0] ?? null;
 
-  const handleContinue = () => {
-    if (selectedGoals.length > 0) {
-      setLearningGoals(selectedGoals);
-      router.push("/account/onboarding/nationality");
-    }
+  const handleDone = () => {
+    if (!learningGoals[0]) return;
+    router.push("/account/onboarding/nationality");
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
-      <div className="h-6"></div>
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className="h-6 shrink-0" />
 
-      {/* Progress Indicator */}
-      <div className="flex items-center justify-center gap-2 py-4">
-        <div className="w-8 h-2 bg-green-600 rounded-full"></div>
-        <div className="w-8 h-2 bg-green-600 rounded-full"></div>
-        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+      <Header showBack />
+
+      <div className="flex-1 max-w-md mx-auto px-4 py-6 md:max-w-lg md:px-8 w-full pb-28">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
+          Why are you learning English?
+        </h1>
+
+        <LearningGoalCards
+          selectedId={selectedId}
+          onSelect={(id) => setLearningGoals([id])}
+        />
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Why are you learning English?
-          </h1>
-          <p className="text-base text-gray-600">
-            Select all that apply to personalize your learning experience
-          </p>
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="max-w-md mx-auto md:max-w-lg">
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            disabled={!learningGoals[0]}
+            onClick={handleDone}
+          >
+            Done
+          </Button>
         </div>
-
-        <div className="space-y-3 mb-8">
-          {goals.map((goal) => {
-            const Icon = goal.Icon;
-            const isSelected = selectedGoals.includes(goal.id);
-
-            return (
-              <button
-                key={goal.id}
-                onClick={() => toggleGoal(goal.id)}
-                className="w-full text-left"
-              >
-                <Card
-                  className={`transition-all ${
-                    isSelected
-                      ? "bg-green-50 ring-2 ring-green-600"
-                      : "hover:shadow-md"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        isSelected ? "bg-green-100" : "bg-blue-100"
-                      }`}
-                    >
-                      <Icon
-                        className={`w-6 h-6 ${
-                          isSelected ? "text-green-600" : "text-blue-600"
-                        }`}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-base font-semibold text-gray-900 mb-1">
-                        {goal.label}
-                      </h3>
-                      <p className="text-xs text-gray-500">{goal.description}</p>
-                    </div>
-                    {isSelected && (
-                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected count indicator */}
-        {selectedGoals.length > 0 && (
-          <p className="text-sm text-gray-500 text-center mb-4">
-            {selectedGoals.length} goal{selectedGoals.length > 1 ? "s" : ""} selected
-          </p>
-        )}
-
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          disabled={selectedGoals.length === 0}
-          onClick={handleContinue}
-        >
-          Continue
-        </Button>
       </div>
     </div>
   );

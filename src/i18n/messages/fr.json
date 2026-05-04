@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "notSet": "Non défini",
+    "loadingEllipsis": "…"
+  },
+  "settings": {
+    "pageTitle": "Paramètres",
+    "preferences": "Préférences",
+    "security": "Sécurité",
+    "nationality": "Nationalité",
+    "appLanguage": "Langue de l’app",
+    "learningGoals": "Objectifs d’apprentissage",
+    "notifications": "Notifications",
+    "lesson": "Cours",
+    "theme": "Thème",
+    "help": "Aide",
+    "subscriptions": "Abonnements",
+    "privacyPolicy": "Politique de confidentialité",
+    "termsOfUse": "Conditions d’utilisation",
+    "changePassword": "Changer le mot de passe",
+    "editProfile": "Modifier le profil",
+    "emailVerification": "Vérification de l’e-mail",
+    "verified": "Vérifié",
+    "notVerified": "Non vérifié",
+    "verify": "Vérifier",
+    "sendingEllipsis": "Envoi…",
+    "verifyEmailHint": "Vérifiez votre e-mail pour sécuriser votre compte",
+    "logout": "Déconnexion",
+    "loggingOutEllipsis": "Déconnexion...",
+    "loggedOutSuccess": "Déconnexion réussie",
+    "logoutFailed": "Échec de la déconnexion",
+    "version": "eklan version 1.0",
+    "loadProfileError": "Impossible de charger votre profil",
+    "saveFailed": "Échec de l’enregistrement",
+    "saved": "Enregistré",
+    "verificationEmailSent": "E-mail de vérification envoyé ! Vérifiez votre boîte de réception.",
+    "verificationEmailFailed": "Échec de l’envoi de l’e-mail de vérification"
+  },
+  "settingsLanguage": {
+    "pageTitle": "Langue de l’app",
+    "description": "Choisissez la langue de l’interface de l’application."
+  },
+  "account": {
+    "viewSessions": "Voir vos séances",
+    "yourProgress": "Votre progression",
+    "savedDrills": "Exercices enregistrés",
+    "hello": "Bonjour, {name} ! 👋",
+    "goodToSeeYou": "Ravi de vous revoir",
+    "guestName": "Utilisateur",
+    "assignedDrills": "Exercices assignés",
+    "seeAll": "Tout voir",
+    "noDrillsYet": "Aucun exercice assigné pour l’instant"
+  },
+  "nav": {
+    "home": "Accueil",
+    "practice": "Pratique",
+    "myPlan": "Mon plan",
+    "profile": "Profil"
+  },
+  "nationalityLanguageModal": {
+    "lineStart": "Bonjour",
+    "lineMid": "👋, vous avez choisi",
+    "lineEnd": "comme nationalité. Souhaitez-vous passer l’application en {language} ?",
+    "switchPrimary": "Oui, passer en {language}",
+    "keepSecondary": "Garder {currentLanguage}",
+    "closeBackdrop": "Fermer"
+  },
+  "settingsTheme": {
+    "pageTitle": "Thème",
+    "themeColour": "Couleur du thème",
+    "description": "Activez le mode sombre ou laissez eklan correspondre visuellement aux paramètres de votre appareil",
+    "system": "Système",
+    "light": "Clair",
+    "dark": "Sombre",
+    "saveSettings": "Enregistrer les paramètres"
+  }
+}

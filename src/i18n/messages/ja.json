@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "保存",
+    "saving": "保存中…",
+    "notSet": "未設定",
+    "loadingEllipsis": "…"
+  },
+  "settings": {
+    "pageTitle": "設定",
+    "preferences": "環境設定",
+    "security": "セキュリティ",
+    "nationality": "国籍",
+    "appLanguage": "アプリの言語",
+    "learningGoals": "学習目標",
+    "notifications": "通知",
+    "lesson": "レッスン",
+    "help": "ヘルプ",
+    "subscriptions": "サブスクリプション",
+    "privacyPolicy": "プライバシーポリシー",
+    "termsOfUse": "利用規約",
+    "changePassword": "パスワード変更",
+    "editProfile": "プロフィールを編集",
+    "emailVerification": "メール認証",
+    "verified": "認証済み",
+    "notVerified": "未認証",
+    "verify": "認証",
+    "sendingEllipsis": "送信中…",
+    "verifyEmailHint": "アカウントを保護するためにメールを認証してください",
+    "logout": "ログアウト",
+    "loggingOutEllipsis": "ログアウト中...",
+    "loggedOutSuccess": "ログアウトしました",
+    "logoutFailed": "ログアウトに失敗しました",
+    "version": "eklan バージョン 1.0",
+    "loadProfileError": "プロフィールを読み込めませんでした",
+    "saveFailed": "保存に失敗しました",
+    "saved": "保存しました",
+    "verificationEmailSent": "確認メールを送信しました。受信トレイをご確認ください。",
+    "verificationEmailFailed": "確認メールの送信に失敗しました",
+    "theme": "テーマ"
+  },
+  "settingsLanguage": {
+    "pageTitle": "アプリの言語",
+    "description": "アプリ画面の表示言語を選んでください。"
+  },
+  "account": {
+    "viewSessions": "セッションを見る",
+    "yourProgress": "あなたの進捗",
+    "savedDrills": "保存したドリル",
+    "hello": "こんにちは、{name}さん！👋",
+    "goodToSeeYou": "またお会いできて嬉しいです",
+    "guestName": "ユーザー",
+    "assignedDrills": "割り当てられたドリル",
+    "seeAll": "すべて見る",
+    "noDrillsYet": "まだ割り当てられたドリルはありません"
+  },
+  "nav": {
+    "home": "ホーム",
+    "practice": "練習",
+    "myPlan": "マイプラン",
+    "profile": "プロフィール"
+  },
+  "nationalityLanguageModal": {
+    "lineStart": "こんにちは",
+    "lineMid": "👋。選択された国籍は",
+    "lineEnd": "です。アプリの言語を {language} に切り替えますか？",
+    "switchPrimary": "はい、{language} に切り替える",
+    "keepSecondary": "{currentLanguage} のまま",
+    "closeBackdrop": "閉じる"
+  },
+  "settingsTheme": {
+    "pageTitle": "テーマ",
+    "themeColour": "テーマカラー",
+    "description": "ダークモードをオンにするか、eklanをデバイスの設定に合わせて表示します",
+    "system": "システム",
+    "light": "ライト",
+    "dark": "ダーク",
+    "saveSettings": "設定を保存"
+  }
+}
