@@ -42,6 +42,42 @@ const SESSION_CHECK_THROTTLE = 2 * 60 * 60 * 1000; // 2 hours
 // Profile check throttle: cache for 24 hours
 const PROFILE_CHECK_THROTTLE = 24 * 60 * 60 * 1000; // 24 hours
 
+/**
+ * Merge hasProfile from the session user with the previous store value.
+ * Better Auth session cookie cache can briefly return stale hasProfile: false
+ * right after onboarding; avoid clobbering a client-true state until the
+ * session reflects the DB.
+ */
+function mergeHasProfileFromSession(
+  user: { hasProfile?: boolean; role?: string } | null | undefined,
+  previousStoreHasProfile: boolean | null
+): boolean {
+  if (!user) return false;
+  const role = user.role === "learner" ? "user" : user.role;
+  if (role === "admin" || role === "tutor") return true;
+  if (user.hasProfile === true) return true;
+  if (previousStoreHasProfile === true) return true;
+  return false;
+}
+
+function withMergedProfileUser<T extends { user?: unknown }>(
+  sessionData: T,
+  previousStoreHasProfile: boolean | null
+): T & { user: Record<string, unknown> } {
+  const raw = sessionData.user as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== "object") {
+    return sessionData as T & { user: Record<string, unknown> };
+  }
+  const hasProfile = mergeHasProfileFromSession(
+    raw as { hasProfile?: boolean; role?: string },
+    previousStoreHasProfile
+  );
+  return {
+    ...sessionData,
+    user: { ...raw, hasProfile },
+  } as T & { user: Record<string, unknown> };
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -61,12 +97,20 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setSession: (session) => {
-        const user = session?.user || null;
-        const hasProfile = user?.hasProfile === true || 
-                          (user?.role === 'admin' || user?.role === 'tutor');
-        
+        const state = get();
+        const mergedSession = session
+          ? withMergedProfileUser(session, state.hasProfile)
+          : null;
+        const user = mergedSession?.user || null;
+        const hasProfile = user
+          ? mergeHasProfileFromSession(
+              user as { hasProfile?: boolean; role?: string },
+              state.hasProfile
+            )
+          : null;
+
         set({
-          session,
+          session: mergedSession,
           user,
           isAuthenticated: !!user,
           hasProfile,
@@ -99,18 +143,17 @@ export const useAuthStore = create<AuthState>()(
           });
 
           if (result.data?.user) {
-            const user = result.data.user as any;
-            // Determine hasProfile from user object or role
-            const hasProfile = user.hasProfile === true || 
-                              (user.role === 'admin' || user.role === 'tutor');
-            
+            const merged = withMergedProfileUser(result.data, get().hasProfile);
+            const user = merged.user as any;
+            const hasProfile = mergeHasProfileFromSession(user, get().hasProfile);
+
             set({
               user,
-              session: result.data,
+              session: merged,
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
-              hasProfile, // Set from user object
+              hasProfile,
               profileCheckedAt: Date.now(),
             });
             return;
@@ -161,17 +204,15 @@ export const useAuthStore = create<AuthState>()(
             }
 
             const user = { ...result.data.user, role: data.role || 'user' } as any;
-            // New users don't have profile yet (unless admin/tutor)
-            const hasProfile = user.hasProfile === true || 
-                              (user.role === 'admin' || user.role === 'tutor');
-            
+            const hasProfile = mergeHasProfileFromSession(user, get().hasProfile);
+
             set({
-              user,
-              session: result.data,
+              user: { ...user, hasProfile },
+              session: { ...result.data, user: { ...user, hasProfile } },
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),
-              hasProfile, // Set from user object
+              hasProfile,
               profileCheckedAt: Date.now(),
             });
             return;
@@ -232,31 +273,39 @@ export const useAuthStore = create<AuthState>()(
             }
           }
 
+          const applySession = (sessionResult: { data?: { user?: unknown } } | null) => {
+            if (!sessionResult?.data?.user) return;
+            const prevHas = get().hasProfile;
+            const merged = withMergedProfileUser(sessionResult.data, prevHas);
+            const user = merged.user as any;
+            const hasProfile = mergeHasProfileFromSession(user, prevHas);
+            set({
+              user,
+              session: merged,
+              isAuthenticated: true,
+              lastSessionCheck: Date.now(),
+              hasProfile,
+              profileCheckedAt: Date.now(),
+            });
+          };
+
+          if (forceRefresh) {
+            try {
+              const sessionResult = await authClient.getSession();
+              applySession(sessionResult);
+            } catch (error) {
+              console.warn("Forced session check failed (keeping cached session):", error);
+            }
+            return;
+          }
+
           // Background refresh (non-blocking) - NEVER clears state on error
           authClient
             .getSession()
             .then((sessionResult) => {
-              if (sessionResult?.data?.user) {
-                const user = sessionResult.data.user as any;
-                const hasProfile = user.hasProfile === true || 
-                                  (user.role === 'admin' || user.role === 'tutor');
-                
-                // Update with fresh data silently
-                set({
-                  user,
-                  session: sessionResult.data,
-                  isAuthenticated: true,
-                  lastSessionCheck: Date.now(),
-                  hasProfile,
-                  profileCheckedAt: Date.now(),
-                });
-              }
-              // On null response - DO NOT clear session
-              // User explicitly logged in, keep them logged in until they logout
-              // This prevents logout on session expiry - user must explicitly logout
+              applySession(sessionResult);
             })
             .catch((error) => {
-              // Network error - keep cached session, don't clear anything
               console.warn("Background session check failed (keeping cached session):", error);
             });
 
@@ -270,13 +319,14 @@ export const useAuthStore = create<AuthState>()(
           const sessionResult = await authClient.getSession();
 
           if (sessionResult?.data?.user) {
-            const user = sessionResult.data.user as any;
-            const hasProfile = user.hasProfile === true || 
-                              (user.role === 'admin' || user.role === 'tutor');
-            
+            const prevHas = get().hasProfile;
+            const merged = withMergedProfileUser(sessionResult.data, prevHas);
+            const user = merged.user as any;
+            const hasProfile = mergeHasProfileFromSession(user, prevHas);
+
             set({
               user,
-              session: sessionResult.data,
+              session: merged,
               isAuthenticated: true,
               isLoading: false,
               lastSessionCheck: Date.now(),

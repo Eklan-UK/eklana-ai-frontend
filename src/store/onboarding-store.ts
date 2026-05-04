@@ -21,7 +21,7 @@ interface OnboardingState {
   setName: (name: string) => void;
   setUserType: (type: string) => void;
   setLearningGoals: (goals: string[]) => void;
-  setNationality: (nationality: string) => void;
+  setNationality: (nationality: string | null) => void;
   setLanguage: (language: string) => void;
   reset: () => void;
   
@@ -31,6 +31,9 @@ interface OnboardingState {
   // Helper: Get data formatted for API
   getFormattedData: () => {
     learningGoals: string[];
+    nationality?: string;
+    language?: string;
+    userType?: string;
     educationLevel?: string;
     learningStyle?: string;
     preferences?: {
@@ -89,6 +92,9 @@ export const useOnboardingStore = create<OnboardingState>()(
 
         return {
           learningGoals: formattedGoals,
+          nationality: state.nationality ?? undefined,
+          language: state.language,
+          userType: state.userType,
           educationLevel: "undergraduate", // All users are students
           preferences: {
             sessionDuration: 60,

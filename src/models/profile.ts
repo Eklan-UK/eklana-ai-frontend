@@ -42,6 +42,22 @@ export interface IProfile extends Document {
 		learningPace: 'slow' | 'moderate' | 'fast';
 	};
 	
+	// Notification preferences
+	notificationPreferences?: {
+		learningReminders: boolean;
+		specialOffers: boolean;
+		subscriptionExpires: boolean;
+	};
+
+	// Lesson preferences
+	lessonPreferences?: {
+		eklanTalks: boolean;
+		chatTranslation: boolean;
+		englishAccent: string;
+		voiceTone: string;
+		speakingSpeed: string;
+	};
+
 	// Status
 	status: 'active' | 'inactive' | 'on-hold' | 'graduated';
 	notes?: string; // Admin/Tutor notes about the user
@@ -135,6 +151,18 @@ const profileSchema = new Schema<IProfile>(
 		notes: {
 			type: String,
 			maxlength: 1000,
+		},
+		notificationPreferences: {
+			learningReminders: { type: Boolean, default: true },
+			specialOffers: { type: Boolean, default: true },
+			subscriptionExpires: { type: Boolean, default: true },
+		},
+		lessonPreferences: {
+			eklanTalks: { type: Boolean, default: true },
+			chatTranslation: { type: Boolean, default: false },
+			englishAccent: { type: String, default: 'british' },
+			voiceTone: { type: String, default: 'warm' },
+			speakingSpeed: { type: String, default: 'normal' },
 		},
 	},
 	{

@@ -2,7 +2,7 @@
 export const LEARNING_GOAL_ID_LABELS: Record<string, string> = {
   // Settings → goals page
   speak: "Speak confidently in meetings",
-  travel: "Travel and communicate abroad",
+  travel: "Travel confidently",
   academic: "Academic success",
   social: "Make friends and socialize",
   career: "Advance my career",
@@ -10,6 +10,12 @@ export const LEARNING_GOAL_ID_LABELS: Record<string, string> = {
   conversations: "Speak naturally in conversations",
   professional: "Sound professional at work",
   interviews: "Prepare for Interviews",
+  // Settings → goals page (Figma desktop)
+  work_korea_foreign: "Working for a foreign company in Korea",
+  working_holiday: "Working holiday / planning to travel",
+  grad_school: "Planning for graduate school",
+  love_languages: "I love learning languages",
+  future_opportunities: "Preparing for future opportunities",
 };
 
 export function formatProfileLearningGoalsShort(profile: {

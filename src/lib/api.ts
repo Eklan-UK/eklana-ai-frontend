@@ -541,6 +541,18 @@ export const userAPI = {
     language?: string;
     learningGoal?: string;
     learningGoals?: string[];
+    notificationPreferences?: {
+      learningReminders: boolean;
+      specialOffers: boolean;
+      subscriptionExpires: boolean;
+    };
+    lessonPreferences?: {
+      eklanTalks?: boolean;
+      chatTranslation?: boolean;
+      englishAccent?: string;
+      voiceTone?: string;
+      speakingSpeed?: string;
+    };
   }) => {
     return apiRequest<{
       code: string;
@@ -550,6 +562,18 @@ export const userAPI = {
         language?: string;
         learningGoal?: string;
         learningGoals?: string[];
+        notificationPreferences?: {
+          learningReminders: boolean;
+          specialOffers: boolean;
+          subscriptionExpires: boolean;
+        };
+        lessonPreferences?: {
+          eklanTalks: boolean;
+          chatTranslation: boolean;
+          englishAccent: string;
+          voiceTone: string;
+          speakingSpeed: string;
+        };
       };
     }>('/users/preferences', {
       method: 'PATCH',
@@ -557,7 +581,7 @@ export const userAPI = {
     });
   },
 
-  // Update current user
+  // Update current user profile (name, email, etc.)
   update: (data: {
     firstName?: string;
     lastName?: string;
@@ -566,22 +590,30 @@ export const userAPI = {
     phone?: string;
     dateOfBirth?: string;
   }) => {
-    return apiRequest<{ code: string; message: string; data: { user: any } }>('/users/update', {
-      method: 'PUT',
+    return apiRequest<{ code: string; message: string; data: { user: any } }>('/users/profile', {
+      method: 'PATCH',
       data,
     });
   },
 
-  // Upload avatar
+  // Upload avatar image file (multipart)
   uploadAvatar: (file: File) => {
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('avatar', file);
 
     return apiClient.post('/users/avatar', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     }).then((response) => response.data);
+  },
+
+  // Set avatar by URL (for preset avatars)
+  setPresetAvatar: (avatarUrl: string) => {
+    return apiRequest<{ code: string; message: string; data: { avatarUrl: string } }>(
+      '/users/avatar',
+      { method: 'PATCH', data: { avatarUrl } }
+    );
   },
 
   // Delete current user
@@ -609,14 +641,14 @@ export const userAPI = {
     });
   },
 
-  // Check if learner profile exists
+  // Check if learner profile exists (not cached — result changes after onboarding)
   checkProfile: () => {
     return apiRequest<{
       code: string;
       message: string;
       hasProfile: boolean;
       role?: string;
-    }>('/users/check-profile');
+    }>('/users/check-profile', { cache: false });
   },
 };
 

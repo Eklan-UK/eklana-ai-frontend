@@ -131,3 +131,55 @@ async function handler(
 
 export const POST = withAuth(handler);
 
+// PATCH /api/v1/users/avatar
+// Set avatar directly by URL (used for preset/pre-uploaded avatars)
+async function patchHandler(
+  req: NextRequest,
+  context: { userId: any; userRole: string }
+): Promise<NextResponse> {
+  try {
+    await connectToDatabase();
+
+    const body = await req.json();
+    const { avatarUrl } = body as { avatarUrl?: string };
+
+    if (!avatarUrl || typeof avatarUrl !== 'string') {
+      return NextResponse.json(
+        { code: 'ValidationError', message: 'avatarUrl is required' },
+        { status: 400 }
+      );
+    }
+
+    const user = await User.findById(context.userId);
+    if (!user) {
+      return NextResponse.json(
+        { code: 'NotFoundError', message: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    user.avatar = avatarUrl;
+    user.image = avatarUrl;
+    await user.save();
+
+    logger.info('Avatar URL set successfully', { userId: context.userId });
+
+    return NextResponse.json(
+      {
+        code: 'Success',
+        message: 'Avatar updated successfully',
+        data: { avatarUrl },
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    logger.error('Error setting avatar URL', { error: error.message });
+    return NextResponse.json(
+      { code: 'ServerError', message: error.message || 'Failed to update avatar' },
+      { status: 500 }
+    );
+  }
+}
+
+export const PATCH = withAuth(patchHandler);
+

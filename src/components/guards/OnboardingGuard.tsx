@@ -7,6 +7,7 @@ import {
   checkAuthFlowStatus,
   getCachedProfileStatus,
 } from "@/utils/auth-flow";
+import { userAPI } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
 interface OnboardingGuardProps {
@@ -80,8 +81,21 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
         return;
       }
 
-      // If cached value says no profile, redirect to onboarding immediately
+      // Cached "no profile" can be wrong (stale session after signup/onboarding).
+      // Confirm against the database before forcing onboarding again.
       if (cachedHasProfile === false) {
+        try {
+          const res = await userAPI.checkProfile();
+          if (res.hasProfile && user) {
+            useAuthStore.getState().setHasProfile(true);
+            useAuthStore.getState().setUser({ ...user, hasProfile: true });
+            setIsAllowed(true);
+            setIsChecking(false);
+            return;
+          }
+        } catch (e) {
+          console.warn("check-profile failed, falling back to cached onboarding state:", e);
+        }
         if (pathname !== "/account/onboarding") {
           router.push("/account/onboarding");
         }

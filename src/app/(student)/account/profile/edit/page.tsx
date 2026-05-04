@@ -1,109 +1,43 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
-import { Lightbulb, Upload, Loader2, X } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
-import { getUserInitials } from "@/utils/user";
+import { getUserDisplayName } from "@/utils/user";
 import { useRouter } from "next/navigation";
 import { profileService } from "@/services/profile.service";
 import { toast } from "sonner";
 import Image from "next/image";
+import { User, Mail } from "lucide-react";
 
 export default function EditProfilePage() {
-  const { user, setUser } = useAuthStore();
+  const { user } = useAuthStore();
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-
-  // UI state
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const initials = getUserInitials(user);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  // Load user data
   useEffect(() => {
     if (user) {
-      setFirstName(user.firstName || "");
-      setLastName(user.lastName || "");
+      setName(getUserDisplayName(user));
       setEmail(user.email || "");
-      setPhone(user.phone || "");
-      setDateOfBirth(
-        user.dateOfBirth
-          ? new Date(user.dateOfBirth).toISOString().split("T")[0]
-          : ""
-      );
-      if (user.avatar) {
-        setAvatarPreview(user.avatar);
-      }
     }
   }, [user]);
 
-  // Handle avatar upload
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB");
-      return;
-    }
-
-    // Show preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAvatarPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    // Upload to server
-    setIsUploadingAvatar(true);
-    try {
-      const result = await profileService.uploadAvatar(file);
-      toast.success("Avatar uploaded successfully");
-      // Update user in store
-      if (user) {
-        setUser({ ...user, avatar: result.avatarUrl });
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to upload avatar");
-      setAvatarPreview(user?.avatar || null);
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
-      await profileService.updateProfile({
-        firstName,
-        lastName,
-        email,
-        phone: phone || undefined,
-        dateOfBirth: dateOfBirth || undefined,
-      });
-
-      toast.success("Profile updated successfully");
+      const trimmed = name.trim();
+      const spaceIdx = trimmed.indexOf(" ");
+      const firstName =
+        spaceIdx >= 0 ? trimmed.slice(0, spaceIdx) : trimmed;
+      const lastName = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1) : "";
+      await profileService.updateProfile({ firstName, lastName, email });
+      toast.success("Profile updated");
       router.back();
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
@@ -112,156 +46,177 @@ export default function EditProfilePage() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      await profileService.deleteAccount();
+      toast.success("Account deleted");
+      router.push("/auth/login");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete account");
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
-      <div className="h-6"></div>
+      <div className="h-6" />
+      <Header showBack title="Edit profile" />
 
-      <Header showBack title="Edit Profile" />
-
-      <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Profile Picture */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="relative">
-              {avatarPreview ? (
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-green-500">
-                  <Image
-                    src={avatarPreview}
-                    alt="Profile"
-                    width={128}
-                    height={128}
-                    className="w-full h-full object-cover"
+      <div className="max-w-md mx-auto px-5 pt-6 pb-10">
+        {/* Avatar row */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="relative w-[74px] h-[74px] shrink-0">
+            {user?.avatar ? (
+              <Image
+                src={user.avatar}
+                alt="Profile"
+                width={74}
+                height={74}
+                className="rounded-full object-cover w-full h-full border border-[#ecffed]"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full border border-[#ecffed] bg-[#fcfcfc] flex items-center justify-center">
+                {/* empty-state image icon matching Figma frame 2 */}
+                <svg
+                  width="52"
+                  height="52"
+                  viewBox="0 0 52 52"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M6.5 40.625L17.333 29.792a3.25 3.25 0 014.594 0l3.64 3.64 6.166-6.165a3.25 3.25 0 014.594 0L45.5 40.625"
+                    stroke="#c8c8c8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
-                </div>
-              ) : (
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-pink-400 via-primary-400 to-blue-400 flex items-center justify-center text-4xl md:text-5xl font-bold text-white border-4 border-green-500">
-                  {initials}
-                </div>
-              )}
-              {isUploadingAvatar && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
-                </div>
-              )}
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleAvatarChange}
-              accept="image/*"
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploadingAvatar}
-              className="mt-4"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              {isUploadingAvatar ? "Uploading..." : "Change Photo"}
-            </Button>
-          </div>
-
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Basic Information
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                type="text"
-                label="First Name *"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-              <Input
-                type="text"
-                label="Last Name *"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <Input
-              type="email"
-              label="Email *"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-
-            <Input
-              type="tel"
-              label="Phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1234567890"
-              disabled={isLoading}
-            />
-
-            <Input
-              type="date"
-              label="Date of Birth"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-
-          <Card className="bg-yellow-50 border-yellow-200">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="w-6 h-6 text-yellow-600 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-gray-900 mb-1">
-                  Profile Tips
-                </p>
-                <p className="text-xs text-gray-600">
-                  A complete profile helps us personalize your learning
-                  experience. All fields marked with * are required.
-                </p>
+                  <rect
+                    x="6.5"
+                    y="9.75"
+                    width="39"
+                    height="32.5"
+                    rx="3.25"
+                    stroke="#c8c8c8"
+                    strokeWidth="2"
+                  />
+                  <circle
+                    cx="19.5"
+                    cy="22.75"
+                    r="3.25"
+                    stroke="#c8c8c8"
+                    strokeWidth="2"
+                  />
+                </svg>
               </div>
-            </div>
-          </Card>
+            )}
+          </div>
 
-          <div className="flex gap-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              fullWidth
-              onClick={() => router.back()}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
+          <button
+            type="button"
+            onClick={() => router.push("/account/profile/photo")}
+            className="border border-[rgba(231,234,237,0.5)] rounded-3xl px-[10px] py-[10px] text-xs text-[#606060] shrink-0"
+          >
+            Change photo
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {/* Name field */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-[#777]">Name</label>
+            <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-1">
+              <User className="w-6 h-6 text-[#aaa] shrink-0" />
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                className="flex-1 bg-transparent text-base text-[#1b1b1b] outline-none min-w-0"
+                required
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Email field */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-[#777] font-nunito">Email</label>
+            <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-1">
+              <Mail className="w-6 h-6 text-[#aaa] shrink-0" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="flex-1 bg-transparent text-base text-[#1b1b1b] outline-none min-w-0"
+                required
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Save button */}
+          <div className="pt-10">
+            <button
               type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
-              disabled={isLoading || isUploadingAvatar}
+              disabled={isLoading}
+              className="w-full bg-primary text-white py-4 rounded-[50px] text-base font-medium disabled:opacity-50 transition-opacity"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
+              {isLoading ? "Saving…" : "Save changes"}
+            </button>
           </div>
         </form>
+
+        {/* Delete my account */}
+        <div className="mt-8">
+          <div className="flex items-start justify-between py-2 border-b border-[rgba(231,234,237,0.5)]">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-sm text-[#ff0e0e]"
+            >
+              Delete my account
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Delete-account confirmation bottom sheet */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end z-50"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-t-[32px] w-full px-4 pt-5 pb-8 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-[#171717] mb-2">
+              Delete account?
+            </h2>
+            <p className="text-sm text-[#777] mb-6">
+              This action is permanent. All your data, progress and
+              subscription will be lost.
+            </p>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className="w-full py-4 bg-[#ff0e0e] text-white rounded-[50px] font-medium mb-3 disabled:opacity-50 transition-opacity"
+            >
+              {isDeletingAccount ? "Deleting…" : "Yes, delete my account"}
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="w-full py-4 border border-[rgba(231,234,237,0.5)] rounded-[50px] text-[#171717] font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
