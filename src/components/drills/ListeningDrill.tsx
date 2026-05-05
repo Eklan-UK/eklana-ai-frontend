@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MarkdownText } from "@/components/ui/MarkdownText";
@@ -18,7 +17,6 @@ interface ListeningDrillProps {
 }
 
 export default function ListeningDrill({ drill, assignmentId }: ListeningDrillProps) {
-  const router = useRouter();
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
@@ -172,9 +170,6 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         title: drill.title,
         type: drill.type,
         });
-
-      // Refresh the page to update drill status
-      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -183,7 +178,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="listening" refreshOnMount={true} />;
+    return <DrillCompletionScreen drillType="listening" />;
   }
 
   return (

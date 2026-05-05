@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
@@ -115,22 +115,12 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         type: drill.type,
         score,
         });
-
-      // Refresh the page to update drill status
-      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Refresh on mount if completed
-  useEffect(() => {
-    if (isCompleted) {
-      router.refresh();
-    }
-  }, [isCompleted, router]);
 
   if (isCompleted) {
     return (
@@ -148,7 +138,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
               fullWidth
               onClick={() => {
                 router.refresh();
-                router.push("/account");
+                router.push("/account/drills");
               }}
             >
               Continue Learning

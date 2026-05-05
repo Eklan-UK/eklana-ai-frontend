@@ -189,10 +189,6 @@ export default function GrammarDrill({
         title: drill.title,
         type: drill.type,
       });
-
-      // Do not call router.refresh() here: it races setIsCompleted and refetches the
-      // server page before React commits, remounting GrammarDrill at pattern 0.
-      // DrillCompletionScreen uses refreshOnMount to refresh after the completion UI shows.
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -210,7 +206,6 @@ export default function GrammarDrill({
         drillType="grammar"
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
-        refreshOnMount={true}
       />
     );
   }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight, Clock3 } from "lucide-react";
-import { getDrillIcon, getDrillTypeInfo, getDrillStatus } from "@/utils/drill";
+import { getDrillIcon, getDrillTypeInfo, getDrillStatus, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const TYPE_LABEL: Record<string, string> = {
   vocabulary: "Vocabulary",
@@ -51,7 +51,6 @@ export interface PlanDrillRowProps {
     title: string;
     type: string;
     date: string;
-    duration_days?: number;
   };
   assignmentId?: string;
   dueDate?: string;
@@ -60,16 +59,6 @@ export interface PlanDrillRowProps {
   onPrefetch?: (drillId: string) => void;
   /** Fires before navigation (e.g. activity tracking). */
   onNavigate?: () => void;
-}
-
-function planDurationLabel(drill: PlanDrillRowProps["drill"]): string {
-  const d = drill.duration_days;
-  if (d != null && d > 0) {
-    const low = Math.max(3, d * 3);
-    const high = Math.max(5, d * 7);
-    return `${low}–${high} minutes`;
-  }
-  return "5–7 minutes";
 }
 
 export function PlanDrillRow({
@@ -121,7 +110,7 @@ export function PlanDrillRow({
         </p>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <Clock3 className="w-3.5 h-3.5 shrink-0" />
-          {planDurationLabel(drill)}
+          {DRILL_ESTIMATED_DURATION_LABEL}
         </div>
       </div>
       <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -127,7 +126,6 @@ export default function PronunciationDrill({
   drill,
   assignmentId,
 }: PronunciationDrillProps) {
-  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -535,9 +533,6 @@ export default function PronunciationDrill({
         type: drill.type,
         score,
         });
-
-      // Refresh the page to update drill status
-      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -671,7 +666,6 @@ export default function PronunciationDrill({
         drillType="pronunciation"
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
-        refreshOnMount={true}
         extraContent={
           sessionTranscripts.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">
