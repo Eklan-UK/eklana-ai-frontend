@@ -12,12 +12,12 @@ export function HomeResponseSpeedCard() {
     return (
       <Card className="animate-pulse">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gray-200 rounded-xl" />
+          <div className="w-12 h-12 bg-muted rounded-xl" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-28 bg-gray-200 rounded" />
-            <div className="h-3 w-16 bg-gray-200 rounded" />
+            <div className="h-4 w-28 bg-muted rounded" />
+            <div className="h-3 w-16 bg-muted rounded" />
           </div>
-          <div className="w-14 h-14 rounded-full bg-gray-200" />
+          <div className="w-14 h-14 rounded-full bg-muted" />
         </div>
       </Card>
     );
@@ -37,11 +37,11 @@ export function HomeResponseSpeedCard() {
     <Card className="!p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center">
             <Zap className="w-6 h-6 text-violet-600" />
           </div>
           <div>
-            <p className="text-sm font-bold font-satoshi text-gray-900">
+            <p className="text-sm font-bold font-satoshi text-foreground">
               Response Speed
             </p>
             <div
@@ -68,9 +68,10 @@ export function HomeResponseSpeedCard() {
               cx="32"
               cy="32"
               r={radius}
-              stroke="#f3f4f6"
+              stroke="currentColor"
               strokeWidth="5"
               fill="none"
+              className="text-muted"
             />
             <circle
               cx="32"
@@ -86,7 +87,7 @@ export function HomeResponseSpeedCard() {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-extrabold font-nunito text-gray-900">
+            <span className="text-sm font-extrabold font-nunito text-foreground">
               {Math.round(validScore)}
             </span>
           </div>

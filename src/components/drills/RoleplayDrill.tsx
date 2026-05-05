@@ -790,7 +790,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   };
 
   const retrySpeakingButtonClass =
-    "w-full bg-white border-2 border-[#3B883E] text-[#3B883E] hover:bg-emerald-50/80 font-semibold text-base py-3.5 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2";
+    "w-full bg-card border-2 border-[#3B883E] text-[#3B883E] hover:bg-emerald-500/15 dark:hover:bg-emerald-500/20 font-semibold text-base py-3.5 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2";
 
   // Switch roles - student becomes AI character and vice versa
   const handleSwitchRoles = () => {
@@ -975,20 +975,20 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         refreshOnMount={true}
         extraContent={
           linesWithTranscript.length > 0 ? (
-            <Card className="border-gray-200 text-left p-4 shadow-none">
-              <p className="text-sm font-semibold text-gray-900 mb-3">
+            <Card className="border-border text-left p-4 shadow-none">
+              <p className="text-sm font-semibold text-foreground mb-3">
                 What we heard from your lines
               </p>
-              <ul className="space-y-3 text-sm text-gray-700">
+              <ul className="space-y-3 text-sm text-foreground">
                 {linesWithTranscript.map((m) => (
                   <li
                     key={m.id}
-                    className="border-b border-gray-100 last:border-0 pb-3 last:pb-0"
+                    className="border-b border-border last:border-0 pb-3 last:pb-0"
                   >
-                    <p className="text-xs text-gray-500 mb-0.5">Script line</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Script line</p>
                     <p className="mb-2">{m.text}</p>
-                    <p className="text-xs text-gray-500 mb-0.5">Transcript</p>
-                    <p className="text-gray-900">{m.transcript}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Transcript</p>
+                    <p className="text-foreground">{m.transcript}</p>
                   </li>
                 ))}
               </ul>
@@ -1075,11 +1075,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
         <div className="px-0.5 py-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Current Scene</p>
-              <p className="text-sm font-semibold text-gray-900">{currentScene.scene_name}</p>
+              <p className="text-xs text-muted-foreground mb-1">Current Scene</p>
+              <p className="text-sm font-semibold text-foreground">{currentScene.scene_name}</p>
             </div>
             {scenes.length > 1 && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 Scene {currentSceneIndex + 1} of {scenes.length}
               </div>
             )}
@@ -1090,8 +1090,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       <div className="max-h-64 overflow-y-auto py-2">
         <div className="space-y-3">
           {completedMessages.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm">
-              <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <div className="text-center py-4 text-muted-foreground text-sm">
+              <MessageCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
               <p>Conversation will appear here</p>
             </div>
           ) : (
@@ -1117,7 +1117,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <div
                     className={`max-w-[85%] rounded-2xl p-3 ${isUserMessage
                         ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
-                        : "bg-gray-100 text-gray-900"
+                        : "bg-muted text-foreground"
                       }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -1130,7 +1130,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                         {displayName}
                       </span>
                       {isUserMessage && message.score !== undefined && (
-                        <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-background/20 px-2 py-0.5 rounded-full">
                           {message.score}%
                         </span>
                       )}
@@ -1155,7 +1155,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
           {/* AI Turn - Show loading/playing state */}
           {isAITurn && (
             <div className="text-center py-8">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mb-4">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center mb-4">
                 {isTTSGenerating ? (
                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                 ) : isPlayingAI || isTTSPlaying ? (
@@ -1164,13 +1164,13 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <Bot className="w-10 h-10 text-blue-600" />
                 )}
               </div>
-              <p className="text-lg font-semibold text-gray-900 mb-2">
+              <p className="text-lg font-semibold text-foreground mb-2">
                 {getSpeakerName(currentTurn.speaker)} is speaking...
               </p>
               <div className="bg-blue-50 rounded-xl p-4 max-w-md mx-auto">
-                <p className="text-gray-900">{currentTurn.text}</p>
+                <p className="text-foreground">{currentTurn.text}</p>
                 {currentTurn.translation && (
-                  <p className="text-sm text-gray-500 mt-2 italic">{currentTurn.translation}</p>
+                  <p className="text-sm text-muted-foreground mt-2 italic">{currentTurn.translation}</p>
                 )}
               </div>
             </div>
@@ -1192,10 +1192,10 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               </div>
 
               {/* Text to Speak */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-6">
+              <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/25 rounded-xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Say this line:</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Say this line:</p>
                     <TTSButton
                       text={currentTurn.text}
                       size="sm"
@@ -1212,11 +1212,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                     />
                   </div>
                 </div>
-                <p className="text-xl font-semibold text-gray-900 text-center">
+                <p className="text-xl font-semibold text-foreground text-center">
                   "{currentTurn.text}"
                 </p>
                 {currentTurn.translation && (
-                  <p className="text-sm text-gray-500 text-center mt-2 italic">
+                  <p className="text-sm text-muted-foreground text-center mt-2 italic">
                     {currentTurn.translation}
                   </p>
                 )}
@@ -1230,7 +1230,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
 
                 {!isRecording && (
-                  <p className="text-sm text-gray-600 text-center px-2">
+                  <p className="text-sm text-muted-foreground text-center px-2">
                     {currentProgress.passed ? (
                       <span className="text-green-600 font-medium">Line passed! ✓</span>
                     ) : isAnalyzing ? (
@@ -1238,7 +1238,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                         Analyzing your pronunciation — longer recordings may take a moment...
                       </span>
                     ) : awaitingSubmit ? (
-                      <span className="text-gray-700">
+                      <span className="text-foreground">
                         Listen in the player, then tap the green send button to submit, or trash to
                         re-record.
                       </span>
@@ -1249,7 +1249,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                 )}
 
                 {currentProgress.attempts > 0 && !currentProgress.passed && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Attempt {currentProgress.attempts} • Need {PASS_THRESHOLD}%+ to pass
                   </p>
                 )}
@@ -1258,11 +1258,11 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               {/* Simple Score Display - Analytics shown on review screen */}
               {pronunciationScore && !currentProgress.passed && (
                 <div className={`rounded-xl p-4 mb-4 ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                    ? "bg-green-50/90"
+                    ? "bg-emerald-500/15"
                     : "bg-amber-50/90"
                   }`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Your Score</span>
+                    <span className="text-sm font-medium text-foreground">Your Score</span>
                     <span className={`text-2xl font-bold ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
                         ? "text-green-600"
                         : "text-amber-600"
@@ -1270,7 +1270,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                       {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
                           ? "bg-green-500"
@@ -1285,8 +1285,8 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                       You need {PASS_THRESHOLD}% or higher to continue
                     </p>
                   )}
-                  <p className="text-sm text-gray-600 mt-3">
-                    <span className="font-medium text-gray-700">Transcript: </span>
+                  <p className="text-sm text-muted-foreground mt-3">
+                    <span className="font-medium text-foreground">Transcript: </span>
                     {transcriptFromTextScore(pronunciationScore) || "—"}
                   </p>
                 </div>
@@ -1294,14 +1294,14 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
               {/* Confetti celebration shown when passed - no analytics here */}
               {currentProgress.passed && pronunciationScore && (
-                <div className="rounded-xl p-4 mb-4 bg-green-50/90 text-center">
+                <div className="rounded-xl p-4 mb-4 bg-emerald-500/15 border border-emerald-500/25 text-center">
                   <PartyPopper className="w-8 h-8 text-green-500 mx-auto mb-2" />
                   <p className="text-lg font-bold text-green-700">
                     {pronunciationScore.speechace_score.pronunciation.toFixed(0)}% - Passed!
                   </p>
                   <p className="text-sm text-green-600">Click Continue to proceed</p>
-                  <p className="text-sm text-gray-600 mt-2">
-                    <span className="font-medium text-gray-700">Transcript: </span>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    <span className="font-medium text-foreground">Transcript: </span>
                     {transcriptFromTextScore(pronunciationScore) || "—"}
                   </p>
                 </div>
@@ -1335,7 +1335,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <RotateCcw className="w-5 h-5 shrink-0" />
                   Retry speaking
                 </button>
-                <p className="text-xs text-center text-gray-500 px-2">
+                <p className="text-xs text-center text-muted-foreground px-2">
                   Redo this line if you want a higher score before moving on.
                 </p>
               </div>
@@ -1355,20 +1355,20 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
 
         {/* Conversation complete - Show Review and Role Switch options */}
         {isEntireDrillComplete && (
-          <div className="-mx-4 bg-green-50/55 px-4 py-5 text-center md:-mx-6 md:px-6">
+          <div className="-mx-4 bg-emerald-500/10 border-y border-emerald-500/20 px-4 py-5 text-center md:-mx-6 md:px-6">
               <PartyPopper className="w-12 h-12 text-green-500 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+              <h3 className="text-lg font-bold text-foreground mb-2">
                 Conversation Complete!
               </h3>
-              <p className="text-sm text-gray-600 mb-2">
+              <p className="text-sm text-muted-foreground mb-2">
                 Great job completing all your lines as <strong>{currentStudentRole}</strong>!
               </p>
 
               {/* Role mode indicator */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full text-sm mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-card rounded-full text-sm mb-4">
                 <User className="w-4 h-4 text-green-600" />
-                <span className="text-gray-600">You played:</span>
-                <span className="font-semibold text-gray-900">{currentStudentRole}</span>
+                <span className="text-muted-foreground">You played:</span>
+                <span className="font-semibold text-foreground">{currentStudentRole}</span>
               </div>
 
               <div className="space-y-3">
@@ -1401,7 +1401,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   <RotateCcw className="w-5 h-5 shrink-0" />
                   Restart drill
                 </button>
-                <p className="text-xs text-gray-500 mt-2 text-center px-2">
+                <p className="text-xs text-muted-foreground mt-2 text-center px-2">
                   Start from the first line again as {currentStudentRole} — same role, scores reset for this run.
                 </p>
               </div>
@@ -1412,7 +1412,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       ) : (
         <div className="flex flex-1 w-full flex-col items-stretch justify-start px-0.5 pt-0 pb-2 min-h-0">
           <div className="flex w-full max-w-lg flex-col items-start gap-4">
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-200/80 bg-white shadow-sm">
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-200/80 bg-card shadow-sm">
               <Image
                 src="/icon.png"
                 alt="Eklana"
@@ -1422,7 +1422,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
               />
             </div>
             <div className="min-w-0 w-full">
-              <div className="rounded-2xl rounded-tl-md bg-gray-100 px-4 py-3 shadow-sm">
+              <div className="rounded-2xl rounded-tl-md bg-muted px-4 py-3 shadow-sm">
                 <p className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
                   {prestartIntro}
                 </p>
@@ -1446,7 +1446,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     isTTSPlaying
                       ? "bg-red-100 text-red-600 hover:bg-red-200"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-muted text-muted-foreground hover:bg-muted"
                   }`}
                   title={isTTSPlaying ? "Stop audio" : "Play audio again"}
                   aria-label={isTTSPlaying ? "Stop audio" : "Play audio"}
@@ -1523,7 +1523,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
                     : isRecording
                       ? "bg-red-500 hover:bg-red-600"
                       : isAnalyzing
-                        ? "bg-gray-300 cursor-not-allowed"
+                        ? "bg-muted cursor-not-allowed"
                         : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
                 aria-label={

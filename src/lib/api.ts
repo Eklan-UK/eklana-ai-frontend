@@ -541,6 +541,7 @@ export const userAPI = {
     language?: string;
     learningGoal?: string;
     learningGoals?: string[];
+    theme?: 'system' | 'light' | 'dark';
     notificationPreferences?: {
       learningReminders: boolean;
       specialOffers: boolean;
@@ -562,6 +563,7 @@ export const userAPI = {
         language?: string;
         learningGoal?: string;
         learningGoals?: string[];
+        theme?: 'system' | 'light' | 'dark';
         notificationPreferences?: {
           learningReminders: boolean;
           specialOffers: boolean;

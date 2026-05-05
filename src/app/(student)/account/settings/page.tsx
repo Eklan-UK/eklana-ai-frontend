@@ -10,8 +10,10 @@ import Image from "next/image";
 import { authService } from "@/services/auth.service";
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { useTheme } from "next-themes";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { formatProfileLearningGoalsShort } from "@/lib/learner-learning-goals";
+import { ThemeSettingSheet } from "@/components/account/ThemeSettingSheet";
 
 interface SettingItemProps {
   label: string;
@@ -44,11 +46,20 @@ function useSecuritySettings(): SettingItemProps[] {
   );
 }
 
-function usePreferenceSettings(): SettingItemProps[] {
+function usePreferenceSettings(onOpenTheme: () => void): SettingItemProps[] {
   const t = useTranslations("settings");
+  const tTheme = useTranslations("settingsTheme");
   const tCommon = useTranslations("common");
   const { data: me, isLoading } = useUserCurrent();
+  const { theme } = useTheme();
   const profile = me?.profile;
+
+  const themeLabel =
+    theme === "dark"
+      ? tTheme("dark")
+      : theme === "system"
+      ? tTheme("system")
+      : tTheme("light");
 
   return useMemo((): SettingItemProps[] => {
     const valueSuffix = isLoading && !me ? tCommon("loadingEllipsis") : undefined;
@@ -81,6 +92,11 @@ function usePreferenceSettings(): SettingItemProps[] {
         href: "/account/settings/lesson",
       },
       {
+        label: t("theme"),
+        value: themeLabel,
+        onClick: onOpenTheme,
+      },
+      {
         label: t("help"),
         href: "/account/settings/help",
       },
@@ -97,7 +113,8 @@ function usePreferenceSettings(): SettingItemProps[] {
         href: "/account/settings/terms",
       },
     ];
-  }, [isLoading, me, profile, t, tCommon]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, me, profile, t, tCommon, tTheme, theme, onOpenTheme]);
 }
 
 function UserProfileSection() {
@@ -289,7 +306,8 @@ function VersionInfo() {
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const preferenceItems = usePreferenceSettings();
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
+  const preferenceItems = usePreferenceSettings(() => setThemeSheetOpen(true));
   const securityItems = useSecuritySettings();
 
   return (
@@ -315,6 +333,11 @@ export default function SettingsPage() {
         <LogoutButton />
         <VersionInfo />
       </div>
+
+      <ThemeSettingSheet
+        isOpen={themeSheetOpen}
+        onClose={() => setThemeSheetOpen(false)}
+      />
     </div>
   );
 }

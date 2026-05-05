@@ -18,7 +18,7 @@ const faqs: FAQItem[] = [
   {
     question: "2. Who can use eklan?",
     answer: (
-      <div className="text-sm text-[#333] leading-5">
+      <div className="text-sm text-foreground leading-5">
         <p className="mb-1">Eklan is built for:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Learners of all ages above 16</li>
@@ -103,7 +103,7 @@ function AccordionItem({
             : "border border-[rgba(231,234,237,0.5)]"
         }`}
       >
-        <span className="text-sm font-bold text-[#171717] leading-5 flex-1">
+        <span className="text-sm font-bold text-foreground leading-5 flex-1">
           {item.question}
         </span>
         {isOpen ? (
@@ -115,7 +115,7 @@ function AccordionItem({
 
       {isOpen && (
         <div className="px-3 pb-3 pt-2 flex gap-2 border border-t-0 border-[rgba(231,234,237,0.5)] rounded-b-lg">
-          <div className="text-sm text-[#333] leading-5 flex-1">
+          <div className="text-sm text-foreground leading-5 flex-1">
             {typeof item.answer === "string" ? (
               <p>{item.answer}</p>
             ) : (
@@ -136,17 +136,17 @@ export default function FAQPage() {
   const toggle = (i: number) => setOpenIndex(openIndex === i ? null : i);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Frequently Asked Questions" />
 
       <div className="max-w-md mx-auto px-5 py-6 md:max-w-2xl md:px-8">
         {/* Heading */}
         <div className="flex flex-col gap-4 mb-4">
-          <h2 className="text-xl font-bold text-[#171717] tracking-tight">
+          <h2 className="text-xl font-bold text-foreground tracking-tight">
             FAQs
           </h2>
-          <p className="text-sm text-black leading-5">
+          <p className="text-sm text-foreground leading-5">
             We&apos;ve answered some of the questions you might have. Can&apos;t
             find what you&apos;re looking for? Reach out anytime at{" "}
             <a

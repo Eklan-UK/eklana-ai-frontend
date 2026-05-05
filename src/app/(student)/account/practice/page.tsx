@@ -28,7 +28,7 @@ function PracticeCard({
 }) {
   return (
     <Link href={href}>
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-3 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] transition-transform cursor-pointer">
+      <div className="bg-card border border-border rounded-2xl p-4 mb-3 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] transition-transform cursor-pointer">
         <div
           className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
         >
@@ -41,17 +41,17 @@ function PracticeCard({
           />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-base font-bold font-nunito text-gray-900 mb-0.5">{title}</p>
-          <p className="text-sm font-satoshi text-gray-500 mb-1 leading-snug">{subtitle}</p>
+          <p className="text-base font-bold font-nunito text-foreground mb-0.5">{title}</p>
+          <p className="text-sm font-satoshi text-muted-foreground mb-1 leading-snug">{subtitle}</p>
           <div className="flex items-center gap-3">
             {meta.map((m, i) => (
-              <span key={i} className="text-xs font-satoshi text-gray-400">
+              <span key={i} className="text-xs font-satoshi text-muted-foreground">
                 {m}
               </span>
             ))}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
       </div>
     </Link>
   );
@@ -59,7 +59,7 @@ function PracticeCard({
 
 export default function PracticePage() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <Header title="Practice" />
 
@@ -67,7 +67,7 @@ export default function PracticePage() {
 
         {/* ── Practice Freely Section ── */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold font-nunito text-gray-900 mb-4">Choose your mode of practice</h2>
+          <h2 className="text-xl font-bold font-nunito text-foreground mb-4">Choose your mode of practice</h2>
 
           <PracticeCard
             href="/account/practice/ai"

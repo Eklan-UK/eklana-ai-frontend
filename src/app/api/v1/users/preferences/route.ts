@@ -14,6 +14,7 @@ const preferencesSchema = z.object({
 	language: z.string().optional(),
 	learningGoal: z.string().optional(),
 	learningGoals: z.array(z.string()).optional(),
+	theme: z.enum(['system', 'light', 'dark']).optional(),
 	notificationPreferences: z.object({
 		learningReminders: z.boolean(),
 		specialOffers: z.boolean(),
@@ -69,6 +70,7 @@ async function handler(
 					language: profile.language,
 					learningGoal: profile.learningGoal,
 					learningGoals: profile.learningGoals,
+					theme: profile.theme,
 					notificationPreferences: profile.notificationPreferences,
 					lessonPreferences: profile.lessonPreferences,
 				},

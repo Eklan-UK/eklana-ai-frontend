@@ -28,7 +28,7 @@ export async function AssignedDrillsSection() {
 
       {drills.length === 0 ? (
         <Card className="text-center py-8">
-          <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <AssignedDrillsEmptyMessage />
         </Card>
       ) : (

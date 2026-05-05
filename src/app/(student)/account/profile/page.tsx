@@ -64,7 +64,7 @@ export default function ProfilePage() {
       : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6"></div>
 
       <div className="bg-gradient-to-br from-green-600 to-green-700 text-white pt-4 pb-8 md:pt-8 md:pb-12">
@@ -99,7 +99,7 @@ export default function ProfilePage() {
               <p className="text-green-100 text-sm md:text-base mb-2">
                 {userEmail}
               </p>
-              <span className="inline-block bg-orange-200 text-gray-800 px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="inline-block bg-orange-100 text-orange-950 px-3 py-1 rounded-full text-xs font-semibold">
                 {planTitle}
               </span>
             </div>
@@ -110,33 +110,33 @@ export default function ProfilePage() {
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 -mt-6 md:-mt-8">
         <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
           <Link href="/account/bookmarks">
-            <Card className="text-center h-full hover:bg-gray-50 transition-colors cursor-pointer">
+            <Card className="text-center h-full hover:bg-muted transition-colors cursor-pointer">
               <div className="flex justify-center mb-2">
                 <Bookmark className="w-8 h-8 text-indigo-600" />
               </div>
-              <p className="text-sm md:text-base font-bold text-gray-900 mt-1">
+              <p className="text-sm md:text-base font-bold text-foreground mt-1">
                 Bookmarks
               </p>
-              <p className="text-xs text-gray-500">View saved</p>
+              <p className="text-xs text-muted-foreground">View saved</p>
             </Card>
           </Link>
           <Card className="text-center">
             <div className="flex justify-center mb-2">
               <Mic className="w-8 h-8 text-green-600" />
             </div>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">
+            <p className="text-2xl md:text-3xl font-bold text-foreground">
               {pronLoading ? "—" : overall !== null ? overall : "—"}
             </p>
-            <p className="text-xs md:text-sm text-gray-500">Pronunciation</p>
+            <p className="text-xs md:text-sm text-muted-foreground">Pronunciation</p>
           </Card>
           <Card className="text-center">
             <div className="flex justify-center mb-2">
               <Clock className="w-8 h-8 text-blue-600" />
             </div>
-            <p className="text-2xl md:text-3xl font-bold text-gray-900">
+            <p className="text-2xl md:text-3xl font-bold text-foreground">
               {timeLoading ? "—" : formatMinutesFromSeconds(timeSeconds ?? 0)}
             </p>
-            <p className="text-xs md:text-sm text-gray-500">Time studied</p>
+            <p className="text-xs md:text-sm text-muted-foreground">Time studied</p>
           </Card>
         </div>
 
@@ -144,17 +144,17 @@ export default function ProfilePage() {
         <PronunciationCard />
 
         <Link href="/account/settings/subscriptions" className="block mb-6">
-          <Card className="mb-0 hover:bg-gray-50 transition-colors">
+          <Card className="mb-0 hover:bg-muted transition-colors">
             <div className="flex items-center justify-between mb-4">
               <span className="bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                 Current plan
               </span>
               <ChevronRight className="w-5 h-5 text-green-600" />
             </div>
-            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
+            <h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">
               {planTitle}
             </h3>
-            <p className="text-sm text-gray-600 mt-2 max-w-sm">
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
               {CURRENT_PLAN_CARD_MESSAGE}
             </p>
           </Card>
@@ -162,7 +162,7 @@ export default function ProfilePage() {
 
         <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900">Streak</h3>
+            <h3 className="text-lg md:text-xl font-bold text-foreground">Streak</h3>
             <Link
               href="/account/streak"
               className="text-green-600 flex items-center gap-1 text-sm"
@@ -175,7 +175,7 @@ export default function ProfilePage() {
 
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-base font-semibold text-gray-900">
+              <h4 className="text-base font-semibold text-foreground">
                 {streakLoading
                   ? "…"
                   : streak && streak.currentStreak > 0
@@ -183,7 +183,7 @@ export default function ProfilePage() {
                     : "Build your streak"}
               </h4>
               {streak && !streakLoading && streak.currentStreak > 0 && (
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   Best: {streak.longestStreak} days
                 </span>
               )}
@@ -194,9 +194,11 @@ export default function ProfilePage() {
                 {streak.weeklyActivity.map((day) => (
                   <div
                     key={day.date}
-                    className={`flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full font-black text-white ${
-                      day.completed ? "bg-green-600" : "bg-black"
-                    } text-[10px] sm:text-xs`}
+                    className={`flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full font-black text-[10px] sm:text-xs ${
+                      day.completed
+                        ? "bg-green-600 text-white"
+                        : "bg-muted text-muted-foreground"
+                    }`}
                     title={day.date}
                   >
                     {weekdayLetter(day.date)}
@@ -205,14 +207,14 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="bg-yellow-50 rounded-lg p-4 mb-4">
-              <p className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+            <div className="bg-yellow-500/10 border border-border rounded-lg p-4 mb-4">
+              <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-yellow-600" />
                 {streak && streak.currentStreak > 0
                   ? "Keep it going"
                   : "Start a streak"}
               </p>
-              <p className="text-xs md:text-sm text-gray-600">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Complete daily focus and lessons on consecutive days to grow your
                 streak. Open the streak page for a full view.
               </p>

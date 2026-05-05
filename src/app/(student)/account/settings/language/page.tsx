@@ -60,13 +60,13 @@ export default function LanguagePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6"></div>
 
       <Header showBack title={t("pageTitle")} />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
-        <p className="text-base text-gray-600 mb-6">{t("description")}</p>
+        <p className="text-base text-muted-foreground mb-6">{t("description")}</p>
 
         <div className="space-y-2 mb-6">
           {languages.map((language) => (
@@ -83,7 +83,7 @@ export default function LanguagePage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900">
+                  <span className="text-base font-medium text-foreground">
                     {language.name}
                   </span>
                   {selected === language.name && (

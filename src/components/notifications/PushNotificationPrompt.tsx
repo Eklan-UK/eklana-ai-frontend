@@ -74,7 +74,7 @@ export function PushNotificationPrompt() {
             size="sm"
             onClick={handleEnable}
             disabled={isLoading}
-            className="bg-white text-green-600 hover:bg-green-50 border-0 text-xs px-3"
+            className="bg-card text-green-600 hover:bg-muted border-0 text-xs px-3"
           >
             <Check className="w-4 h-4 mr-1" />
             Enable

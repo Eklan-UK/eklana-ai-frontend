@@ -23,10 +23,10 @@ function SettingsRow({
         onClick={onClick}
         className="flex items-center justify-between w-full py-1 text-left"
       >
-        <span className="text-sm text-[#333]">{label}</span>
-        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+        <span className="text-sm text-foreground">{label}</span>
+        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
       </button>
-      {!last && <div className="h-px w-full bg-gray-100" />}
+      {!last && <div className="h-px w-full bg-border" />}
     </div>
   );
 }
@@ -100,7 +100,7 @@ export default function HelpFeedbackPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Help & feedback" />
 
@@ -132,7 +132,7 @@ export default function HelpFeedbackPage() {
           />
 
           {/* Sheet */}
-          <div className="relative bg-white rounded-t-[26px] w-full max-w-md mx-auto overflow-hidden shadow-xl">
+          <div className="relative bg-card rounded-t-[26px] w-full max-w-md mx-auto overflow-hidden shadow-xl">
             {/* Decorative wave background */}
             <div className="absolute inset-x-0 top-0 h-28 overflow-hidden pointer-events-none">
               <div
@@ -162,12 +162,12 @@ export default function HelpFeedbackPage() {
               <div className="flex flex-col items-center gap-4">
                 <div className="flex flex-col items-center gap-4 w-[234px] text-center">
                   <div>
-                    <p className="text-xl font-bold text-[#1b1b1b] leading-[34px] whitespace-nowrap">
+                    <p className="text-xl font-bold text-foreground leading-[34px] whitespace-nowrap">
                       {feedbackName
                         ? `How is it going, ${feedbackName.split(" ")[0]}?`
                         : "How is it going?"}
                     </p>
-                    <p className="text-sm text-[#8e8e8e] mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       Enjoying your experience with{" "}
                       <span className="font-bold text-[#3b883e]">eklan</span>
                       <span className="font-bold text-[#3b883e]">?</span>{" "}
@@ -192,29 +192,29 @@ export default function HelpFeedbackPage() {
                 <div className="flex flex-col gap-2.5">
                   {/* Name field */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm text-[#777]">Name</label>
-                    <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3">
+                    <label className="text-sm text-muted-foreground">Name</label>
+                    <div className="bg-muted border border-border rounded-xl p-3">
                       <input
                         type="text"
                         value={feedbackName}
                         onChange={(e) => setFeedbackName(e.target.value)}
                         placeholder="Your name"
-                        className="w-full bg-transparent text-base text-[#171717] outline-none"
+                        className="w-full bg-transparent text-base text-foreground outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Message field */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-sm text-[#777]">
+                    <label className="text-sm text-muted-foreground">
                       Tell us what you want us to improve
                     </label>
-                    <div className="bg-[rgba(252,252,252,0.36)] border border-[#e7eaed] rounded-xl p-3 h-[104px]">
+                    <div className="bg-muted border border-border rounded-xl p-3 h-[104px]">
                       <textarea
                         value={feedbackMessage}
                         onChange={(e) => setFeedbackMessage(e.target.value)}
                         placeholder="Tell us how we can improve your experience..."
-                        className="w-full h-full bg-transparent text-sm text-[#171717] outline-none resize-none placeholder:text-[#d2d2d2]"
+                        className="w-full h-full bg-transparent text-sm text-foreground outline-none resize-none placeholder:text-muted-foreground"
                       />
                     </div>
                   </div>
@@ -222,7 +222,7 @@ export default function HelpFeedbackPage() {
 
                 {/* Bottom CTA */}
                 <div className="flex flex-col gap-4">
-                  <p className="text-sm text-[#a4a4a4]">
+                  <p className="text-sm text-muted-foreground">
                     Your feedback helps us improve and serve you better.
                   </p>
                   <button

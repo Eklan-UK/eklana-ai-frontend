@@ -58,6 +58,9 @@ export interface IProfile extends Document {
 		speakingSpeed: string;
 	};
 
+	// UI preferences
+	theme?: 'system' | 'light' | 'dark';
+
 	// Status
 	status: 'active' | 'inactive' | 'on-hold' | 'graduated';
 	notes?: string; // Admin/Tutor notes about the user
@@ -163,6 +166,11 @@ const profileSchema = new Schema<IProfile>(
 			englishAccent: { type: String, default: 'british' },
 			voiceTone: { type: String, default: 'warm' },
 			speakingSpeed: { type: String, default: 'normal' },
+		},
+		theme: {
+			type: String,
+			enum: ['system', 'light', 'dark'],
+			default: 'system',
 		},
 	},
 	{

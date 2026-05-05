@@ -161,7 +161,7 @@ export default function NationalityPage() {
     modalOpen;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6"></div>
 
       <Header showBack title={tSettings("nationality")} />

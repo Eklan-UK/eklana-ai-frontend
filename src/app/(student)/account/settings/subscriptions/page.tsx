@@ -66,20 +66,20 @@ export default function SubscriptionsPage() {
   const planTitle = planTitleFromUser(user);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
 
       <Header showBack title="Subscriptions" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-3xl md:px-8">
-        <Card className="mb-6 bg-green-50 border-green-200">
+        <Card className="mb-6 bg-primary/10 border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">
+              <p className="text-sm font-semibold text-foreground mb-1">
                 Current plan
               </p>
               <p className="text-2xl font-bold text-green-600">{planTitle}</p>
-              <p className="text-sm text-gray-600 mt-2 max-w-sm">
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm">
                 {CURRENT_PLAN_CARD_MESSAGE}
               </p>
             </div>
@@ -88,7 +88,7 @@ export default function SubscriptionsPage() {
         </Card>
 
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Plan overview</h2>
+          <h2 className="text-xl font-bold text-foreground mb-4">Plan overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {plans.map((plan) => {
               const Icon = plan.icon;
@@ -97,11 +97,11 @@ export default function SubscriptionsPage() {
                 <Card
                   key={plan.id}
                   className={`relative ${
-                    isCurrent ? "ring-2 ring-green-600 bg-green-50" : ""
+                    isCurrent ? "ring-2 ring-green-600 bg-green-500/10" : ""
                   } ${plan.popular ? "border-2 border-yellow-400" : ""}`}
                 >
                   {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-xs font-semibold">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-950 px-3 py-1 rounded-full text-xs font-semibold">
                       Most Popular
                     </div>
                   )}
@@ -116,10 +116,10 @@ export default function SubscriptionsPage() {
                       <div
                         className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                           plan.color === "green"
-                            ? "bg-green-100"
+                            ? "bg-green-500/15"
                             : plan.color === "yellow"
-                              ? "bg-yellow-100"
-                              : "bg-gray-100"
+                              ? "bg-yellow-500/15"
+                              : "bg-muted"
                         }`}
                       >
                         <Icon
@@ -128,11 +128,11 @@ export default function SubscriptionsPage() {
                               ? "text-green-600"
                               : plan.color === "yellow"
                                 ? "text-yellow-600"
-                                : "text-gray-600"
+                                : "text-muted-foreground"
                           }`}
                         />
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900">
+                      <h3 className="text-lg font-bold text-foreground">
                         {plan.name}
                       </h3>
                     </div>
@@ -145,10 +145,10 @@ export default function SubscriptionsPage() {
                                 ? "text-green-600"
                                 : plan.color === "yellow"
                                   ? "text-yellow-600"
-                                  : "text-gray-600"
+                                  : "text-muted-foreground"
                             }`}
                           />
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-muted-foreground">
                             {feature}
                           </span>
                         </li>
@@ -161,9 +161,9 @@ export default function SubscriptionsPage() {
           </div>
         </div>
 
-        <Card className="bg-gray-50 border-gray-200">
+        <Card className="bg-muted/50 border-border">
           <div className="text-center py-4">
-            <p className="text-sm font-semibold text-gray-900 mb-2">
+            <p className="text-sm font-semibold text-foreground mb-2">
               Questions about subscriptions?
             </p>
             <a

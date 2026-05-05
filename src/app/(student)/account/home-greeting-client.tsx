@@ -15,10 +15,10 @@ export function HomeGreetingClient({
   return (
     <div className="flex items-center justify-between mb-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
           {t("hello", { name: displayName })}
         </h1>
-        <p className="text-sm md:text-base text-gray-600 mt-1">
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           {t("goodToSeeYou")}
         </p>
       </div>

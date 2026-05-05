@@ -20,20 +20,20 @@ export default function DrillError({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="bg-card rounded-lg shadow-lg p-8 max-w-md w-full text-center">
         <AlertTriangle className="w-16 h-16 text-red-600 mx-auto mb-4" />
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-bold text-foreground mb-2">
           Drill Not Found
         </h1>
 
-        <p className="text-gray-600 mb-2">
+        <p className="text-muted-foreground mb-2">
           The drill you're looking for doesn't exist or has been deleted.
         </p>
 
         {error.message && (
-          <p className="text-sm text-gray-500 bg-gray-100 rounded p-3 mb-6 word-break">
+          <p className="text-sm text-muted-foreground bg-muted rounded p-3 mb-6 word-break">
             {error.message}
           </p>
         )}
