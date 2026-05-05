@@ -38,7 +38,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
       {/* Background patterns */}
       <div className="absolute top-0 left-0 p-8 opacity-20 pointer-events-none">
         <div className="grid grid-cols-2 gap-4">
