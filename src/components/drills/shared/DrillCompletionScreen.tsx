@@ -3,7 +3,6 @@
 import { CheckCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +13,6 @@ interface DrillCompletionScreenProps {
   drillType?: string;
   returnPath?: string;
   returnLabel?: string;
-  refreshOnMount?: boolean;
   /** Optional content below the default message (e.g. session transcripts). */
   extraContent?: ReactNode;
 }
@@ -25,21 +23,12 @@ export function DrillCompletionScreen({
   drillType = "drill",
   returnPath = "/account/drills",
   returnLabel = "Continue Learning",
-  refreshOnMount = false,
   extraContent,
 }: DrillCompletionScreenProps) {
   const router = useRouter();
   const defaultMessage = `You've completed the ${drillType} drill.`;
 
-  // Refresh the page data when component mounts if requested
-  useEffect(() => {
-    if (refreshOnMount) {
-      router.refresh();
-    }
-  }, [refreshOnMount, router]);
-
   const handleContinue = () => {
-    // Refresh before navigating to ensure updated status
     router.refresh();
     router.push(returnPath);
   };
@@ -64,4 +53,3 @@ export function DrillCompletionScreen({
     </div>
   );
 }
-

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -20,6 +19,7 @@ import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 import { useTTS } from "@/hooks/useTTS";
 
 interface SummaryDrillProps {
@@ -31,7 +31,6 @@ export default function SummaryDrill({
   drill,
   assignmentId,
 }: SummaryDrillProps) {
-  const router = useRouter();
   const [summary, setSummary] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -189,9 +188,6 @@ export default function SummaryDrill({
         title: drill.title,
         type: drill.type,
         });
-
-      // Refresh the page to update drill status
-      router.refresh();
     } catch (error: any) {
       toast.error(
         "Failed to submit drill: " + (error.message || "Unknown error")
@@ -206,7 +202,6 @@ export default function SummaryDrill({
       <DrillCompletionScreen
         title="Summary Submitted"
         message="Your summary has been submitted for review. You'll receive feedback from your tutor soon."
-        refreshOnMount={true}
         drillType="summary"
       />
     );
@@ -273,9 +268,7 @@ export default function SummaryDrill({
                   Read the Passage
                 </p>
               <p className="text-sm text-muted-foreground">
-                  Read the passage carefully. Pay attention to the main ideas
-                  and key details. Estimated reading time: {readingTimeMinutes}{" "}
-                  min ({passageWordCount} words)
+                Read the passage carefully. Pay attention to the main ideas and key details. About {readingTimeMinutes} min to read this passage ({passageWordCount} words). The full drill takes {DRILL_ESTIMATED_DURATION_LABEL}.
               </p>
             </div>
           </div>

@@ -150,6 +150,71 @@ export async function onDrillDueSoon(
 }
 
 /**
+ * Daily practice reminder sent to a learner.
+ * pendingCount > 0: they have drills to do.
+ * pendingCount === 0: they've finished or have none assigned — send a motivational nudge.
+ */
+export async function onDrillPracticeReminder(
+  studentId: string,
+  pendingCount: number,
+  streakDays: number,
+) {
+  const hasPending = pendingCount > 0;
+  const drillWord = pendingCount === 1 ? "drill" : "drills";
+
+  const title = hasPending ? "Time to practise! 📚" : "Well done today! 💪";
+  const body = hasPending
+    ? `You have ${pendingCount} ${drillWord} waiting. Open your plan and keep the streak going!`
+    : streakDays > 0
+      ? `You've finished your drills. Keep your ${streakDays}-day streak alive — revisit one to stay sharp.`
+      : "You've finished your drills. Revisit one to keep your skills sharp.";
+
+  console.log("[Notification Trigger] onDrillPracticeReminder called:", {
+    studentId,
+    pendingCount,
+    streakDays,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const fcmTokens = await FCMToken.find({
+      userId: studentId,
+      isActive: true,
+    })
+      .select("token")
+      .lean()
+      .exec();
+
+    if (fcmTokens.length === 0) {
+      console.warn(
+        "[Notification Trigger] No active FCM tokens for student:",
+        studentId,
+      );
+      return null;
+    }
+
+    const tokens = fcmTokens.map((t) => t.token);
+
+    const result = await sendNotificationToUsers([studentId], tokens, {
+      title,
+      body,
+      type: NotificationType.DRILL_REMINDER,
+      data: {
+        screen: "MyPlan",
+        url: "/account/drills",
+      },
+    });
+
+    console.log("[Notification Trigger] onDrillPracticeReminder result:", result);
+    return result;
+  } catch (error) {
+    console.error("[Notification Trigger] onDrillPracticeReminder error:", error);
+    throw error;
+  }
+}
+
+/**
  * Trigger when a tutor reviews a student's submission
  */
 export async function onDrillReviewed(

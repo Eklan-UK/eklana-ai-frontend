@@ -296,19 +296,11 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         type: drill.type,
         score,
       });
-
-      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
       setIsSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    if (isCompleted) {
-      router.refresh();
-    }
-  }, [isCompleted, router]);
 
   if (isCompleted) {
     return (
@@ -323,7 +315,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
             fullWidth
             onClick={() => {
               router.refresh();
-              router.push("/account");
+              router.push("/account/drills");
             }}
           >
             Continue Learning

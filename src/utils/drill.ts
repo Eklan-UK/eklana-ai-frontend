@@ -5,6 +5,9 @@
 
 export type DrillStatus = "active" | "ongoing" | "upcoming" | "completed" | "missed" | "pending";
 
+/** Consistent completion-time estimate shown to learners across all drill surfaces. */
+export const DRILL_ESTIMATED_DURATION_LABEL = "5–10 minutes";
+
 export interface DrillItem {
   assignmentId?: string;
   drill: {

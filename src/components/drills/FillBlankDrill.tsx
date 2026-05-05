@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -18,7 +17,6 @@ interface FillBlankDrillProps {
 }
 
 export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillProps) {
-  const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
   const [showResults, setShowResults] = useState(false);
@@ -194,9 +192,6 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
         type: drill.type,
         score,
       });
-
-      // Refresh the page to update drill status
-      router.refresh();
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -205,7 +200,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="fill_blank" refreshOnMount={true} />;
+    return <DrillCompletionScreen drillType="fill_blank" />;
   }
 
   const allItemsComplete = items.every((item: any, itemIdx: number) => {
