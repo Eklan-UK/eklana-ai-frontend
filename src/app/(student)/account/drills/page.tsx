@@ -75,15 +75,15 @@ export default function DrillsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
 
-      <div className="sticky top-0 z-40 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100/80">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-md mx-auto px-4 pt-4 pb-3 md:max-w-2xl md:px-8">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900">My Plans</h1>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h1 className="text-2xl font-bold text-foreground">My Plans</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 Designed for you, based on your goals
               </p>
             </div>
@@ -118,9 +118,9 @@ export default function DrillsPage() {
         <LearnerNextSessionCard session={nextSession} isLoading={classesLoading} />
 
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Assigned Drills</h2>
+          <h2 className="text-lg font-bold text-foreground mb-3">Assigned Drills</h2>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1 mb-4 flex gap-1">
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-1 mb-4 flex gap-1">
             {(["ongoing", "reviewed", "completed"] as const).map((tab) => (
               <button
                 key={tab}
@@ -129,7 +129,7 @@ export default function DrillsPage() {
                 className={`flex-1 px-2 sm:px-4 py-3 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   activeTab === tab
                     ? "bg-[#22c55e] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
                 <span>{tabLabels[tab]}</span>
@@ -138,7 +138,7 @@ export default function DrillsPage() {
                     className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${
                       activeTab === tab
                         ? "bg-white/20 text-white"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {stats[tab]}
@@ -154,11 +154,11 @@ export default function DrillsPage() {
             </div>
           ) : filteredDrills.length === 0 ? (
             <Card className="p-8 text-center">
-              <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 No drills found
               </h3>
-              <p className="text-gray-500 text-sm">
+              <p className="text-muted-foreground text-sm">
                 {activeTab === "ongoing"
                   ? "You don't have any ongoing drills."
                   : activeTab === "reviewed"

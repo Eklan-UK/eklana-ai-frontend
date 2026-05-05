@@ -315,8 +315,8 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       <DrillLayout title="Drill Completed">
         <Card className="text-center py-8">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
-          <p className="text-gray-600 mb-6">You&apos;ve completed the matching drill.</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Great Job!</h2>
+          <p className="text-muted-foreground mb-6">You&apos;ve completed the matching drill.</p>
           <Button
             variant="primary"
             size="lg"
@@ -342,15 +342,15 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     isIncorrect: boolean
   ) => {
     if (isMatched) {
-      return `${TILE_BASE} border-emerald-500 bg-emerald-50 text-emerald-900 cursor-default`;
+      return `${TILE_BASE} border-emerald-500/60 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 cursor-default`;
     }
     if (isIncorrect) {
-      return `${TILE_BASE} border-red-400 bg-red-50 text-red-900`;
+      return `${TILE_BASE} border-red-400/80 bg-red-500/15 text-red-900 dark:text-red-200`;
     }
     if (isSelected) {
-      return `${TILE_BASE} border-gray-200 bg-white text-gray-900 ring-2 ring-emerald-200 ring-offset-1`;
+      return `${TILE_BASE} border-border bg-card text-foreground ring-2 ring-emerald-500/40 ring-offset-1 ring-offset-background`;
     }
-    return `${TILE_BASE} border-gray-200 bg-white text-gray-900 hover:border-gray-300 active:bg-gray-50`;
+    return `${TILE_BASE} border-border bg-card text-foreground hover:border-border active:bg-muted`;
   };
 
   const drillIdStr = drill._id != null ? String(drill._id) : "";
@@ -374,12 +374,12 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       }
     >
       <div className="space-y-5 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))]">
-        <h2 className="text-lg font-bold text-gray-900 leading-snug">
+        <h2 className="text-lg font-bold text-foreground leading-snug">
           Tap the Matching pairs
         </h2>
 
         {drill.context ? (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+          <div className="rounded-lg border border-border bg-muted px-3 py-2.5 text-sm text-foreground">
             {drill.context}
           </div>
         ) : null}
@@ -410,7 +410,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
                 >
                   <span className="break-words">{leftItem.text}</span>
                   {leftItem.translation ? (
-                    <span className="text-xs font-normal text-gray-500">{leftItem.translation}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{leftItem.translation}</span>
                   ) : null}
                 </button>
                 <button
@@ -421,7 +421,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
                 >
                   <span className="break-words">{rightItem.text}</span>
                   {rightItem.translation ? (
-                    <span className="text-xs font-normal text-gray-500">{rightItem.translation}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{rightItem.translation}</span>
                   ) : null}
                 </button>
               </Fragment>
@@ -437,7 +437,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
           disabled={isSubmitting || !allMatched}
           className={
             isSubmitting || !allMatched
-              ? "!rounded-full !border-transparent !bg-[#E8E8E8] !text-white hover:!bg-[#E8E8E8] focus-visible:!ring-gray-400 disabled:!opacity-100 cursor-not-allowed shadow-none"
+              ? "!rounded-full !border-transparent !bg-muted !text-muted-foreground hover:!bg-muted focus-visible:!ring-muted-foreground disabled:!opacity-100 cursor-not-allowed shadow-none"
               : "!rounded-full !border-transparent !bg-[#3B883E] !text-white hover:!bg-emerald-700 active:!bg-emerald-800 focus-visible:!ring-emerald-600 shadow-none"
           }
         >

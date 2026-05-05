@@ -105,11 +105,11 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           onDrop={handleDrop}
           className={`
 						border-2 border-dashed rounded-lg p-8 text-center transition-colors relative
-						${isDragging ? "border-[#418b43] bg-emerald-50" : "border-gray-300"}
+						${isDragging ? "border-[#418b43] bg-emerald-50" : "border-border"}
 						${
               disabled
                 ? "opacity-50 cursor-not-allowed"
-                : "cursor-pointer hover:border-[#418b43] hover:bg-gray-50"
+                : "cursor-pointer hover:border-[#418b43] hover:bg-muted"
             }
 					`}
         >
@@ -126,26 +126,26 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
             tabIndex={-1}
           />
           <div className="pointer-events-none">
-            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-sm font-medium text-gray-700 mb-1">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground mb-1">
               Drag and drop a file here, or click to browse
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Supported formats: PDF, Word, Excel, CSV, Text, Markdown (Max{" "}
               {maxSize}MB)
             </p>
           </div>
         </div>
       ) : (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+        <div className="border border-border rounded-lg p-4 bg-muted">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-foreground truncate">
                   {selectedFile.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
               </div>
@@ -153,10 +153,10 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
             <button
               onClick={handleRemove}
               disabled={disabled}
-              className="p-1 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+              className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
               title="Remove file"
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
         </div>

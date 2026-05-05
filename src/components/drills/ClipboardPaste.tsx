@@ -81,8 +81,8 @@ export const ClipboardPaste: React.FC<ClipboardPasteProps> = ({
 	}
 
 	return (
-		<div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-			<label className="block text-sm font-medium text-gray-700 mb-2">
+		<div className="border border-border rounded-lg p-4 bg-muted">
+			<label className="block text-sm font-medium text-foreground mb-2">
 				Paste your data here (CSV, TSV, or tab-separated format)
 			</label>
 			<Textarea

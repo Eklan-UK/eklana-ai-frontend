@@ -382,25 +382,25 @@ export default function DrillCompletedPage() {
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {attempt.matchingResults.pairsMatched}
                     </p>
-                    <p className="text-sm text-gray-500">Matched</p>
+                    <p className="text-sm text-muted-foreground">Matched</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {attempt.matchingResults.totalPairs}
                     </p>
-                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {Math.round(attempt.matchingResults.accuracy)}%
                     </p>
-                    <p className="text-sm text-gray-500">Accuracy</p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
                   </div>
                 </div>
                 {attempt.matchingResults.incorrectPairs &&
                   attempt.matchingResults.incorrectPairs.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="font-semibold text-gray-900 mb-2">
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <h4 className="font-semibold text-foreground mb-2">
                         Incorrect Matches
                       </h4>
                       <div className="space-y-2">
@@ -408,7 +408,7 @@ export default function DrillCompletedPage() {
                           (pair, idx) => (
                             <div
                               key={idx}
-                              className="text-sm text-gray-600 bg-red-50 p-2 rounded"
+                              className="text-sm text-muted-foreground bg-red-500/10 p-2 rounded"
                             >
                               <span className="font-medium">{pair.left}</span> →{" "}
                               <span className="font-medium">{pair.right}</span>{" "}
@@ -435,26 +435,26 @@ export default function DrillCompletedPage() {
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {attempt.definitionResults.wordsDefined}
                     </p>
-                    <p className="text-sm text-gray-500">Defined</p>
+                    <p className="text-sm text-muted-foreground">Defined</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {attempt.definitionResults.totalWords}
                     </p>
-                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {Math.round(attempt.definitionResults.accuracy)}%
                     </p>
-                    <p className="text-sm text-gray-500">Accuracy</p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
                   </div>
                 </div>
               </Card>
               {attempt.definitionResults.wordScores &&
                 attempt.definitionResults.wordScores.length > 0 && (
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">
+                    <h4 className="font-semibold text-foreground mb-2">
                       Word Scores
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -462,7 +462,7 @@ export default function DrillCompletedPage() {
                         (wordScore, idx) => (
                           <Card key={idx} className="p-3">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-900">
+                              <span className="font-medium text-foreground">
                                 {wordScore.word}
                               </span>
                               <span className="text-sm font-semibold text-[#22c55e]">
@@ -492,12 +492,12 @@ export default function DrillCompletedPage() {
               {patterns.map((patternItem, patternIdx) => (
                 <Card key={patternIdx} className="p-6">
                   {/* Pattern Header */}
-                  <div className="mb-4 pb-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  <div className="mb-4 pb-4 border-b border-border">
+                    <h3 className="text-lg font-semibold text-foreground mb-1">
                       {patternItem.pattern}
                     </h3>
                     {patternItem.hint && (
-                      <p className="text-sm text-gray-500">{patternItem.hint}</p>
+                      <p className="text-sm text-muted-foreground">{patternItem.hint}</p>
                     )}
                     <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
                       <p className="text-xs text-green-600 font-medium mb-1">
@@ -511,7 +511,7 @@ export default function DrillCompletedPage() {
 
                   {/* Sentences */}
                   <div className="space-y-4">
-                    <h4 className="font-medium text-gray-700">Your Sentences:</h4>
+                    <h4 className="font-medium text-foreground">Your Sentences:</h4>
                     {patternItem.sentences?.map((sentence, sentenceIdx) => {
                       const review = isReviewed
                         ? patternReviews?.find(
@@ -528,8 +528,8 @@ export default function DrillCompletedPage() {
                           className={`rounded-lg border-2 ${isCorrect === true
                               ? "border-green-300 bg-green-50"
                               : isCorrect === false
-                                ? "border-red-200 bg-white"
-                                : "border-gray-200 bg-gray-50"
+                                ? "border-red-500/30 bg-card"
+                                : "border-border bg-muted"
                             }`}
                         >
                           <div className="p-4">
@@ -540,12 +540,12 @@ export default function DrillCompletedPage() {
                                       ? "bg-green-200 text-green-700"
                                       : isCorrect === false
                                         ? "bg-red-100 text-red-600"
-                                        : "bg-gray-200 text-gray-600"
+                                        : "bg-muted text-muted-foreground"
                                     }`}
                                 >
                                   {sentence.index + 1}
                                 </span>
-                                <p className="text-gray-900 pt-0.5">
+                                <p className="text-foreground pt-0.5">
                                   {sentence.text}
                                 </p>
                               </div>
@@ -615,25 +615,25 @@ export default function DrillCompletedPage() {
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {attempt.grammarResults.patternsPracticed}
                     </p>
-                    <p className="text-sm text-gray-500">Practiced</p>
+                    <p className="text-sm text-muted-foreground">Practiced</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {attempt.grammarResults.totalPatterns}
                     </p>
-                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {Math.round(attempt.grammarResults.accuracy || 0)}%
                     </p>
-                    <p className="text-sm text-gray-500">Accuracy</p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
                   </div>
                 </div>
               </Card>
               {attempt.grammarResults.patternScores.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
+                  <h4 className="font-semibold text-foreground mb-2">
                     Pattern Scores
                   </h4>
                   <div className="space-y-2">
@@ -641,7 +641,7 @@ export default function DrillCompletedPage() {
                       (patternScore, idx) => (
                         <Card key={idx} className="p-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">
+                            <span className="text-sm text-foreground">
                               {patternScore.pattern}
                             </span>
                             <span className="text-sm font-semibold text-[#22c55e]">
@@ -670,19 +670,19 @@ export default function DrillCompletedPage() {
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {attempt.sentenceWritingResults.sentencesWritten}
                     </p>
-                    <p className="text-sm text-gray-500">Written</p>
+                    <p className="text-sm text-muted-foreground">Written</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {attempt.sentenceWritingResults.totalSentences}
                     </p>
-                    <p className="text-sm text-gray-500">Total</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-[#22c55e]">
                       {Math.round(attempt.sentenceWritingResults.accuracy)}%
                     </p>
-                    <p className="text-sm text-gray-500">Accuracy</p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
                   </div>
                 </div>
               </Card>
@@ -720,23 +720,23 @@ export default function DrillCompletedPage() {
               {allWords.map((wordItem, wordIdx) => (
                 <Card key={wordIdx} className="p-6">
                   {/* Word Header */}
-                  <div className="mb-4 pb-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  <div className="mb-4 pb-4 border-b border-border">
+                    <h3 className="text-lg font-semibold text-foreground mb-1">
                       {allWords.length > 1
                         ? `Word ${wordIdx + 1}: ${wordItem.word}`
                         : wordItem.word}
                     </h3>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">
                         Your Definition:
                       </p>
-                      <p className="text-gray-900">{wordItem.definition}</p>
+                      <p className="text-foreground">{wordItem.definition}</p>
                     </div>
                   </div>
 
                   {/* Sentences */}
                   <div className="space-y-4">
-                    <h4 className="font-medium text-gray-700">Your Sentences:</h4>
+                    <h4 className="font-medium text-foreground">Your Sentences:</h4>
                     {wordItem.sentences?.map((sentence, sentenceIdx) => {
                       const globalIdx = getGlobalIndex(wordIdx, sentenceIdx);
                       const review = isReviewed
@@ -754,8 +754,8 @@ export default function DrillCompletedPage() {
                           className={`rounded-lg border-2 ${isCorrect === true
                               ? "border-green-300 bg-green-50"
                               : isCorrect === false
-                                ? "border-red-200 bg-white"
-                                : "border-gray-200 bg-gray-50"
+                                ? "border-red-500/30 bg-card"
+                                : "border-border bg-muted"
                             }`}
                         >
                           <div className="p-4">
@@ -766,12 +766,12 @@ export default function DrillCompletedPage() {
                                       ? "bg-green-200 text-green-700"
                                       : isCorrect === false
                                         ? "bg-red-100 text-red-600"
-                                        : "bg-gray-200 text-gray-600"
+                                        : "bg-muted text-muted-foreground"
                                     }`}
                                 >
                                   {sentenceIdx + 1}
                                 </span>
-                                <p className="text-gray-900 pt-0.5">
+                                <p className="text-foreground pt-0.5">
                                   {sentence.text}
                                 </p>
                               </div>
@@ -839,24 +839,24 @@ export default function DrillCompletedPage() {
             <div className="space-y-6">
               {/* Your Summary */}
               <Card className="p-6">
-                <div className="mb-4 pb-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <div className="mb-4 pb-4 border-b border-border">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <FileText className="w-5 h-5 text-green-500" />
                     Your Summary
                     {wordCount && (
-                      <span className="text-sm font-normal text-gray-500 ml-2">
+                      <span className="text-sm font-normal text-muted-foreground ml-2">
                         ({wordCount} words)
                       </span>
                     )}
                   </h3>
                   {articleTitle && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       Passage: {articleTitle}
                     </p>
                   )}
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">
                     {summary || "No summary provided"}
                   </p>
                 </div>
@@ -955,10 +955,10 @@ export default function DrillCompletedPage() {
               <Card className="p-6">
                 <div className="text-center">
                   <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
                     Listening Completed
                   </h3>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     You successfully completed the listening drill.
                   </p>
                 </div>
@@ -971,7 +971,7 @@ export default function DrillCompletedPage() {
       default:
         return (
           <Card className="p-6">
-            <p className="text-gray-500 text-center">
+            <p className="text-muted-foreground text-center">
               No detailed results available for this drill type.
             </p>
           </Card>
@@ -991,21 +991,21 @@ export default function DrillCompletedPage() {
 
   if (error || !assignment || !attempt) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
           <Link
             href="/account"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Account
           </Link>
           <Card className="p-8 text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">
+            <h2 className="text-xl font-bold text-foreground mb-2">
               {error || "Submission not found"}
             </h2>
-            <p className="text-gray-500 mb-6">
+            <p className="text-muted-foreground mb-6">
               {error ||
                 "We couldn't find the submission for this drill. Please try again."}
             </p>
@@ -1021,13 +1021,13 @@ export default function DrillCompletedPage() {
   const typeInfo = getDrillTypeInfo(assignment.drillId.type);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
           <Link
             href="/account/drills"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to My Drills
@@ -1036,10 +1036,10 @@ export default function DrillCompletedPage() {
             <div className="flex items-center gap-3">
               <span className="text-3xl">{typeInfo.icon}</span>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   {assignment.drillId.title}
                 </h1>
-                <p className="text-sm text-gray-500 capitalize">
+                <p className="text-sm text-muted-foreground capitalize">
                   {assignment.drillId.type.replace("_", " ")} •{" "}
                   {assignment.drillId.difficulty}
                 </p>
@@ -1061,7 +1061,7 @@ export default function DrillCompletedPage() {
         {/* Overall Score Card */}
         <Card className="p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-foreground">
               Submission Details
             </h2>
             <div className="flex items-center gap-2 text-green-600">
@@ -1075,31 +1075,31 @@ export default function DrillCompletedPage() {
               <p className="text-3xl font-bold text-[#22c55e] mb-1">
                 {attempt.score || 0}%
               </p>
-              <p className="text-sm text-gray-600">Overall Score</p>
+              <p className="text-sm text-muted-foreground">Overall Score</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center justify-center gap-2 mb-1">
                 <Clock className="w-5 h-5 text-blue-600" />
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-foreground">
                   {formatTime(attempt.timeSpent)}
                 </p>
               </div>
-              <p className="text-sm text-gray-600">Time Spent</p>
+              <p className="text-sm text-muted-foreground">Time Spent</p>
             </div>
             <div className="text-center p-4 bg-primary-50 rounded-lg">
               <div className="flex items-center justify-center gap-2 mb-1">
                 <Target className="w-5 h-5 text-primary-600" />
-                <p className="text-2xl font-bold text-gray-900 capitalize">
+                <p className="text-2xl font-bold text-foreground capitalize">
                   {assignment.drillId.difficulty}
                 </p>
               </div>
-              <p className="text-sm text-gray-600">Difficulty</p>
+              <p className="text-sm text-muted-foreground">Difficulty</p>
             </div>
           </div>
 
           {attempt.completedAt && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
                 <span>Completed on: {formatDate(attempt.completedAt)}</span>
               </div>
@@ -1109,7 +1109,7 @@ export default function DrillCompletedPage() {
 
         {/* Detailed Results */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <h2 className="text-xl font-bold text-foreground mb-4">
             Detailed Results
           </h2>
           {renderResults()}

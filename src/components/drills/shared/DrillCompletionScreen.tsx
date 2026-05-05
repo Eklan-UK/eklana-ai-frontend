@@ -45,14 +45,14 @@ export function DrillCompletionScreen({
   };
 
   return (
-    <div className="min-h-screen bg-white pb-6">
+    <div className="min-h-screen bg-card pb-6">
       <div className="h-6"></div>
       <Header title={title} showBack={true} />
       <div className="max-w-md mx-auto px-4 py-6">
         <Card className="text-center py-8">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Great Job!</h2>
-          <p className="text-gray-600 mb-6">{message || defaultMessage}</p>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Great Job!</h2>
+          <p className="text-muted-foreground mb-6">{message || defaultMessage}</p>
           {extraContent ? (
             <div className="text-left mb-6 w-full">{extraContent}</div>
           ) : null}

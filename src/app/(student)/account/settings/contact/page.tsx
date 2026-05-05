@@ -15,7 +15,7 @@ function InputField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm text-[#171717]">{label}</label>
+      <label className="text-sm text-foreground">{label}</label>
       {children}
     </div>
   );
@@ -74,7 +74,7 @@ export default function ContactUsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Contact Us" />
 
@@ -84,27 +84,27 @@ export default function ContactUsPage() {
           {/* Name + Email row */}
           <div className="flex flex-col gap-4">
             <InputField label="Name">
-              <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-2">
-                <User className="w-6 h-6 text-gray-400 shrink-0" />
+              <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
+                <User className="w-6 h-6 text-muted-foreground shrink-0" />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
-                  className="flex-1 bg-transparent text-base text-[#171717] outline-none"
+                  className="flex-1 bg-transparent text-base text-foreground outline-none"
                 />
               </div>
             </InputField>
 
             <InputField label="Email">
-              <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-2">
-                <Mail className="w-6 h-6 text-gray-400 shrink-0" />
+              <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
+                <Mail className="w-6 h-6 text-muted-foreground shrink-0" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="flex-1 bg-transparent text-base text-[#171717] outline-none"
+                  className="flex-1 bg-transparent text-base text-foreground outline-none"
                 />
               </div>
             </InputField>
@@ -113,30 +113,30 @@ export default function ContactUsPage() {
           {/* Subject + Message */}
           <div className="flex flex-col gap-4">
             <InputField label="Subject">
-              <div className="bg-[rgba(252,252,252,0.36)] border border-[#e7eaed] rounded-xl p-3 h-12 flex items-center">
+              <div className="bg-muted border border-border rounded-xl p-3 h-12 flex items-center">
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="What's this about?"
-                  className="w-full bg-transparent text-sm text-[#171717] outline-none placeholder:text-[#bbb]"
+                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
             </InputField>
 
             <InputField label="Your message">
-              <div className="bg-[rgba(252,252,252,0.36)] border border-[#e7eaed] rounded-xl p-3 h-[193px]">
+              <div className="bg-muted border border-border rounded-xl p-3 h-[193px]">
                 <textarea
                   value={message}
                   onChange={(e) => {
                     if (e.target.value.length <= 500) setMessage(e.target.value);
                   }}
                   placeholder="Message (max 500 characters)"
-                  className="w-full h-full bg-transparent text-sm text-[#171717] outline-none resize-none placeholder:text-[#bbb]"
+                  className="w-full h-full bg-transparent text-sm text-foreground outline-none resize-none placeholder:text-muted-foreground"
                 />
               </div>
               {message.length > 0 && (
-                <p className="text-xs text-gray-400 text-right mt-1">
+                <p className="text-xs text-muted-foreground text-right mt-1">
                   {message.length}/500
                 </p>
               )}

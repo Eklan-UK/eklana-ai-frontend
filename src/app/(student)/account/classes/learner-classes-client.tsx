@@ -298,7 +298,7 @@ export function LearnerClassesClient() {
       ) : null}
 
       {listLoading ? (
-        <div className="rounded-2xl border border-border bg-white px-4 py-16 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-border bg-card px-4 py-16 text-center text-sm text-muted-foreground">
           Loading sessions…
         </div>
       ) : null}

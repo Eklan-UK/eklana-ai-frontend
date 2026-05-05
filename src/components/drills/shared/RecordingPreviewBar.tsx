@@ -117,7 +117,7 @@ export function RecordingPreviewBar({
     <div className={`flex w-full items-center gap-2 ${className}`}>
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
 
-      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-gray-200/90 bg-gray-100/95 py-2 pl-2 pr-3 shadow-sm backdrop-blur-sm">
+      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-border/90 bg-muted/95 py-2 pl-2 pr-3 shadow-sm backdrop-blur-sm">
         <button
           type="button"
           onClick={() => void togglePlay()}
@@ -140,13 +140,13 @@ export function RecordingPreviewBar({
           ))}
         </div>
 
-        <span className="shrink-0 tabular-nums text-xs font-medium text-gray-700">{timeLabel}</span>
+        <span className="shrink-0 tabular-nums text-xs font-medium text-foreground">{timeLabel}</span>
       </div>
 
       <button
         type="button"
         onClick={onDiscard}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gray-200/90 bg-gray-100/95 text-slate-700 shadow-sm transition-colors hover:bg-gray-200/90 active:scale-95"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/90 bg-muted/95 text-foreground shadow-sm transition-colors hover:bg-muted/90 active:scale-95"
         aria-label="Delete recording and re-record"
       >
         <Trash2 className="h-5 w-5" strokeWidth={2} />

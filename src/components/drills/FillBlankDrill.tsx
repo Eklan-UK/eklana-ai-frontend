@@ -62,7 +62,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
                   <span
                     className={`px-3 py-1.5 rounded border-2 font-medium ${
                       isCorrect
-                        ? "bg-green-100 border-green-500 text-green-800"
+                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-900 dark:text-emerald-200"
                         : "bg-red-100 border-red-500 text-red-800"
                     }`}
                   >
@@ -89,7 +89,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
                         },
                       });
                     }}
-                    className="px-3 py-1.5 border-2 border-blue-500 rounded bg-white min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
                   >
                     <option value="">Select...</option>
                     {blank.options
@@ -252,12 +252,12 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
                 );
 
                 return (
-                  <div key={itemIdx} className="p-4 bg-gray-50 rounded-lg">
+                  <div key={itemIdx} className="p-4 bg-muted rounded-lg">
                     <div className="mb-2">
                       {renderSentence(item, true)}
                     </div>
                     {item.translation && (
-                      <p className="text-sm text-gray-600 italic mt-2">
+                      <p className="text-sm text-muted-foreground italic mt-2">
                         {item.translation}
                       </p>
                     )}
@@ -317,7 +317,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
             <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="mb-2">{renderSentence(currentItem, false)}</div>
               {currentItem.translation && (
-                <p className="text-sm text-gray-600 italic mt-3 border-t pt-3">
+                <p className="text-sm text-muted-foreground italic mt-3 border-t pt-3">
                   Translation: {currentItem.translation}
                 </p>
               )}
@@ -325,13 +325,13 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
 
             {/* Hints */}
             {currentItem.blanks.some((b: any) => b.hint) && (
-              <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <p className="text-sm font-semibold mb-2 text-yellow-800">
+              <div className="mb-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/25">
+                <p className="text-sm font-semibold mb-2 text-foreground">
                   💡 Hints:
                 </p>
                 {currentItem.blanks.map((blank: any, blankIdx: number) => (
                   blank.hint && (
-                    <p key={blankIdx} className="text-sm text-gray-700 mb-1">
+                    <p key={blankIdx} className="text-sm text-foreground mb-1">
                       Blank {blankIdx + 1}: {blank.hint}
                     </p>
                   )

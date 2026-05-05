@@ -59,7 +59,7 @@ function TutorDrillCardComponent({
       case "advanced":
         return "bg-red-100 text-red-700";
       default:
-        return "bg-gray-100 text-gray-700";
+        return "bg-muted text-foreground";
     }
   }, []);
   
@@ -79,7 +79,7 @@ function TutorDrillCardComponent({
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl">{getDrillIcon(drill.type)}</span>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-foreground">
                 {drill.title}
               </h3>
               <div className="flex items-center gap-2 mt-1">
@@ -90,14 +90,14 @@ function TutorDrillCardComponent({
                 >
                   {drill.difficulty}
                 </span>
-                <span className="text-xs text-gray-500 capitalize">
+                <span className="text-xs text-muted-foreground capitalize">
                   {drill.type}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-gray-600 mt-3">
+          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-3">
             <div className="flex items-center gap-1">
               <Users className="w-4 h-4" />
               <span>
@@ -114,7 +114,7 @@ function TutorDrillCardComponent({
               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 drill.is_active
                   ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-700"
+                  : "bg-muted text-foreground"
               }`}
             >
               {drill.is_active ? "Active" : "Inactive"}
@@ -124,8 +124,8 @@ function TutorDrillCardComponent({
 
         <div className="flex items-center gap-2 ml-4">
           <Link href={`/tutor/drills/${drillId}/edit`}>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition">
-              <Edit className="w-5 h-5 text-gray-600" />
+            <button className="p-2 hover:bg-muted rounded-lg transition">
+              <Edit className="w-5 h-5 text-muted-foreground" />
             </button>
           </Link>
           {onDelete && (
@@ -142,7 +142,7 @@ function TutorDrillCardComponent({
             </button>
           )}
           <Link href={`/tutor/drills/${drillId}`}>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </Link>
         </div>
       </div>

@@ -109,7 +109,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
@@ -117,10 +117,10 @@ export default function RegisterPage() {
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Create your account
           </h1>
-          <p className="text-base text-gray-600">
+          <p className="text-base text-muted-foreground">
             Start your English learning journey today
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               disabled={isSubmitting || isLoading}
               required
-              icon={<User className="w-5 h-5 text-gray-400" />}
+              icon={<User className="w-5 h-5 text-muted-foreground" />}
             />
             <Input
               type="text"
@@ -147,7 +147,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               disabled={isSubmitting || isLoading}
               required
-              icon={<User className="w-5 h-5 text-gray-400" />}
+              icon={<User className="w-5 h-5 text-muted-foreground" />}
             />
           </div>
 
@@ -160,7 +160,7 @@ export default function RegisterPage() {
             onChange={handleChange}
             disabled={isSubmitting || isLoading}
             required
-            icon={<Mail className="w-5 h-5 text-gray-400" />}
+            icon={<Mail className="w-5 h-5 text-muted-foreground" />}
           />
 
           <Input
@@ -174,11 +174,11 @@ export default function RegisterPage() {
             required
             minLength={8}
             autoComplete="new-password"
-            icon={<Lock className="w-5 h-5 text-gray-400" />}
+            icon={<Lock className="w-5 h-5 text-muted-foreground" />}
             rightIcon={
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-muted-foreground hover:text-foreground rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((v) => !v)}
               >
@@ -201,11 +201,11 @@ export default function RegisterPage() {
             disabled={isSubmitting || isLoading}
             required
             autoComplete="new-password"
-            icon={<Lock className="w-5 h-5 text-gray-400" />}
+            icon={<Lock className="w-5 h-5 text-muted-foreground" />}
             rightIcon={
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-muted-foreground hover:text-foreground rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label={
                   showConfirmPassword ? "Hide confirm password" : "Show confirm password"
                 }
@@ -223,18 +223,18 @@ export default function RegisterPage() {
           <div className="flex items-start gap-2">
             <input
               type="checkbox"
-              className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+              className="mt-1 w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500"
               checked={acceptedTerms}
               onChange={(e) => setAcceptedTerms(e.target.checked)}
               disabled={isSubmitting || isLoading}
             />
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               I agree to the{" "}
-              <Link href="/terms" className="text-green-600 hover:text-green-700">
+              <Link href="/terms" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="text-green-600 hover:text-green-700">
+              <Link href="/privacy" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
                 Privacy Policy
               </Link>
             </p>
@@ -258,10 +258,10 @@ export default function RegisterPage() {
           </Button>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              <span className="px-2 bg-background text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
@@ -291,11 +291,11 @@ export default function RegisterPage() {
             </Button>
           </div>
 
-          <p className="text-center text-sm text-gray-600">
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
               href="/auth/login"
-              className="text-green-600 font-semibold hover:text-green-700"
+              className="text-emerald-600 dark:text-emerald-400 font-semibold hover:text-emerald-700 dark:hover:text-emerald-300"
             >
               Sign in
             </Link>

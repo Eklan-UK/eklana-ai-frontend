@@ -33,8 +33,8 @@ export const Input: React.FC<InputProps> = ({
             w-full rounded-xl border border-border bg-card px-4 py-3
             ${icon ? 'pl-12' : ''}
             ${rightIcon ? 'pr-12' : ''}
-            text-gray-900 placeholder:text-muted-foreground
-            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+            text-foreground placeholder:text-muted-foreground
+            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background
             ${error ? 'border-accent-red' : ''}
             ${className}
           `}

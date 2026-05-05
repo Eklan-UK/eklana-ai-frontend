@@ -158,7 +158,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
@@ -166,10 +166,10 @@ export default function LoginPage() {
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Welcome back!
           </h1>
-          <p className="text-base text-gray-600">
+          <p className="text-base text-muted-foreground">
             Sign in to continue your learning journey
           </p>
         </div>
@@ -178,26 +178,22 @@ export default function LoginPage() {
         {showVerificationMessage && (
           <div className={`mb-6 p-4 rounded-xl border-2 ${
             verificationEmailSent 
-              ? "bg-green-50 border-green-200" 
-              : "bg-amber-50 border-amber-200"
+              ? "bg-emerald-500/10 border-emerald-500/30" 
+              : "bg-amber-500/10 border-amber-500/30"
           }`}>
             <div className="flex items-start gap-3">
               {verificationEmailSent ? (
-                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
               ) : (
-                <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               )}
               <div className="flex-1">
-                <h3 className={`font-semibold ${
-                  verificationEmailSent ? "text-green-900" : "text-amber-900"
-                }`}>
+                <h3 className="font-semibold text-foreground">
                   {verificationEmailSent 
                     ? "Verification Email Sent!" 
                     : "Email Not Verified"}
                 </h3>
-                <p className={`text-sm mt-1 ${
-                  verificationEmailSent ? "text-green-700" : "text-amber-700"
-                }`}>
+                <p className="text-sm mt-1 text-muted-foreground">
                   {verificationEmailSent 
                     ? `We've sent a verification link to ${email}. Please check your inbox and click the link to verify your email.`
                     : "Please verify your email address to sign in."}
@@ -210,7 +206,7 @@ export default function LoginPage() {
                     size="sm"
                     onClick={handleResendVerification}
                     disabled={isSendingVerification}
-                    className="mt-3 border-amber-300 text-amber-700 hover:bg-amber-100"
+                    className="mt-3 border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/15"
                   >
                     {isSendingVerification ? (
                       <>
@@ -228,14 +224,14 @@ export default function LoginPage() {
                 
                 {verificationEmailSent && (
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-green-600">
+                    <span className="text-xs text-muted-foreground">
                       Didn't receive it?
                     </span>
                     <button
                       type="button"
                       onClick={handleResendVerification}
                       disabled={isSendingVerification}
-                      className="text-xs text-green-700 font-semibold hover:text-green-800 underline disabled:opacity-50"
+                      className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 underline disabled:opacity-50"
                     >
                       {isSendingVerification ? "Sending..." : "Resend"}
                     </button>
@@ -262,7 +258,7 @@ export default function LoginPage() {
             }}
             disabled={isSubmitting || isLoading}
             required
-            icon={<Mail className="w-5 h-5 text-gray-400" />}
+            icon={<Mail className="w-5 h-5 text-muted-foreground" />}
           />
 
           <Input
@@ -274,11 +270,11 @@ export default function LoginPage() {
             disabled={isSubmitting || isLoading}
             required
             autoComplete="current-password"
-            icon={<Lock className="w-5 h-5 text-gray-400" />}
+            icon={<Lock className="w-5 h-5 text-muted-foreground" />}
             rightIcon={
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-muted-foreground hover:text-foreground rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((v) => !v)}
               >
@@ -295,16 +291,16 @@ export default function LoginPage() {
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                className="w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
                 disabled={isSubmitting || isLoading}
               />
-              <span className="text-sm text-gray-600">Remember me</span>
+              <span className="text-sm text-muted-foreground">Remember me</span>
             </label>
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-green-600 hover:text-green-700"
+              className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
             >
               Forgot password?
             </Link>
@@ -329,10 +325,10 @@ export default function LoginPage() {
           </Button>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">
+              <span className="px-2 bg-background text-muted-foreground">
                 Or continue with
               </span>
             </div>
@@ -368,11 +364,11 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          <p className="text-center text-sm text-gray-600">
+          <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/register"
-              className="text-green-600 font-semibold hover:text-green-700"
+              className="text-emerald-600 dark:text-emerald-400 font-semibold hover:text-emerald-700 dark:hover:text-emerald-300"
             >
               Sign up
             </Link>

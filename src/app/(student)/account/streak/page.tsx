@@ -5,7 +5,7 @@ import { StreakDisplay } from "@/components/streak/StreakDisplay";
 
 export default function StreakPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Streak" />
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-4">

@@ -21,8 +21,9 @@ function PronunciationRing({ score }: { score: number }) {
         <circle
           cx="50" cy="50" r={radius}
           strokeWidth="8"
-          stroke="#f3f4f6"
+          stroke="currentColor"
           fill="none"
+          className="text-muted"
         />
         {/* Progress */}
         <circle
@@ -38,10 +39,10 @@ function PronunciationRing({ score }: { score: number }) {
       </svg>
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center transform">
-        <span className="text-3xl font-bold font-nunito text-gray-900 leading-none">
+        <span className="text-3xl font-bold font-nunito text-foreground leading-none">
           {Math.round(validScore)}
         </span>
-        <span className="text-[10px] text-gray-400 font-satoshi uppercase tracking-wide mt-1">Avg Score</span>
+        <span className="text-[10px] text-muted-foreground font-satoshi uppercase tracking-wide mt-1">Avg Score</span>
       </div>
     </div>
   );
@@ -55,10 +56,10 @@ export function PronunciationCard() {
     return (
       <Card className="mb-6 animate-pulse p-6">
         <div className="flex items-center gap-6">
-          <div className="w-28 h-28 rounded-full bg-gray-200" />
+          <div className="w-28 h-28 rounded-full bg-muted" />
           <div className="flex-1 space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-1/3" />
-            <div className="h-8 bg-gray-200 rounded w-1/2" />
+            <div className="h-4 bg-muted rounded w-1/3" />
+            <div className="h-8 bg-muted rounded w-1/2" />
           </div>
         </div>
       </Card>
@@ -75,14 +76,14 @@ export function PronunciationCard() {
   return (
     <Card className="mb-6 !p-6 relative overflow-hidden">
       {/* Decorative background blob */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-2xl -mr-10 -mt-10 opacity-60 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl -mr-10 -mt-10 opacity-60 pointer-events-none" />
 
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 relative z-10">
-        <div className="p-1.5 bg-green-100/50 rounded-lg">
+        <div className="p-1.5 bg-primary/15 rounded-lg">
           <Mic className="w-4 h-4 text-green-600" />
         </div>
-        <h3 className="text-sm font-bold text-gray-800 font-satoshi uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-foreground font-satoshi uppercase tracking-wider">
           Pronunciation Performance
         </h3>
       </div>
@@ -96,17 +97,17 @@ export function PronunciationCard() {
         {/* Stats */}
         <div className="flex-1 text-center sm:text-left">
           <div className="mb-4">
-            <p className="text-xs text-gray-500 font-satoshi uppercase tracking-wider font-semibold mb-1">
+            <p className="text-xs text-muted-foreground font-satoshi uppercase tracking-wider font-semibold mb-1">
               Total Words Analyzed
             </p>
-            <p className="text-4xl font-extrabold font-nunito text-gray-900 tracking-tight">
+            <p className="text-4xl font-extrabold font-nunito text-foreground tracking-tight">
               {totalWords.toLocaleString()}
             </p>
           </div>
           
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-center sm:justify-start gap-2">
-            <BarChart2 className="w-4 h-4 text-gray-400" />
-            <p className="text-sm text-gray-500 font-satoshi">
+          <div className="pt-4 border-t border-border flex items-center justify-center sm:justify-start gap-2">
+            <BarChart2 className="w-4 h-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground font-satoshi">
               Average across all vocabulary and roleplay drills
             </p>
           </div>

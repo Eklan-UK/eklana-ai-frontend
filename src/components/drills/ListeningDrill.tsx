@@ -191,14 +191,14 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         {/* Context */}
         {drill.context && (
           <Card className="mb-4">
-            <p className="text-sm text-gray-700">{drill.context}</p>
+            <p className="text-sm text-foreground">{drill.context}</p>
           </Card>
         )}
 
         {/* Content Title */}
         {contentTitle && contentTitle !== drill.title && (
           <Card className="mb-4">
-            <h2 className="text-xl font-bold text-gray-900">{contentTitle}</h2>
+            <h2 className="text-xl font-bold text-foreground">{contentTitle}</h2>
           </Card>
         )}
 
@@ -206,7 +206,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         <Card className="mb-4">
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">Listen to the content:</h3>
+              <h3 className="text-sm font-medium text-foreground">Listen to the content:</h3>
               <Button
                 variant={isPlaying ? "outline" : "primary"}
                 size="sm"
@@ -233,14 +233,14 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
             </div>
             
             {content && (
-              <div className="prose prose-sm max-w-none bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="prose prose-sm max-w-none bg-muted p-4 rounded-lg border border-border">
                 <MarkdownText>{content}</MarkdownText>
               </div>
             )}
 
             {!content && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4">
+                <p className="text-sm text-foreground">
                   No content available for this listening drill.
                 </p>
               </div>
@@ -249,23 +249,23 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         </Card>
 
         {/* Listening Status Card */}
-        <Card className={`mb-4 ${hasListened ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+        <Card className={`mb-4 ${hasListened ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-amber-500/10 border-amber-500/25'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {hasListened ? (
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
               ) : (
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Headphones className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Headphones className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                 </div>
               )}
               <div>
-                <p className={`text-sm font-medium ${hasListened ? 'text-green-900' : 'text-amber-900'}`}>
+                <p className={`text-sm font-medium ${hasListened ? 'text-foreground' : 'text-foreground'}`}>
                   {hasListened ? 'Listening Complete!' : 'Listening Required'}
                 </p>
-                <p className={`text-xs ${hasListened ? 'text-green-700' : 'text-amber-700'}`}>
+                <p className="text-xs text-muted-foreground">
                   {hasListened 
                     ? 'You can now complete this drill' 
                     : 'Listen to the content or mark as listened'}
@@ -282,7 +282,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
                   setHasListened(true);
                   toast.success("Marked as listened!");
                 }}
-                className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                className="border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/15"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
                 Mark as Listened

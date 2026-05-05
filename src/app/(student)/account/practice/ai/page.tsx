@@ -55,16 +55,16 @@ export default function FreeTalkSelectionPage() {
   const hasCompletedDrills = completedScenarioDrills.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header title="" showBack />
 
       <div className="max-w-md mx-auto px-5 pb-12 md:max-w-2xl md:px-8">
         {/* Title */}
-        <h1 className="text-2xl font-bold font-nunito text-gray-900 mb-1">
+        <h1 className="text-2xl font-bold font-nunito text-foreground mb-1">
           Start a Free Talk
         </h1>
-        <p className="text-base font-satoshi text-gray-500 mb-4">
+        <p className="text-base font-satoshi text-muted-foreground mb-4">
           Choose how you'd like to practice today.
         </p>
 
@@ -79,17 +79,17 @@ export default function FreeTalkSelectionPage() {
         {/* ── Based on Your Drills ── */}
         {isLoading ? (
           <div className="mb-8">
-            <h2 className="text-sm font-bold font-nunito text-gray-700 mb-3">
+            <h2 className="text-sm font-bold font-nunito text-foreground mb-3">
               Based on Your Drills
             </h2>
             <div className="space-y-3">
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 h-20 animate-pulse" />
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 h-20 animate-pulse" />
+              <div className="bg-card border border-border rounded-2xl p-4 h-20 animate-pulse" />
+              <div className="bg-card border border-border rounded-2xl p-4 h-20 animate-pulse" />
             </div>
           </div>
         ) : hasCompletedDrills ? (
           <div className="mb-8">
-            <h2 className="text-sm font-bold font-nunito text-gray-700 mb-3">
+            <h2 className="text-sm font-bold font-nunito text-foreground mb-3">
               Based on Your Drills
             </h2>
             <div className="space-y-3">
@@ -114,7 +114,7 @@ export default function FreeTalkSelectionPage() {
                 return (
                   <div
                     key={assignment.assignmentId || drillId}
-                    className="w-full bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all"
+                    className="w-full bg-card border border-border rounded-2xl overflow-hidden hover:shadow-md hover:border-emerald-500/40 transition-all"
                   >
                     <button
                       type="button"
@@ -131,23 +131,23 @@ export default function FreeTalkSelectionPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-base font-bold font-nunito text-gray-900 truncate">
+                          <p className="text-base font-bold font-nunito text-foreground truncate">
                             {drill.title}
                           </p>
                           <span className="text-xs font-satoshi text-blue-500 flex-shrink-0">
                             • Scenario
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-gray-400">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
                           <Clock className="w-3.5 h-3.5" />
                           <span className="text-xs font-satoshi">5-7 minutes</span>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     </button>
                     {roleplayScenes.length > 1 && (
-                      <div className="px-4 pb-3 pt-0 border-t border-gray-100 flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-satoshi text-gray-500 w-full sm:w-auto">Scene:</span>
+                      <div className="px-4 pb-3 pt-0 border-t border-border flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-satoshi text-muted-foreground w-full sm:w-auto">Scene:</span>
                         {roleplayScenes.map((s: { scene_name?: string; title?: string; name?: string }, i: number) => {
                           const label =
                             (s.scene_name || s.title || s.name || `Part ${i + 1}`).trim() || `Scene ${i + 1}`;
@@ -156,7 +156,7 @@ export default function FreeTalkSelectionPage() {
                               key={`${drillId}-scene-${i}`}
                               type="button"
                               onClick={() => router.push(buildSessionUrl(i))}
-                              className="text-xs font-semibold font-satoshi px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/80"
+                              className="text-xs font-semibold font-satoshi px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/25 border border-emerald-500/30"
                             >
                               {label}
                             </button>
@@ -173,7 +173,7 @@ export default function FreeTalkSelectionPage() {
 
         {/* ── Free Topics ── */}
         <div>
-          <h2 className="text-sm font-bold font-nunito text-gray-700 mb-3">
+          <h2 className="text-sm font-bold font-nunito text-foreground mb-3">
             Free Topics
           </h2>
           <div className="space-y-3">
@@ -183,10 +183,10 @@ export default function FreeTalkSelectionPage() {
                 onClick={() =>
                   router.push(`/account/practice/ai/session?topic=${topicItem.id}`)
                 }
-                className={`w-full bg-white border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-all text-left ${
+                className={`w-full bg-card border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-all text-left ${
                   idx === 0
-                    ? "border-emerald-300 shadow-sm"
-                    : "border-gray-200"
+                    ? "border-emerald-500/50 shadow-sm"
+                    : "border-border"
                 }`}
               >
                 {/* Emoji avatar */}
@@ -198,11 +198,11 @@ export default function FreeTalkSelectionPage() {
 
                 {/* Title + subtitle */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-base font-bold font-nunito text-gray-900">
+                  <p className="text-base font-bold font-nunito text-foreground">
                     {topicItem.title}
                   </p>
                   {topicItem.subtitle && (
-                    <p className="text-sm font-satoshi text-gray-500">
+                    <p className="text-sm font-satoshi text-muted-foreground">
                       {topicItem.subtitle}
                     </p>
                   )}

@@ -43,7 +43,7 @@ export function SpeakingPracticeAttemptDetails({
   if (!attempt) return null;
 
   const compact = variant === "compact";
-  const titleClass = compact ? "text-xs font-semibold text-gray-800 mb-2" : "text-lg font-semibold text-gray-900 mb-4";
+  const titleClass = compact ? "text-xs font-semibold text-foreground mb-2" : "text-lg font-semibold text-foreground mb-4";
 
   if (drillType === "vocabulary" && attempt.vocabularyResults?.wordScores?.length) {
     const wordScores = attempt.vocabularyResults.wordScores;
@@ -55,15 +55,15 @@ export function SpeakingPracticeAttemptDetails({
             <Card key={idx} className={compact ? "p-3" : "p-4"}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{wordScore.word}</p>
-                  <p className="text-xs text-gray-500">Attempts: {wordScore.attempts}</p>
+                  <p className="font-semibold text-foreground truncate">{wordScore.word}</p>
+                  <p className="text-xs text-muted-foreground">Attempts: {wordScore.attempts}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className={`font-bold text-emerald-600 ${compact ? "text-sm" : "text-lg"}`}>
                     {wordScore.score}%
                   </p>
                   {wordScore.pronunciationScore !== undefined && (
-                    <p className="text-xs text-gray-500">Pronunciation: {wordScore.pronunciationScore}%</p>
+                    <p className="text-xs text-muted-foreground">Pronunciation: {wordScore.pronunciationScore}%</p>
                   )}
                 </div>
               </div>
@@ -84,15 +84,15 @@ export function SpeakingPracticeAttemptDetails({
             <Card key={idx} className={compact ? "p-3" : "p-4"}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{wordScore.word}</p>
-                  <p className="text-xs text-gray-500">Attempts: {wordScore.attempts}</p>
+                  <p className="font-semibold text-foreground truncate">{wordScore.word}</p>
+                  <p className="text-xs text-muted-foreground">Attempts: {wordScore.attempts}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className={`font-bold text-emerald-600 ${compact ? "text-sm" : "text-lg"}`}>
                     {wordScore.score}%
                   </p>
                   {wordScore.pronunciationScore !== undefined && (
-                    <p className="text-xs text-gray-500">Pronunciation: {wordScore.pronunciationScore}%</p>
+                    <p className="text-xs text-muted-foreground">Pronunciation: {wordScore.pronunciationScore}%</p>
                   )}
                 </div>
               </div>
@@ -112,12 +112,12 @@ export function SpeakingPracticeAttemptDetails({
           {sceneScores.map((scene, idx) => (
             <Card key={idx} className={compact ? "p-3" : "p-4"}>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="font-semibold text-gray-900 truncate">{scene.sceneName}</p>
+                <p className="font-semibold text-foreground truncate">{scene.sceneName}</p>
                 <p className={`font-bold text-emerald-600 shrink-0 ${compact ? "text-sm" : "text-lg"}`}>
                   {scene.score}%
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3 text-xs text-gray-600">
+              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {scene.fluencyScore !== undefined && <span>Fluency: {scene.fluencyScore}%</span>}
                 {scene.pronunciationScore !== undefined && (
                   <span>Pronunciation: {scene.pronunciationScore}%</span>

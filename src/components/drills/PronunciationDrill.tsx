@@ -63,23 +63,23 @@ function ScreenIndicator({
       <div
         className={`flex-1 p-3 rounded-lg text-center ${
           currentScreen === "word"
-            ? "bg-blue-100 border-2 border-blue-500"
+            ? "bg-sky-500/15 border-2 border-sky-500"
             : isWordPassed
-            ? "bg-green-50 border border-green-300"
-            : "bg-gray-100 border border-gray-300"
+              ? "bg-emerald-500/10 border border-emerald-500/40"
+            : "bg-muted border border-border"
         }`}
       >
         <div className="flex items-center justify-center gap-2">
           {isWordPassed && currentScreen !== "word" && (
-            <CheckCircle className="w-4 h-4 text-green-600" />
+            <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           )}
           <span
             className={`text-sm font-medium ${
               currentScreen === "word"
-                ? "text-blue-700"
+                ? "text-sky-800 dark:text-sky-200"
                 : isWordPassed
-                ? "text-green-700"
-                : "text-gray-600"
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-muted-foreground"
             }`}
           >
             Word
@@ -89,30 +89,30 @@ function ScreenIndicator({
       <div
         className={`flex-1 p-3 rounded-lg text-center ${
           currentScreen === "sentence"
-            ? "bg-blue-100 border-2 border-blue-500"
+            ? "bg-sky-500/15 border-2 border-sky-500"
             : isSentencePassed
-            ? "bg-green-50 border border-green-300"
+              ? "bg-emerald-500/10 border border-emerald-500/40"
             : !isWordPassed
-            ? "bg-gray-100 border border-gray-300 opacity-50"
-            : "bg-gray-100 border border-gray-300"
+            ? "bg-muted border border-border opacity-50"
+            : "bg-muted border border-border"
         }`}
       >
         <div className="flex items-center justify-center gap-2">
           {!isWordPassed && currentScreen !== "sentence" && (
-            <Lock className="w-4 h-4 text-gray-400" />
+            <Lock className="w-4 h-4 text-muted-foreground" />
           )}
           {isSentencePassed && currentScreen !== "sentence" && (
-            <CheckCircle className="w-4 h-4 text-green-600" />
+            <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           )}
           <span
             className={`text-sm font-medium ${
               currentScreen === "sentence"
-                ? "text-blue-700"
+                ? "text-sky-800 dark:text-sky-200"
                 : isSentencePassed
-                ? "text-green-700"
+                ? "text-emerald-700 dark:text-emerald-300"
                 : !isWordPassed
-                ? "text-gray-400"
-                : "text-gray-600"
+                ? "text-muted-foreground"
+                : "text-muted-foreground"
             }`}
           >
             Sentence
@@ -674,24 +674,24 @@ export default function PronunciationDrill({
         refreshOnMount={true}
         extraContent={
           sessionTranscripts.length > 0 ? (
-            <Card className="border-gray-200 text-left p-4 shadow-none">
-              <p className="text-sm font-semibold text-gray-900 mb-3">
+            <Card className="border-border text-left p-4 shadow-none">
+              <p className="text-sm font-semibold text-foreground mb-3">
                 What we heard from your recordings
               </p>
-              <ul className="space-y-3 text-sm text-gray-700">
+              <ul className="space-y-3 text-sm text-foreground">
                 {sessionTranscripts.map((row, i) => (
                   <li
                     key={`${row.itemIndex}-${row.screen}-${i}`}
-                    className="border-b border-gray-100 last:border-0 pb-3 last:pb-0"
+                    className="border-b border-border last:border-0 pb-3 last:pb-0"
                   >
-                    <div className="text-xs text-gray-500 mb-1">
+                    <div className="text-xs text-muted-foreground mb-1">
                       Item {row.itemIndex + 1} ·{" "}
                       {row.screen === "word" ? "Word" : "Sentence"}
                     </div>
-                    <p className="text-xs text-gray-500 mb-0.5">Target</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Target</p>
                     <p className="mb-2">{row.expected}</p>
-                    <p className="text-xs text-gray-500 mb-0.5">Transcript</p>
-                    <p className="text-gray-900">{row.transcript || "—"}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Transcript</p>
+                    <p className="text-foreground">{row.transcript || "—"}</p>
                   </li>
                 ))}
               </ul>
@@ -707,7 +707,7 @@ export default function PronunciationDrill({
     return (
       <DrillLayout title={drill.title}>
         <Card className="text-center py-8">
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             No pronunciation items found in this drill.
           </p>
         </Card>
@@ -767,18 +767,18 @@ export default function PronunciationDrill({
             <div className="text-center py-6">
               {/* Word/Sentence Display */}
               <div className="mb-6">
-            <h2 className="text-sm font-medium text-gray-700 mb-2">
+            <h2 className="text-sm font-medium text-foreground mb-2">
               {currentScreen === "word"
                 ? "Pronounce the Word"
                 : "Pronounce the Sentence"}
             </h2>
             {currentItem.sound?.trim() && (
-              <p className="text-sm text-gray-500 mb-3">
-                Sound focus: <span className="font-medium text-gray-700">{currentItem.sound}</span>
+              <p className="text-sm text-muted-foreground mb-3">
+                Sound focus: <span className="font-medium text-foreground">{currentItem.sound}</span>
               </p>
             )}
             <div className="flex items-center justify-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground">
                 {currentText}
               </h1>
               {currentScreen === "word" && (
@@ -804,8 +804,8 @@ export default function PronunciationDrill({
 
           {/* Lock message for sentence screen */}
           {currentScreen === "sentence" && !isWordPassed && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center justify-center gap-2 text-yellow-800">
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/25 rounded-lg">
+              <div className="flex items-center justify-center gap-2 text-foreground">
                 <Lock className="w-4 h-4" />
                 <p className="text-sm font-medium">
                   Complete word pronunciation first (65%+ required)
@@ -816,7 +816,7 @@ export default function PronunciationDrill({
 
           {/* Listen Section */}
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
+            <h3 className="text-sm font-medium text-foreground mb-3">
               Listen to the correct pronunciation
             </h3>
             <TTSButton
@@ -834,28 +834,28 @@ export default function PronunciationDrill({
 
           {/* Record Section */}
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">
+            <h3 className="text-sm font-medium text-foreground mb-4">
               Record your pronunciation
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Use the microphone at the bottom — tap to record, then submit or re-record from the
               preview.
             </p>
             {isAnalyzing && (
               <div className="flex items-center justify-center gap-2 mt-4">
                 <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Analyzing your pronunciation — longer recordings may take a moment...
                 </p>
               </div>
             )}
             {pronunciationScore && !isAnalyzing && (
               <>
-                <p className="text-sm text-green-600 mt-4 font-medium">
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-4 font-medium">
                   ✓ Analysis complete! Your breakdown is below.
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  <span className="font-medium text-gray-700">Transcript: </span>
+                <p className="text-sm text-muted-foreground mt-2">
+                  <span className="font-medium text-foreground">Transcript: </span>
                   {transcriptFromTextScore(pronunciationScore) || "—"}
                 </p>
               </>
@@ -863,7 +863,7 @@ export default function PronunciationDrill({
           </div>
 
           {/* Auto-play toggle */}
-          <label className="flex items-center justify-center gap-2 text-sm text-gray-600 mt-4">
+          <label className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-4">
             <input
               type="checkbox"
               checked={autoPlayAudio}
@@ -877,7 +877,7 @@ export default function PronunciationDrill({
 
           {inDrillReviewRow && (
             <div className="space-y-2">
-              <h3 className="text-sm font-bold text-gray-900 px-1">Your performance</h3>
+              <h3 className="text-sm font-bold text-foreground px-1">Your performance</h3>
               <DrillLineReviewAccordion
                 key={`${inDrillReviewRow.sceneIndex}-${inDrillReviewRow.turnIndex}-${inDrillReviewRow.attempts}`}
                 row={inDrillReviewRow}
@@ -1029,7 +1029,7 @@ export default function PronunciationDrill({
                     isRecording
                       ? "bg-red-500 hover:bg-red-600"
                       : isAnalyzing
-                        ? "bg-gray-300 cursor-not-allowed"
+                        ? "bg-muted cursor-not-allowed"
                         : "bg-emerald-600 hover:bg-emerald-700"
                   }`}
                   aria-label={

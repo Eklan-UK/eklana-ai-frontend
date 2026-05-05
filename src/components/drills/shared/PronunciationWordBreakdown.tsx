@@ -52,7 +52,7 @@ export function PronunciationWordBreakdown({
   return (
     <div className={isReview ? "space-y-3" : ""}>
       {showWordLabel && (
-        <p className="text-sm font-semibold text-gray-900">{wordScore.word}</p>
+        <p className="text-sm font-semibold text-foreground">{wordScore.word}</p>
       )}
 
       {syllables && syllables.length > 0 && (
@@ -60,8 +60,8 @@ export function PronunciationWordBreakdown({
           <h4
             className={
               isReview
-                ? "text-xs font-medium text-gray-500 mb-1.5"
-                : "text-xs font-semibold text-gray-700 mb-2"
+                ? "text-xs font-medium text-muted-foreground mb-1.5"
+                : "text-xs font-semibold text-foreground mb-2"
             }
           >
             Syllables
@@ -78,11 +78,11 @@ export function PronunciationWordBreakdown({
                 key={idx}
                 className={
                   isReview
-                    ? "shrink-0 min-w-[72px] rounded-lg border border-gray-200 bg-gray-50/90 px-2.5 py-2"
-                    : "flex-1 min-w-[80px] p-2 bg-gray-50 rounded-lg"
+                    ? "shrink-0 min-w-[72px] rounded-lg border border-border bg-muted/90 px-2.5 py-2"
+                    : "flex-1 min-w-[80px] p-2 bg-muted rounded-lg"
                 }
               >
-                <p className="text-xs font-medium text-gray-900 mb-1">{syllable.letters}</p>
+                <p className="text-xs font-medium text-foreground mb-1">{syllable.letters}</p>
                 <div
                   className={
                     isReview
@@ -98,7 +98,7 @@ export function PronunciationWordBreakdown({
                   {syllable.stress_level !== null && (
                     <span
                       className={
-                        isReview ? "text-[10px] text-gray-500" : "text-xs text-gray-500"
+                        isReview ? "text-[10px] text-muted-foreground" : "text-xs text-muted-foreground"
                       }
                     >
                       {isReview ? "stress: " : "Stress: "}
@@ -117,8 +117,8 @@ export function PronunciationWordBreakdown({
           <h4
             className={
               isReview
-                ? "text-xs font-medium text-gray-500 mb-1.5"
-                : "text-xs font-semibold text-gray-700 mb-2"
+                ? "text-xs font-medium text-muted-foreground mb-1.5"
+                : "text-xs font-semibold text-foreground mb-2"
             }
           >
             Phonemes
@@ -143,7 +143,7 @@ export function PronunciationWordBreakdown({
       {/* Best-effort: syllable letters + scores until API exposes letter_score_list */}
       {isReview && syllables && syllables.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium text-gray-500 mb-1.5">Letter level Feedback</h4>
+          <h4 className="text-xs font-medium text-muted-foreground mb-1.5">Letter level Feedback</h4>
           <div className="flex gap-1.5 flex-wrap">
             {syllables.map((syllable, idx) => (
               <div

@@ -103,12 +103,12 @@ export default function DrillPracticeInterface({
         return <FillBlankDrill {...commonProps} />;
       default:
         return (
-          <div className="min-h-screen bg-white pb-6">
+          <div className="min-h-screen bg-background pb-6">
             <div className="h-6"></div>
             <Header title="Unknown Drill Type" showBack={true} />
             <div className="max-w-md mx-auto px-4 py-6">
               <Card>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   This drill type is not yet supported.
                 </p>
               </Card>
