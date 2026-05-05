@@ -223,18 +223,18 @@ export default function RegisterPage() {
           <div className="flex items-start gap-2">
             <input
               type="checkbox"
-              className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+              className="mt-1 w-4 h-4 text-emerald-600 border-border rounded focus:ring-emerald-500"
               checked={acceptedTerms}
               onChange={(e) => setAcceptedTerms(e.target.checked)}
               disabled={isSubmitting || isLoading}
             />
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               I agree to the{" "}
-              <Link href="/terms" className="text-green-600 hover:text-green-700">
+              <Link href="/terms" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="text-green-600 hover:text-green-700">
+              <Link href="/privacy" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
                 Privacy Policy
               </Link>
             </p>
@@ -258,10 +258,10 @@ export default function RegisterPage() {
           </Button>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              <span className="px-2 bg-background text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
@@ -291,11 +291,11 @@ export default function RegisterPage() {
             </Button>
           </div>
 
-          <p className="text-center text-sm text-gray-600">
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
               href="/auth/login"
-              className="text-green-600 font-semibold hover:text-green-700"
+              className="text-emerald-600 dark:text-emerald-400 font-semibold hover:text-emerald-700 dark:hover:text-emerald-300"
             >
               Sign in
             </Link>
