@@ -34,7 +34,7 @@ export const Input: React.FC<InputProps> = ({
             ${icon ? 'pl-12' : ''}
             ${rightIcon ? 'pr-12' : ''}
             text-foreground placeholder:text-muted-foreground
-            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background
             ${error ? 'border-accent-red' : ''}
             ${className}
           `}

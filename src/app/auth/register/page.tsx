@@ -109,7 +109,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
@@ -117,10 +117,10 @@ export default function RegisterPage() {
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Create your account
           </h1>
-          <p className="text-base text-gray-600">
+          <p className="text-base text-muted-foreground">
             Start your English learning journey today
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               disabled={isSubmitting || isLoading}
               required
-              icon={<User className="w-5 h-5 text-gray-400" />}
+              icon={<User className="w-5 h-5 text-muted-foreground" />}
             />
             <Input
               type="text"
@@ -147,7 +147,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               disabled={isSubmitting || isLoading}
               required
-              icon={<User className="w-5 h-5 text-gray-400" />}
+              icon={<User className="w-5 h-5 text-muted-foreground" />}
             />
           </div>
 
@@ -160,7 +160,7 @@ export default function RegisterPage() {
             onChange={handleChange}
             disabled={isSubmitting || isLoading}
             required
-            icon={<Mail className="w-5 h-5 text-gray-400" />}
+            icon={<Mail className="w-5 h-5 text-muted-foreground" />}
           />
 
           <Input
@@ -174,11 +174,11 @@ export default function RegisterPage() {
             required
             minLength={8}
             autoComplete="new-password"
-            icon={<Lock className="w-5 h-5 text-gray-400" />}
+            icon={<Lock className="w-5 h-5 text-muted-foreground" />}
             rightIcon={
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-muted-foreground hover:text-foreground rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((v) => !v)}
               >
@@ -201,11 +201,11 @@ export default function RegisterPage() {
             disabled={isSubmitting || isLoading}
             required
             autoComplete="new-password"
-            icon={<Lock className="w-5 h-5 text-gray-400" />}
+            icon={<Lock className="w-5 h-5 text-muted-foreground" />}
             rightIcon={
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-muted-foreground hover:text-foreground rounded-md p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label={
                   showConfirmPassword ? "Hide confirm password" : "Show confirm password"
                 }
