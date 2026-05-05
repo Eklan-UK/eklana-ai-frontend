@@ -71,12 +71,12 @@ function OverallScoreDonut({ score, statsLine }: { score: number; statsLine: str
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5">
-          <span className="text-4xl font-bold tabular-nums text-gray-900">{Math.round(clamped)}</span>
+          <span className="text-4xl font-bold tabular-nums text-foreground">{Math.round(clamped)}</span>
         </div>
       </div>
-      <p className="mt-3 text-sm font-medium text-gray-500">Overall Score</p>
+      <p className="mt-3 text-sm font-medium text-muted-foreground">Overall Score</p>
       {statsLine ? (
-        <p className="mt-1 text-xs text-gray-500 text-center max-w-sm px-2">{statsLine}</p>
+        <p className="mt-1 text-xs text-muted-foreground text-center max-w-sm px-2">{statsLine}</p>
       ) : null}
     </div>
   );
@@ -97,17 +97,17 @@ function LineAnalysisPanel({ row }: { row: PerformanceReviewAnalyticsRow }) {
             />
           </div>
         ))}
-        <p className="text-xs text-gray-500 pt-1 border-t border-gray-100">
-          <span className="font-medium text-gray-600">Transcript: </span>
+        <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+          <span className="font-medium text-muted-foreground">Transcript: </span>
           {transcriptFromTextScore(row.textScore) || "—"}
         </p>
-        <p className="text-[11px] text-gray-400">Attempts: {row.attempts}</p>
+        <p className="text-[11px] text-muted-foreground">Attempts: {row.attempts}</p>
       </div>
     );
   }
 
   if (row.textScore) {
-    return <p className="text-xs text-gray-500">No word-level breakdown for this line.</p>;
+    return <p className="text-xs text-muted-foreground">No word-level breakdown for this line.</p>;
   }
 
   return <p className="text-xs text-amber-700">No detailed score stored for this line.</p>;
@@ -130,14 +130,14 @@ function LineReviewAccordionRow({
   const spokenDisplay = transcript || row.text;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
       <div className="px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">{lineLabel}</p>
-        <p className="text-sm text-gray-900 leading-snug whitespace-pre-wrap">{spokenDisplay}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">{lineLabel}</p>
+        <p className="text-sm text-foreground leading-snug whitespace-pre-wrap">{spokenDisplay}</p>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-4 py-2.5 bg-gray-50/50">
-        <span className="text-sm font-semibold text-gray-800">Performance score</span>
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 bg-muted/50">
+        <span className="text-sm font-semibold text-foreground">Performance score</span>
         <div
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
             row.score >= passThreshold ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
@@ -151,16 +151,16 @@ function LineReviewAccordionRow({
         type="button"
         onClick={onToggleAnalysis}
         aria-expanded={isAnalysisOpen}
-        className="flex w-full items-center justify-between gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm font-semibold text-emerald-900 hover:bg-emerald-50/50 transition-colors"
+        className="flex w-full items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-left text-sm font-semibold text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/15 transition-colors"
       >
         <span>Breakdown of the analysis</span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-gray-600 transition-transform ${isAnalysisOpen ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isAnalysisOpen ? "rotate-180" : ""}`}
           aria-hidden
         />
       </button>
       {isAnalysisOpen ? (
-        <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-3">
+        <div className="border-t border-border bg-muted/60 px-4 py-3">
           <LineAnalysisPanel row={row} />
         </div>
       ) : null}
@@ -231,11 +231,11 @@ export function DrillPerformanceReview({
           <OverallScoreDonut score={avgScore} statsLine={statsLine} />
         ) : (
           <div className="text-center py-8 px-4">
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-muted-foreground mb-2">
               {isViewer ? "No performance data in this snapshot." : "No pronunciation breakdown yet"}
             </p>
             {!isViewer ? (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Complete your spoken lines with a successful analysis to see scores here.
               </p>
             ) : null}
@@ -244,33 +244,33 @@ export function DrillPerformanceReview({
 
         {hasData && (
           <>
-            <h2 className="text-lg font-bold text-gray-900 mt-8 mb-3">{sectionHeading}</h2>
+            <h2 className="text-lg font-bold text-foreground mt-8 mb-3">{sectionHeading}</h2>
             <div className="space-y-2">
               {groups.map((group, listIdx) => {
                 const isOpen = openIdx === listIdx;
                 return (
                   <div
                     key={group.sceneIndex}
-                    className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm"
+                    className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm"
                   >
                     <button
                       type="button"
                       onClick={() => toggleScene(listIdx, isOpen)}
-                      className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50/80 transition-colors"
+                      className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/80 transition-colors"
                       aria-expanded={isOpen}
                     >
                       <div>
-                        <span className="font-bold text-gray-900">{group.sceneTitle}</span>
+                        <span className="font-bold text-foreground">{group.sceneTitle}</span>
                       </div>
                       <ChevronDown
-                        className={`h-5 w-5 shrink-0 text-gray-500 transition-transform ${
+                        className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
                           isOpen ? "rotate-180" : ""
                         }`}
                       />
                     </button>
                     {isOpen && (
-                      <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50/40">
-                        <h3 className="text-sm font-bold text-gray-900">
+                      <div className="border-t border-border px-4 py-4 space-y-4 bg-muted/40">
+                        <h3 className="text-sm font-bold text-foreground">
                           Here is a Breakdown of your performance
                         </h3>
                         <div className="space-y-3">
@@ -302,7 +302,7 @@ export function DrillPerformanceReview({
       </div>
 
       {isViewer ? (
-        <div className="border-t border-gray-200 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="border-t border-border bg-card px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="max-w-md mx-auto w-full">
             <Button
               variant="primary"
@@ -317,7 +317,7 @@ export function DrillPerformanceReview({
           </div>
         </div>
       ) : (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
           <div className="max-w-md mx-auto w-full px-4 space-y-2.5">
             <Button
               variant="primary"
@@ -342,7 +342,7 @@ export function DrillPerformanceReview({
               fullWidth
               disabled={isSubmitting}
               onClick={onPracticeAgain}
-              className="!rounded-full border-[#3B883E] text-[#3B883E] hover:bg-emerald-50/80"
+              className="!rounded-full border-[#3B883E] text-[#3B883E] hover:bg-emerald-500/15 dark:hover:bg-emerald-500/20"
             >
               Practice again
             </Button>

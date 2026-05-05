@@ -31,7 +31,7 @@ const CATEGORY_TEXT: Record<string, string> = {
   indigo: "text-amber-600",
   pink: "text-pink-600",
   teal: "text-teal-700",
-  gray: "text-gray-600",
+  gray: "text-muted-foreground",
 };
 
 const THUMB_GRADIENT: Record<string, string> = {
@@ -42,7 +42,7 @@ const THUMB_GRADIENT: Record<string, string> = {
   indigo: "from-amber-200 to-yellow-200",
   pink: "from-pink-200 to-rose-300",
   teal: "from-cyan-200 to-teal-300",
-  gray: "from-slate-200 to-gray-300",
+  gray: "from-muted to-muted dark:from-slate-600 dark:to-slate-700",
 };
 
 export interface PlanDrillRowProps {
@@ -103,7 +103,7 @@ export function PlanDrillRow({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-2xl bg-white border border-gray-100 p-3 shadow-sm hover:shadow-md transition-shadow"
+      className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow"
       onMouseEnter={() => onPrefetch?.(drill._id)}
       onClick={() => onNavigate?.()}
     >
@@ -113,18 +113,18 @@ export function PlanDrillRow({
         {getDrillIcon(drill.type)}
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
+        <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
           {drill.title}
         </h3>
         <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
           • {humanizeDrillType(drill.type)}
         </p>
-        <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <Clock3 className="w-3.5 h-3.5 shrink-0" />
           {planDurationLabel(drill)}
         </div>
       </div>
-      <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" aria-hidden />
+      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
     </Link>
   );
 }

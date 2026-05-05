@@ -30,7 +30,7 @@ function AccordionItem({
         className="flex items-start justify-between w-full p-3 rounded-lg border border-[rgba(231,234,237,0.5)] text-left gap-2"
         aria-expanded={isOpen}
       >
-        <span className="text-sm font-semibold text-[#171717] leading-5 flex-1 min-w-0">
+        <span className="text-sm font-semibold text-foreground leading-5 flex-1 min-w-0">
           {title}
         </span>
         <span className="text-green-600 shrink-0 mt-0.5">
@@ -38,7 +38,7 @@ function AccordionItem({
         </span>
       </button>
       {isOpen && (
-        <div className="px-2 pt-2 pb-1 w-full text-sm text-[#333] leading-5 space-y-2">
+        <div className="px-2 pt-2 pb-1 w-full text-sm text-foreground leading-5 space-y-2">
           {content}
         </div>
       )}
@@ -453,14 +453,14 @@ export default function SettingsTermsPage() {
     setOpenIndex((prev) => (prev === i ? null : i));
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Terms of Use" />
       <div className="px-5 pt-6 pb-16">
-        <h1 className="text-xl font-bold text-[#171717] leading-6 tracking-tight mb-4">
+        <h1 className="text-xl font-bold text-foreground leading-6 tracking-tight mb-4">
           Terms of use
         </h1>
-        <div className="text-sm text-black leading-5 mb-4 space-y-3">
+        <div className="text-sm text-foreground leading-5 mb-4 space-y-3">
           <p>
             These terms and conditions (&quot;Terms and Conditions&quot;) constitute a
             legally binding agreement between you, the user who will be utilizing Eklan

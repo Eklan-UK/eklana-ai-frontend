@@ -55,13 +55,13 @@ export function HomeConfidenceCard() {
       <Card className="animate-pulse">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 bg-yellow-100/50 rounded-lg" />
+            <div className="w-12 h-12 bg-muted rounded-lg" />
             <div className="space-y-2">
-              <div className="h-4 w-20 bg-gray-200 rounded" />
-              <div className="h-3 w-24 bg-gray-200 rounded" />
+              <div className="h-4 w-20 bg-muted rounded" />
+              <div className="h-3 w-24 bg-muted rounded" />
             </div>
           </div>
-          <div className="w-16 h-16 rounded-full bg-gray-100" />
+          <div className="w-16 h-16 rounded-full bg-muted" />
         </div>
       </Card>
     );
@@ -84,7 +84,7 @@ export function HomeConfidenceCard() {
             <TrendingUp className="w-6 h-6 text-yellow-600" />
           </div>
           <div>
-            <p className="text-sm font-medium font-satoshi text-gray-900">
+            <p className="text-sm font-medium font-satoshi text-foreground">
               Confidence
             </p>
             <p className={`text-xs flex items-center gap-1 mt-1 ${
@@ -109,9 +109,10 @@ export function HomeConfidenceCard() {
               cx="32"
               cy="32"
               r={radius}
-              stroke="#e5e7eb"
+              stroke="currentColor"
               strokeWidth="4"
               fill="none"
+              className="text-border"
             />
             {/* Progress Circle */}
             <circle

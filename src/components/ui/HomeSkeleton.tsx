@@ -5,13 +5,13 @@ export function HomeHeaderSkeleton() {
   return (
     <div className="flex items-center justify-between mb-6 animate-pulse">
       <div className="flex-1 min-w-0 pr-4">
-        <div className="h-8 md:h-9 bg-gray-200 rounded-lg w-48 mb-2" />
-        <div className="h-4 bg-gray-100 rounded w-full max-w-xs" />
+        <div className="h-8 md:h-9 bg-muted rounded-lg w-48 mb-2" />
+        <div className="h-4 bg-muted rounded w-full max-w-xs" />
       </div>
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
-        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-200 rounded-lg" />
-        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-200 rounded-lg" />
-        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-200 rounded-lg" />
+        <div className="w-10 h-10 md:w-12 md:h-12 bg-muted rounded-lg" />
+        <div className="w-10 h-10 md:w-12 md:h-12 bg-muted rounded-lg" />
+        <div className="w-10 h-10 md:w-12 md:h-12 bg-muted rounded-lg" />
       </div>
     </div>
   );
@@ -22,8 +22,8 @@ export function AssignedDrillsSkeleton() {
   return (
     <div className="mb-6 md:mb-8 space-y-3">
       <div className="flex items-center justify-between mb-4">
-        <div className="h-6 bg-gray-200 rounded w-40 animate-pulse" />
-        <div className="h-4 bg-gray-100 rounded w-16 animate-pulse" />
+        <div className="h-6 bg-muted rounded w-40 animate-pulse" />
+        <div className="h-4 bg-muted rounded w-16 animate-pulse" />
       </div>
       <CardSkeleton />
       <CardSkeleton />
@@ -38,34 +38,34 @@ export function AssignedDrillsSkeleton() {
  */
 export default function HomeSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
         <HomeHeaderSkeleton />
 
-        <div className="h-24 rounded-xl bg-gray-200 animate-pulse mb-4 md:mb-6" />
+        <div className="h-24 rounded-xl bg-muted animate-pulse mb-4 md:mb-6" />
 
-        <div className="h-12 rounded-lg bg-gray-200 animate-pulse mb-4 md:mb-6" />
+        <div className="h-12 rounded-lg bg-muted animate-pulse mb-4 md:mb-6" />
 
         <div className="mb-4 md:mb-6">
-          <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse" />
+          <div className="h-6 bg-muted rounded w-32 mb-4 animate-pulse" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="h-32 rounded-xl bg-gray-200 animate-pulse" />
-            <div className="h-32 rounded-xl bg-gray-200 animate-pulse" />
+            <div className="h-32 rounded-xl bg-muted animate-pulse" />
+            <div className="h-32 rounded-xl bg-muted animate-pulse" />
           </div>
-          <div className="h-14 rounded-full bg-gray-100 animate-pulse mt-3" />
+          <div className="h-14 rounded-full bg-muted animate-pulse mt-3" />
         </div>
 
         <AssignedDrillsSkeleton />
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <div className="h-6 bg-gray-200 rounded w-36 animate-pulse" />
-            <div className="h-4 bg-gray-100 rounded w-14 animate-pulse" />
+            <div className="h-6 bg-muted rounded w-36 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-14 animate-pulse" />
           </div>
           <div className="space-y-3">
-            <div className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-            <div className="h-16 rounded-xl bg-gray-100 animate-pulse" />
+            <div className="h-16 rounded-xl bg-muted animate-pulse" />
+            <div className="h-16 rounded-xl bg-muted animate-pulse" />
           </div>
         </div>
       </div>

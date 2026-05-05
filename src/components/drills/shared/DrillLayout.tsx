@@ -42,7 +42,7 @@ export function DrillLayout({
   title,
   children,
   className = "",
-  backgroundGradient = "bg-white",
+  backgroundGradient = "bg-background",
   maxWidth = "md",
   hideNavigation = true, // Default to hiding nav during drills
   minimalHeader = false,

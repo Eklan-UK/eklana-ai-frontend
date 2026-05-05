@@ -9,7 +9,7 @@ export function AssignedDrillsTitleRow() {
 
   return (
     <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg md:text-xl font-bold text-gray-900">
+      <h3 className="text-lg md:text-xl font-bold text-foreground">
         {t("assignedDrills")}
       </h3>
       <Link
@@ -25,5 +25,5 @@ export function AssignedDrillsTitleRow() {
 
 export function AssignedDrillsEmptyMessage() {
   const t = useTranslations("account");
-  return <p className="text-gray-600">{t("noDrillsYet")}</p>;
+  return <p className="text-muted-foreground">{t("noDrillsYet")}</p>;
 }

@@ -35,13 +35,13 @@ export function DrillProgress({
 
   const inner = (
     <>
-      <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+      <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
         <span>
           {label} {current} of {total}
         </span>
         <span className={`font-bold text-${textColor}`}>{percentage}%</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="w-full bg-muted rounded-full h-2">
         <div
           className={`${gradient} h-2 rounded-full transition-all duration-300`}
           style={{ width: `${percentage}%` }}
@@ -55,7 +55,7 @@ export function DrillProgress({
   }
 
   return (
-    <Card className={`mb-4 bg-white/80 backdrop-blur-sm ${className}`}>
+    <Card className={`mb-4 bg-card/80 backdrop-blur-sm ${className}`}>
       {inner}
     </Card>
   );

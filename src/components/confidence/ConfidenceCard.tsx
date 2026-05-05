@@ -23,8 +23,9 @@ function ConfidenceRing({ score, color }: { score: number; color: string }) {
         <circle
           cx="50" cy="50" r={radius}
           strokeWidth="8"
-          stroke="#f3f4f6"
+          stroke="currentColor"
           fill="none"
+          className="text-muted"
         />
         {/* Progress */}
         <circle
@@ -40,10 +41,10 @@ function ConfidenceRing({ score, color }: { score: number; color: string }) {
       </svg>
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold font-nunito text-gray-900 leading-none">
+        <span className="text-2xl font-bold font-nunito text-foreground leading-none">
           {score}
         </span>
-        <span className="text-xs text-gray-400 font-satoshi">/ 100</span>
+        <span className="text-xs text-muted-foreground font-satoshi">/ 100</span>
       </div>
     </div>
   );
@@ -66,7 +67,7 @@ function TrendBadge({ trend }: { trend: ConfidenceMetrics['trend'] }) {
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-satoshi">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs font-satoshi">
       <Minus className="w-3 h-3" /> Stable
     </span>
   );
@@ -80,11 +81,11 @@ export function ConfidenceCard() {
     return (
       <Card className="mb-6 p-4 animate-pulse">
         <div className="flex items-center gap-4">
-          <div className="w-28 h-28 rounded-full bg-gray-200" />
+          <div className="w-28 h-28 rounded-full bg-muted" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 bg-gray-200 rounded w-1/2" />
-            <div className="h-6 bg-gray-200 rounded w-1/3" />
-            <div className="h-3 bg-gray-200 rounded w-2/3" />
+            <div className="h-4 bg-muted rounded w-1/2" />
+            <div className="h-6 bg-muted rounded w-1/3" />
+            <div className="h-3 bg-muted rounded w-2/3" />
           </div>
         </div>
       </Card>
@@ -102,7 +103,7 @@ export function ConfidenceCard() {
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Target className="w-4 h-4 text-[#22c55e]" />
-        <h3 className="text-sm font-semibold text-gray-700 font-satoshi uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-foreground font-satoshi uppercase tracking-wide">
           Confidence Score
         </h3>
       </div>
@@ -126,7 +127,7 @@ export function ConfidenceCard() {
           </div>
 
           {/* Drills progress */}
-          <p className="text-xs font-satoshi text-gray-500 mb-3">
+          <p className="text-xs font-satoshi text-muted-foreground mb-3">
             {confidence.drillsCompleted} of {confidence.drillsAssigned} drills completed
           </p>
 
@@ -147,7 +148,7 @@ export function ConfidenceCard() {
       </div>
 
       {/* Footer formula hint */}
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400 font-satoshi">
+      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-satoshi">
         <span>Completion 40% + Quality 60%</span>
         <span>Based on Speechace scores</span>
       </div>
@@ -161,12 +162,12 @@ function SubBar({ label, value, color }: { label: string; value: number; color: 
   return (
     <div>
       <div className="flex items-center justify-between mb-0.5">
-        <span className="text-xs text-gray-500 font-satoshi">{label}</span>
+        <span className="text-xs text-muted-foreground font-satoshi">{label}</span>
         <span className="text-xs font-semibold font-satoshi" style={{ color }}>
           {pct}%
         </span>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, backgroundColor: color }}

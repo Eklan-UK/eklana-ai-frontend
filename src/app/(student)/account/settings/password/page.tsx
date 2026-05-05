@@ -75,7 +75,7 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
@@ -87,10 +87,10 @@ export default function ChangePasswordPage() {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 text-yellow-600 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-gray-900 mb-1">
+                <p className="text-sm font-semibold text-foreground mb-1">
                   Password Requirements
                 </p>
-                <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
                   <li>At least 8 characters long</li>
                   <li>Must be different from your current password</li>
                 </ul>
@@ -116,7 +116,7 @@ export default function ChangePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {showCurrentPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -145,7 +145,7 @@ export default function ChangePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {showNewPassword ? (
                       <EyeOff className="w-5 h-5" />
@@ -174,7 +174,7 @@ export default function ChangePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="w-5 h-5" />

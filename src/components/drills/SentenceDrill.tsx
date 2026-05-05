@@ -248,7 +248,7 @@ export default function SentenceDrill({
           <div className="flex flex-col items-center gap-3 text-amber-600 py-8">
             <AlertCircle className="w-12 h-12" />
             <p className="text-lg font-medium">No words found</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               This drill may not be configured correctly. Please contact your
               tutor.
             </p>
@@ -268,7 +268,7 @@ export default function SentenceDrill({
       {/* Context */}
       {drill.context && (
         <Card className="mb-0">
-          <p className="text-sm text-gray-700">{drill.context}</p>
+          <p className="text-sm text-foreground">{drill.context}</p>
         </Card>
       )}
 
@@ -278,7 +278,7 @@ export default function SentenceDrill({
           {currentWord?.word ? (
             <>
               <div className="flex items-center justify-center gap-3 mb-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                <h1 className="text-3xl md:text-4xl font-bold text-foreground">
                   {currentWord.word}
                 </h1>
                 <TTSButton text={currentWord.word} size="lg" audioUrl={currentWord.audioUrl} />
@@ -295,7 +295,7 @@ export default function SentenceDrill({
                   💡 Hint: {currentWord.hint}
                 </p>
               )}
-              <p className="text-sm text-gray-500 mt-3">
+              <p className="text-sm text-muted-foreground mt-3">
                 Provide definition and two sentences
               </p>
             </>
@@ -303,7 +303,7 @@ export default function SentenceDrill({
             <div className="flex flex-col items-center gap-3 text-amber-600">
               <AlertCircle className="w-12 h-12" />
               <p className="text-lg font-medium">No target word found</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 This drill may not be configured correctly. Please contact your
                 tutor.
               </p>
@@ -315,17 +315,17 @@ export default function SentenceDrill({
       {/* Definition Section */}
       <Card className="mb-0">
         <div className="mb-4">
-          <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-gray-600" />
+          <label className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-muted-foreground" />
             Definition:
           </label>
           <Textarea
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none"
+            className="w-full p-4 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none bg-background text-foreground"
             placeholder="Enter the definition of the word..."
             value={currentAnswer.definition}
             onChange={(e) => updateCurrentAnswer("definition", e.target.value)}
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             {currentAnswer.definition.length} characters
           </p>
         </div>
@@ -334,17 +334,17 @@ export default function SentenceDrill({
       {/* Sentence 1 Section */}
       <Card className="mb-0">
         <div className="mb-4">
-          <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <PenTool className="w-4 h-4 text-gray-600" />
+          <label className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+            <PenTool className="w-4 h-4 text-muted-foreground" />
             Sentence 1:
           </label>
           <Textarea
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none"
+            className="w-full p-4 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none bg-background text-foreground"
             placeholder="Write a sentence using the word..."
             value={currentAnswer.sentence1}
             onChange={(e) => updateCurrentAnswer("sentence1", e.target.value)}
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             {currentAnswer.sentence1.length} characters
           </p>
         </div>
@@ -353,17 +353,17 @@ export default function SentenceDrill({
       {/* Sentence 2 Section */}
       <Card className="mb-0">
         <div className="mb-4">
-          <label className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <PenTool className="w-4 h-4 text-gray-600" />
+          <label className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+            <PenTool className="w-4 h-4 text-muted-foreground" />
             Sentence 2:
           </label>
           <Textarea
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none"
+            className="w-full p-4 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[100px] resize-none bg-background text-foreground"
             placeholder="Write another sentence using the word..."
             value={currentAnswer.sentence2}
             onChange={(e) => updateCurrentAnswer("sentence2", e.target.value)}
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             {currentAnswer.sentence2.length} characters
           </p>
         </div>
@@ -371,7 +371,7 @@ export default function SentenceDrill({
         </div>
 
         {/* Fixed bottom navigation (assigned sentence / writing drill) */}
-        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-gray-200/90 bg-white/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+        <div className="shrink-0 -mx-4 px-4 md:-mx-8 md:px-8 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-border/90 bg-background/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
           <div className="relative flex min-h-12 items-center justify-between gap-2 sm:gap-4">
             <Button
               type="button"
@@ -384,7 +384,7 @@ export default function SentenceDrill({
               <ChevronLeft className="w-5 h-5 shrink-0 sm:mr-1" />
               <span>Previous</span>
             </Button>
-            <p className="pointer-events-none absolute left-1/2 top-1/2 z-0 max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-medium leading-tight text-gray-600 tabular-nums sm:max-w-none sm:text-sm">
+            <p className="pointer-events-none absolute left-1/2 top-1/2 z-0 max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center text-[11px] font-medium leading-tight text-muted-foreground tabular-nums sm:max-w-none sm:text-sm">
               Word {currentIndex + 1} of {totalWords}
             </p>
             <Button

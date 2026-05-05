@@ -215,7 +215,7 @@ export default function SummaryDrill({
   return (
     <DrillLayout
       title={drill.title}
-      backgroundGradient="bg-gradient-to-br from-green-50 to-emerald-50"
+      backgroundGradient="bg-background"
       maxWidth="3xl"
     >
       {/* Mode Tabs */}
@@ -225,7 +225,7 @@ export default function SummaryDrill({
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "read"
               ? "bg-green-600 text-white shadow-lg"
-              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+              : "bg-card text-muted-foreground hover:bg-muted border border-border"
           }`}
         >
           <Eye className="w-4 h-4" />
@@ -239,7 +239,7 @@ export default function SummaryDrill({
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "listen"
               ? "bg-green-600 text-white shadow-lg"
-              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+              : "bg-card text-muted-foreground hover:bg-muted border border-border"
           }`}
         >
           <Headphones className="w-4 h-4" />
@@ -253,7 +253,7 @@ export default function SummaryDrill({
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "write"
               ? "bg-green-600 text-white shadow-lg"
-              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+              : "bg-card text-muted-foreground hover:bg-muted border border-border"
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -265,14 +265,14 @@ export default function SummaryDrill({
       {currentMode === "read" && (
         <>
         {/* Instructions */}
-        <Card className="mb-6 bg-green-50 border-green-200">
+        <Card className="mb-6 bg-emerald-500/10 border border-emerald-500/25">
           <div className="flex items-start gap-3">
-              <BookOpen className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
             <div>
-                <p className="text-sm font-semibold text-green-900 mb-1">
+                <p className="text-sm font-semibold text-foreground mb-1">
                   Read the Passage
                 </p>
-              <p className="text-sm text-green-800">
+              <p className="text-sm text-muted-foreground">
                   Read the passage carefully. Pay attention to the main ideas
                   and key details. Estimated reading time: {readingTimeMinutes}{" "}
                   min ({passageWordCount} words)
@@ -282,10 +282,10 @@ export default function SummaryDrill({
         </Card>
 
           {/* Passage Card */}
-          <Card className="mb-6 bg-white shadow-lg">
-          <div className="mb-4 pb-4 border-b border-gray-200">
+          <Card className="mb-6 bg-card shadow-lg">
+          <div className="mb-4 pb-4 border-b border-border">
               <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-green-500" />
                 {articleTitle}
               </h2>
@@ -294,7 +294,7 @@ export default function SummaryDrill({
             </div>
 
             <div className="prose prose-sm max-w-none">
-              <div className="text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
+              <div className="text-foreground leading-relaxed whitespace-pre-wrap text-base">
                 {articleContent || "No passage content provided."}
               </div>
             </div>
@@ -318,14 +318,14 @@ export default function SummaryDrill({
       {currentMode === "listen" && (
         <>
           {/* Instructions */}
-          <Card className="mb-6 bg-green-50 border-green-200">
+          <Card className="mb-6 bg-emerald-500/10 border border-emerald-500/25">
             <div className="flex items-start gap-3">
-              <Headphones className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <Headphones className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-green-900 mb-1">
+                <p className="text-sm font-semibold text-foreground mb-1">
                   Listen to the Passage
                 </p>
-                <p className="text-sm text-green-800">
+                <p className="text-sm text-muted-foreground">
                   Listen to the passage being read aloud. You can follow along
                   with the text below or close your eyes and focus on listening.
                 </p>
@@ -343,10 +343,10 @@ export default function SummaryDrill({
                 disabled={hasListened && !isPlaying}
                 className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 transition-all ${
                   isPlaying
-                    ? "bg-white/30 scale-110"
+                    ? "bg-background/30 scale-110"
                     : hasListened
-                    ? "bg-white/10 cursor-not-allowed"
-                    : "bg-white/20 hover:bg-white/30"
+                    ? "bg-background/10 cursor-not-allowed"
+                    : "bg-background/20 hover:bg-background/30"
                 }`}
               >
                 {isPlaying ? (
@@ -376,10 +376,10 @@ export default function SummaryDrill({
           </Card>
 
           {/* Toggle Passage Visibility */}
-          <Card className="mb-6 bg-white shadow-lg">
+          <Card className="mb-6 bg-card shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Eye className="w-4 h-4 text-gray-500" />
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <Eye className="w-4 h-4 text-muted-foreground" />
                 Passage Text
               </h3>
               <button
@@ -392,7 +392,7 @@ export default function SummaryDrill({
           
             {showPassage && (
           <div className="prose prose-sm max-w-none">
-            <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+            <div className="text-foreground leading-relaxed whitespace-pre-wrap">
                   {articleContent || "No passage content provided."}
                 </div>
               </div>
@@ -420,14 +420,14 @@ export default function SummaryDrill({
       {currentMode === "write" && (
         <>
           {/* Instructions */}
-          <Card className="mb-6 bg-green-50 border-green-200">
+          <Card className="mb-6 bg-emerald-500/10 border border-emerald-500/25">
             <div className="flex items-start gap-3">
-              <FileText className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-green-900 mb-1">
+                <p className="text-sm font-semibold text-foreground mb-1">
                   Write Your Summary
                 </p>
-                <p className="text-sm text-green-800">
+                <p className="text-sm text-muted-foreground">
                   Summarize the main ideas and key points from the passage.
                   Write at least 30 words. Your summary will be reviewed by your
                   tutor.
@@ -437,12 +437,12 @@ export default function SummaryDrill({
           </Card>
 
           {/* Reference Toggle */}
-          <Card className="mb-4 bg-white shadow-sm">
+          <Card className="mb-4 bg-card shadow-sm">
             <button
               onClick={() => setShowPassage(!showPassage)}
               className="w-full flex items-center justify-between"
             >
-              <span className="flex items-center gap-2 font-medium text-gray-700">
+              <span className="flex items-center gap-2 font-medium text-foreground">
                 <BookOpen className="w-4 h-4 text-green-500" />
                 {articleTitle}
               </span>
@@ -452,9 +452,9 @@ export default function SummaryDrill({
             </button>
 
             {showPassage && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="prose prose-sm max-w-none">
-                  <div className="text-gray-600 leading-relaxed whitespace-pre-wrap text-sm max-h-48 overflow-y-auto">
+                  <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-sm max-h-48 overflow-y-auto">
                     {articleContent}
                   </div>
             </div>
@@ -463,15 +463,15 @@ export default function SummaryDrill({
         </Card>
 
         {/* Summary Input */}
-          <Card className="mb-6 bg-white shadow-lg">
+          <Card className="mb-6 bg-card shadow-lg">
           <div className="mb-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <label className="block text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4 text-green-500" />
                 Your Summary
             </label>
             <div className="relative">
               <textarea
-                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[200px] resize-none text-base"
+                  className="w-full p-4 border-2 border-border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all min-h-[200px] resize-none text-base bg-background text-foreground"
                   placeholder="Write your summary here...&#10;&#10;Include the main points and key ideas from the passage. Try to use your own words."
                 value={summary}
                 onChange={(e) => handleSummaryChange(e.target.value)}
@@ -482,7 +482,7 @@ export default function SummaryDrill({
                   <div className="flex items-center gap-3">
                     <span
                       className={`text-sm font-medium ${
-                        wordCount >= 30 ? "text-green-600" : "text-gray-500"
+                        wordCount >= 30 ? "text-green-600" : "text-muted-foreground"
                       }`}
                     >
                       {wordCount} {wordCount === 1 ? "word" : "words"}

@@ -65,7 +65,7 @@ function ReviewBadge({
 
   if (reviewStatus === "pending") {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-medium">
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-200 text-xs font-medium">
         <Clock3 className="w-3 h-3" />
         <span>Pending Review</span>
       </div>
@@ -78,7 +78,7 @@ function ReviewBadge({
 
   if (allCorrect) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 text-xs font-medium">
         <CheckCircle className="w-3 h-3" />
         <span>All Correct</span>
       </div>
@@ -87,7 +87,7 @@ function ReviewBadge({
 
   if (hasIncorrect) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 text-xs font-medium">
         <AlertCircle className="w-3 h-3" />
         <span>
           {correctCount}/{totalCount} Correct
@@ -97,7 +97,7 @@ function ReviewBadge({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 text-xs font-medium">
       <CheckCircle className="w-3 h-3" />
       <span>Reviewed</span>
     </div>
@@ -183,7 +183,7 @@ function DrillCardComponent({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="text-lg sm:text-xl flex-shrink-0">{typeInfo.icon}</span>
-              <span className="font-medium text-gray-900 text-sm sm:text-base truncate">{drill.title}</span>
+              <span className="font-medium text-foreground text-sm sm:text-base truncate">{drill.title}</span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {showReviewBadge && (
@@ -222,7 +222,7 @@ function DrillCardComponent({
         <span className="text-xl sm:text-2xl flex-shrink-0">{getDrillIcon(drill.type)}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2 sm:truncate">
+            <h3 className="font-semibold text-foreground text-sm sm:text-base line-clamp-2 sm:truncate">
               {drill.title}
             </h3>
             <div className="flex-shrink-0 hidden sm:block">
@@ -235,11 +235,11 @@ function DrillCardComponent({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mt-1">
-            <span className="text-xs text-gray-500 capitalize">
+            <span className="text-xs text-muted-foreground capitalize">
               {drill.type}
             </span>
-            <span className="text-xs text-gray-400">•</span>
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground">•</span>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Target className="w-3 h-3" />
               <span className="capitalize">{drill.difficulty}</span>
             </div>
@@ -257,7 +257,7 @@ function DrillCardComponent({
       </div>
 
       {/* Due date and score info */}
-      <div className="flex items-center gap-2 sm:gap-4 text-xs text-gray-500 mb-3 flex-wrap">
+      <div className="flex items-center gap-2 sm:gap-4 text-xs text-muted-foreground mb-3 flex-wrap">
         <div className="flex items-center gap-1">
           <Calendar className="w-3 h-3 flex-shrink-0" />
           <span className="whitespace-nowrap">Due: {formatDate(calculatedDueDate.toISOString())}</span>
@@ -282,8 +282,8 @@ function DrillCardComponent({
       )}
 
       {isOverdue && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
-          <p className="text-xs text-red-700">This drill is overdue</p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 mb-2">
+          <p className="text-xs text-red-800 dark:text-red-200">This drill is overdue</p>
         </div>
       )}
 
@@ -291,7 +291,7 @@ function DrillCardComponent({
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           {assignedBy && variant === "detailed" && (
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-xs text-muted-foreground truncate">
               Assigned by: {assignedBy.firstName} {assignedBy.lastName}
             </p>
           )}
@@ -305,7 +305,7 @@ function DrillCardComponent({
                   variant="primary"
                   size="sm"
                   disabled={true}
-                  className="bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed text-xs sm:text-sm px-3 sm:px-4"
+                  className="bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed text-xs sm:text-sm px-3 sm:px-4"
                 >
                   View
                 </Button>

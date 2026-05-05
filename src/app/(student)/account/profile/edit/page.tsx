@@ -59,7 +59,7 @@ export default function EditProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Edit profile" />
 
@@ -76,7 +76,7 @@ export default function EditProfilePage() {
                 className="rounded-full object-cover w-full h-full border border-[#ecffed]"
               />
             ) : (
-              <div className="w-full h-full rounded-full border border-[#ecffed] bg-[#fcfcfc] flex items-center justify-center">
+              <div className="w-full h-full rounded-full border border-[#ecffed] bg-muted flex items-center justify-center">
                 {/* empty-state image icon matching Figma frame 2 */}
                 <svg
                   width="52"
@@ -126,15 +126,15 @@ export default function EditProfilePage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Name field */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-[#777]">Name</label>
-            <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-1">
-              <User className="w-6 h-6 text-[#aaa] shrink-0" />
+            <label className="text-sm text-muted-foreground">Name</label>
+            <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-1">
+              <User className="w-6 h-6 text-muted-foreground shrink-0" />
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                className="flex-1 bg-transparent text-base text-[#1b1b1b] outline-none min-w-0"
+                className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
                 required
                 disabled={isLoading}
               />
@@ -143,15 +143,15 @@ export default function EditProfilePage() {
 
           {/* Email field */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-[#777] font-nunito">Email</label>
-            <div className="bg-[#fcfcfc] border border-[rgba(231,234,237,0.5)] rounded-xl p-3 flex items-center gap-1">
-              <Mail className="w-6 h-6 text-[#aaa] shrink-0" />
+            <label className="text-sm text-muted-foreground font-nunito">Email</label>
+            <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-1">
+              <Mail className="w-6 h-6 text-muted-foreground shrink-0" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="flex-1 bg-transparent text-base text-[#1b1b1b] outline-none min-w-0"
+                className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
                 required
                 disabled={isLoading}
               />
@@ -191,13 +191,13 @@ export default function EditProfilePage() {
           onClick={() => setShowDeleteConfirm(false)}
         >
           <div
-            className="bg-white rounded-t-[32px] w-full px-4 pt-5 pb-8 shadow-lg"
+            className="bg-card rounded-t-[32px] w-full px-4 pt-5 pb-8 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-bold text-[#171717] mb-2">
+            <h2 className="text-base font-bold text-foreground mb-2">
               Delete account?
             </h2>
-            <p className="text-sm text-[#777] mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               This action is permanent. All your data, progress and
               subscription will be lost.
             </p>
@@ -210,7 +210,7 @@ export default function EditProfilePage() {
             </button>
             <button
               onClick={() => setShowDeleteConfirm(false)}
-              className="w-full py-4 border border-[rgba(231,234,237,0.5)] rounded-[50px] text-[#171717] font-medium"
+              className="w-full py-4 border border-border rounded-[50px] text-foreground font-medium"
             >
               Cancel
             </button>

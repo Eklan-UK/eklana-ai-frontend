@@ -81,7 +81,7 @@ function Toggle({
 // ─── Separator ─────────────────────────────────────────────────────────────────
 
 function Separator() {
-  return <div className="h-px w-full bg-gray-100" />;
+  return <div className="h-px w-full bg-border" />;
 }
 
 // ─── Setting row (toggle variant) ──────────────────────────────────────────────
@@ -100,7 +100,7 @@ function ToggleRow({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-[#606060]">{label}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
         <Toggle enabled={enabled} onChange={onChange} disabled={disabled} />
       </div>
       <Separator />
@@ -126,10 +126,10 @@ function NavRow({
         onClick={onClick}
         className="flex items-center justify-between w-full text-left"
       >
-        <span className="text-sm text-[#333333]">{label}</span>
+        <span className="text-sm text-foreground">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#606060]">{value}</span>
-          <ChevronRight className="w-4 h-4 text-[#606060]" strokeWidth={1.8} />
+          <span className="text-sm text-muted-foreground">{value}</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" strokeWidth={1.8} />
         </div>
       </button>
       <Separator />
@@ -173,14 +173,14 @@ function BottomSheet({
         aria-hidden
       />
       {/* Sheet */}
-      <div className="relative z-10 w-full bg-white rounded-t-[32px] border border-[#ebebef] shadow-[0px_4px_6px_-1px_rgba(18,18,23,0.08),0px_2px_4px_-1px_rgba(18,18,23,0.06)] pb-6 pt-5 px-4 max-w-lg mx-auto">
+      <div className="relative z-10 w-full bg-card rounded-t-[32px] border border-border shadow-[0px_4px_6px_-1px_rgba(18,18,23,0.08),0px_2px_4px_-1px_rgba(18,18,23,0.06)] pb-6 pt-5 px-4 max-w-lg mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pr-1">
-          <h2 className="text-base font-bold text-[#121217] leading-6">{title}</h2>
+          <h2 className="text-base font-bold text-foreground leading-6">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -211,12 +211,12 @@ function SelectionCard({
       onClick={onClick}
       className={`w-full text-left p-4 rounded-2xl flex items-center gap-2 transition-all ${
         selected
-          ? "border border-[rgba(76,175,80,0.5)] bg-white [box-shadow:0px_4px_0px_rgba(52,199,89,0.1)]"
-          : "border border-[0.5px] border-[#d7dce2] bg-white [box-shadow:0px_4px_0px_rgba(231,234,237,0.5)]"
+          ? "border border-[rgba(76,175,80,0.5)] bg-card [box-shadow:0px_4px_0px_rgba(52,199,89,0.1)]"
+          : "border border-border bg-card [box-shadow:0px_4px_0px_rgba(231,234,237,0.5)]"
       }`}
     >
       {prefix && <span className="text-xl leading-none shrink-0">{prefix}</span>}
-      <span className="text-sm font-medium text-[#1e1c1c]">{label}</span>
+      <span className="text-sm font-medium text-foreground">{label}</span>
     </button>
   );
 }
@@ -280,7 +280,7 @@ export default function LessonSettingsPage() {
     SPEED_OPTIONS[0].display;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Lesson" />
 

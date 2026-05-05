@@ -24,9 +24,9 @@ function ScoreIndicator({
   };
 
   const getColorClasses = (score: number) => {
-    if (score >= threshold.good) return "bg-green-100 text-green-600";
-    if (score >= threshold.ok) return "bg-yellow-100 text-yellow-600";
-    return "bg-red-100 text-red-600";
+    if (score >= threshold.good) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+    if (score >= threshold.ok) return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
+    return "bg-red-500/15 text-red-700 dark:text-red-300";
   };
 
   return (
@@ -43,8 +43,8 @@ function WordScoreCard({ wordScore, index }: { wordScore: WordScore; index: numb
     <Card key={index}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-base font-semibold text-gray-900">{wordScore.word}</h3>
-          <p className="text-xs text-gray-500">Word Quality Score</p>
+          <h3 className="text-base font-semibold text-foreground">{wordScore.word}</h3>
+          <p className="text-xs text-muted-foreground">Word Quality Score</p>
         </div>
         <ScoreIndicator score={wordScore.quality_score} />
       </div>
@@ -65,13 +65,13 @@ export function WordAnalytics({ pronunciationScore }: WordAnalyticsProps) {
   return (
     <div className="mb-4 space-y-4">
       {/* Overall Score Indicator */}
-      <Card className="bg-gradient-to-br from-green-50 to-blue-50 border-green-200">
+      <Card className="bg-emerald-500/10 border border-emerald-500/25">
         <div className="text-center py-4">
           <div className="flex items-center justify-center gap-3 mb-2">
             <ScoreIndicator score={score} size="lg" threshold={{ good: 65, ok: 50 }} />
             <div className="text-left">
-              <p className="text-sm font-medium text-gray-600">Pronunciation Score</p>
-              <p className="text-xs text-gray-500">{passed ? "✓ Passed" : "Need 65% to pass"}</p>
+              <p className="text-sm font-medium text-muted-foreground">Pronunciation Score</p>
+              <p className="text-xs text-muted-foreground">{passed ? "✓ Passed" : "Need 65% to pass"}</p>
             </div>
           </div>
         </div>
@@ -84,8 +84,8 @@ export function WordAnalytics({ pronunciationScore }: WordAnalyticsProps) {
 
       {/* Pass/Fail Message */}
       {!passed && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800 text-center">You need at least 65% to pass. Try again!</p>
+        <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-lg">
+          <p className="text-sm text-foreground text-center">You need at least 65% to pass. Try again!</p>
         </div>
       )}
     </div>

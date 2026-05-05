@@ -2,6 +2,7 @@
 
 import { NextIntlClientProvider } from "next-intl";
 import { useEffect, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import {
   type AppLocale,
@@ -30,7 +31,10 @@ export function StudentIntlProvider({
   children: React.ReactNode;
 }) {
   const { data } = useUserCurrent();
+  const { setTheme } = useTheme();
   const profileLang = data?.profile?.language;
+  const profileTheme = (data?.profile as { theme?: string } | undefined)?.theme;
+
   const locale = useMemo(
     () => profileLanguageToLocale(profileLang),
     [profileLang]
@@ -45,6 +49,15 @@ export function StudentIntlProvider({
   useEffect(() => {
     document.documentElement.lang = htmlLangFromLocale(locale);
   }, [locale]);
+
+  // Hydrate theme from backend preference once profile loads
+  useEffect(() => {
+    if (profileTheme === "system" || profileTheme === "light" || profileTheme === "dark") {
+      setTheme(profileTheme);
+    }
+  // Run only when profile theme value first becomes available
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileTheme]);
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>

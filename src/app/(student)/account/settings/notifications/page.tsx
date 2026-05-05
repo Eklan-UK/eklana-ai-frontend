@@ -39,7 +39,7 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!enabled)}
       className={`relative w-[52px] h-[30px] rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 ${
-        enabled ? "bg-green-500" : "bg-gray-200"
+        enabled ? "bg-green-500" : "bg-muted"
       } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
       <span
@@ -64,10 +64,10 @@ function ToggleRow({ label, value, onChange, saving, id, last }: ToggleRowProps)
   return (
     <div
       className={`flex items-center justify-between py-4 ${
-        last ? "" : "border-b border-gray-100"
+        last ? "" : "border-b border-border"
       }`}
     >
-      <label htmlFor={id} className="text-base text-gray-900 cursor-pointer select-none">
+      <label htmlFor={id} className="text-base text-foreground cursor-pointer select-none">
         {label}
       </label>
       <Toggle id={id} enabled={value} onChange={onChange} disabled={saving} />
@@ -122,7 +122,7 @@ export default function SettingsNotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="h-6" />
       <Header showBack title="Notifications" />
 

@@ -34,12 +34,12 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 	};
 
 	return (
-		<div className="border border-gray-200 rounded-lg p-6 bg-white">
+		<div className="border border-border rounded-lg p-6 bg-card">
 			{/* Header */}
 			<div className="flex items-center justify-between mb-4">
 				<div>
-					<h3 className="text-lg font-semibold text-gray-900">Parsed Content Preview</h3>
-					<p className="text-sm text-gray-500">
+					<h3 className="text-lg font-semibold text-foreground">Parsed Content Preview</h3>
+					<p className="text-sm text-muted-foreground">
 						Detected type: <span className="font-medium capitalize">{type}</span> (
 						<span className={getConfidenceColor(confidence)}>
 							{getConfidenceLabel(confidence)} confidence: {Math.round(confidence * 100)}%
@@ -63,8 +63,8 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 			{/* Title */}
 			{title && (
 				<div className="mb-4">
-					<label className="text-xs font-medium text-gray-500 uppercase">Title</label>
-					<p className="text-sm text-gray-900 mt-1">{title}</p>
+					<label className="text-xs font-medium text-muted-foreground uppercase">Title</label>
+					<p className="text-sm text-foreground mt-1">{title}</p>
 				</div>
 			)}
 
@@ -73,14 +73,14 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 				<div className="mb-4 grid grid-cols-2 gap-4">
 					{metadata.difficulty && (
 						<div>
-							<label className="text-xs font-medium text-gray-500 uppercase">Difficulty</label>
-							<p className="text-sm text-gray-900 mt-1 capitalize">{metadata.difficulty}</p>
+							<label className="text-xs font-medium text-muted-foreground uppercase">Difficulty</label>
+							<p className="text-sm text-foreground mt-1 capitalize">{metadata.difficulty}</p>
 						</div>
 					)}
 					{metadata.context && (
 						<div>
-							<label className="text-xs font-medium text-gray-500 uppercase">Context</label>
-							<p className="text-sm text-gray-900 mt-1">{metadata.context}</p>
+							<label className="text-xs font-medium text-muted-foreground uppercase">Context</label>
+							<p className="text-sm text-foreground mt-1">{metadata.context}</p>
 						</div>
 					)}
 				</div>
@@ -88,49 +88,49 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 
 			{/* Items Preview */}
 			<div className="mb-4">
-				<label className="text-xs font-medium text-gray-500 uppercase mb-2 block">
+				<label className="text-xs font-medium text-muted-foreground uppercase mb-2 block">
 					Extracted Items ({items.length})
 				</label>
-				<div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+				<div className="max-h-64 overflow-y-auto border border-border rounded-lg">
 					<table className="w-full text-sm">
-						<thead className="bg-gray-50 sticky top-0">
+						<thead className="bg-muted sticky top-0">
 							<tr>
 								{type === "vocabulary" && (
 									<>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Word</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Translation</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Sentence</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Word</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Translation</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Sentence</th>
 									</>
 								)}
 								{type === "matching" && (
 									<>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Left</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Right</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Left</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Right</th>
 									</>
 								)}
 								{type === "roleplay" && (
 									<>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Scene</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Dialogue Turns</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Scene</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Dialogue Turns</th>
 									</>
 								)}
 								{(type === "definition" || type === "sentence_writing") && (
 									<>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Word</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Hint</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Word</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Hint</th>
 									</>
 								)}
 								{type === "grammar" && (
 									<>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Pattern</th>
-										<th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Example</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Pattern</th>
+										<th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Example</th>
 									</>
 								)}
 							</tr>
 						</thead>
-						<tbody className="divide-y divide-gray-100">
+						<tbody className="divide-y divide-border">
 							{items.slice(0, 10).map((item, index) => (
-								<tr key={index} className="hover:bg-gray-50">
+								<tr key={index} className="hover:bg-muted">
 									{type === "vocabulary" && (
 										<>
 											<td className="px-3 py-2">{item.word || "-"}</td>
@@ -167,7 +167,7 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 						</tbody>
 					</table>
 					{items.length > 10 && (
-						<div className="px-3 py-2 text-xs text-gray-500 text-center bg-gray-50">
+						<div className="px-3 py-2 text-xs text-muted-foreground text-center bg-muted">
 							... and {items.length - 10} more items
 						</div>
 					)}
@@ -175,7 +175,7 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 			</div>
 
 			{/* Actions */}
-			<div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+			<div className="flex items-center gap-3 pt-4 border-t border-border">
 				<Button
 					onClick={onConfirm}
 					className="flex-1 flex items-center justify-center gap-2"
