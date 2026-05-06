@@ -465,6 +465,10 @@ export const getNotificationTemplate = (
       title: "Admin Message",
       body: "You have a message from the administrator",
     },
+    [NotificationType.DRILL_REMINDER]: {
+      title: "Time to practise",
+      body: "Keep your streak going — your drills are waiting",
+    },
   };
 
   return templates[type] || templates[NotificationType.SYSTEM_ALERT];
