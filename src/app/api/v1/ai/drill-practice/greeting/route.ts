@@ -83,11 +83,14 @@ async function handler(
 
 		const vList = vocabParam ? parseVocabListParam(vocabParam) : [];
 		const freeTalkOverlay = resolveDrillFreeTalkOverlay(drill, scenarioId, vList) ?? undefined;
+		const freeTalkReversed =
+			searchParams.get('reversed') === '1' && Boolean(freeTalkOverlay?.scenarioDescription);
 
 		const stream = await generateDrillPracticeGreetingStream(
 			drillData,
 			userName,
-			freeTalkOverlay ?? undefined
+			freeTalkOverlay ?? undefined,
+			freeTalkReversed ? true : undefined
 		);
 
 		return new NextResponse(stream, {

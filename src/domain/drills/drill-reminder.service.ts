@@ -27,7 +27,9 @@ export class DrillReminderService {
     const errors: string[] = [];
 
     // Collect unique learner IDs that have at least one active FCM token
-    const learnerIds: string[] = await FCMToken.distinct('userId', { isActive: true });
+    const learnerIds = (await FCMToken.distinct('userId', { isActive: true })).map((id) =>
+      String(id),
+    );
 
     logger.info('[DrillReminderService] runDailyReminders start', {
       learnersWithTokens: learnerIds.length,
@@ -55,14 +57,14 @@ export class DrillReminderService {
         // Get current streak (falls back to 0 on error or disabled)
         let streakDays = 0;
         try {
-          const streakData = await StreakService.getStreakData(learnerId.toString());
+          const streakData = await StreakService.getStreakData(learnerId);
           streakDays = streakData.currentStreak;
         } catch {
           // streak is non-critical — proceed with 0
         }
 
         const result = await onDrillPracticeReminder(
-          learnerId.toString(),
+          learnerId,
           pendingCount,
           streakDays,
         );

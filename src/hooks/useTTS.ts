@@ -103,7 +103,11 @@ export function useTTS(options: UseTTSOptions = {}) {
           try {
             await audio.play();
           } catch (playErr: any) {
-            if (playErr.name === "AbortError") return;
+            if (playErr.name === "AbortError") {
+              setIsGenerating(false);
+              setIsPlaying(false);
+              return;
+            }
             setIsGenerating(false);
             setIsPlaying(false);
             if (playErr.name === "NotAllowedError") {

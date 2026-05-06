@@ -46,7 +46,8 @@ export class Mp3QueuePlayer {
 		try {
 			await audio.play();
 		} catch (err: any) {
-			if (err?.name === "AbortError") return;
+			// Always advance the queue regardless of error type (including AbortError)
+			// so onQueueEmpty is reliably fired and the "Speaking…" state clears.
 			void this.playNext();
 		}
 	}
