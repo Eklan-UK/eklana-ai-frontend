@@ -13,6 +13,7 @@ import {
   Keyboard,
   Home,
   Target,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -191,6 +192,8 @@ function AISessionPage() {
   const scenarioIdParam = searchParams.get("scenarioId");
   const vocabParam = searchParams.get("vocab");
   const scenarioTextParam = searchParams.get("scenarioText");
+  const reversedParam = searchParams.get("reversed");
+  const isReversed = reversedParam === "1";
   const vocabularyList = useMemo(
     () => parseVocabListParam(vocabParam),
     [vocabParam]
@@ -203,7 +206,7 @@ function AISessionPage() {
       return null;
     }
   }, [scenarioTextParam]);
-  const freeTalkTag = [scenarioIdParam || "", vocabParam || "", scenarioTextParam || ""].join("::");
+  const freeTalkTag = [scenarioIdParam || "", vocabParam || "", scenarioTextParam || "", isReversed ? "r" : ""].join("::");
   const isDrillPractice = !!drillId;
   const router = useRouter();
   const { user } = useAuthStore();
@@ -270,7 +273,7 @@ function AISessionPage() {
   );
 
   const freeTalkContextForApi = useMemo(():
-    | { scenarioId: string; vocabularyList: string[] }
+    | { scenarioId: string; vocabularyList: string[]; reversed?: boolean }
     | undefined => {
     if (!shouldSendFreeTalkDrillContext) return undefined;
     return {
@@ -279,8 +282,11 @@ function AISessionPage() {
           ? String(scenarioIdParam)
           : "",
       vocabularyList,
+      ...(isReversed ? { reversed: true } : {}),
     };
-  }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList]);
+  }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList, isReversed]);
+
+  const showReverseRolesMenu = !isDrillPractice || shouldSendFreeTalkDrillContext;
 
   const freeTalkSystemInstruction = useMemo(
     () =>
@@ -290,8 +296,9 @@ function AISessionPage() {
             topic,
             scenarioDescription: scenarioTextDecoded,
             vocabularyList,
+            reversed: isReversed,
           }),
-    [isDrillPractice, topic, scenarioTextDecoded, vocabularyList]
+    [isDrillPractice, topic, scenarioTextDecoded, vocabularyList, isReversed]
   );
 
   const [masteredVocab, setMasteredVocab] = useState<Record<string, boolean>>(() => {
@@ -533,6 +540,18 @@ function AISessionPage() {
     if (isDrillPractice) {
       initializeDrillPractice();
     }
+  };
+
+  const handleReverseRole = () => {
+    setShowMenu(false);
+    const params = new URLSearchParams();
+    if (drillId) params.set("drillId", drillId);
+    if (topic) params.set("topic", topic);
+    if (scenarioIdParam) params.set("scenarioId", scenarioIdParam);
+    if (vocabParam) params.set("vocab", vocabParam);
+    if (scenarioTextParam) params.set("scenarioText", scenarioTextParam);
+    if (!isReversed) params.set("reversed", "1");
+    router.push(`/account/practice/ai/session?${params.toString()}`);
   };
 
   const finalizeExitToPath = useCallback(
@@ -1057,6 +1076,7 @@ function AISessionPage() {
               topic,
               scenarioDescription: scenarioTextDecoded,
               vocabularyList,
+              reversed: isReversed,
             });
 
             await aiService.streamVoiceConversationMessage(
@@ -1255,9 +1275,16 @@ function AISessionPage() {
               <Image src="/logo2.svg" alt="Eklan" width={24} height={24} />
             </div>
             <div className="ml-3 min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 dark:text-[#f0f2f1] truncate">
-                {isDrillPractice ? "Eklan" : "AI Partner"}
-              </h1>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-sm font-semibold text-gray-900 dark:text-[#f0f2f1] truncate">
+                  {isDrillPractice ? "Eklan" : "AI Partner"}
+                </h1>
+                {isReversed && (
+                  <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                    You&apos;re the teacher
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-500 dark:text-[#9aa39e] truncate">{subtitle}</p>
             </div>
           </div>
@@ -1296,6 +1323,15 @@ function AISessionPage() {
                       <div className="w-4 h-4 bg-white rounded-full shadow mx-0.5" />
                     </div>
                   </button>
+                  {showReverseRolesMenu && (
+                    <button
+                      onClick={handleReverseRole}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#c8cdc9] hover:bg-gray-50 dark:hover:bg-[#232724] transition-colors"
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                      <span>{isReversed ? "Restore roles" : "Reverse roles"}</span>
+                    </button>
+                  )}
                   <div className="h-px bg-gray-100 dark:bg-[#2a2e2c] mx-2" />
                   <button
                     onClick={() => {

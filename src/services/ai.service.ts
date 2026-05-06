@@ -171,7 +171,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -211,7 +211,7 @@ export const aiService = {
     drillId: string,
     onChunk: (chunk: { type: string; data: any }) => void,
     signal?: AbortSignal,
-    freeTalkContext?: { scenarioId: string; vocabularyList: string[] }
+    freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean }
   ): Promise<void> {
     const qs = new URLSearchParams();
     qs.set("drillId", drillId);
@@ -220,6 +220,9 @@ export const aiService = {
     }
     if (freeTalkContext?.vocabularyList?.length) {
       qs.set("vocab", JSON.stringify(freeTalkContext.vocabularyList));
+    }
+    if (freeTalkContext?.reversed) {
+      qs.set("reversed", "1");
     }
     const response = await fetch(
       `${API_BASE_URL}/ai/drill-practice/greeting?${qs.toString()}`,
@@ -292,7 +295,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {

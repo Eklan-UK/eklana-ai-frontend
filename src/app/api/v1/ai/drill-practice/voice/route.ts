@@ -99,11 +99,13 @@ async function handler(
 		const mimeType = audioFile.type || 'audio/m4a';
 
 		let freeTalkOverlay: DrillFreeTalkOverlay | undefined;
+		let freeTalkReversed = false;
 		if (freeTalkContextRaw) {
 			try {
 				const ft = JSON.parse(freeTalkContextRaw) as {
 					scenarioId?: string;
 					vocabularyList?: string[];
+					reversed?: boolean;
 				};
 				const sid = ft.scenarioId != null && String(ft.scenarioId).trim() !== '' ? String(ft.scenarioId) : undefined;
 				const vl = Array.isArray(ft.vocabularyList)
@@ -113,6 +115,7 @@ async function handler(
 				if (resolved) {
 					freeTalkOverlay = resolved;
 				}
+				freeTalkReversed = Boolean(ft.reversed);
 			} catch {
 				/* invalid JSON */
 			}
@@ -127,6 +130,7 @@ async function handler(
 			userId:  String(context.userId),  // enables session reuse
 			drillId: drillId,
 			...(freeTalkOverlay ? { freeTalkOverlay } : {}),
+			...(freeTalkReversed && freeTalkOverlay ? { freeTalkReversed: true } : {}),
 		});
 
 		return new NextResponse(stream, {

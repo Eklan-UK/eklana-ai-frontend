@@ -88,6 +88,7 @@ async function handler(
 		const userName = (user?.firstName as string | undefined) || undefined;
 
 		let freeTalkOverlay: DrillFreeTalkOverlay | undefined;
+		let freeTalkReversed = false;
 		if (freeTalkContext && typeof freeTalkContext === 'object') {
 			const rawSid = (freeTalkContext as { scenarioId?: string | number }).scenarioId;
 			const sid =
@@ -100,6 +101,7 @@ async function handler(
 			if (resolved) {
 				freeTalkOverlay = resolved;
 			}
+			freeTalkReversed = Boolean((freeTalkContext as { reversed?: unknown }).reversed);
 		}
 
 		const stream = await generateDrillPracticeResponseStream({
@@ -109,6 +111,7 @@ async function handler(
 			temperature,
 			userName,
 			...(freeTalkOverlay ? { freeTalkOverlay } : {}),
+			...(freeTalkReversed && freeTalkOverlay ? { freeTalkReversed: true } : {}),
 		});
 
 		return new NextResponse(stream, {
