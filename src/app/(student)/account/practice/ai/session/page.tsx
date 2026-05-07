@@ -348,8 +348,8 @@ function AISessionPage() {
   const recStartTsRef     = useRef<number>(0);
 
   const SILENCE_THRESHOLD = 0.018; // RMS amplitude 0-1
-  const SILENCE_MS        = 900;
-  const MIN_REC_MS        = 1200;
+  const SILENCE_MS        = 1800;  // 1.8s — accommodates natural pauses mid-thought
+  const MIN_REC_MS        = 2000;  // 2s minimum before silence detection activates
 
   const startVAD = (stream: MediaStream) => {
     const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -1106,6 +1106,18 @@ function AISessionPage() {
                       : "";
                   fullTextMeta =
                     typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
+
+                  // Surface Gemini-side errors (e.g. timeout_no_response) so the user
+                  // knows something went wrong instead of seeing a frozen placeholder.
+                  if (chunk.data?.error) {
+                    const errStr = String(chunk.data.error);
+                    const isTimeout = errStr.includes("timeout");
+                    toast.error(
+                      isTimeout
+                        ? "Your message was too long. Please try speaking in shorter sentences."
+                        : "Voice processing failed. Please try again."
+                    );
+                  }
 
                   // Free Talk: keep user bubble as a plain voice note — no transcription shown.
                   // AI message is updated if the server returns a pre-formed full reply.

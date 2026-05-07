@@ -1371,18 +1371,8 @@ export async function generateVoiceConversationSSEStream(
 
 	const t0 = Date.now();
 
-	// ① FFmpeg — convert to raw PCM 16 kHz (the only format Live API accepts).
-	let pcmBuffer: Buffer;
-	try {
-		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
-		logger.info('[FreeTalk] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
-	} catch (e: any) {
-		throw new Error(`Audio conversion failed: ${e?.message || 'ffmpeg error'}`);
-	}
-	const pcmBase64 = pcmBuffer.toString('base64');
-	const pcmBytes  = pcmBuffer.length;
-
-	// Build system instruction — applied on each new Live connection (we evict after each turn).
+	// Build system instruction first (sync, no I/O) so it's ready before the
+	// parallel awaits below.
 	const persona = contextPrompt ||
 		'You are Eklan, a friendly AI English speaking practice partner. Your role is to have natural, encouraging conversations to help the student improve their English.';
 	let systemInstruction = persona;
@@ -1391,25 +1381,43 @@ export async function generateVoiceConversationSSEStream(
 	}
 	systemInstruction += '\n\nRespond naturally in spoken English. Keep replies concise (2-4 sentences). Be warm and encouraging.';
 	if (conversationHistory.length > 0) {
-		// Only relevant for the first turn of a fresh session.
 		const recent = conversationHistory.slice(-6);
 		systemInstruction += '\n\nRecent conversation:\n' +
 			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 
-	// ② Live session key (cache is evicted after each completed turn — see closeStream).
+	// ①+② Run FFmpeg conversion and Live session connect in parallel — mirrors the
+	// drill pipeline. Session creation (~500-970 ms) overlaps with FFmpeg (~50-280 ms),
+	// reducing total startup latency by up to ~970 ms.
 	const cacheKey = userId ? `freetalk_${userId}` : `freetalk_anon_${Date.now()}`;
 	const tSession = Date.now();
-	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-		responseModalities: [Modality.AUDIO],
-		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-		systemInstruction: { parts: [{ text: systemInstruction }] },
-		inputAudioTranscription: {},
-		outputAudioTranscription: {},
-		thinkingConfig: { thinkingBudget: 0 },
-	});
-	logger.info('[FreeTalk] ② session ready', { ms: Date.now() - tSession });
-
+	let pcmBuffer: Buffer;
+	let entry: LiveSessionEntry;
+	try {
+		[pcmBuffer, entry] = await Promise.all([
+			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
+				throw new Error(`Audio conversion failed: ${e?.message || 'ffmpeg error'}`);
+			}),
+		getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+			systemInstruction: { parts: [{ text: systemInstruction }] },
+			inputAudioTranscription: {},
+			outputAudioTranscription: {},
+			thinkingConfig: { thinkingBudget: 0 },
+			// Disable server-side VAD so it doesn't fire on natural pauses
+			// mid-recording for long inputs. We signal activity start/end manually.
+			realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+		}),
+	]);
+} catch (e: any) {
+	throw e;
+}
+logger.info('[FreeTalk] ①+② ffmpeg+session ready (parallel)', {
+	totalMs: Date.now() - t0,
+	inBytes: audioBuffer.length,
+	outBytes: pcmBuffer.length,
+});
 	// ③ Create the SSE stream — session is already connected; just route messages.
 	// Shared state for start + cancel (client disconnect aborts the reader; timers must still clear).
 	const sseCtx = {
@@ -1546,11 +1554,19 @@ export async function generateVoiceConversationSSEStream(
 
 		scheduleFirstChunkTimeout();
 
-		// Send audio — session is already open
+		// Send audio bracketed by manual activity signals so the server-side VAD
+		// (which is disabled in the session config) does not fire on natural pauses
+		// mid-recording. activityStart → chunks → activityEnd tells Gemini exactly
+		// when the pre-recorded speech starts and ends.
 		entry.status = 'busy';
-		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-		entry.session.sendRealtimeInput({ audioStreamEnd: true });
-		logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.session.sendRealtimeInput({ activityStart: {} });
+		const PCM_CHUNK_BYTES = 16_000;
+		for (let offset = 0; offset < pcmBuffer.length; offset += PCM_CHUNK_BYTES) {
+			const slice = pcmBuffer.subarray(offset, offset + PCM_CHUNK_BYTES);
+			entry.session.sendRealtimeInput({ audio: { data: slice.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+		}
+		entry.session.sendRealtimeInput({ activityEnd: {} });
+		logger.info('[FreeTalk] ②→③ audio sent (manual VAD)', { pcmBytes: pcmBuffer.length, chunks: Math.ceil(pcmBuffer.length / PCM_CHUNK_BYTES), msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
@@ -1640,25 +1656,27 @@ export async function generateDrillPracticeVoiceResponseStream(
 			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
 				throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
 			}),
-			getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-				responseModalities: [Modality.AUDIO],
-				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-				systemInstruction: { parts: [{ text: systemInstruction }] },
-				inputAudioTranscription: {},
-				outputAudioTranscription: {},
-				thinkingConfig: { thinkingBudget: 0 },
-			}),
-		]);
-	} catch (e: any) {
-		throw e;
-	}
-	logger.info('[Drill] ①+② ffmpeg+session ready (parallel)', {
-		totalMs: Date.now() - t0,
-		inBytes: audioBuffer.length,
-		outBytes: pcmBuffer.length,
-	});
-	const pcmBase64 = pcmBuffer.toString('base64');
-	const pcmBytes  = pcmBuffer.length;
+		getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+			systemInstruction: { parts: [{ text: systemInstruction }] },
+			inputAudioTranscription: {},
+			outputAudioTranscription: {},
+			thinkingConfig: { thinkingBudget: 0 },
+			// Disable server-side VAD so it doesn't fire on natural pauses
+			// mid-recording for long inputs. We signal activity start/end manually.
+			realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+		}),
+	]);
+} catch (e: any) {
+	throw e;
+}
+logger.info('[Drill] ①+② ffmpeg+session ready (parallel)', {
+	totalMs: Date.now() - t0,
+	inBytes: audioBuffer.length,
+	outBytes: pcmBuffer.length,
+});
+	const pcmBytes = pcmBuffer.length;
 
 	// ③ Create the SSE stream — session is already connected; just route messages.
 	const sseCtx = {
@@ -1801,11 +1819,19 @@ export async function generateDrillPracticeVoiceResponseStream(
 
 		scheduleFirstChunkTimeout();
 
-		// Send audio — session is already open
+		// Send audio bracketed by manual activity signals so the server-side VAD
+		// (which is disabled in the session config) does not fire on natural pauses
+		// mid-recording. activityStart → chunks → activityEnd tells Gemini exactly
+		// when the pre-recorded speech starts and ends.
 		entry.status = 'busy';
-		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-		entry.session.sendRealtimeInput({ audioStreamEnd: true });
-		logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.session.sendRealtimeInput({ activityStart: {} });
+		const PCM_CHUNK_BYTES = 16_000;
+		for (let offset = 0; offset < pcmBuffer.length; offset += PCM_CHUNK_BYTES) {
+			const slice = pcmBuffer.subarray(offset, offset + PCM_CHUNK_BYTES);
+			entry.session.sendRealtimeInput({ audio: { data: slice.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+		}
+		entry.session.sendRealtimeInput({ activityEnd: {} });
+		logger.info('[Drill] ②→③ audio sent (manual VAD)', { pcmBytes, chunks: Math.ceil(pcmBuffer.length / PCM_CHUNK_BYTES), msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
