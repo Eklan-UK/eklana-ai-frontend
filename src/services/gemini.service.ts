@@ -957,8 +957,6 @@ export async function generateConversationResponseStream(
 			temperature,
 			maxOutputTokens: maxTokens,
 		},
-		// Disable internal reasoning to minimise time-to-first-token.
-		thinkingConfig: { thinkingBudget: 0 },
 		...(systemInstruction
 			? {
 					systemInstruction: {
