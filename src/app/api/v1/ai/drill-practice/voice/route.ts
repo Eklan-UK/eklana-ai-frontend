@@ -40,33 +40,24 @@ async function handler(
 
 		await connectToDatabase();
 
-		const user = await User.findById(context.userId).select('firstName').lean();
-		const userName = (user?.firstName as string | undefined) || undefined;
+		const [user, assignment, drill] = await Promise.all([
+			User.findById(context.userId).select('firstName').lean(),
+			DrillAssignment.findOne({ learnerId: context.userId, drillId }).lean(),
+			DrillModel.findById(drillId).lean(),
+		]);
 
-		// Verify user has an assignment for this drill
-		const assignment = await DrillAssignment.findOne({
-			learnerId: context.userId,
-			drillId: drillId,
-		}).lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		if (!assignment) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill not found in your assignments',
-				},
+				{ code: 'NotFound', message: 'Drill not found in your assignments' },
 				{ status: 404 }
 			);
 		}
 
-		// Fetch full drill data
-		const drill = await DrillModel.findById(drillId).lean();
 		if (!drill) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill data not available',
-				},
+				{ code: 'NotFound', message: 'Drill data not available' },
 				{ status: 404 }
 			);
 		}
@@ -99,11 +90,13 @@ async function handler(
 		const mimeType = audioFile.type || 'audio/m4a';
 
 		let freeTalkOverlay: DrillFreeTalkOverlay | undefined;
+		let freeTalkReversed = false;
 		if (freeTalkContextRaw) {
 			try {
 				const ft = JSON.parse(freeTalkContextRaw) as {
 					scenarioId?: string;
 					vocabularyList?: string[];
+					reversed?: boolean;
 				};
 				const sid = ft.scenarioId != null && String(ft.scenarioId).trim() !== '' ? String(ft.scenarioId) : undefined;
 				const vl = Array.isArray(ft.vocabularyList)
@@ -113,6 +106,7 @@ async function handler(
 				if (resolved) {
 					freeTalkOverlay = resolved;
 				}
+				freeTalkReversed = Boolean(ft.reversed);
 			} catch {
 				/* invalid JSON */
 			}
@@ -127,6 +121,7 @@ async function handler(
 			userId:  String(context.userId),  // enables session reuse
 			drillId: drillId,
 			...(freeTalkOverlay ? { freeTalkOverlay } : {}),
+			...(freeTalkReversed && freeTalkOverlay ? { freeTalkReversed: true } : {}),
 		});
 
 		return new NextResponse(stream, {

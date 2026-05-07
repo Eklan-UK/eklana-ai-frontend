@@ -171,7 +171,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -211,7 +211,7 @@ export const aiService = {
     drillId: string,
     onChunk: (chunk: { type: string; data: any }) => void,
     signal?: AbortSignal,
-    freeTalkContext?: { scenarioId: string; vocabularyList: string[] }
+    freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean }
   ): Promise<void> {
     const qs = new URLSearchParams();
     qs.set("drillId", drillId);
@@ -220,6 +220,9 @@ export const aiService = {
     }
     if (freeTalkContext?.vocabularyList?.length) {
       qs.set("vocab", JSON.stringify(freeTalkContext.vocabularyList));
+    }
+    if (freeTalkContext?.reversed) {
+      qs.set("reversed", "1");
     }
     const response = await fetch(
       `${API_BASE_URL}/ai/drill-practice/greeting?${qs.toString()}`,
@@ -274,7 +277,14 @@ export const aiService = {
     if (!response.ok) {
       if (response.headers.get("content-type")?.includes("application/json")) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to get voice conversation stream");
+        const msg = error.message || "Failed to get voice conversation stream";
+        throw new Error(
+          response.status === 503
+            ? "The service is temporarily unavailable. Please try again in a moment."
+            : response.status === 401
+            ? "Session expired. Please refresh the page and try again."
+            : msg
+        );
       }
       throw new Error(`Failed to get voice conversation stream: ${response.status}`);
     }
@@ -292,7 +302,7 @@ export const aiService = {
       conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
       temperature?: number;
       signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[] };
+      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
     },
     onChunk: (chunk: { type: string; data: any }) => void
   ): Promise<void> {
@@ -320,7 +330,14 @@ export const aiService = {
     if (!response.ok) {
       if (response.headers.get("content-type")?.includes("application/json")) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to get drill voice stream");
+        const msg = error.message || "Failed to get drill voice stream";
+        throw new Error(
+          response.status === 503
+            ? "The service is temporarily unavailable. Please try again in a moment."
+            : response.status === 401
+            ? "Session expired. Please refresh the page and try again."
+            : msg
+        );
       }
       throw new Error(`Failed to get drill voice stream: ${response.status}`);
     }

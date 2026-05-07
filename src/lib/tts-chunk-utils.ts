@@ -1,4 +1,5 @@
-const MIN_WORDS_FOR_LONG_CHUNK = 8;
+// Lower threshold so TTS fires earlier — first audio arrives after 5 words instead of 8.
+const MIN_WORDS_FOR_LONG_CHUNK = 5;
 const MIN_WORDS_FOR_SENTENCE = 3;
 
 /**

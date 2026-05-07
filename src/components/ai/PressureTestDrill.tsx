@@ -86,10 +86,10 @@ const PRESSURE_SPEED_MS = 2000;
 function PressureTestAiThinkingBubble() {
   return (
     <div className="flex justify-start" role="status" aria-live="polite" aria-label="Eklan is thinking">
-      <div className="inline-flex max-w-[85%] items-center gap-1.5 rounded-2xl border border-[#ebebeb] bg-[#f4f5f4] px-4 py-3 min-h-[2.5rem] shadow-sm">
-        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse" />
-        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse [animation-delay:150ms]" />
-        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 animate-pulse [animation-delay:300ms]" />
+      <div className="inline-flex max-w-[85%] items-center gap-1.5 rounded-2xl border border-[#ebebeb] dark:border-[#2a2e2c] bg-[#f4f5f4] dark:bg-[#1a1d1c] px-4 py-3 min-h-[2.5rem] shadow-sm">
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 dark:bg-[#6b7270] animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 dark:bg-[#6b7270] animate-pulse [animation-delay:150ms]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gray-500/90 dark:bg-[#6b7270] animate-pulse [animation-delay:300ms]" />
       </div>
     </div>
   );
@@ -1154,38 +1154,38 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
   ]);
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden bg-gray-50">
-      <header className="flex-shrink-0 bg-white border-b border-gray-100 z-10">
+    <div className="flex flex-col h-[100dvh] overflow-hidden bg-gray-50 dark:bg-[#0c0e0d]">
+      <header className="flex-shrink-0 bg-white dark:bg-[#131614] border-b border-gray-100 dark:border-[#2a2e2c] z-10">
         <div className="max-w-2xl mx-auto w-full px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => { stopAllActivity(); router.back(); }}
-                className="w-8 h-8 rounded-full bg-[#eff0ef] flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-[#eff0ef] dark:bg-[#1a1d1c] flex items-center justify-center"
                 aria-label="Go back"
               >
-                <ArrowLeft className="w-4 h-4 text-[#2f2f2f]" />
+                <ArrowLeft className="w-4 h-4 text-[#2f2f2f] dark:text-[#c8cdc9]" />
               </button>
-              <h1 className="text-md font-semibold text-gray-900 leading-tight">Pressure Test</h1>
+              <h1 className="text-md font-semibold text-gray-900 dark:text-[#f0f2f1] leading-tight">Pressure Test</h1>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-md font-medium text-gray-500 tabular-nums">
+              <span className="text-md font-medium text-gray-500 dark:text-[#9aa39e] tabular-nums">
                 {turnNumber} of {TOTAL_TURNS}
               </span>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
                   aria-label="More options"
                 >
-                  <MoreVertical className="w-5 h-5 text-gray-500" />
+                  <MoreVertical className="w-5 h-5 text-gray-500 dark:text-[#9aa39e]" />
                 </button>
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-10 z-40 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="absolute right-0 top-10 z-40 w-40 bg-white dark:bg-[#1a1d1c] rounded-xl shadow-lg border border-gray-100 dark:border-[#2a2e2c] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
                       <button
                         type="button"
                         onClick={() => {
@@ -1193,7 +1193,7 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
                           stopAllActivity();
                           router.back();
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                       >
                         <X className="w-4 h-4" />
                         <span>End Session</span>
@@ -1204,7 +1204,7 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
               </div>
             </div>
           </div>
-          <div className="ml-10 mt-2.5 h-1 rounded-full bg-[#dedede] overflow-hidden">
+          <div className="ml-10 mt-2.5 h-1 rounded-full bg-[#dedede] dark:bg-[#2a2e2c] overflow-hidden">
             <div className="h-full bg-[#4dab56] transition-all" style={{ width: progressWidth }} />
           </div>
         </div>
@@ -1222,11 +1222,11 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
                 }
                 const currentAiIdx = aiIdx++;
                 return (
-                  <section key={`ai-${idx}`} className="bg-[#f4f5f4] border border-[#ebebeb] rounded-2xl p-4">
-                    <div className="w-10 h-10 rounded-full bg-[#d9f1da] flex items-center justify-center mb-3">
+                  <section key={`ai-${idx}`} className="bg-[#f4f5f4] dark:bg-[#1a1d1c] border border-[#ebebeb] dark:border-[#2a2e2c] rounded-2xl p-4">
+                    <div className="w-10 h-10 rounded-full bg-[#d9f1da] dark:bg-emerald-900/40 flex items-center justify-center mb-3">
                       <Image src="/logo2.svg" alt="Eklan" width={20} height={20} />
                     </div>
-                    <p className="text-sm text-gray-700 leading-relaxed">
+                    <p className="text-sm text-gray-700 dark:text-[#c8cdc9] leading-relaxed">
                       {currentAiIdx === 0 ? (
                         // Intro bubble — styled greeting
                         <>
@@ -1235,10 +1235,10 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
                         </>
                       ) : msg.text ? (
                         // Scenario bubble (streams in from first token)
-                        <span className="font-semibold text-emerald-700">{msg.text}</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">{msg.text}</span>
                       ) : null}
                     </p>
-                    <div className="flex items-center gap-3 mt-3 text-gray-700">
+                    <div className="flex items-center gap-3 mt-3 text-gray-700 dark:text-[#9aa39e]">
                       <Languages className="w-4 h-4" />
                       <button
                         type="button"
@@ -1276,29 +1276,29 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
           {isAiTyping && !isAiStreaming && <PressureTestAiThinkingBubble />}
 
           {isAnalyzing && (
-            <div className="fixed inset-0 z-40 bg-gray-50/95 flex flex-col items-center justify-center px-8">
+            <div className="fixed inset-0 z-40 bg-gray-50/95 dark:bg-[#0c0e0d]/95 flex flex-col items-center justify-center px-8">
               <p className="text-6xl mb-4">👏</p>
-              <h2 className="text-[50px] font-bold text-slate-800 mb-1 leading-none">Nice work!</h2>
-              <p className="text-[35px] text-slate-500 mb-8 text-center leading-tight">You just completed a Pressure Test</p>
+              <h2 className="text-[50px] font-bold text-slate-800 dark:text-[#f0f2f1] mb-1 leading-none">Nice work!</h2>
+              <p className="text-[35px] text-slate-500 dark:text-[#9aa39e] mb-8 text-center leading-tight">You just completed a Pressure Test</p>
               <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-4 animate-[pulse_1.8s_ease-in-out_infinite]">
                 <Image src="/logo2.svg" alt="Eklan" width={34} height={34} />
               </div>
-              <p className="text-[32px] text-slate-600 leading-tight">Analyzing your responses...</p>
+              <p className="text-[32px] text-slate-600 dark:text-[#9aa39e] leading-tight">Analyzing your responses...</p>
             </div>
           )}
         </div>
       </main>
 
-      <footer className="flex-shrink-0 bg-white border-t border-gray-100 z-10">
+      <footer className="flex-shrink-0 bg-white dark:bg-[#131614] border-t border-gray-100 dark:border-[#2a2e2c] z-10">
         <div className="max-w-2xl mx-auto w-full px-4 pt-3 pb-2">
 
           {/* ── Recording state: label + live waveform ─── */}
           {isRecording && (
             <>
-              <p className="text-center text-sm text-gray-700 mb-2">
-                🎙 Your turn &nbsp;<span className="text-gray-400">Tap to Speak</span>
+              <p className="text-center text-sm text-gray-700 dark:text-[#c8cdc9] mb-2">
+                🎙 Your turn &nbsp;<span className="text-gray-400 dark:text-[#6b7270]">Tap to Speak</span>
               </p>
-              <div className="bg-[#f6f7f6] border border-[#ebedeb] rounded-full px-3 py-2 mb-4 flex items-center gap-2">
+              <div className="bg-[#f6f7f6] dark:bg-[#1a1d1c] border border-[#ebedeb] dark:border-[#2a2e2c] rounded-full px-3 py-2 mb-4 flex items-center gap-2">
                 <div className="flex-1 h-7 flex items-center gap-[1px] overflow-hidden">
                   {waveBars.map((v, i) => (
                     <span
@@ -1308,7 +1308,7 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
                     />
                   ))}
                 </div>
-                <span className="text-xs text-gray-500 tabular-nums pr-1">
+                <span className="text-xs text-gray-500 dark:text-[#9aa39e] tabular-nums pr-1">
                   {formatDuration(recordingMs)}
                 </span>
               </div>
@@ -1318,18 +1318,18 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
           {/* ── Recorded / preview state ─── */}
           {recordedAudio && !isRecording && (
             <>
-              <p className="text-center text-xs text-gray-400 mb-2">
+              <p className="text-center text-xs text-gray-400 dark:text-[#6b7270] mb-2">
                 preview your recording using the play button
               </p>
               {lastGapMs != null && isSpeedSuccess != null && (
-                <p className="text-center text-sm text-slate-600 mb-2" aria-live="polite">
+                <p className="text-center text-sm text-slate-600 dark:text-[#9aa39e] mb-2" aria-live="polite">
                   <span className="mr-1" aria-hidden>
                     {isSpeedSuccess ? "⚡" : "🐢"}
                   </span>
                   {lastGapMs}ms to first response
                 </p>
               )}
-              <div className="bg-[#f6f7f6] border border-[#ebedeb] rounded-full px-3 py-2 mb-4 flex items-center gap-2">
+              <div className="bg-[#f6f7f6] dark:bg-[#1a1d1c] border border-[#ebedeb] dark:border-[#2a2e2c] rounded-full px-3 py-2 mb-4 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1350,13 +1350,13 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
                     />
                   ))}
                 </div>
-                <span className="text-xs text-gray-500 tabular-nums">{formatDuration(recordedDurationMs)}</span>
+                <span className="text-xs text-gray-500 dark:text-[#9aa39e] tabular-nums">{formatDuration(recordedDurationMs)}</span>
                 <button
                   type="button"
                   onClick={() => resetRecording()}
-                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
+                  className="w-7 h-7 rounded-full bg-slate-100 dark:bg-[#2a2e2c] flex items-center justify-center flex-shrink-0"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                  <Trash2 className="w-3.5 h-3.5 text-slate-500 dark:text-[#9aa39e]" />
                 </button>
               </div>
             </>
@@ -1366,14 +1366,14 @@ export function PressureTestDrill({ drillId, sessionRunId }: PressureTestDrillPr
           {!isRecording && !recordedAudio && (
             <>
               {lastGapMs != null && isSpeedSuccess != null && (
-                <p className="text-center text-sm text-slate-600 mb-1" aria-live="polite">
+                <p className="text-center text-sm text-slate-600 dark:text-[#9aa39e] mb-1" aria-live="polite">
                   <span className="mr-1" aria-hidden>
                     {isSpeedSuccess ? "⚡" : "🐢"}
                   </span>
                   {lastGapMs}ms to first response
                 </p>
               )}
-              <p className="text-center text-xs text-gray-400 mb-3">
+              <p className="text-center text-xs text-gray-400 dark:text-[#6b7270] mb-3">
                 {isAiTyping ? "Eklan is thinking…" : isTranscribing ? "Processing…" : "Tap to speak"}
               </p>
             </>

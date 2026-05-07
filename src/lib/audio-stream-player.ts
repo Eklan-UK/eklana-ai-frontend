@@ -8,6 +8,8 @@ export class AudioStreamPlayer {
   private isPlaying: boolean = false;
   private stopped = false;
   private onEndedCallback: (() => void) | null = null;
+  /** Counts scheduled BufferSources that have not yet fired onended. */
+  private pendingBuffers: number = 0;
 
   constructor(onEnded?: () => void) {
     this.onEndedCallback = onEnded || null;
@@ -71,11 +73,13 @@ export class AudioStreamPlayer {
       source.start(playTime);
       this.nextPlayTime = playTime + audioBuffer.duration;
 
-      // Handle sequence ending
+      // Handle sequence ending: decrement counter; fire callback when the last buffer finishes.
+      this.pendingBuffers++;
       source.onended = () => {
-        if (this.audioContext && this.audioContext.currentTime >= this.nextPlayTime - 0.05) {
+        this.pendingBuffers--;
+        if (this.pendingBuffers === 0) {
           this.isPlaying = false;
-          if (this.onEndedCallback) this.onEndedCallback();
+          this.onEndedCallback?.();
         }
       };
     } catch (err) {
@@ -85,6 +89,7 @@ export class AudioStreamPlayer {
 
   public stop() {
     this.stopped = true;
+    this.pendingBuffers = 0;
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         this.audioContext.close();
@@ -94,6 +99,18 @@ export class AudioStreamPlayer {
     this.isPlaying = false;
     this.nextPlayTime = 0;
     if (this.onEndedCallback) this.onEndedCallback();
+  }
+
+  /**
+   * Call once the SSE stream has fully finished sending chunks.
+   * If no audio was ever queued (or all buffers have already played), fires
+   * onEndedCallback immediately — prevents the "Speaking…" indicator from
+   * getting permanently stuck when the server sends no audio chunks.
+   */
+  public signalStreamEnd() {
+    if (!this.stopped && this.pendingBuffers === 0 && !this.isPlaying) {
+      this.onEndedCallback?.();
+    }
   }
 
   public getIsPlaying() {

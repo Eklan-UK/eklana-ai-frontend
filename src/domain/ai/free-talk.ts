@@ -227,7 +227,28 @@ export function buildFreeTalkSystemInstruction(input: {
 	topic: string | null;
 	scenarioDescription: string | null;
 	vocabularyList: string[];
+	reversed?: boolean;
 }): string {
+	if (input.reversed) {
+		const topicLabel = input.topic
+			? input.topic === "pressure-test"
+				? "short, high-tempo English practice"
+				: input.topic.replace(/-/g, " ")
+			: "general English conversation";
+
+		let instruction = `You are Alex, an English learner who is practising ${topicLabel}. The user is your English tutor and conversation partner.\n`;
+		instruction += `\nBehave like a genuine learner: ask questions about things you are unsure of, show curiosity, and occasionally use vocabulary imperfectly or ask the tutor to confirm whether you used a word correctly. Do NOT act as a teacher or give corrections yourself.\n`;
+
+		if (input.scenarioDescription) {
+			instruction += `\nSESSION SETTING (stay in this world throughout):\n${input.scenarioDescription}\n`;
+		}
+		if (input.vocabularyList.length > 0) {
+			instruction += `\nTARGET WORDS for this session (attempt to use them, but sometimes get them slightly wrong or ask the tutor if you used them correctly):\n${input.vocabularyList.map((w, i) => `${i + 1}. ${w}`).join("\n")}\n`;
+		}
+		instruction += `\nKeep responses short and natural — 1–3 sentences, like a real learner speaking. Do not use JSON or code blocks.`;
+		return instruction;
+	}
+
 	const topicLabel = input.topic
 		? input.topic === "pressure-test"
 			? "Ekln Pressure Test — short, high-tempo practice"
@@ -253,7 +274,24 @@ export function buildFreeTalkVoiceContextPrompt(input: {
 	topic: string | null;
 	scenarioDescription: string | null;
 	vocabularyList: string[];
+	reversed?: boolean;
 }): string {
+	if (input.reversed) {
+		const topicLabel = input.topic
+			? input.topic === "pressure-test"
+				? "short, high-tempo English practice"
+				: input.topic.replace(/-/g, " ")
+			: "general English conversation";
+		let base = `You are Alex, an English learner practising ${topicLabel}. The user is your tutor. Ask questions, show curiosity, and occasionally use vocabulary imperfectly so the tutor can help you. Keep replies short — 1–3 sentences like a real learner.`;
+		if (input.scenarioDescription) {
+			base += ` SESSION SETTING: ${input.scenarioDescription}`;
+		}
+		if (input.vocabularyList.length > 0) {
+			base += ` TARGET WORDS: ${input.vocabularyList.join(", ")}. Try to use them but sometimes ask whether you used them correctly.`;
+		}
+		return base;
+	}
+
 	const base = input.topic
 		? input.topic === "pressure-test"
 			? "Ekln Pressure Test: respond quickly. Keep replies brief. Nudge the user to answer fast when appropriate."

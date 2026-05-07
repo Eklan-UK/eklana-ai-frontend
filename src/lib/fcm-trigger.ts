@@ -14,6 +14,7 @@ import {
 export enum NotificationType {
   CLASS_SESSION_REMINDER = "class_session_reminder",
   LESSON_REMINDER = "lesson_reminder",
+  DRILL_REMINDER = "drill_reminder",
   ASSIGNMENT_DUE = "assignment_due",
   ASSIGNMENT_SUBMITTED = "assignment_submitted",
   PRONUNCIATION_FEEDBACK = "pronunciation_feedback",
@@ -463,6 +464,10 @@ export const getNotificationTemplate = (
     [NotificationType.ADMIN_NOTIFICATION]: {
       title: "Admin Message",
       body: "You have a message from the administrator",
+    },
+    [NotificationType.DRILL_REMINDER]: {
+      title: "Time to practise",
+      body: "Keep your streak going — your drills are waiting",
     },
   };
 

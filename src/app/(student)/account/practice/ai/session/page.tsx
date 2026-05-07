@@ -191,6 +191,8 @@ function AISessionPage() {
   const scenarioIdParam = searchParams.get("scenarioId");
   const vocabParam = searchParams.get("vocab");
   const scenarioTextParam = searchParams.get("scenarioText");
+  const reversedParam = searchParams.get("reversed");
+  const isReversed = reversedParam === "1";
   const vocabularyList = useMemo(
     () => parseVocabListParam(vocabParam),
     [vocabParam]
@@ -203,7 +205,7 @@ function AISessionPage() {
       return null;
     }
   }, [scenarioTextParam]);
-  const freeTalkTag = [scenarioIdParam || "", vocabParam || "", scenarioTextParam || ""].join("::");
+  const freeTalkTag = [scenarioIdParam || "", vocabParam || "", scenarioTextParam || "", isReversed ? "r" : ""].join("::");
   const isDrillPractice = !!drillId;
   const router = useRouter();
   const { user } = useAuthStore();
@@ -270,7 +272,7 @@ function AISessionPage() {
   );
 
   const freeTalkContextForApi = useMemo(():
-    | { scenarioId: string; vocabularyList: string[] }
+    | { scenarioId: string; vocabularyList: string[]; reversed?: boolean }
     | undefined => {
     if (!shouldSendFreeTalkDrillContext) return undefined;
     return {
@@ -279,8 +281,9 @@ function AISessionPage() {
           ? String(scenarioIdParam)
           : "",
       vocabularyList,
+      ...(isReversed ? { reversed: true } : {}),
     };
-  }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList]);
+  }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList, isReversed]);
 
   const freeTalkSystemInstruction = useMemo(
     () =>
@@ -290,8 +293,9 @@ function AISessionPage() {
             topic,
             scenarioDescription: scenarioTextDecoded,
             vocabularyList,
+            reversed: isReversed,
           }),
-    [isDrillPractice, topic, scenarioTextDecoded, vocabularyList]
+    [isDrillPractice, topic, scenarioTextDecoded, vocabularyList, isReversed]
   );
 
   const [masteredVocab, setMasteredVocab] = useState<Record<string, boolean>>(() => {
@@ -335,8 +339,6 @@ function AISessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  /** True from mic stop until first model chunk (voice) — “Listening…” wave. */
-  const [isListeningAfterSilence, setIsListeningAfterSilence] = useState(false);
 
   // VAD
   const analyserRef       = useRef<AnalyserNode | null>(null);
@@ -346,8 +348,8 @@ function AISessionPage() {
   const recStartTsRef     = useRef<number>(0);
 
   const SILENCE_THRESHOLD = 0.018; // RMS amplitude 0-1
-  const SILENCE_MS        = 1800;
-  const MIN_REC_MS        = 1200;
+  const SILENCE_MS        = 1800;  // 1.8s — accommodates natural pauses mid-thought
+  const MIN_REC_MS        = 2000;  // 2s minimum before silence detection activates
 
   const startVAD = (stream: MediaStream) => {
     const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -434,6 +436,13 @@ function AISessionPage() {
   /* ─── Lifecycle ────────────────────────────────────────────────────────── */
 
   const drillInitRef = useRef(false);
+
+  // Always-current ref for conversationHistory to avoid stale closures in
+  // async voice handlers that are created before a state update commits.
+  const conversationHistoryRef = useRef(conversationHistory);
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
 
   const handleRetryDrillInit = useCallback(() => {
     setDrillInitFailed(false);
@@ -810,26 +819,37 @@ function AISessionPage() {
           setPlayingMessageIndex(aiMessageIndex);
         }
 
-        /** Serialize TTS fetches so audio chunks play in order even if responses arrive late. */
-        let ttsChain: Promise<void> = Promise.resolve();
+        /**
+         * Concurrent TTS: all generateTTS fetches start immediately in parallel
+         * so phrase N+1's network request doesn't wait for phrase N to finish.
+         * The flush chain guarantees Mp3QueuePlayer receives blobs in order.
+         */
+        const pendingTtsPromises: Promise<Blob>[] = [];
+        let ttsFlushChain: Promise<void> = Promise.resolve();
         const enqueueTts = (text: string) => {
           if (!mp3 || !text.trim()) return;
           const phrase = text.trim();
-          ttsChain = ttsChain
-            .then(() => generateTTS({ text: phrase }))
-            .then((blob) => {
+          // Fire fetch immediately (parallel with any in-flight phrases).
+          const blobPromise = generateTTS({ text: phrase });
+          pendingTtsPromises.push(blobPromise);
+          // Flush in strict arrival order so playback sequence is preserved.
+          ttsFlushChain = ttsFlushChain.then(async () => {
+            const promise = pendingTtsPromises.shift();
+            if (!promise) return;
+            try {
+              const blob = await promise;
               mp3.enqueue(blob);
-            })
-            .catch(() => {
+            } catch (e: any) {
               toast.error("Failed to generate speech for a phrase");
-            });
+            }
+          }).catch(() => {});
         };
 
         await aiService.streamConversationMessage(
           {
             messages: conversationMessages,
             temperature: 0.7,
-            maxTokens: 1000,
+            maxTokens: 350,
             signal: streamSignal,
             ...(freeTalkSystemInstruction
               ? { systemInstruction: freeTalkSystemInstruction }
@@ -934,15 +954,12 @@ function AISessionPage() {
           setIsRecording(false);
           return;
         }
-
-        setIsListeningAfterSilence(true);
         setIsTranscribing(true);
         setIsRecording(false);
 
         // Add placeholder user + streaming AI message immediately.
         const userMessageIndex = messages.length;
         const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
-
         const userMessage: ChatMessage = { type: "user", text: "🎤 [Voice message]" };
         const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
 
@@ -955,7 +972,7 @@ function AISessionPage() {
           content: m.text,
         }));
 
-        const drillHistoryBeforeTurn = conversationHistory;
+        const drillHistoryBeforeTurn = conversationHistoryRef.current;
 
         let finalResponse = "";
         let fullTextMeta = "";
@@ -988,7 +1005,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1028,6 +1044,10 @@ function AISessionPage() {
                 }
               }
             );
+
+            // Signal that all audio chunks have been sent; if none were queued
+            // this fires onEndedCallback immediately so "Speaking…" clears.
+            audioPlayer.signalStreamEnd();
 
             setMessages((prev) =>
               prev.map((m, i) =>
@@ -1053,6 +1073,7 @@ function AISessionPage() {
               topic,
               scenarioDescription: scenarioTextDecoded,
               vocabularyList,
+              reversed: isReversed,
             });
 
             await aiService.streamVoiceConversationMessage(
@@ -1066,7 +1087,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1087,25 +1107,34 @@ function AISessionPage() {
                   fullTextMeta =
                     typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
 
-                  setMessages((prev) =>
-                    prev.map((m, i) => {
-                      if (i === userMessageIndex) {
-                        return {
-                          ...m,
-                          text: inputTextMeta
-                            ? `🎤 [Voice] ${inputTextMeta}`
-                            : "🎤 [Voice message]",
-                        };
-                      }
-                      if (i === aiMessageIndex && fullTextMeta) {
-                        return { ...m, text: fullTextMeta };
-                      }
-                      return m;
-                    })
-                  );
+                  // Surface Gemini-side errors (e.g. timeout_no_response) so the user
+                  // knows something went wrong instead of seeing a frozen placeholder.
+                  if (chunk.data?.error) {
+                    const errStr = String(chunk.data.error);
+                    const isTimeout = errStr.includes("timeout");
+                    toast.error(
+                      isTimeout
+                        ? "Your message was too long. Please try speaking in shorter sentences."
+                        : "Voice processing failed. Please try again."
+                    );
+                  }
+
+                  // Free Talk: keep user bubble as a plain voice note — no transcription shown.
+                  // AI message is updated if the server returns a pre-formed full reply.
+                  if (fullTextMeta) {
+                    setMessages((prev) =>
+                      prev.map((m, i) =>
+                        i === aiMessageIndex ? { ...m, text: fullTextMeta } : m
+                      )
+                    );
+                  }
                 }
               }
             );
+
+            // Signal that all audio chunks have been sent; if none were queued
+            // this fires onEndedCallback immediately so "Speaking…" clears.
+            audioPlayer.signalStreamEnd();
 
             setMessages((prev) =>
               prev.map((m, i) =>
@@ -1136,7 +1165,6 @@ function AISessionPage() {
             message || "Failed to process voice. Try using the keyboard instead.",
           );
           setIsThinking(false);
-          setIsListeningAfterSilence(false);
           setIsTranscribing(false);
           setStreamingAudioActive(false);
           setPlayingMessageIndex(null);
@@ -1180,17 +1208,17 @@ function AISessionPage() {
     const cachedMsgCount = cachedSession.current?.messages.length ?? 0;
 
     return (
-      <div className="flex flex-col h-[100vh] bg-gray-50 items-center justify-center px-6">
-        <div className="bg-white rounded-3xl shadow-lg p-6 max-w-sm w-full text-center">
+      <div className="flex flex-col h-[100vh] bg-gray-50 dark:bg-[#0c0e0d] items-center justify-center px-6">
+        <div className="bg-white dark:bg-[#131614] rounded-3xl shadow-lg p-6 max-w-sm w-full text-center">
           {/* Icon */}
           <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Image src="/logo2.svg" alt="Eklan" width={32} height={32} />
           </div>
 
-          <h2 className="text-lg font-bold font-nunito text-gray-900 mb-1">
+          <h2 className="text-lg font-bold font-nunito text-gray-900 dark:text-[#f0f2f1] mb-1">
             Continue previous session?
           </h2>
-          <p className="text-sm font-satoshi text-gray-500 mb-6">
+          <p className="text-sm font-satoshi text-gray-500 dark:text-[#9aa39e] mb-6">
             You have {cachedMsgCount} message{cachedMsgCount !== 1 ? "s" : ""} from an earlier conversation.
           </p>
 
@@ -1205,7 +1233,7 @@ function AISessionPage() {
             <button
               type="button"
               onClick={handleNewSession}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-[#1a1d1c] dark:hover:bg-[#232724] text-gray-700 dark:text-[#c8cdc9] font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
               Start fresh
@@ -1213,7 +1241,7 @@ function AISessionPage() {
             <button
               type="button"
               onClick={handleFinalExit}
-              className="w-full border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
+              className="w-full border border-gray-200 dark:border-[#2a2e2c] hover:bg-gray-50 dark:hover:bg-[#1a1d1c] text-gray-800 dark:text-[#c8cdc9] font-semibold py-3 rounded-2xl transition-colors flex items-center justify-center gap-2"
             >
               <Home className="w-4 h-4" />
               Exit to Home
@@ -1227,19 +1255,19 @@ function AISessionPage() {
   /* ─── Render ───────────────────────────────────────────────────────────── */
 
   return (
-    <div ref={containerRef} className="relative flex flex-col h-[100dvh] bg-gray-50">
+    <div ref={containerRef} className="relative flex flex-col h-[100dvh] bg-gray-50 dark:bg-[#0c0e0d]">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
+      <header className="sticky top-0 z-20 bg-white dark:bg-[#131614] border-b border-gray-100 dark:border-[#2a2e2c]">
         <div className="flex items-center px-4 py-3 max-w-2xl mx-auto">
           <button
             type="button"
             onClick={() => {
               void beginExitFlow("/account/practice/ai");
             }}
-            className="p-2.5 -ml-2.5 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2.5 -ml-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
             aria-label="Leave session"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-[#9aa39e]" />
           </button>
 
           <div className="flex items-center flex-1 ml-3 min-w-0">
@@ -1247,10 +1275,17 @@ function AISessionPage() {
               <Image src="/logo2.svg" alt="Eklan" width={24} height={24} />
             </div>
             <div className="ml-3 min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 truncate">
-                {isDrillPractice ? "Eklan" : "AI Partner"}
-              </h1>
-              <p className="text-xs text-gray-500 truncate">{subtitle}</p>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-sm font-semibold text-gray-900 dark:text-[#f0f2f1] truncate">
+                  {isDrillPractice ? "Eklan" : "AI Partner"}
+                </h1>
+                {isReversed && (
+                  <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                    You&apos;re the teacher
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa39e] truncate">{subtitle}</p>
             </div>
           </div>
 
@@ -1259,7 +1294,7 @@ function AISessionPage() {
               <button
                 type="button"
                 onClick={() => setShowGoalWords((s) => !s)}
-                className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"
+                className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
                 aria-label="Goal words"
                 title="Goal words"
               >
@@ -1269,32 +1304,32 @@ function AISessionPage() {
             <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2.5 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
             >
-              <MoreVertical className="w-5 h-5 text-gray-500" />
+              <MoreVertical className="w-5 h-5 text-gray-500 dark:text-[#9aa39e]" />
             </button>
 
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-10 z-40 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="absolute right-0 top-10 z-40 w-48 bg-white dark:bg-[#1a1d1c] rounded-xl shadow-lg border border-gray-100 dark:border-[#2a2e2c] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
                   <button
                     onClick={() => { setAutoPlayAudio(!autoPlayAudio); setShowMenu(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#c8cdc9] hover:bg-gray-50 dark:hover:bg-[#232724] transition-colors"
                   >
                     <Volume2 className="w-4 h-4" />
                     <span>Auto-play {autoPlayAudio ? "on" : "off"}</span>
-                    <div className={`ml-auto w-8 h-5 rounded-full flex items-center transition-colors ${autoPlayAudio ? "bg-emerald-500 justify-end" : "bg-gray-300 justify-start"}`}>
+                    <div className={`ml-auto w-8 h-5 rounded-full flex items-center transition-colors ${autoPlayAudio ? "bg-emerald-500 justify-end" : "bg-gray-300 dark:bg-[#3a3e3c] justify-start"}`}>
                       <div className="w-4 h-4 bg-white rounded-full shadow mx-0.5" />
                     </div>
                   </button>
-                  <div className="h-px bg-gray-100 mx-2" />
+                  <div className="h-px bg-gray-100 dark:bg-[#2a2e2c] mx-2" />
                   <button
                     onClick={() => {
                       setShowMenu(false);
                       void beginExitFlow("/account/practice/ai");
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                   >
                     <X className="w-4 h-4" />
                     <span>End session</span>
@@ -1316,19 +1351,19 @@ function AISessionPage() {
             aria-label="Close goal words"
           />
           <aside
-            className="fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-white shadow-xl border-l border-gray-100 flex flex-col"
+            className="fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-white dark:bg-[#131614] shadow-xl border-l border-gray-100 dark:border-[#2a2e2c] flex flex-col"
             role="dialog"
             aria-label="Goal words"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h2 className="text-sm font-bold text-gray-900">Goal words</h2>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#2a2e2c]">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-[#f0f2f1]">Goal words</h2>
               <button
                 type="button"
                 onClick={() => setShowGoalWords(false)}
-                className="p-2 rounded-full hover:bg-gray-100"
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c]"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-gray-500 dark:text-[#9aa39e]" />
               </button>
             </div>
             <ul className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -1338,14 +1373,14 @@ function AISessionPage() {
                   className={
                     masteredVocab[w]
                       ? "text-sm line-through text-emerald-600/90"
-                      : "text-sm font-medium text-gray-800"
+                      : "text-sm font-medium text-gray-800 dark:text-[#c8cdc9]"
                   }
                 >
                   {w}
                 </li>
               ))}
             </ul>
-            <p className="p-3 text-xs text-gray-500 border-t border-gray-100">
+            <p className="p-3 text-xs text-gray-500 dark:text-[#9aa39e] border-t border-gray-100 dark:border-[#2a2e2c]">
               Say a target word in chat to mark it as mastered.
             </p>
           </aside>
@@ -1354,14 +1389,14 @@ function AISessionPage() {
 
       {/* ── Initialization overlay (matches mobile) ────────────────────── */}
       {isInitializing && (
-        <div className="absolute inset-0 z-30 bg-white flex flex-col items-center justify-center px-8">
+        <div className="absolute inset-0 z-30 bg-white dark:bg-[#0c0e0d] flex flex-col items-center justify-center px-8">
           {/* Logo bubble */}
           <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mb-6 shadow-lg">
             <Image src="/logo2.svg" alt="Eklan" width={52} height={52} />
           </div>
 
-          <h2 className="text-xl font-bold text-gray-900 mb-2 font-nunito">Getting ready…</h2>
-          <p className="text-sm text-gray-400 text-center max-w-xs mb-10">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-[#f0f2f1] mb-2 font-nunito">Getting ready…</h2>
+          <p className="text-sm text-gray-400 dark:text-[#6b7270] text-center max-w-xs mb-10">
             Eklan is personalising your session. This only takes a moment.
           </p>
 
@@ -1383,7 +1418,7 @@ function AISessionPage() {
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
           {/* Date pill */}
           <div className="flex justify-center">
-            <span className="text-[11px] text-gray-400 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
+            <span className="text-[11px] text-gray-400 dark:text-[#6b7270] bg-white/80 dark:bg-[#131614]/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
               Today
             </span>
           </div>
@@ -1398,12 +1433,22 @@ function AISessionPage() {
                   <Image src="/logo2.svg" alt="Eklan" width={28} height={28} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[92%] sm:max-w-[85%]">
-                    <MarkdownText className="text-sm text-gray-900 leading-relaxed">
-                      {message.text}
-                    </MarkdownText>
-                    {message.isStreaming && (
-                      <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                  <div className="bg-gray-100 dark:bg-[#1a1d1c] rounded-2xl rounded-tl-sm px-4 py-3 max-w-[92%] sm:max-w-[85%]">
+                    {message.isStreaming && !message.text.trim() ? (
+                      <div className="flex gap-1 py-0.5">
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    ) : (
+                      <>
+                        <MarkdownText className="text-sm text-gray-900 dark:text-[#e8ebe9] leading-relaxed">
+                          {message.text}
+                        </MarkdownText>
+                        {message.isStreaming && (
+                          <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 ml-1">
@@ -1450,51 +1495,16 @@ function AISessionPage() {
             </div>
           )}
 
-          {/* Thinking indicator */}
-          {isThinking && (
-            <div className="flex justify-start">
-              <div className="bg-white shadow-sm border border-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>
       </main>
 
       {/* ── Bottom controls — mirrors mobile layout ─────────────────────── */}
-      <footer className="sticky bottom-0 bg-white border-t border-gray-100">
+      <footer className="sticky bottom-0 bg-white dark:bg-[#131614] border-t border-gray-100 dark:border-[#2a2e2c]">
 
-        {/* Post–voice-stop feedback: listening (immediate) vs processing (after first chunk) */}
-        {isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-emerald-50 border-b border-emerald-100">
-            <span className="flex items-end gap-0.5 h-4" aria-hidden>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span
-                  key={i}
-                  className="w-0.5 rounded-full bg-emerald-500/80 animate-pulse"
-                  style={{
-                    height: `${10 + (i % 3) * 4}px`,
-                    animationDuration: "0.9s",
-                    animationDelay: `${i * 90}ms`,
-                  }}
-                />
-              ))}
-            </span>
-            <span className="text-xs font-medium text-emerald-800">Listening…</span>
-          </div>
-        )}
-        {isTranscribing && !isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-blue-50 border-b border-blue-100">
-            <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-            <span className="text-xs font-medium text-blue-600">Processing…</span>
-          </div>
-        )}
+        {/* voice-stop feedback: processing only (until first chunk) */}
+
 
         {showTextInput ? (
           /* ── Text input mode ── */
@@ -1502,9 +1512,9 @@ function AISessionPage() {
             {/* Back to mic */}
             <button
               onClick={() => setShowTextInput(false)}
-              className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center flex-shrink-0 hover:bg-slate-100 transition-colors"
+              className="w-12 h-12 rounded-full bg-slate-50 dark:bg-[#1a1d1c] border border-slate-200 dark:border-[#2a2e2c] flex items-center justify-center flex-shrink-0 hover:bg-slate-100 dark:hover:bg-[#232724] transition-colors"
             >
-              <Mic className="w-5 h-5 text-slate-500" />
+              <Mic className="w-5 h-5 text-slate-500 dark:text-[#9aa39e]" />
             </button>
 
             <textarea
@@ -1522,7 +1532,7 @@ function AISessionPage() {
               placeholder="Type a message…"
               disabled={isInitializing || isThinking}
               autoFocus
-              className="flex-1 bg-gray-100 rounded-2xl px-4 py-2.5 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white transition-all disabled:opacity-50 resize-none leading-relaxed"
+              className="flex-1 bg-gray-100 dark:bg-[#1a1d1c] rounded-2xl px-4 py-2.5 text-base text-gray-900 dark:text-[#f0f2f1] placeholder-gray-400 dark:placeholder-[#6b7270] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:bg-white dark:focus:bg-[#232724] transition-all disabled:opacity-50 resize-none leading-relaxed"
               style={{ maxHeight: 120 }}
             />
 
@@ -1543,9 +1553,9 @@ function AISessionPage() {
               <button
                 onClick={() => setShowTextInput(true)}
                 disabled={isThinking || isInitializing}
-                className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mr-10 hover:bg-slate-100 transition-colors disabled:opacity-40"
+                className="w-12 h-12 rounded-full bg-slate-50 dark:bg-[#1a1d1c] border border-slate-200 dark:border-[#2a2e2c] flex items-center justify-center mr-10 hover:bg-slate-100 dark:hover:bg-[#232724] transition-colors disabled:opacity-40"
               >
-                <Keyboard className="w-5 h-5 text-slate-500" />
+                <Keyboard className="w-5 h-5 text-slate-500 dark:text-[#9aa39e]" />
               </button>
 
               {/* Large mic button with pulse rings */}
@@ -1591,12 +1601,8 @@ function AISessionPage() {
             </div>
 
             {/* Hint text */}
-            <p className="text-center text-xs text-gray-400 mt-2 mb-1">
-              {isRecording
-                ? "Tap to stop · silence auto-stops"
-                : isThinking
-                ? "Eklan is thinking…"
-                : "Tap to speak"}
+            <p className="text-center text-xs text-gray-400 dark:text-[#6b7270] mt-2 mb-1">
+              {isRecording ? "Tap to stop · silence auto-stops" : "Tap to speak"}
             </p>
           </div>
         )}
@@ -1622,7 +1628,7 @@ function AISessionPage() {
 export default function AISessionPageWrapper() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col h-[100dvh] items-center justify-center bg-gray-50">
+      <div className="flex flex-col h-[100dvh] items-center justify-center bg-gray-50 dark:bg-[#0c0e0d]">
         <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse" />
       </div>
     }>

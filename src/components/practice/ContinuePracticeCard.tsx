@@ -2,6 +2,7 @@
 
 import { Play } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const DRILL_TYPE_LABELS: Record<string, string> = {
   roleplay: "Roleplay",
@@ -44,7 +45,7 @@ export function ContinuePracticeCard({
           <span className="text-white/80 text-sm capitalize">
             {DRILL_TYPE_LABELS[drillType] || drillType}
           </span>
-          <span className="text-white/80 text-sm">5–10 mins</span>
+          <span className="text-white/80 text-sm">{DRILL_ESTIMATED_DURATION_LABEL}</span>
         </div>
         <button
           type="button"

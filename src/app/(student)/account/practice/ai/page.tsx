@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight, Clock, X } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
 import { useLearnerDrills } from "@/hooks/useDrills";
 import { Header } from "@/components/layout/Header";
 
@@ -45,6 +46,30 @@ const FREE_TOPICS = [
 export default function FreeTalkSelectionPage() {
   const router = useRouter();
   const { data: drillsData, isLoading } = useLearnerDrills({ status: "completed" });
+
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [roleOptions, setRoleOptions] = useState<{ student: string; ai: string } | null>(null);
+
+  function openRoleModal(url: string, characters?: { student?: string; ai?: string }) {
+    setPendingUrl(url);
+    setRoleOptions({
+      student: characters?.student?.trim() || "Learner",
+      ai: characters?.ai?.trim() || "English Coach",
+    });
+  }
+
+  function handleSelectRole(reversed: boolean) {
+    if (!pendingUrl) return;
+    const url = reversed ? `${pendingUrl}&reversed=1` : pendingUrl;
+    setPendingUrl(null);
+    setRoleOptions(null);
+    router.push(url);
+  }
+
+  function dismissModal() {
+    setPendingUrl(null);
+    setRoleOptions(null);
+  }
 
   // Filter to only completed scenario (roleplay) drills
   const completedScenarioDrills = (drillsData ?? []).filter((a: any) => {
@@ -110,6 +135,12 @@ export default function FreeTalkSelectionPage() {
                   return `/account/practice/ai/session?${q.toString()}`;
                 };
                 const defaultUrl = buildSessionUrl(0);
+                const drillCharacters = {
+                  student: drill.student_character_name,
+                  ai: Array.isArray(drill.ai_character_names) && drill.ai_character_names[0]
+                    ? drill.ai_character_names[0]
+                    : drill.ai_character_name,
+                };
 
                 return (
                   <div
@@ -118,7 +149,7 @@ export default function FreeTalkSelectionPage() {
                   >
                     <button
                       type="button"
-                      onClick={() => router.push(defaultUrl)}
+                      onClick={() => openRoleModal(defaultUrl, drillCharacters)}
                       className="w-full p-4 flex items-center gap-4 text-left"
                     >
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -155,7 +186,7 @@ export default function FreeTalkSelectionPage() {
                             <button
                               key={`${drillId}-scene-${i}`}
                               type="button"
-                              onClick={() => router.push(buildSessionUrl(i))}
+                              onClick={() => openRoleModal(buildSessionUrl(i), drillCharacters)}
                               className="text-xs font-semibold font-satoshi px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/25 border border-emerald-500/30"
                             >
                               {label}
@@ -181,7 +212,7 @@ export default function FreeTalkSelectionPage() {
               <button
                 key={topicItem.id}
                 onClick={() =>
-                  router.push(`/account/practice/ai/session?topic=${topicItem.id}`)
+                  openRoleModal(`/account/practice/ai/session?topic=${topicItem.id}`)
                 }
                 className={`w-full bg-card border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-all text-left ${
                   idx === 0
@@ -212,6 +243,78 @@ export default function FreeTalkSelectionPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Role Selection Modal ── */}
+      {pendingUrl && roleOptions && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-4 pb-6 sm:pb-0"
+          onClick={dismissModal}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-[#131614] rounded-3xl shadow-2xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold font-nunito text-foreground">
+                Choose your role
+              </h2>
+              <button
+                type="button"
+                onClick={dismissModal}
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-sm font-satoshi text-muted-foreground mb-5">
+              Pick the role you want to practice in this session.
+            </p>
+
+            {/* Role cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Card 1 – student role */}
+              <button
+                type="button"
+                onClick={() => handleSelectRole(false)}
+                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors text-center"
+              >
+                <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-2xl">
+                  🧑‍🎓
+                </div>
+                <div>
+                  <p className="text-[10px] font-satoshi uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mb-0.5">
+                    Play as
+                  </p>
+                  <p className="text-sm font-bold font-nunito text-foreground leading-tight">
+                    {roleOptions.student}
+                  </p>
+                </div>
+              </button>
+
+              {/* Card 2 – AI role */}
+              <button
+                type="button"
+                onClick={() => handleSelectRole(true)}
+                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-border hover:border-amber-400 bg-card hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors text-center"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-2xl">
+                  🎓
+                </div>
+                <div>
+                  <p className="text-[10px] font-satoshi uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-0.5">
+                    Play as
+                  </p>
+                  <p className="text-sm font-bold font-nunito text-foreground leading-tight">
+                    {roleOptions.ai}
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

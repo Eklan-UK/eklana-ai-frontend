@@ -76,6 +76,8 @@ interface DrillPracticeOptions {
 	userName?: string;
 	/** From role-play: fixed scene + target words (Free Talk from drill). */
 	freeTalkOverlay?: DrillFreeTalkOverlay;
+	/** User practises as tutor; model plays learner (Alex) in the same drill scenario. */
+	freeTalkReversed?: boolean;
 }
 
 // ─── PCM to WAV conversion ───────────────────────────────────────────────────
@@ -627,8 +629,37 @@ function buildDrillPracticePrompt(
 	drill: DrillPracticeOptions['drill'],
 	pronunciationWeaknesses?: string[],
 	userName?: string,
-	freeTalkOverlay?: DrillFreeTalkOverlay
+	freeTalkOverlay?: DrillFreeTalkOverlay,
+	freeTalkReversed?: boolean
 ): string {
+	if (freeTalkReversed && freeTalkOverlay?.scenarioDescription) {
+		let prompt = '';
+		if (userName) {
+			prompt += `TUTOR / REAL USER: The person speaking to you is named "${userName}". They are your English tutor leading this practice. Address them naturally by name when appropriate.\n\n`;
+		}
+		prompt += `You are Alex, an English learner. The user (${userName || 'your tutor'}) leads the session as the tutor, interviewer, or partner role from the scenario below. You play the learner/candidate/applicant side — the side a student would play in this situation.\n`;
+		prompt += `Behave like a genuine learner: ask questions, show curiosity, and occasionally use vocabulary imperfectly or ask the tutor to confirm a phrase. Do NOT act as the teacher, examiner, or interviewer yourself.\n\n`;
+		prompt += `DRILL (from their human tutor): "${drill.title}" — type: ${drill.type}, difficulty: ${drill.difficulty || 'intermediate'}`;
+		if (drill.context) {
+			prompt += `\nGeneral context: ${drill.context}`;
+		}
+		prompt += `\n\nFOCUSED ROLEPLAY SESSION (stay in this world):\n${freeTalkOverlay.scenarioDescription}`;
+		if (freeTalkOverlay.referenceScript?.trim()) {
+			prompt += `\n\nREFERENCE SCRIPT (shows how the scenario flows — use it to stay on-topic; you speak as the learner side, not as every line verbatim):\n${freeTalkOverlay.referenceScript.trim()}`;
+		}
+		if (freeTalkOverlay.vocabularyList.length > 0) {
+			const lines = freeTalkOverlay.vocabularyList.map(
+				(w, i) => `  ${i + 1}. ${w}`
+			).join('\n');
+			prompt += `\n\nTARGET WORDS (try to use them; sometimes ask ${userName || 'the tutor'} if you used one correctly):\n${lines}`;
+		}
+		prompt += `\n\nGENERATION INSTRUCTION:\nStay in the same setting and premise. Build on what ${userName || 'the tutor'} says. Keep replies short (1–3 sentences) like a real learner speaking. No JSON or markdown.`;
+		if (pronunciationWeaknesses && pronunciationWeaknesses.length > 0) {
+			prompt += `\n\nNote: ${userName || 'The tutor'} may help you with sounds you find difficult: ${pronunciationWeaknesses.join(', ')}.`;
+		}
+		return prompt;
+	}
+
 	// ═══ LAYER 1 — Identity ═══
 	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
 	if (userName) {
@@ -1340,18 +1371,8 @@ export async function generateVoiceConversationSSEStream(
 
 	const t0 = Date.now();
 
-	// ① FFmpeg — convert to raw PCM 16 kHz (the only format Live API accepts).
-	let pcmBuffer: Buffer;
-	try {
-		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
-		logger.info('[FreeTalk] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
-	} catch (e: any) {
-		throw new Error(`Audio conversion failed: ${e?.message || 'ffmpeg error'}`);
-	}
-	const pcmBase64 = pcmBuffer.toString('base64');
-	const pcmBytes  = pcmBuffer.length;
-
-	// Build system instruction — applied on each new Live connection (we evict after each turn).
+	// Build system instruction first (sync, no I/O) so it's ready before the
+	// parallel awaits below.
 	const persona = contextPrompt ||
 		'You are Eklan, a friendly AI English speaking practice partner. Your role is to have natural, encouraging conversations to help the student improve their English.';
 	let systemInstruction = persona;
@@ -1360,25 +1381,43 @@ export async function generateVoiceConversationSSEStream(
 	}
 	systemInstruction += '\n\nRespond naturally in spoken English. Keep replies concise (2-4 sentences). Be warm and encouraging.';
 	if (conversationHistory.length > 0) {
-		// Only relevant for the first turn of a fresh session.
 		const recent = conversationHistory.slice(-6);
 		systemInstruction += '\n\nRecent conversation:\n' +
 			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 
-	// ② Live session key (cache is evicted after each completed turn — see closeStream).
+	// ①+② Run FFmpeg conversion and Live session connect in parallel — mirrors the
+	// drill pipeline. Session creation (~500-970 ms) overlaps with FFmpeg (~50-280 ms),
+	// reducing total startup latency by up to ~970 ms.
 	const cacheKey = userId ? `freetalk_${userId}` : `freetalk_anon_${Date.now()}`;
 	const tSession = Date.now();
-	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-		responseModalities: [Modality.AUDIO],
-		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-		systemInstruction: { parts: [{ text: systemInstruction }] },
-		inputAudioTranscription: {},
-		outputAudioTranscription: {},
-		thinkingConfig: { thinkingBudget: 0 },
-	});
-	logger.info('[FreeTalk] ② session ready', { ms: Date.now() - tSession });
-
+	let pcmBuffer: Buffer;
+	let entry: LiveSessionEntry;
+	try {
+		[pcmBuffer, entry] = await Promise.all([
+			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
+				throw new Error(`Audio conversion failed: ${e?.message || 'ffmpeg error'}`);
+			}),
+		getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+			systemInstruction: { parts: [{ text: systemInstruction }] },
+			inputAudioTranscription: {},
+			outputAudioTranscription: {},
+			thinkingConfig: { thinkingBudget: 0 },
+			// Disable server-side VAD so it doesn't fire on natural pauses
+			// mid-recording for long inputs. We signal activity start/end manually.
+			realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+		}),
+	]);
+} catch (e: any) {
+	throw e;
+}
+logger.info('[FreeTalk] ①+② ffmpeg+session ready (parallel)', {
+	totalMs: Date.now() - t0,
+	inBytes: audioBuffer.length,
+	outBytes: pcmBuffer.length,
+});
 	// ③ Create the SSE stream — session is already connected; just route messages.
 	// Shared state for start + cancel (client disconnect aborts the reader; timers must still clear).
 	const sseCtx = {
@@ -1498,7 +1537,7 @@ export async function generateVoiceConversationSSEStream(
 					});
 					sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
 					closeStream('turnComplete');
-				}, 800);
+				}, 150);
 			}
 		};
 
@@ -1515,11 +1554,19 @@ export async function generateVoiceConversationSSEStream(
 
 		scheduleFirstChunkTimeout();
 
-		// Send audio — session is already open
+		// Send audio bracketed by manual activity signals so the server-side VAD
+		// (which is disabled in the session config) does not fire on natural pauses
+		// mid-recording. activityStart → chunks → activityEnd tells Gemini exactly
+		// when the pre-recorded speech starts and ends.
 		entry.status = 'busy';
-		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-		entry.session.sendRealtimeInput({ audioStreamEnd: true });
-		logger.info('[FreeTalk] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.session.sendRealtimeInput({ activityStart: {} });
+		const PCM_CHUNK_BYTES = 16_000;
+		for (let offset = 0; offset < pcmBuffer.length; offset += PCM_CHUNK_BYTES) {
+			const slice = pcmBuffer.subarray(offset, offset + PCM_CHUNK_BYTES);
+			entry.session.sendRealtimeInput({ audio: { data: slice.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+		}
+		entry.session.sendRealtimeInput({ activityEnd: {} });
+		logger.info('[FreeTalk] ②→③ audio sent (manual VAD)', { pcmBytes: pcmBuffer.length, chunks: Math.ceil(pcmBuffer.length / PCM_CHUNK_BYTES), msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
@@ -1553,6 +1600,8 @@ export async function generateDrillPracticeVoiceResponseStream(
 		userId?: string;     // used as part of the session cache key
 		drillId?: string;    // used as part of the session cache key
 		freeTalkOverlay?: DrillFreeTalkOverlay;
+		/** User practises as tutor; model plays learner (Alex). */
+		freeTalkReversed?: boolean;
 	}
 ): Promise<ReadableStream> {
 	const {
@@ -1565,57 +1614,69 @@ export async function generateDrillPracticeVoiceResponseStream(
 		userId,
 		drillId,
 		freeTalkOverlay,
+		freeTalkReversed,
 	} = options;
 
 	if (!genAINew) throw new Error('Gemini Live API is not configured');
 
 	const t0 = Date.now();
 
-	// ① FFmpeg — convert to raw PCM 16 kHz.
-	let pcmBuffer: Buffer;
-	try {
-		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
-		logger.info('[Drill] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
-	} catch (e: any) {
-		throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
-	}
-	const pcmBase64 = pcmBuffer.toString('base64');
-	const pcmBytes  = pcmBuffer.length;
-
-	// Build system instruction — only used when a NEW session is opened.
+	// Build system instruction before kicking off parallel work (sync, no I/O).
 	let systemInstruction = buildDrillPracticePrompt(
 		drill,
 		pronunciationWeaknesses,
 		userName,
-		freeTalkOverlay
+		freeTalkOverlay,
+		freeTalkReversed
 	);
 	if (conversationHistory.length > 0) {
-		const recent = conversationHistory.slice(-6);
+		const recent = conversationHistory.slice(-4);
 		systemInstruction += '\n\nRecent conversation:\n' +
 			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 	systemInstruction += '\n\nIMPORTANT: The user is speaking via voice. Listen carefully, respond in spoken English. Keep responses concise (2-4 sentences). No JSON or markdown.';
 
-	// ② New Live session if drill + optional Free Talk focus changes
 	const overlayKey = freeTalkOverlay?.scenarioDescription
 		? `_ft_${Buffer.from(freeTalkOverlay.scenarioDescription)
 			.toString('base64')
 			.replace(/\+/g, '-')
 			.replace(/\//g, '_')
 			.replace(/=+$/, '')
-			.slice(0, 48)}`
+			.slice(0, 48)}${freeTalkReversed ? '_rev' : ''}`
 		: '';
 	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}${overlayKey}` : `drill_anon_${Date.now()}`;
+
+	// ①+② Run FFmpeg conversion and Live session connect in parallel — session
+	// creation (~500-970 ms) dominates; overlapping FFmpeg (~50-280 ms) hides it.
 	const tSession = Date.now();
-	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-		responseModalities: [Modality.AUDIO],
-		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-		systemInstruction: { parts: [{ text: systemInstruction }] },
-		inputAudioTranscription: {},
-		outputAudioTranscription: {},
-		thinkingConfig: { thinkingBudget: 0 },
-	});
-	logger.info('[Drill] ② session ready', { ms: Date.now() - tSession });
+	let pcmBuffer: Buffer;
+	let entry: LiveSessionEntry;
+	try {
+		[pcmBuffer, entry] = await Promise.all([
+			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
+				throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
+			}),
+		getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+			responseModalities: [Modality.AUDIO],
+			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+			systemInstruction: { parts: [{ text: systemInstruction }] },
+			inputAudioTranscription: {},
+			outputAudioTranscription: {},
+			thinkingConfig: { thinkingBudget: 0 },
+			// Disable server-side VAD so it doesn't fire on natural pauses
+			// mid-recording for long inputs. We signal activity start/end manually.
+			realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+		}),
+	]);
+} catch (e: any) {
+	throw e;
+}
+logger.info('[Drill] ①+② ffmpeg+session ready (parallel)', {
+	totalMs: Date.now() - t0,
+	inBytes: audioBuffer.length,
+	outBytes: pcmBuffer.length,
+});
+	const pcmBytes = pcmBuffer.length;
 
 	// ③ Create the SSE stream — session is already connected; just route messages.
 	const sseCtx = {
@@ -1723,25 +1784,25 @@ export async function generateDrillPracticeVoiceResponseStream(
 				sendChunk('audio', pcm);
 			}
 
-			if (message.serverContent?.turnComplete && !metadataSent) {
-				metadataSent = true;
-				sseCtx.turnCompleteHandle = setTimeout(() => {
-					sseCtx.turnCompleteHandle = undefined;
-					if (sseCtx.streamClosed) return;
-					logger.info('[Drill] ④ turn complete', {
-						totalMs: Date.now() - t0,
-						ffmpegMs: tSession - t0,
-						firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
-						firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
-					});
-					sendChunk('metadata', {
-						fullText:   fullAssistantText.join('').trim(),
-						inputText:  fullUserText.trim(),
-						drillType:  drill.type,
-						drillTitle: drill.title,
-					});
-					closeStream('turnComplete');
-				}, 800);
+		if (message.serverContent?.turnComplete && !metadataSent) {
+			metadataSent = true;
+			sseCtx.turnCompleteHandle = setTimeout(() => {
+				sseCtx.turnCompleteHandle = undefined;
+				if (sseCtx.streamClosed) return;
+				logger.info('[Drill] ④ turn complete', {
+					totalMs: Date.now() - t0,
+					ffmpegMs: tSession - t0,
+					firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
+					firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+				});
+				sendChunk('metadata', {
+					fullText:   fullAssistantText.join('').trim(),
+					inputText:  fullUserText.trim(),
+					drillType:  drill.type,
+					drillTitle: drill.title,
+				});
+				closeStream('turnComplete');
+			}, 150);
 			}
 		};
 
@@ -1758,11 +1819,19 @@ export async function generateDrillPracticeVoiceResponseStream(
 
 		scheduleFirstChunkTimeout();
 
-		// Send audio — session is already open
+		// Send audio bracketed by manual activity signals so the server-side VAD
+		// (which is disabled in the session config) does not fire on natural pauses
+		// mid-recording. activityStart → chunks → activityEnd tells Gemini exactly
+		// when the pre-recorded speech starts and ends.
 		entry.status = 'busy';
-		entry.session.sendRealtimeInput({ audio: { data: pcmBase64, mimeType: 'audio/pcm;rate=16000' } });
-		entry.session.sendRealtimeInput({ audioStreamEnd: true });
-		logger.info('[Drill] ②→③ audio sent', { pcmBytes, msSinceStart: Date.now() - t0 });
+		entry.session.sendRealtimeInput({ activityStart: {} });
+		const PCM_CHUNK_BYTES = 16_000;
+		for (let offset = 0; offset < pcmBuffer.length; offset += PCM_CHUNK_BYTES) {
+			const slice = pcmBuffer.subarray(offset, offset + PCM_CHUNK_BYTES);
+			entry.session.sendRealtimeInput({ audio: { data: slice.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
+		}
+		entry.session.sendRealtimeInput({ activityEnd: {} });
+		logger.info('[Drill] ②→③ audio sent (manual VAD)', { pcmBytes, chunks: Math.ceil(pcmBuffer.length / PCM_CHUNK_BYTES), msSinceStart: Date.now() - t0 });
 		},
 		cancel(reason) {
 			if (sseCtx.streamClosed) return;
@@ -1863,9 +1932,9 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 			throw new Error('Gemini API is not configured');
 		}
 
-		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName, freeTalkOverlay } = options;
+		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName, freeTalkOverlay, freeTalkReversed } = options;
 
-		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName, freeTalkOverlay);
+		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName, freeTalkOverlay, freeTalkReversed);
 
 		// Build conversation history for Live API turns
 		let validHistory = conversationHistory;
@@ -1928,7 +1997,8 @@ export async function generateDrillPracticeResponseStream(options: DrillPractice
 export async function generateDrillPracticeGreetingStream(
 	drill: DrillPracticeOptions['drill'],
 	userName?: string,
-	freeTalkOverlay?: DrillFreeTalkOverlay
+	freeTalkOverlay?: DrillFreeTalkOverlay,
+	freeTalkReversed?: boolean
 ): Promise<ReadableStream> {
 	try {
 		if (!config.GEMINI_API_KEY) {
@@ -1955,7 +2025,28 @@ export async function generateDrillPracticeGreetingStream(
 			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
 		}
 
-		if (freeTalkOverlay?.scenarioDescription) {
+		if (freeTalkOverlay?.scenarioDescription && freeTalkReversed) {
+			const vocabLine =
+				freeTalkOverlay.vocabularyList.length > 0
+					? `\n\nTARGET WORDS you may try to use (and sometimes ask about): ${freeTalkOverlay.vocabularyList.join(', ')}.`
+					: '';
+			const scriptBlock =
+				freeTalkOverlay.referenceScript?.trim()
+					? `\n\nREFERENCE SCRIPT (context for the situation — you play the learner side, not every speaker):\n${freeTalkOverlay.referenceScript.trim()}`
+					: '';
+			systemPrompt = `${userName ? `Your tutor is named "${userName}". Address them naturally; they lead this practice while you play the learner role.\n\n` : ''}You are Alex, an English learner. You are practising in the scenario below; the user is your tutor or partner in the situation and leads the conversation while you respond as the learner/candidate side.
+
+DRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nGeneral context: ${drill.context}` : ''}
+
+FOCUSED FREE TALK SETTING (stay in this exact situation):
+${freeTalkOverlay.scenarioDescription}${scriptBlock}${vocabLine}
+
+Your opening (2 short sentences max):
+1. Greet as Alex, eager or a little nervous to practise in this setting
+2. Invite ${userName || 'them'} to start, or ask one small opening question as the learner would
+
+CRITICAL: You are NOT the interviewer or teacher. Do NOT ask "What would you like to practice?".`;
+		} else if (freeTalkOverlay?.scenarioDescription) {
 			const vocabLine =
 				freeTalkOverlay.vocabularyList.length > 0
 					? `\n\nTARGET WORDS to feature in this session: ${freeTalkOverlay.vocabularyList.join(', ')}.`
