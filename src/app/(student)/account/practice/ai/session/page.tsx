@@ -13,7 +13,6 @@ import {
   Keyboard,
   Home,
   Target,
-  ArrowLeftRight,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -286,8 +285,6 @@ function AISessionPage() {
     };
   }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList, isReversed]);
 
-  const showReverseRolesMenu = !isDrillPractice || shouldSendFreeTalkDrillContext;
-
   const freeTalkSystemInstruction = useMemo(
     () =>
       isDrillPractice
@@ -342,8 +339,6 @@ function AISessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  /** True from mic stop until first model chunk (voice) — “Listening…” wave. */
-  const [isListeningAfterSilence, setIsListeningAfterSilence] = useState(false);
 
   // VAD
   const analyserRef       = useRef<AnalyserNode | null>(null);
@@ -540,18 +535,6 @@ function AISessionPage() {
     if (isDrillPractice) {
       initializeDrillPractice();
     }
-  };
-
-  const handleReverseRole = () => {
-    setShowMenu(false);
-    const params = new URLSearchParams();
-    if (drillId) params.set("drillId", drillId);
-    if (topic) params.set("topic", topic);
-    if (scenarioIdParam) params.set("scenarioId", scenarioIdParam);
-    if (vocabParam) params.set("vocab", vocabParam);
-    if (scenarioTextParam) params.set("scenarioText", scenarioTextParam);
-    if (!isReversed) params.set("reversed", "1");
-    router.push(`/account/practice/ai/session?${params.toString()}`);
   };
 
   const finalizeExitToPath = useCallback(
@@ -953,8 +936,6 @@ function AISessionPage() {
           setIsRecording(false);
           return;
         }
-
-        setIsListeningAfterSilence(true);
         setIsTranscribing(true);
         setIsRecording(false);
 
@@ -1007,7 +988,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1090,7 +1070,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1164,7 +1143,6 @@ function AISessionPage() {
             message || "Failed to process voice. Try using the keyboard instead.",
           );
           setIsThinking(false);
-          setIsListeningAfterSilence(false);
           setIsTranscribing(false);
           setStreamingAudioActive(false);
           setPlayingMessageIndex(null);
@@ -1323,15 +1301,6 @@ function AISessionPage() {
                       <div className="w-4 h-4 bg-white rounded-full shadow mx-0.5" />
                     </div>
                   </button>
-                  {showReverseRolesMenu && (
-                    <button
-                      onClick={handleReverseRole}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#c8cdc9] hover:bg-gray-50 dark:hover:bg-[#232724] transition-colors"
-                    >
-                      <ArrowLeftRight className="w-4 h-4" />
-                      <span>{isReversed ? "Restore roles" : "Reverse roles"}</span>
-                    </button>
-                  )}
                   <div className="h-px bg-gray-100 dark:bg-[#2a2e2c] mx-2" />
                   <button
                     onClick={() => {
@@ -1443,11 +1412,21 @@ function AISessionPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="bg-gray-100 dark:bg-[#1a1d1c] rounded-2xl rounded-tl-sm px-4 py-3 max-w-[92%] sm:max-w-[85%]">
-                    <MarkdownText className="text-sm text-gray-900 dark:text-[#e8ebe9] leading-relaxed">
-                      {message.text}
-                    </MarkdownText>
-                    {message.isStreaming && (
-                      <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                    {message.isStreaming && !message.text.trim() ? (
+                      <div className="flex gap-1 py-0.5">
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    ) : (
+                      <>
+                        <MarkdownText className="text-sm text-gray-900 dark:text-[#e8ebe9] leading-relaxed">
+                          {message.text}
+                        </MarkdownText>
+                        {message.isStreaming && (
+                          <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 ml-1">
@@ -1494,18 +1473,6 @@ function AISessionPage() {
             </div>
           )}
 
-          {/* Thinking indicator */}
-          {isThinking && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-[#1a1d1c] shadow-sm border border-gray-100 dark:border-[#2a2e2c] rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>
@@ -1514,31 +1481,8 @@ function AISessionPage() {
       {/* ── Bottom controls — mirrors mobile layout ─────────────────────── */}
       <footer className="sticky bottom-0 bg-white dark:bg-[#131614] border-t border-gray-100 dark:border-[#2a2e2c]">
 
-        {/* Post–voice-stop feedback: listening (immediate) vs processing (after first chunk) */}
-        {isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-emerald-50 border-b border-emerald-100">
-            <span className="flex items-end gap-0.5 h-4" aria-hidden>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span
-                  key={i}
-                  className="w-0.5 rounded-full bg-emerald-500/80 animate-pulse"
-                  style={{
-                    height: `${10 + (i % 3) * 4}px`,
-                    animationDuration: "0.9s",
-                    animationDelay: `${i * 90}ms`,
-                  }}
-                />
-              ))}
-            </span>
-            <span className="text-xs font-medium text-emerald-800">Listening…</span>
-          </div>
-        )}
-        {isTranscribing && !isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-blue-50 border-b border-blue-100">
-            <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-            <span className="text-xs font-medium text-blue-600">Processing…</span>
-          </div>
-        )}
+        {/* voice-stop feedback: processing only (until first chunk) */}
+
 
         {showTextInput ? (
           /* ── Text input mode ── */
@@ -1636,11 +1580,7 @@ function AISessionPage() {
 
             {/* Hint text */}
             <p className="text-center text-xs text-gray-400 dark:text-[#6b7270] mt-2 mb-1">
-              {isRecording
-                ? "Tap to stop · silence auto-stops"
-                : isThinking
-                ? "Eklan is thinking…"
-                : "Tap to speak"}
+              {isRecording ? "Tap to stop · silence auto-stops" : "Tap to speak"}
             </p>
           </div>
         )}
