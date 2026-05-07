@@ -264,6 +264,30 @@ export const requireAuth = async (
 			error: error.message,
 			stack: error.stack,
 		});
+
+		// Distinguish infrastructure failures (DB down, DNS, timeout) from genuine
+		// auth failures. Returning 401 for infra errors misleads clients into thinking
+		// the user is logged out, when in fact the session lookup simply couldn't run.
+		const isInfraError =
+			error.message?.includes('Failed to get session') ||
+			error.message?.includes('MongoServerSelectionError') ||
+			error.message?.includes('MongoNetworkError') ||
+			error.message?.includes('EAI_AGAIN') ||
+			error.message?.includes('ECONNREFUSED') ||
+			error.message?.includes('getaddrinfo') ||
+			error.name === 'MongoServerSelectionError' ||
+			error.name === 'MongoNetworkError';
+
+		if (isInfraError) {
+			return NextResponse.json(
+				{
+					code: 'ServiceUnavailable',
+					message: 'Authentication service is temporarily unavailable. Please try again in a moment.',
+				},
+				{ status: 503 }
+			);
+		}
+
 		return NextResponse.json(
 			{
 				code: 'AuthenticationError',

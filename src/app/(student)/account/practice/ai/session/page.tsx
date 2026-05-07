@@ -348,7 +348,7 @@ function AISessionPage() {
   const recStartTsRef     = useRef<number>(0);
 
   const SILENCE_THRESHOLD = 0.018; // RMS amplitude 0-1
-  const SILENCE_MS        = 1800;
+  const SILENCE_MS        = 900;
   const MIN_REC_MS        = 1200;
 
   const startVAD = (stream: MediaStream) => {
@@ -436,6 +436,13 @@ function AISessionPage() {
   /* ─── Lifecycle ────────────────────────────────────────────────────────── */
 
   const drillInitRef = useRef(false);
+
+  // Always-current ref for conversationHistory to avoid stale closures in
+  // async voice handlers that are created before a state update commits.
+  const conversationHistoryRef = useRef(conversationHistory);
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
 
   const handleRetryDrillInit = useCallback(() => {
     setDrillInitFailed(false);
@@ -812,26 +819,37 @@ function AISessionPage() {
           setPlayingMessageIndex(aiMessageIndex);
         }
 
-        /** Serialize TTS fetches so audio chunks play in order even if responses arrive late. */
-        let ttsChain: Promise<void> = Promise.resolve();
+        /**
+         * Concurrent TTS: all generateTTS fetches start immediately in parallel
+         * so phrase N+1's network request doesn't wait for phrase N to finish.
+         * The flush chain guarantees Mp3QueuePlayer receives blobs in order.
+         */
+        const pendingTtsPromises: Promise<Blob>[] = [];
+        let ttsFlushChain: Promise<void> = Promise.resolve();
         const enqueueTts = (text: string) => {
           if (!mp3 || !text.trim()) return;
           const phrase = text.trim();
-          ttsChain = ttsChain
-            .then(() => generateTTS({ text: phrase }))
-            .then((blob) => {
+          // Fire fetch immediately (parallel with any in-flight phrases).
+          const blobPromise = generateTTS({ text: phrase });
+          pendingTtsPromises.push(blobPromise);
+          // Flush in strict arrival order so playback sequence is preserved.
+          ttsFlushChain = ttsFlushChain.then(async () => {
+            const promise = pendingTtsPromises.shift();
+            if (!promise) return;
+            try {
+              const blob = await promise;
               mp3.enqueue(blob);
-            })
-            .catch(() => {
+            } catch (e: any) {
               toast.error("Failed to generate speech for a phrase");
-            });
+            }
+          }).catch(() => {});
         };
 
         await aiService.streamConversationMessage(
           {
             messages: conversationMessages,
             temperature: 0.7,
-            maxTokens: 1000,
+            maxTokens: 350,
             signal: streamSignal,
             ...(freeTalkSystemInstruction
               ? { systemInstruction: freeTalkSystemInstruction }
@@ -942,7 +960,6 @@ function AISessionPage() {
         // Add placeholder user + streaming AI message immediately.
         const userMessageIndex = messages.length;
         const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
-
         const userMessage: ChatMessage = { type: "user", text: "🎤 [Voice message]" };
         const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
 
@@ -955,7 +972,7 @@ function AISessionPage() {
           content: m.text,
         }));
 
-        const drillHistoryBeforeTurn = conversationHistory;
+        const drillHistoryBeforeTurn = conversationHistoryRef.current;
 
         let finalResponse = "";
         let fullTextMeta = "";
@@ -1090,22 +1107,15 @@ function AISessionPage() {
                   fullTextMeta =
                     typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
 
-                  setMessages((prev) =>
-                    prev.map((m, i) => {
-                      if (i === userMessageIndex) {
-                        return {
-                          ...m,
-                          text: inputTextMeta
-                            ? `🎤 [Voice] ${inputTextMeta}`
-                            : "🎤 [Voice message]",
-                        };
-                      }
-                      if (i === aiMessageIndex && fullTextMeta) {
-                        return { ...m, text: fullTextMeta };
-                      }
-                      return m;
-                    })
-                  );
+                  // Free Talk: keep user bubble as a plain voice note — no transcription shown.
+                  // AI message is updated if the server returns a pre-formed full reply.
+                  if (fullTextMeta) {
+                    setMessages((prev) =>
+                      prev.map((m, i) =>
+                        i === aiMessageIndex ? { ...m, text: fullTextMeta } : m
+                      )
+                    );
+                  }
                 }
               }
             );
