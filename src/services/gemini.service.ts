@@ -1529,7 +1529,7 @@ export async function generateVoiceConversationSSEStream(
 					});
 					sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim() });
 					closeStream('turnComplete');
-				}, 800);
+				}, 150);
 			}
 		};
 
@@ -1605,18 +1605,7 @@ export async function generateDrillPracticeVoiceResponseStream(
 
 	const t0 = Date.now();
 
-	// ① FFmpeg — convert to raw PCM 16 kHz.
-	let pcmBuffer: Buffer;
-	try {
-		pcmBuffer = await convertAudioToRawPcm16k(audioBuffer);
-		logger.info('[Drill] ① ffmpeg', { ms: Date.now() - t0, inBytes: audioBuffer.length, outBytes: pcmBuffer.length });
-	} catch (e: any) {
-		throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
-	}
-	const pcmBase64 = pcmBuffer.toString('base64');
-	const pcmBytes  = pcmBuffer.length;
-
-	// Build system instruction — only used when a NEW session is opened.
+	// Build system instruction before kicking off parallel work (sync, no I/O).
 	let systemInstruction = buildDrillPracticePrompt(
 		drill,
 		pronunciationWeaknesses,
@@ -1625,13 +1614,12 @@ export async function generateDrillPracticeVoiceResponseStream(
 		freeTalkReversed
 	);
 	if (conversationHistory.length > 0) {
-		const recent = conversationHistory.slice(-6);
+		const recent = conversationHistory.slice(-4);
 		systemInstruction += '\n\nRecent conversation:\n' +
 			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
 	}
 	systemInstruction += '\n\nIMPORTANT: The user is speaking via voice. Listen carefully, respond in spoken English. Keep responses concise (2-4 sentences). No JSON or markdown.';
 
-	// ② New Live session if drill + optional Free Talk focus changes
 	const overlayKey = freeTalkOverlay?.scenarioDescription
 		? `_ft_${Buffer.from(freeTalkOverlay.scenarioDescription)
 			.toString('base64')
@@ -1641,16 +1629,36 @@ export async function generateDrillPracticeVoiceResponseStream(
 			.slice(0, 48)}${freeTalkReversed ? '_rev' : ''}`
 		: '';
 	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}${overlayKey}` : `drill_anon_${Date.now()}`;
+
+	// ①+② Run FFmpeg conversion and Live session connect in parallel — session
+	// creation (~500-970 ms) dominates; overlapping FFmpeg (~50-280 ms) hides it.
 	const tSession = Date.now();
-	const entry = await getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-		responseModalities: [Modality.AUDIO],
-		speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-		systemInstruction: { parts: [{ text: systemInstruction }] },
-		inputAudioTranscription: {},
-		outputAudioTranscription: {},
-		thinkingConfig: { thinkingBudget: 0 },
+	let pcmBuffer: Buffer;
+	let entry: LiveSessionEntry;
+	try {
+		[pcmBuffer, entry] = await Promise.all([
+			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
+				throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
+			}),
+			getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
+				responseModalities: [Modality.AUDIO],
+				speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+				systemInstruction: { parts: [{ text: systemInstruction }] },
+				inputAudioTranscription: {},
+				outputAudioTranscription: {},
+				thinkingConfig: { thinkingBudget: 0 },
+			}),
+		]);
+	} catch (e: any) {
+		throw e;
+	}
+	logger.info('[Drill] ①+② ffmpeg+session ready (parallel)', {
+		totalMs: Date.now() - t0,
+		inBytes: audioBuffer.length,
+		outBytes: pcmBuffer.length,
 	});
-	logger.info('[Drill] ② session ready', { ms: Date.now() - tSession });
+	const pcmBase64 = pcmBuffer.toString('base64');
+	const pcmBytes  = pcmBuffer.length;
 
 	// ③ Create the SSE stream — session is already connected; just route messages.
 	const sseCtx = {
@@ -1758,25 +1766,25 @@ export async function generateDrillPracticeVoiceResponseStream(
 				sendChunk('audio', pcm);
 			}
 
-			if (message.serverContent?.turnComplete && !metadataSent) {
-				metadataSent = true;
-				sseCtx.turnCompleteHandle = setTimeout(() => {
-					sseCtx.turnCompleteHandle = undefined;
-					if (sseCtx.streamClosed) return;
-					logger.info('[Drill] ④ turn complete', {
-						totalMs: Date.now() - t0,
-						ffmpegMs: tSession - t0,
-						firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
-						firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
-					});
-					sendChunk('metadata', {
-						fullText:   fullAssistantText.join('').trim(),
-						inputText:  fullUserText.trim(),
-						drillType:  drill.type,
-						drillTitle: drill.title,
-					});
-					closeStream('turnComplete');
-				}, 800);
+		if (message.serverContent?.turnComplete && !metadataSent) {
+			metadataSent = true;
+			sseCtx.turnCompleteHandle = setTimeout(() => {
+				sseCtx.turnCompleteHandle = undefined;
+				if (sseCtx.streamClosed) return;
+				logger.info('[Drill] ④ turn complete', {
+					totalMs: Date.now() - t0,
+					ffmpegMs: tSession - t0,
+					firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
+					firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
+				});
+				sendChunk('metadata', {
+					fullText:   fullAssistantText.join('').trim(),
+					inputText:  fullUserText.trim(),
+					drillType:  drill.type,
+					drillTitle: drill.title,
+				});
+				closeStream('turnComplete');
+			}, 150);
 			}
 		};
 

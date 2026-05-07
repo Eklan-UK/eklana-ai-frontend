@@ -277,7 +277,14 @@ export const aiService = {
     if (!response.ok) {
       if (response.headers.get("content-type")?.includes("application/json")) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to get voice conversation stream");
+        const msg = error.message || "Failed to get voice conversation stream";
+        throw new Error(
+          response.status === 503
+            ? "The service is temporarily unavailable. Please try again in a moment."
+            : response.status === 401
+            ? "Session expired. Please refresh the page and try again."
+            : msg
+        );
       }
       throw new Error(`Failed to get voice conversation stream: ${response.status}`);
     }
@@ -323,7 +330,14 @@ export const aiService = {
     if (!response.ok) {
       if (response.headers.get("content-type")?.includes("application/json")) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to get drill voice stream");
+        const msg = error.message || "Failed to get drill voice stream";
+        throw new Error(
+          response.status === 503
+            ? "The service is temporarily unavailable. Please try again in a moment."
+            : response.status === 401
+            ? "Session expired. Please refresh the page and try again."
+            : msg
+        );
       }
       throw new Error(`Failed to get drill voice stream: ${response.status}`);
     }

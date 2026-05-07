@@ -13,7 +13,6 @@ import {
   Keyboard,
   Home,
   Target,
-  ArrowLeftRight,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTTS } from "@/hooks/useTTS";
@@ -286,8 +285,6 @@ function AISessionPage() {
     };
   }, [shouldSendFreeTalkDrillContext, scenarioIdParam, vocabularyList, isReversed]);
 
-  const showReverseRolesMenu = !isDrillPractice || shouldSendFreeTalkDrillContext;
-
   const freeTalkSystemInstruction = useMemo(
     () =>
       isDrillPractice
@@ -342,8 +339,6 @@ function AISessionPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  /** True from mic stop until first model chunk (voice) — “Listening…” wave. */
-  const [isListeningAfterSilence, setIsListeningAfterSilence] = useState(false);
 
   // VAD
   const analyserRef       = useRef<AnalyserNode | null>(null);
@@ -353,7 +348,7 @@ function AISessionPage() {
   const recStartTsRef     = useRef<number>(0);
 
   const SILENCE_THRESHOLD = 0.018; // RMS amplitude 0-1
-  const SILENCE_MS        = 1800;
+  const SILENCE_MS        = 900;
   const MIN_REC_MS        = 1200;
 
   const startVAD = (stream: MediaStream) => {
@@ -441,6 +436,13 @@ function AISessionPage() {
   /* ─── Lifecycle ────────────────────────────────────────────────────────── */
 
   const drillInitRef = useRef(false);
+
+  // Always-current ref for conversationHistory to avoid stale closures in
+  // async voice handlers that are created before a state update commits.
+  const conversationHistoryRef = useRef(conversationHistory);
+  useEffect(() => {
+    conversationHistoryRef.current = conversationHistory;
+  }, [conversationHistory]);
 
   const handleRetryDrillInit = useCallback(() => {
     setDrillInitFailed(false);
@@ -540,18 +542,6 @@ function AISessionPage() {
     if (isDrillPractice) {
       initializeDrillPractice();
     }
-  };
-
-  const handleReverseRole = () => {
-    setShowMenu(false);
-    const params = new URLSearchParams();
-    if (drillId) params.set("drillId", drillId);
-    if (topic) params.set("topic", topic);
-    if (scenarioIdParam) params.set("scenarioId", scenarioIdParam);
-    if (vocabParam) params.set("vocab", vocabParam);
-    if (scenarioTextParam) params.set("scenarioText", scenarioTextParam);
-    if (!isReversed) params.set("reversed", "1");
-    router.push(`/account/practice/ai/session?${params.toString()}`);
   };
 
   const finalizeExitToPath = useCallback(
@@ -829,26 +819,37 @@ function AISessionPage() {
           setPlayingMessageIndex(aiMessageIndex);
         }
 
-        /** Serialize TTS fetches so audio chunks play in order even if responses arrive late. */
-        let ttsChain: Promise<void> = Promise.resolve();
+        /**
+         * Concurrent TTS: all generateTTS fetches start immediately in parallel
+         * so phrase N+1's network request doesn't wait for phrase N to finish.
+         * The flush chain guarantees Mp3QueuePlayer receives blobs in order.
+         */
+        const pendingTtsPromises: Promise<Blob>[] = [];
+        let ttsFlushChain: Promise<void> = Promise.resolve();
         const enqueueTts = (text: string) => {
           if (!mp3 || !text.trim()) return;
           const phrase = text.trim();
-          ttsChain = ttsChain
-            .then(() => generateTTS({ text: phrase }))
-            .then((blob) => {
+          // Fire fetch immediately (parallel with any in-flight phrases).
+          const blobPromise = generateTTS({ text: phrase });
+          pendingTtsPromises.push(blobPromise);
+          // Flush in strict arrival order so playback sequence is preserved.
+          ttsFlushChain = ttsFlushChain.then(async () => {
+            const promise = pendingTtsPromises.shift();
+            if (!promise) return;
+            try {
+              const blob = await promise;
               mp3.enqueue(blob);
-            })
-            .catch(() => {
+            } catch (e: any) {
               toast.error("Failed to generate speech for a phrase");
-            });
+            }
+          }).catch(() => {});
         };
 
         await aiService.streamConversationMessage(
           {
             messages: conversationMessages,
             temperature: 0.7,
-            maxTokens: 1000,
+            maxTokens: 350,
             signal: streamSignal,
             ...(freeTalkSystemInstruction
               ? { systemInstruction: freeTalkSystemInstruction }
@@ -953,15 +954,12 @@ function AISessionPage() {
           setIsRecording(false);
           return;
         }
-
-        setIsListeningAfterSilence(true);
         setIsTranscribing(true);
         setIsRecording(false);
 
         // Add placeholder user + streaming AI message immediately.
         const userMessageIndex = messages.length;
         const aiMessageIndex = messages.length + 1; // 0-indexed: current length (includes user message)
-
         const userMessage: ChatMessage = { type: "user", text: "🎤 [Voice message]" };
         const aiMessagePlaceholder: ChatMessage = { type: "ai", text: "", isStreaming: true };
 
@@ -974,7 +972,7 @@ function AISessionPage() {
           content: m.text,
         }));
 
-        const drillHistoryBeforeTurn = conversationHistory;
+        const drillHistoryBeforeTurn = conversationHistoryRef.current;
 
         let finalResponse = "";
         let fullTextMeta = "";
@@ -1007,7 +1005,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1090,7 +1087,6 @@ function AISessionPage() {
                 if (!didReceiveFirstChunk) {
                   didReceiveFirstChunk = true;
                   setIsThinking(false);
-                  setIsListeningAfterSilence(false);
                   setIsTranscribing(false);
                 }
 
@@ -1111,22 +1107,15 @@ function AISessionPage() {
                   fullTextMeta =
                     typeof chunk.data?.fullText === "string" ? chunk.data.fullText : "";
 
-                  setMessages((prev) =>
-                    prev.map((m, i) => {
-                      if (i === userMessageIndex) {
-                        return {
-                          ...m,
-                          text: inputTextMeta
-                            ? `🎤 [Voice] ${inputTextMeta}`
-                            : "🎤 [Voice message]",
-                        };
-                      }
-                      if (i === aiMessageIndex && fullTextMeta) {
-                        return { ...m, text: fullTextMeta };
-                      }
-                      return m;
-                    })
-                  );
+                  // Free Talk: keep user bubble as a plain voice note — no transcription shown.
+                  // AI message is updated if the server returns a pre-formed full reply.
+                  if (fullTextMeta) {
+                    setMessages((prev) =>
+                      prev.map((m, i) =>
+                        i === aiMessageIndex ? { ...m, text: fullTextMeta } : m
+                      )
+                    );
+                  }
                 }
               }
             );
@@ -1164,7 +1153,6 @@ function AISessionPage() {
             message || "Failed to process voice. Try using the keyboard instead.",
           );
           setIsThinking(false);
-          setIsListeningAfterSilence(false);
           setIsTranscribing(false);
           setStreamingAudioActive(false);
           setPlayingMessageIndex(null);
@@ -1323,15 +1311,6 @@ function AISessionPage() {
                       <div className="w-4 h-4 bg-white rounded-full shadow mx-0.5" />
                     </div>
                   </button>
-                  {showReverseRolesMenu && (
-                    <button
-                      onClick={handleReverseRole}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#c8cdc9] hover:bg-gray-50 dark:hover:bg-[#232724] transition-colors"
-                    >
-                      <ArrowLeftRight className="w-4 h-4" />
-                      <span>{isReversed ? "Restore roles" : "Reverse roles"}</span>
-                    </button>
-                  )}
                   <div className="h-px bg-gray-100 dark:bg-[#2a2e2c] mx-2" />
                   <button
                     onClick={() => {
@@ -1443,11 +1422,21 @@ function AISessionPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="bg-gray-100 dark:bg-[#1a1d1c] rounded-2xl rounded-tl-sm px-4 py-3 max-w-[92%] sm:max-w-[85%]">
-                    <MarkdownText className="text-sm text-gray-900 dark:text-[#e8ebe9] leading-relaxed">
-                      {message.text}
-                    </MarkdownText>
-                    {message.isStreaming && (
-                      <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                    {message.isStreaming && !message.text.trim() ? (
+                      <div className="flex gap-1 py-0.5">
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 bg-gray-400 dark:bg-[#5a5e5c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    ) : (
+                      <>
+                        <MarkdownText className="text-sm text-gray-900 dark:text-[#e8ebe9] leading-relaxed">
+                          {message.text}
+                        </MarkdownText>
+                        {message.isStreaming && (
+                          <span className="inline-block w-1.5 h-4 ml-1 bg-emerald-500 animate-pulse align-middle" />
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 ml-1">
@@ -1494,18 +1483,6 @@ function AISessionPage() {
             </div>
           )}
 
-          {/* Thinking indicator */}
-          {isThinking && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-[#1a1d1c] shadow-sm border border-gray-100 dark:border-[#2a2e2c] rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 bg-gray-300 dark:bg-[#3a3e3c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
-            </div>
-          )}
 
           <div ref={messagesEndRef} />
         </div>
@@ -1514,31 +1491,8 @@ function AISessionPage() {
       {/* ── Bottom controls — mirrors mobile layout ─────────────────────── */}
       <footer className="sticky bottom-0 bg-white dark:bg-[#131614] border-t border-gray-100 dark:border-[#2a2e2c]">
 
-        {/* Post–voice-stop feedback: listening (immediate) vs processing (after first chunk) */}
-        {isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-emerald-50 border-b border-emerald-100">
-            <span className="flex items-end gap-0.5 h-4" aria-hidden>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span
-                  key={i}
-                  className="w-0.5 rounded-full bg-emerald-500/80 animate-pulse"
-                  style={{
-                    height: `${10 + (i % 3) * 4}px`,
-                    animationDuration: "0.9s",
-                    animationDelay: `${i * 90}ms`,
-                  }}
-                />
-              ))}
-            </span>
-            <span className="text-xs font-medium text-emerald-800">Listening…</span>
-          </div>
-        )}
-        {isTranscribing && !isListeningAfterSilence && (
-          <div className="flex items-center justify-center gap-2 py-1.5 bg-blue-50 border-b border-blue-100">
-            <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-            <span className="text-xs font-medium text-blue-600">Processing…</span>
-          </div>
-        )}
+        {/* voice-stop feedback: processing only (until first chunk) */}
+
 
         {showTextInput ? (
           /* ── Text input mode ── */
@@ -1636,11 +1590,7 @@ function AISessionPage() {
 
             {/* Hint text */}
             <p className="text-center text-xs text-gray-400 dark:text-[#6b7270] mt-2 mb-1">
-              {isRecording
-                ? "Tap to stop · silence auto-stops"
-                : isThinking
-                ? "Eklan is thinking…"
-                : "Tap to speak"}
+              {isRecording ? "Tap to stop · silence auto-stops" : "Tap to speak"}
             </p>
           </div>
         )}

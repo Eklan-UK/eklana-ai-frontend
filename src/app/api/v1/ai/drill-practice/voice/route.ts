@@ -40,33 +40,24 @@ async function handler(
 
 		await connectToDatabase();
 
-		const user = await User.findById(context.userId).select('firstName').lean();
-		const userName = (user?.firstName as string | undefined) || undefined;
+		const [user, assignment, drill] = await Promise.all([
+			User.findById(context.userId).select('firstName').lean(),
+			DrillAssignment.findOne({ learnerId: context.userId, drillId }).lean(),
+			DrillModel.findById(drillId).lean(),
+		]);
 
-		// Verify user has an assignment for this drill
-		const assignment = await DrillAssignment.findOne({
-			learnerId: context.userId,
-			drillId: drillId,
-		}).lean();
+		const userName = (user?.firstName as string | undefined) || undefined;
 
 		if (!assignment) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill not found in your assignments',
-				},
+				{ code: 'NotFound', message: 'Drill not found in your assignments' },
 				{ status: 404 }
 			);
 		}
 
-		// Fetch full drill data
-		const drill = await DrillModel.findById(drillId).lean();
 		if (!drill) {
 			return NextResponse.json(
-				{
-					code: 'NotFound',
-					message: 'Drill data not available',
-				},
+				{ code: 'NotFound', message: 'Drill data not available' },
 				{ status: 404 }
 			);
 		}
