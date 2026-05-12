@@ -14,8 +14,9 @@ async function handler(
 ): Promise<NextResponse> {
 	try {
 		const body = await req.json();
-		const { userMessage, conversationHistory } = body as {
+		const { userMessage, activeScenarioTitle, conversationHistory } = body as {
 			userMessage?: string;
+			activeScenarioTitle?: string;
 			conversationHistory?: Array<{ role: 'user' | 'model'; content: string }>;
 		};
 
@@ -32,6 +33,7 @@ async function handler(
 
 		const stream = await generateFreeTalkResponseStream(
 			userMessage.trim(),
+			(activeScenarioTitle ?? '').trim(),
 			Array.isArray(conversationHistory) ? conversationHistory : [],
 			userName,
 		);
