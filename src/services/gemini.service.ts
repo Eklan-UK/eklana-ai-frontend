@@ -2692,6 +2692,19 @@ export async function generateFreeTalkResponseStream(
 
 	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
 
+	// When the user just agreed to start a new scenario, the metadata must look
+	// exactly like a greeting response — { fullText, scenarioTitle, hint, usefulPhrases }
+	// with NO scenarioComplete key. That shape is what the mobile app uses to trigger
+	// the hint modal while the AI reads the new situation aloud.
+	if (isNewScenarioIntro) {
+		return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
+			fullText,
+			scenarioTitle: scenario.title,
+			hint: scenario.hint,
+			usefulPhrases: scenario.usefulPhrases,
+		}));
+	}
+
 	// Pre-select the next scenario NOW so it's captured in the closure even if
 	// scenarioComplete is only detected later during the TransformStream flush.
 	const nextIdx = (FREE_TALK_SCENARIOS.indexOf(scenario) + 1) % FREE_TALK_SCENARIOS.length;
@@ -2699,6 +2712,9 @@ export async function generateFreeTalkResponseStream(
 
 	return wrapWithFreeTalkMetadata(liveStream, (fullText, scenarioComplete) => {
 		if (scenarioComplete) {
+			// Scenario complete: include next scenario hint data so the app can pre-load it
+			// silently. The hint modal is NOT shown yet — it fires only on the next new-scenario
+			// intro response (see the isNewScenarioIntro branch above).
 			return {
 				fullText,
 				scenarioComplete: true,
