@@ -2335,3 +2335,314 @@ export async function generateGeminiTTSAudio(
 		return await generateTtsWithModel(config.GEMINI_TTS_MODEL_FALLBACK, text, voiceName);
 	}
 }
+
+// ─── Eklan Free Talk (ICU scenario practice) ─────────────────────────────────
+
+interface FreeTalkScenario {
+	title: string;
+	situation: string;
+	hint: string;
+	usefulPhrases: string[];
+}
+
+const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
+	{
+		title: 'Sudden Oxygen Drop',
+		situation: "Mr. Miller's oxygen saturation suddenly drops from 96% to 82%. He looks frightened and begins breathing rapidly.",
+		hint: 'Calm the patient. Explain what is happening. Call for help if necessary.',
+		usefulPhrases: [
+			'Stay calm.',
+			'Your oxygen level is dropping.',
+			'Take slow, deep breaths.',
+			"I'm calling the respiratory therapist.",
+		],
+	},
+	{
+		title: 'Airway Obstruction',
+		situation: 'The patient begins coughing heavily and cannot speak clearly. You suspect mucus is blocking the airway.',
+		hint: 'Explain the problem. Encourage coughing. Prepare suction equipment.',
+		usefulPhrases: [
+			'There may be an airway obstruction.',
+			'Keep coughing slowly.',
+			'We need to suction your airway.',
+			"You're doing well.",
+		],
+	},
+	{
+		title: 'Patient Panic During Ventilator Removal',
+		situation: 'The patient becomes anxious after the ventilator is removed and says, "I can\'t breathe!"',
+		hint: 'Reassure the patient. Encourage controlled breathing. Explain why coughing is important.',
+		usefulPhrases: [
+			"You're safe now.",
+			'Try not to panic.',
+			'Take a deep breath.',
+			'Coughing helps clear your lungs.',
+		],
+	},
+	{
+		title: 'Alcohol Withdrawal Symptoms',
+		situation: 'The patient becomes irritable and angry. He says he wants alcohol and refuses treatment.',
+		hint: 'Remain calm and professional. Explain withdrawal symptoms. Offer reassurance.',
+		usefulPhrases: [
+			"I understand you're frustrated.",
+			'Withdrawal symptoms can cause anxiety.',
+			'We are trying to keep you safe.',
+			'This medication may help you relax.',
+		],
+	},
+	{
+		title: 'Emergency Team Communication',
+		situation: "You notice the patient's condition worsening rapidly and must inform the ICU team immediately.",
+		hint: "Report the patient's condition clearly. Request support quickly.",
+		usefulPhrases: [
+			'The patient is desaturating rapidly.',
+			'We may have an airway obstruction.',
+			'Please prepare suction equipment.',
+			'I need respiratory support in room 12.',
+		],
+	},
+	{
+		title: 'Medication Questions',
+		situation: 'The patient asks why he needs medication and worries about side effects.',
+		hint: 'Explain the medication simply. Discuss possible side effects safely.',
+		usefulPhrases: [
+			'This medication helps reduce anxiety.',
+			'You may feel sleepy or dizzy.',
+			'Please call for assistance before standing.',
+			'Do you have any questions about the medication?',
+		],
+	},
+	{
+		title: 'CRRT Dialysis Concern',
+		situation: 'Mrs. Thompson becomes nervous after seeing the CRRT machine.',
+		hint: 'Explain CRRT calmly. Reassure the patient.',
+		usefulPhrases: [
+			'This machine provides continuous dialysis.',
+			'CRRT is gentler for ICU patients.',
+			'We are monitoring you closely.',
+			'I will stay here with you.',
+		],
+	},
+	{
+		title: 'Family Member Anxiety',
+		situation: "The patient's daughter looks worried after the emergency situation.",
+		hint: 'Update the family member professionally. Reassure her calmly.',
+		usefulPhrases: [
+			'His condition is stable now.',
+			'We responded quickly to the emergency.',
+			'His breathing is improving.',
+			'We will continue monitoring him closely.',
+		],
+	},
+	{
+		title: 'Refusing Breathing Exercises',
+		situation: 'The patient says he is too tired to continue breathing exercises.',
+		hint: 'Encourage cooperation. Explain the importance of the exercises.',
+		usefulPhrases: [
+			'These exercises help prevent pneumonia.',
+			'Your lungs sound clearer now.',
+			'Please try a few more breaths.',
+			"You're making good progress.",
+		],
+	},
+	{
+		title: 'Overnight Monitoring',
+		situation: 'The patient asks why ICU staff continue checking him overnight.',
+		hint: 'Explain ICU monitoring procedures. Reassure the patient.',
+		usefulPhrases: [
+			'We need to monitor your condition overnight.',
+			'We are checking your vital signs regularly.',
+			'This helps us respond quickly to emergencies.',
+			'Please call us if you feel short of breath.',
+		],
+	},
+];
+
+let _freeTalkScenarioIndex = 0;
+
+function pickNextFreeTalkScenario(): { scenario: FreeTalkScenario; nextScenario: FreeTalkScenario } {
+	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
+	_freeTalkScenarioIndex++;
+	const scenario = FREE_TALK_SCENARIOS[idx];
+	const nextScenario = FREE_TALK_SCENARIOS[(_freeTalkScenarioIndex) % FREE_TALK_SCENARIOS.length];
+	return { scenario, nextScenario };
+}
+
+const SCENARIO_COMPLETE_TOKEN = '[SCENARIO_COMPLETE]';
+
+/**
+ * Wraps a Live API ReadableStream (emitting `audio`/`text` SSE chunks) with a
+ * TransformStream that:
+ *  - Strips the SCENARIO_COMPLETE_TOKEN from text chunks
+ *  - Appends a final `metadata` SSE chunk once the upstream ends
+ */
+function wrapWithFreeTalkMetadata(
+	liveStream: ReadableStream,
+	buildMetadata: (fullText: string, scenarioComplete: boolean) => Record<string, unknown>,
+): ReadableStream {
+	const encoder = new TextEncoder();
+	const decoder = new TextDecoder();
+	const fullTextParts: string[] = [];
+	let scenarioComplete = false;
+
+	const transform = new TransformStream<Uint8Array, Uint8Array>({
+		transform(chunk, controller) {
+			const raw = decoder.decode(chunk);
+			// Each enqueue from generateWithLiveAPIStream is exactly one SSE line.
+			if (!raw.startsWith('data: ')) {
+				controller.enqueue(chunk);
+				return;
+			}
+			let parsed: { type: string; data: unknown };
+			try {
+				parsed = JSON.parse(raw.slice(6).trimEnd());
+			} catch {
+				controller.enqueue(chunk);
+				return;
+			}
+			if (parsed.type === 'audio') {
+				controller.enqueue(chunk);
+			} else if (parsed.type === 'text') {
+				let text = (parsed.data as string) || '';
+				if (text.includes(SCENARIO_COMPLETE_TOKEN)) {
+					scenarioComplete = true;
+					text = text.replace(SCENARIO_COMPLETE_TOKEN, '').trim();
+				}
+				if (text) {
+					fullTextParts.push(text);
+					controller.enqueue(
+						encoder.encode(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`),
+					);
+				}
+			}
+			// Drop any other type from the upstream (none expected)
+		},
+		flush(controller) {
+			const fullText = fullTextParts.join('').trim();
+			const metadata = buildMetadata(fullText, scenarioComplete);
+			controller.enqueue(
+				encoder.encode(`data: ${JSON.stringify({ type: 'metadata', data: metadata })}\n\n`),
+			);
+		},
+	});
+
+	return liveStream.pipeThrough(transform);
+}
+
+/**
+ * Greeting stream for the Eklan Free Talk screen.
+ * Picks the next scenario, streams the situation text + audio, and ends
+ * with a `metadata` chunk containing `scenarioTitle`, `hint`, and `usefulPhrases`.
+ */
+export async function generateFreeTalkGreetingStream(userName?: string): Promise<ReadableStream> {
+	if (!config.GEMINI_API_KEY) {
+		throw new Error('Gemini API is not configured');
+	}
+
+	const { scenario, nextScenario: _next } = pickNextFreeTalkScenario();
+
+	let systemPrompt = `You are Eklan, an ICU English language practice tutor. You present realistic clinical scenarios to help nurses practise communicating clearly in emergency situations.
+
+Current scenario: ${scenario.title}
+Situation: ${scenario.situation}
+
+Your task on this opening turn:
+- Read the situation naturally and clearly, as if setting the scene for a trainee nurse.
+- End with a prompt that invites the user to respond (e.g. "How would you respond?").
+- Keep your response brief — 3 to 5 sentences.
+- Tone: calm, professional, encouraging.
+- Always respond in English only.
+- Do not use JSON or code blocks.`;
+
+	if (userName) {
+		systemPrompt += `\n\nThe trainee's name is ${userName}. You may address them by name to welcome them.`;
+	}
+
+	const turns = [
+		{
+			role: 'user',
+			parts: [{ text: 'Please present the scenario.' }],
+		},
+	];
+
+	logger.info('[FreeTalk] Generating greeting stream', { scenario: scenario.title, model: LIVE_MODEL });
+
+	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
+
+	return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
+		fullText,
+		scenarioTitle: scenario.title,
+		hint: scenario.hint,
+		usefulPhrases: scenario.usefulPhrases,
+	}));
+}
+
+/**
+ * Response stream for the Eklan Free Talk screen.
+ * Evaluates the user's message, continues the roleplay, and ends with a
+ * `metadata` chunk containing `scenarioComplete` (and next scenario hint data
+ * when the scenario has been fully practised).
+ */
+export async function generateFreeTalkResponseStream(
+	userMessage: string,
+	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
+	userName?: string,
+): Promise<ReadableStream> {
+	if (!config.GEMINI_API_KEY) {
+		throw new Error('Gemini API is not configured');
+	}
+
+	let systemPrompt = `You are Eklan, an ICU English language practice tutor helping nurses practise communicating in clinical scenarios.
+
+On each turn:
+1. Evaluate the user's response: briefly acknowledge what was good, then gently correct any missing or incorrect steps.
+2. Continue the roleplay naturally if there is more to practise (e.g. patient escalates, a family member asks questions, etc.).
+3. When ALL key steps of the scenario have been covered and practised, congratulate the user warmly and ask whether they would like to continue with another scenario or stop here. Append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message — immediately after your final word, no space before it, nothing after it.
+4. If the user says they want to continue ("yes", "another", "go on", etc.) — introduce a new clinical scenario naturally.
+5. If the user says they want to stop ("no", "stop", "end", "that's enough", etc.) — close the session warmly.
+Keep all responses brief and conversational (2–5 sentences). Always respond in English only. Do not use JSON or code blocks.`;
+
+	if (userName) {
+		systemPrompt += `\n\nThe trainee's name is ${userName}. Address them by name occasionally.`;
+	}
+
+	// Normalise history: Live API requires turns to start with a user message
+	let validHistory = conversationHistory;
+	if (validHistory.length > 0 && validHistory[0].role === 'model') {
+		const firstUserIdx = validHistory.findIndex((m) => m.role === 'user');
+		validHistory = firstUserIdx > 0 ? validHistory.slice(firstUserIdx) : [];
+	}
+
+	const historyTurns = validHistory.map((m) => ({
+		role: m.role === 'user' ? 'user' : 'model',
+		parts: [{ text: m.content }],
+	}));
+
+	const turns = [
+		...historyTurns,
+		{ role: 'user', parts: [{ text: userMessage }] },
+	];
+
+	logger.info('[FreeTalk] Generating response stream', {
+		model: LIVE_MODEL,
+		turnsCount: turns.length,
+	});
+
+	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
+
+	// Pre-select the next scenario so it is ready if scenarioComplete is detected
+	const { scenario: nextScenario } = pickNextFreeTalkScenario();
+
+	return wrapWithFreeTalkMetadata(liveStream, (fullText, scenarioComplete) => {
+		if (scenarioComplete) {
+			return {
+				fullText,
+				scenarioComplete: true,
+				scenarioTitle: nextScenario.title,
+				hint: nextScenario.hint,
+				usefulPhrases: nextScenario.usefulPhrases,
+			};
+		}
+		return { fullText, scenarioComplete: false };
+	});
+}
