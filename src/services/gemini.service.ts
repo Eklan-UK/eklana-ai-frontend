@@ -2498,7 +2498,9 @@ function isNewScenarioIntroTurn(history: Array<{ role: string; content: string }
 		t.includes("let's move on") ||
 		t.includes('moving on to') ||
 		t.includes('continue with another') ||
-		t.includes('well done') && t.includes('scenario')
+		t.includes('would you like to continue') ||
+		t.includes('happy to stop') ||
+		(t.includes('well done') && t.includes('scenario'))
 	);
 }
 
@@ -2610,9 +2612,18 @@ OUTPUT RULES — your reply must:
 - NEVER print "Step 1", "Step 2", "Step 3", "EVALUATE", "ADVANCE", or any structural label.
 - Keep the whole reply to 2–4 natural sentences.
 
-Including this reply, the user has now made ${userTurnCount + 1} response(s) in this scenario. Do not wrap up the scenario until the user has replied at least 3 times in total. After 3+ turns with all key steps covered, congratulate the user briefly and append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message (immediately after your final word, no space before it, nothing after it). Your celebration text should transition immediately to the next scenario — do NOT ask if they want to stop.
+The user has made ${userTurnCount + 1} response(s) so far in this scenario.
+Do not consider the scenario complete until ALL of the following are true:
+- The user has replied at least 5 times, AND
+- All key clinical steps for this scenario have been covered.
+Until both conditions are met, keep the scenario going: add a complication, have the patient react differently, involve a team member, or ask a deeper follow-up question. Push the learner further — one correct answer is never enough.
 
-NEVER ask the user if they want to stop or end the session. Always move to the next scenario after completing one. After 10 scenarios, cycle back to the beginning.
+Only after 5+ user replies AND all key steps are covered:
+- Congratulate the user warmly (1–2 sentences).
+- Ask: "Would you like to continue with another scenario, or are you happy to stop here?"
+- Append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message — immediately after your final word, no space before it, nothing after it.
+
+Do NOT append ${SCENARIO_COMPLETE_TOKEN} before 5 user replies, even if the user gives a perfect answer.
 
 Respond in English only — even if the user writes in another language.`;
 	if (userName) {
@@ -2723,7 +2734,7 @@ export async function generateFreeTalkResponseStream(
 	const totalUserReplies = userTurnCount + 1;
 
 	return wrapWithFreeTalkMetadata(liveStream, (fullText, modelSignalledComplete) => {
-		const scenarioComplete = modelSignalledComplete && totalUserReplies >= 3;
+		const scenarioComplete = modelSignalledComplete && totalUserReplies >= 5;
 		if (scenarioComplete) {
 			return {
 				fullText,
