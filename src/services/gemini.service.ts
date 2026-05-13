@@ -2335,3 +2335,414 @@ export async function generateGeminiTTSAudio(
 		return await generateTtsWithModel(config.GEMINI_TTS_MODEL_FALLBACK, text, voiceName);
 	}
 }
+
+// ─── Eklan Free Talk (ICU scenario practice) ─────────────────────────────────
+
+interface FreeTalkScenario {
+	title: string;
+	situation: string;
+	hint: string;
+	usefulPhrases: string[];
+}
+
+const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
+	{
+		title: 'Sudden Oxygen Drop',
+		situation: "Mr. Miller's oxygen saturation suddenly drops from 96% to 82%. He looks frightened and begins breathing rapidly.",
+		hint: 'Calm the patient. Explain what is happening. Call for help if necessary.',
+		usefulPhrases: [
+			'Stay calm.',
+			'Your oxygen level is dropping.',
+			'Take slow, deep breaths.',
+			"I'm calling the respiratory therapist.",
+		],
+	},
+	{
+		title: 'Airway Obstruction',
+		situation: 'The patient begins coughing heavily and cannot speak clearly. You suspect mucus is blocking the airway.',
+		hint: 'Explain the problem. Encourage coughing. Prepare suction equipment.',
+		usefulPhrases: [
+			'There may be an airway obstruction.',
+			'Keep coughing slowly.',
+			'We need to suction your airway.',
+			"You're doing well.",
+		],
+	},
+	{
+		title: 'Patient Panic During Ventilator Removal',
+		situation: 'The patient becomes anxious after the ventilator is removed and says, "I can\'t breathe!"',
+		hint: 'Reassure the patient. Encourage controlled breathing. Explain why coughing is important.',
+		usefulPhrases: [
+			"You're safe now.",
+			'Try not to panic.',
+			'Take a deep breath.',
+			'Coughing helps clear your lungs.',
+		],
+	},
+	{
+		title: 'Alcohol Withdrawal Symptoms',
+		situation: 'The patient becomes irritable and angry. He says he wants alcohol and refuses treatment.',
+		hint: 'Remain calm and professional. Explain withdrawal symptoms. Offer reassurance.',
+		usefulPhrases: [
+			"I understand you're frustrated.",
+			'Withdrawal symptoms can cause anxiety.',
+			'We are trying to keep you safe.',
+			'This medication may help you relax.',
+		],
+	},
+	{
+		title: 'Emergency Team Communication',
+		situation: "You notice the patient's condition worsening rapidly and must inform the ICU team immediately.",
+		hint: "Report the patient's condition clearly. Request support quickly.",
+		usefulPhrases: [
+			'The patient is desaturating rapidly.',
+			'We may have an airway obstruction.',
+			'Please prepare suction equipment.',
+			'I need respiratory support in room 12.',
+		],
+	},
+	{
+		title: 'Medication Questions',
+		situation: 'The patient asks why he needs medication and worries about side effects.',
+		hint: 'Explain the medication simply. Discuss possible side effects safely.',
+		usefulPhrases: [
+			'This medication helps reduce anxiety.',
+			'You may feel sleepy or dizzy.',
+			'Please call for assistance before standing.',
+			'Do you have any questions about the medication?',
+		],
+	},
+	{
+		title: 'CRRT Dialysis Concern',
+		situation: 'Mrs. Thompson becomes nervous after seeing the CRRT machine.',
+		hint: 'Explain CRRT calmly. Reassure the patient.',
+		usefulPhrases: [
+			'This machine provides continuous dialysis.',
+			'CRRT is gentler for ICU patients.',
+			'We are monitoring you closely.',
+			'I will stay here with you.',
+		],
+	},
+	{
+		title: 'Family Member Anxiety',
+		situation: "The patient's daughter looks worried after the emergency situation.",
+		hint: 'Update the family member professionally. Reassure her calmly.',
+		usefulPhrases: [
+			'His condition is stable now.',
+			'We responded quickly to the emergency.',
+			'His breathing is improving.',
+			'We will continue monitoring him closely.',
+		],
+	},
+	{
+		title: 'Refusing Breathing Exercises',
+		situation: 'The patient says he is too tired to continue breathing exercises.',
+		hint: 'Encourage cooperation. Explain the importance of the exercises.',
+		usefulPhrases: [
+			'These exercises help prevent pneumonia.',
+			'Your lungs sound clearer now.',
+			'Please try a few more breaths.',
+			"You're making good progress.",
+		],
+	},
+	{
+		title: 'Overnight Monitoring',
+		situation: 'The patient asks why ICU staff continue checking him overnight.',
+		hint: 'Explain ICU monitoring procedures. Reassure the patient.',
+		usefulPhrases: [
+			'We need to monitor your condition overnight.',
+			'We are checking your vital signs regularly.',
+			'This helps us respond quickly to emergencies.',
+			'Please call us if you feel short of breath.',
+		],
+	},
+];
+
+let _freeTalkScenarioIndex = 0;
+
+/** Picks the next scenario in round-robin order (used only by the greeting handler). */
+function pickNextFreeTalkScenario(): FreeTalkScenario {
+	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
+	_freeTalkScenarioIndex++;
+	return FREE_TALK_SCENARIOS[idx];
+}
+
+/** Case-insensitive lookup — returns undefined if title is not found. */
+function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario | undefined {
+	if (!title) return undefined;
+	const norm = title.trim().toLowerCase();
+	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm);
+}
+
+/** Index of `scenario` in the bank (wraps around), used to find the next scenario. */
+function nextFreeTalkScenario(scenario: FreeTalkScenario): FreeTalkScenario {
+	const idx = FREE_TALK_SCENARIOS.indexOf(scenario);
+	return FREE_TALK_SCENARIOS[(idx + 1) % FREE_TALK_SCENARIOS.length];
+}
+
+/**
+ * After a scenario completes the AI always celebrates briefly and transitions to the
+ * next one (never asks "do you want to stop?"). The next POST call from the app will
+ * carry the new `activeScenarioTitle` — detect this by checking whether the last model
+ * turn contains transition language that signals the old scenario just ended.
+ */
+function isNewScenarioIntroTurn(history: Array<{ role: string; content: string }>): boolean {
+	if (history.length === 0) return false;
+	const lastModel = [...history].reverse().find(m => m.role === 'model');
+	if (!lastModel) return false;
+	const t = lastModel.content.toLowerCase();
+	return (
+		t.includes('another scenario') ||
+		t.includes('next scenario') ||
+		t.includes("let's keep going") ||
+		t.includes("let's move on") ||
+		t.includes('moving on to') ||
+		t.includes('continue with another') ||
+		t.includes('well done') && t.includes('scenario')
+	);
+}
+
+/** Sentinel appended by the AI to signal that the current scenario is complete. */
+const SCENARIO_COMPLETE_TOKEN = '[SCENARIO_COMPLETE]';
+
+/**
+ * Wraps a Live API ReadableStream (emitting `audio`/`text` SSE lines) with a
+ * TransformStream that:
+ *  - Passes `audio` chunks through unchanged.
+ *  - Strips SCENARIO_COMPLETE_TOKEN from `text` chunks before re-emitting.
+ *  - Appends a single `metadata` SSE chunk once the upstream ends.
+ */
+function wrapWithFreeTalkMetadata(
+	liveStream: ReadableStream,
+	buildMetadata: (fullText: string, scenarioComplete: boolean) => Record<string, unknown>,
+): ReadableStream {
+	const encoder = new TextEncoder();
+	const decoder = new TextDecoder();
+	const textParts: string[] = [];
+	let scenarioComplete = false;
+
+	const transform = new TransformStream<Uint8Array, Uint8Array>({
+		transform(chunk, controller) {
+			const raw = decoder.decode(chunk);
+			if (!raw.startsWith('data: ')) {
+				controller.enqueue(chunk);
+				return;
+			}
+			let parsed: { type: string; data: unknown };
+			try {
+				parsed = JSON.parse(raw.slice(6).trimEnd());
+			} catch {
+				controller.enqueue(chunk);
+				return;
+			}
+			if (parsed.type === 'audio') {
+				controller.enqueue(chunk);
+			} else if (parsed.type === 'text') {
+				let text = (parsed.data as string) || '';
+				if (text.includes(SCENARIO_COMPLETE_TOKEN)) {
+					scenarioComplete = true;
+					text = text.replace(SCENARIO_COMPLETE_TOKEN, '').trim();
+				}
+				if (text) {
+					textParts.push(text);
+					controller.enqueue(
+						encoder.encode(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`),
+					);
+				}
+			}
+		},
+		flush(controller) {
+			const fullText = textParts.join('').trim();
+			const metadata = buildMetadata(fullText, scenarioComplete);
+			controller.enqueue(
+				encoder.encode(`data: ${JSON.stringify({ type: 'metadata', data: metadata })}\n\n`),
+			);
+		},
+	});
+
+	return liveStream.pipeThrough(transform);
+}
+
+// ── Prompt builders ───────────────────────────────────────────────────────────
+
+/** Used on GET /greeting AND on the new-scenario-intro branch of POST. */
+function buildFreeTalkGreetingPrompt(scenario: FreeTalkScenario, userName?: string): string {
+	let p = `You are Eklan, an ICU English language practice tutor. You present realistic clinical scenarios to help nurses practise communicating clearly in emergency situations.
+
+You are about to introduce a new scenario. Read the situation below naturally and clearly, as if setting the scene for the learner. Invite them to respond — but do not give them the answer.
+
+Scenario: ${scenario.title}
+Situation: ${scenario.situation}
+
+Keep your opening brief (3–5 sentences). End with a gentle prompt for the user to respond.
+Respond in English only.`;
+	if (userName) {
+		p += `\n\nThe trainee's name is ${userName}. You may address them by name.`;
+	}
+	return p;
+}
+
+/** Used on every normal continuation turn of POST /api/v1/ai/free-talk. */
+function buildFreeTalkContinuationPrompt(
+	activeScenarioTitle: string,
+	situation: string,
+	userTurnCount: number,
+	userName?: string,
+): string {
+	let p = `You are Eklan, an ICU English language practice tutor.
+You are currently in the middle of the scenario: "${activeScenarioTitle}".
+Situation context: ${situation}
+
+DO NOT introduce a new scenario. DO NOT re-read the full situation text.
+The conversation history below shows what has already been said.
+
+MANDATORY RESPONSE STRUCTURE — follow this every single turn:
+
+Step 1 — EVALUATE (required, always first):
+  - Quote or paraphrase what the user just said.
+  - Judge whether it was clinically appropriate and in clear English.
+  - If WRONG or INCOMPLETE: explain specifically what was missing or incorrect,
+    then rephrase the question in a simpler way and ask it again.
+    Example: "You mentioned staying calm, which is good — but you didn't explain
+    what's happening to the patient. Try again: how would you tell Mr. Miller
+    that his oxygen level is dropping?"
+  - If PARTIALLY CORRECT: praise what was right, then identify the gap and prompt
+    for the missing element.
+  - If CORRECT: confirm clearly ("Good — that's exactly right.") then move on.
+
+Step 2 — ADVANCE (only after evaluation):
+  - Continue the roleplay naturally: the patient reacts, a complication arises,
+    or a team member interjects. Keep it brief (1–2 sentences).
+
+Step 3 — NEXT PROMPT (always end with a question or cue for the user):
+  - Give the user something to respond to.
+
+Including this reply, the user has now made ${userTurnCount + 1} response(s) in this scenario. Do not wrap up the scenario until the user has replied at least 3 times in total. After 3+ turns with all key steps covered, congratulate the user briefly and append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message (immediately after your final word, no space before it, nothing after it). Your celebration text should transition immediately to the next scenario — do NOT ask if they want to stop.
+
+NEVER ask the user if they want to stop or end the session. Always move to the next scenario after completing one. The student leaves when they are ready by pressing the Leave button in the app — that is their decision, not yours.
+After 10 scenarios, cycle back to the beginning so the session continues indefinitely.
+
+Keep the full reply concise (3–5 sentences total). Speak in clear clinical English.
+Respond in English only — even if the user writes in another language.
+Do not use JSON or code blocks.`;
+	if (userName) {
+		p += `\n\nThe trainee's name is ${userName}. Address them by name occasionally.`;
+	}
+	return p;
+}
+
+// ── Exported stream functions ─────────────────────────────────────────────────
+
+/**
+ * Greeting stream — picks the next scenario (round-robin), streams its situation
+ * text + audio, and ends with a metadata chunk containing scenarioTitle/hint/usefulPhrases.
+ * This is the ONLY place the round-robin picker runs.
+ */
+export async function generateFreeTalkGreetingStream(userName?: string): Promise<ReadableStream> {
+	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
+
+	const scenario = pickNextFreeTalkScenario();
+	const systemPrompt = buildFreeTalkGreetingPrompt(scenario, userName);
+
+	logger.info('[FreeTalk] Generating greeting stream', { scenario: scenario.title, model: LIVE_MODEL });
+
+	const liveStream = await generateWithLiveAPIStream(systemPrompt, [
+		{ role: 'user', parts: [{ text: 'Please present the scenario.' }] },
+	]);
+
+	return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
+		fullText,
+		scenarioTitle: scenario.title,
+		hint: scenario.hint,
+		usefulPhrases: scenario.usefulPhrases,
+	}));
+}
+
+/**
+ * Response stream for every POST /api/v1/ai/free-talk call.
+ *
+ * Rules:
+ * - `activeScenarioTitle` anchors the system prompt — the round-robin picker
+ *   is NEVER called here.
+ * - When `isNewScenarioIntroTurn` detects that the app just signalled a new
+ *   scenario (last AI message contained transition language), the current
+ *   `activeScenarioTitle` IS the new scenario, so we use it directly with the
+ *   greeting prompt template (no +1 offset needed).
+ * - On the `scenarioComplete: true` metadata path, the NEXT scenario (one after
+ *   the current) is pre-selected for the silent pre-load hint data.
+ * - `scenarioComplete: true` is only emitted when the model appended the token
+ *   AND the user has replied at least 3 times (server-side guard).
+ */
+export async function generateFreeTalkResponseStream(
+	userMessage: string,
+	activeScenarioTitle: string,
+	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
+	userName?: string,
+): Promise<ReadableStream> {
+	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
+
+	const scenario =
+		findFreeTalkScenarioByTitle(activeScenarioTitle) ?? FREE_TALK_SCENARIOS[0];
+
+	const isNewIntro = isNewScenarioIntroTurn(conversationHistory);
+	const userTurnCount = conversationHistory.filter((m) => m.role === 'user').length;
+	const systemPrompt = isNewIntro
+		? buildFreeTalkGreetingPrompt(scenario, userName)
+		: buildFreeTalkContinuationPrompt(scenario.title, scenario.situation, userTurnCount, userName);
+
+	// Normalise history — Live API requires the first turn to be from the user
+	let validHistory = conversationHistory;
+	if (validHistory.length > 0 && validHistory[0].role === 'model') {
+		const firstUser = validHistory.findIndex((m) => m.role === 'user');
+		validHistory = firstUser > 0 ? validHistory.slice(firstUser) : [];
+	}
+
+	const turns = [
+		...validHistory.map((m) => ({
+			role: m.role === 'user' ? 'user' : 'model',
+			parts: [{ text: m.content }],
+		})),
+		{ role: 'user', parts: [{ text: userMessage }] },
+	];
+
+	logger.info('[FreeTalk] Generating response stream', {
+		model: LIVE_MODEL,
+		scenario: scenario.title,
+		isNewIntro,
+		userTurnCount,
+		turnsCount: turns.length,
+	});
+
+	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
+
+	// New-scenario intro: metadata must look exactly like a greeting response
+	// (scenarioTitle + hint + usefulPhrases, NO scenarioComplete key) —
+	// this is what triggers the hint modal in the mobile app.
+	if (isNewIntro) {
+		return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
+			fullText,
+			scenarioTitle: scenario.title,
+			hint: scenario.hint,
+			usefulPhrases: scenario.usefulPhrases,
+		}));
+	}
+
+	// For normal continuation turns, pre-capture the next scenario now so it's
+	// available inside the TransformStream flush closure.
+	const next = nextFreeTalkScenario(scenario);
+	const totalUserReplies = userTurnCount + 1;
+
+	return wrapWithFreeTalkMetadata(liveStream, (fullText, modelSignalledComplete) => {
+		const scenarioComplete = modelSignalledComplete && totalUserReplies >= 3;
+		if (scenarioComplete) {
+			return {
+				fullText,
+				scenarioComplete: true,
+				scenarioTitle: next.title,
+				hint: next.hint,
+				usefulPhrases: next.usefulPhrases,
+			};
+		}
+		return { fullText, scenarioComplete: false };
+	});
+}
