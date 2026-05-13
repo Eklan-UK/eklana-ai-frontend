@@ -2460,24 +2460,31 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 
 let _freeTalkScenarioIndex = 0;
 
-function pickNextFreeTalkScenario(): { scenario: FreeTalkScenario; nextScenario: FreeTalkScenario } {
+/** Picks the next scenario in round-robin order (used only by the greeting handler). */
+function pickNextFreeTalkScenario(): FreeTalkScenario {
 	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
 	_freeTalkScenarioIndex++;
-	const scenario = FREE_TALK_SCENARIOS[idx];
-	const nextScenario = FREE_TALK_SCENARIOS[(_freeTalkScenarioIndex) % FREE_TALK_SCENARIOS.length];
-	return { scenario, nextScenario };
+	return FREE_TALK_SCENARIOS[idx];
 }
 
+/** Case-insensitive lookup — returns undefined if title is not found. */
 function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario | undefined {
 	if (!title) return undefined;
-	const normalised = title.trim().toLowerCase();
-	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === normalised);
+	const norm = title.trim().toLowerCase();
+	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm);
+}
+
+/** Index of `scenario` in the bank (wraps around), used to find the next scenario. */
+function nextFreeTalkScenario(scenario: FreeTalkScenario): FreeTalkScenario {
+	const idx = FREE_TALK_SCENARIOS.indexOf(scenario);
+	return FREE_TALK_SCENARIOS[(idx + 1) % FREE_TALK_SCENARIOS.length];
 }
 
 /**
- * Returns true when the conversation just reached a scenario-complete boundary —
- * i.e. the last model turn asked the user whether to continue or stop.
- * Used to decide whether the next POST call should use the greeting prompt.
+ * After a scenario completes the AI always celebrates briefly and transitions to the
+ * next one (never asks "do you want to stop?"). The next POST call from the app will
+ * carry the new `activeScenarioTitle` — detect this by checking whether the last model
+ * turn contains transition language that signals the old scenario just ended.
  */
 function isNewScenarioIntroTurn(history: Array<{ role: string; content: string }>): boolean {
 	if (history.length === 0) return false;
@@ -2486,20 +2493,24 @@ function isNewScenarioIntroTurn(history: Array<{ role: string; content: string }
 	const t = lastModel.content.toLowerCase();
 	return (
 		t.includes('another scenario') ||
-		t.includes('would you like to continue') ||
-		t.includes('would you prefer to stop') ||
+		t.includes('next scenario') ||
+		t.includes("let's keep going") ||
+		t.includes("let's move on") ||
+		t.includes('moving on to') ||
 		t.includes('continue with another') ||
-		t.includes('stop here')
+		t.includes('well done') && t.includes('scenario')
 	);
 }
 
+/** Sentinel appended by the AI to signal that the current scenario is complete. */
 const SCENARIO_COMPLETE_TOKEN = '[SCENARIO_COMPLETE]';
 
 /**
- * Wraps a Live API ReadableStream (emitting `audio`/`text` SSE chunks) with a
+ * Wraps a Live API ReadableStream (emitting `audio`/`text` SSE lines) with a
  * TransformStream that:
- *  - Strips the SCENARIO_COMPLETE_TOKEN from text chunks
- *  - Appends a final `metadata` SSE chunk once the upstream ends
+ *  - Passes `audio` chunks through unchanged.
+ *  - Strips SCENARIO_COMPLETE_TOKEN from `text` chunks before re-emitting.
+ *  - Appends a single `metadata` SSE chunk once the upstream ends.
  */
 function wrapWithFreeTalkMetadata(
 	liveStream: ReadableStream,
@@ -2507,13 +2518,12 @@ function wrapWithFreeTalkMetadata(
 ): ReadableStream {
 	const encoder = new TextEncoder();
 	const decoder = new TextDecoder();
-	const fullTextParts: string[] = [];
+	const textParts: string[] = [];
 	let scenarioComplete = false;
 
 	const transform = new TransformStream<Uint8Array, Uint8Array>({
 		transform(chunk, controller) {
 			const raw = decoder.decode(chunk);
-			// Each enqueue from generateWithLiveAPIStream is exactly one SSE line.
 			if (!raw.startsWith('data: ')) {
 				controller.enqueue(chunk);
 				return;
@@ -2534,16 +2544,15 @@ function wrapWithFreeTalkMetadata(
 					text = text.replace(SCENARIO_COMPLETE_TOKEN, '').trim();
 				}
 				if (text) {
-					fullTextParts.push(text);
+					textParts.push(text);
 					controller.enqueue(
 						encoder.encode(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`),
 					);
 				}
 			}
-			// Drop any other type from the upstream (none expected)
 		},
 		flush(controller) {
-			const fullText = fullTextParts.join('').trim();
+			const fullText = textParts.join('').trim();
 			const metadata = buildMetadata(fullText, scenarioComplete);
 			controller.enqueue(
 				encoder.encode(`data: ${JSON.stringify({ type: 'metadata', data: metadata })}\n\n`),
@@ -2554,9 +2563,11 @@ function wrapWithFreeTalkMetadata(
 	return liveStream.pipeThrough(transform);
 }
 
-/** System prompt used ONLY on GET /api/v1/ai/free-talk/greeting (and the "start new scenario" branch of POST). */
+// ── Prompt builders ───────────────────────────────────────────────────────────
+
+/** Used on GET /greeting AND on the new-scenario-intro branch of POST. */
 function buildFreeTalkGreetingPrompt(scenario: FreeTalkScenario, userName?: string): string {
-	let prompt = `You are Eklan, an ICU English language practice tutor. You present realistic clinical scenarios to help nurses practise communicating clearly in emergency situations.
+	let p = `You are Eklan, an ICU English language practice tutor. You present realistic clinical scenarios to help nurses practise communicating clearly in emergency situations.
 
 You are about to introduce a new scenario. Read the situation below naturally and clearly, as if setting the scene for the learner. Invite them to respond — but do not give them the answer.
 
@@ -2566,60 +2577,78 @@ Situation: ${scenario.situation}
 Keep your opening brief (3–5 sentences). End with a gentle prompt for the user to respond.
 Respond in English only.`;
 	if (userName) {
-		prompt += `\n\nThe trainee's name is ${userName}. You may address them by name.`;
+		p += `\n\nThe trainee's name is ${userName}. You may address them by name.`;
 	}
-	return prompt;
+	return p;
 }
 
-/** System prompt used on EVERY continuation turn of POST /api/v1/ai/free-talk. */
+/** Used on every normal continuation turn of POST /api/v1/ai/free-talk. */
 function buildFreeTalkContinuationPrompt(
 	activeScenarioTitle: string,
 	situation: string,
 	userTurnCount: number,
 	userName?: string,
 ): string {
-	let prompt = `You are Eklan, an ICU English language practice tutor.
+	let p = `You are Eklan, an ICU English language practice tutor.
 You are currently in the middle of the scenario: "${activeScenarioTitle}".
-Situation (for context — do NOT re-read aloud): ${situation}
+Situation context: ${situation}
 
 DO NOT introduce a new scenario. DO NOT re-read the full situation text.
 The conversation history below shows what has already been said.
 
-Your job on this turn:
-1. Evaluate the user's latest reply — acknowledge what they did well and gently correct any gaps.
-2. Continue the roleplay naturally (e.g. the patient reacts, a complication develops, a team member asks a question).
-3. Do not wrap up the scenario until the user has replied at least 3 times in total. The user has so far replied ${userTurnCount} time(s) in this scenario.
-4. When all key steps have been practised (minimum 3 user turns completed), congratulate the user warmly and ask if they want another scenario or to stop. Append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message — immediately after your final word, no space before it, nothing after it.
-5. If the user says they want to stop ("no", "stop", "end", "that's enough", etc.) — close the session warmly. Do NOT append ${SCENARIO_COMPLETE_TOKEN} on a stop response.
+MANDATORY RESPONSE STRUCTURE — follow this every single turn:
 
-Keep all responses concise (2–4 sentences). Speak in clear, natural clinical English. Respond in English only. Do not use JSON or code blocks.`;
+Step 1 — EVALUATE (required, always first):
+  - Quote or paraphrase what the user just said.
+  - Judge whether it was clinically appropriate and in clear English.
+  - If WRONG or INCOMPLETE: explain specifically what was missing or incorrect,
+    then rephrase the question in a simpler way and ask it again.
+    Example: "You mentioned staying calm, which is good — but you didn't explain
+    what's happening to the patient. Try again: how would you tell Mr. Miller
+    that his oxygen level is dropping?"
+  - If PARTIALLY CORRECT: praise what was right, then identify the gap and prompt
+    for the missing element.
+  - If CORRECT: confirm clearly ("Good — that's exactly right.") then move on.
+
+Step 2 — ADVANCE (only after evaluation):
+  - Continue the roleplay naturally: the patient reacts, a complication arises,
+    or a team member interjects. Keep it brief (1–2 sentences).
+
+Step 3 — NEXT PROMPT (always end with a question or cue for the user):
+  - Give the user something to respond to.
+
+Including this reply, the user has now made ${userTurnCount + 1} response(s) in this scenario. Do not wrap up the scenario until the user has replied at least 3 times in total. After 3+ turns with all key steps covered, congratulate the user briefly and append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message (immediately after your final word, no space before it, nothing after it). Your celebration text should transition immediately to the next scenario — do NOT ask if they want to stop.
+
+NEVER ask the user if they want to stop or end the session. Always move to the next scenario after completing one. The student leaves when they are ready by pressing the Leave button in the app — that is their decision, not yours.
+After 10 scenarios, cycle back to the beginning so the session continues indefinitely.
+
+Keep the full reply concise (3–5 sentences total). Speak in clear clinical English.
+Respond in English only — even if the user writes in another language.
+Do not use JSON or code blocks.`;
 	if (userName) {
-		prompt += `\n\nThe trainee's name is ${userName}. Address them by name occasionally.`;
+		p += `\n\nThe trainee's name is ${userName}. Address them by name occasionally.`;
 	}
-	return prompt;
+	return p;
 }
 
+// ── Exported stream functions ─────────────────────────────────────────────────
+
 /**
- * Greeting stream for the Eklan Free Talk screen.
- * Picks the next scenario, streams the situation text + audio, and ends
- * with a `metadata` chunk containing `scenarioTitle`, `hint`, and `usefulPhrases`.
- * This is the ONLY place the scenario-picker is allowed to run.
+ * Greeting stream — picks the next scenario (round-robin), streams its situation
+ * text + audio, and ends with a metadata chunk containing scenarioTitle/hint/usefulPhrases.
+ * This is the ONLY place the round-robin picker runs.
  */
 export async function generateFreeTalkGreetingStream(userName?: string): Promise<ReadableStream> {
-	if (!config.GEMINI_API_KEY) {
-		throw new Error('Gemini API is not configured');
-	}
+	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
 
-	const { scenario } = pickNextFreeTalkScenario();
+	const scenario = pickNextFreeTalkScenario();
 	const systemPrompt = buildFreeTalkGreetingPrompt(scenario, userName);
-
-	const turns = [
-		{ role: 'user', parts: [{ text: 'Please present the scenario.' }] },
-	];
 
 	logger.info('[FreeTalk] Generating greeting stream', { scenario: scenario.title, model: LIVE_MODEL });
 
-	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
+	const liveStream = await generateWithLiveAPIStream(systemPrompt, [
+		{ role: 'user', parts: [{ text: 'Please present the scenario.' }] },
+	]);
 
 	return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
 		fullText,
@@ -2630,17 +2659,19 @@ export async function generateFreeTalkGreetingStream(userName?: string): Promise
 }
 
 /**
- * Response stream for the Eklan Free Talk screen.
+ * Response stream for every POST /api/v1/ai/free-talk call.
  *
- * Uses `activeScenarioTitle` to anchor the system prompt to the correct scenario —
- * the scenario-picker is NEVER called here unless the user explicitly agreed to
- * continue after a scenarioComplete (detected by `isNewScenarioIntroTurn`).
- *
- * Two prompt paths:
- *  - New scenario intro (user said "yes/continue" after scenarioComplete):
- *    → greeting prompt template, scenario from `activeScenarioTitle`
- *  - Continuation (every other turn):
- *    → continuation prompt template with explicit "DO NOT re-read situation" guard
+ * Rules:
+ * - `activeScenarioTitle` anchors the system prompt — the round-robin picker
+ *   is NEVER called here.
+ * - When `isNewScenarioIntroTurn` detects that the app just signalled a new
+ *   scenario (last AI message contained transition language), the current
+ *   `activeScenarioTitle` IS the new scenario, so we use it directly with the
+ *   greeting prompt template (no +1 offset needed).
+ * - On the `scenarioComplete: true` metadata path, the NEXT scenario (one after
+ *   the current) is pre-selected for the silent pre-load hint data.
+ * - `scenarioComplete: true` is only emitted when the model appended the token
+ *   AND the user has replied at least 3 times (server-side guard).
  */
 export async function generateFreeTalkResponseStream(
 	userMessage: string,
@@ -2648,55 +2679,46 @@ export async function generateFreeTalkResponseStream(
 	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
 	userName?: string,
 ): Promise<ReadableStream> {
-	if (!config.GEMINI_API_KEY) {
-		throw new Error('Gemini API is not configured');
-	}
+	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
 
-	// Look up scenario — fall back to first if title is unknown/missing
-	const scenario = findFreeTalkScenarioByTitle(activeScenarioTitle) ?? FREE_TALK_SCENARIOS[0];
+	const scenario =
+		findFreeTalkScenarioByTitle(activeScenarioTitle) ?? FREE_TALK_SCENARIOS[0];
 
-	// Detect whether the user just agreed to start a NEW scenario (post-scenarioComplete transition)
-	const isNewScenarioIntro = isNewScenarioIntroTurn(conversationHistory);
-
-	// Count how many user turns have happened so far in this scenario
-	const userTurnCount = conversationHistory.filter(m => m.role === 'user').length;
-
-	const systemPrompt = isNewScenarioIntro
+	const isNewIntro = isNewScenarioIntroTurn(conversationHistory);
+	const userTurnCount = conversationHistory.filter((m) => m.role === 'user').length;
+	const systemPrompt = isNewIntro
 		? buildFreeTalkGreetingPrompt(scenario, userName)
 		: buildFreeTalkContinuationPrompt(scenario.title, scenario.situation, userTurnCount, userName);
 
-	// Normalise history: Live API requires turns to start with a user message
+	// Normalise history — Live API requires the first turn to be from the user
 	let validHistory = conversationHistory;
 	if (validHistory.length > 0 && validHistory[0].role === 'model') {
-		const firstUserIdx = validHistory.findIndex((m) => m.role === 'user');
-		validHistory = firstUserIdx > 0 ? validHistory.slice(firstUserIdx) : [];
+		const firstUser = validHistory.findIndex((m) => m.role === 'user');
+		validHistory = firstUser > 0 ? validHistory.slice(firstUser) : [];
 	}
 
-	const historyTurns = validHistory.map((m) => ({
-		role: m.role === 'user' ? 'user' : 'model',
-		parts: [{ text: m.content }],
-	}));
-
 	const turns = [
-		...historyTurns,
+		...validHistory.map((m) => ({
+			role: m.role === 'user' ? 'user' : 'model',
+			parts: [{ text: m.content }],
+		})),
 		{ role: 'user', parts: [{ text: userMessage }] },
 	];
 
 	logger.info('[FreeTalk] Generating response stream', {
 		model: LIVE_MODEL,
 		scenario: scenario.title,
-		isNewScenarioIntro,
+		isNewIntro,
 		userTurnCount,
 		turnsCount: turns.length,
 	});
 
 	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
 
-	// When the user just agreed to start a new scenario, the metadata must look
-	// exactly like a greeting response — { fullText, scenarioTitle, hint, usefulPhrases }
-	// with NO scenarioComplete key. That shape is what the mobile app uses to trigger
-	// the hint modal while the AI reads the new situation aloud.
-	if (isNewScenarioIntro) {
+	// New-scenario intro: metadata must look exactly like a greeting response
+	// (scenarioTitle + hint + usefulPhrases, NO scenarioComplete key) —
+	// this is what triggers the hint modal in the mobile app.
+	if (isNewIntro) {
 		return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
 			fullText,
 			scenarioTitle: scenario.title,
@@ -2705,22 +2727,20 @@ export async function generateFreeTalkResponseStream(
 		}));
 	}
 
-	// Pre-select the next scenario NOW so it's captured in the closure even if
-	// scenarioComplete is only detected later during the TransformStream flush.
-	const nextIdx = (FREE_TALK_SCENARIOS.indexOf(scenario) + 1) % FREE_TALK_SCENARIOS.length;
-	const nextScenario = FREE_TALK_SCENARIOS[nextIdx];
+	// For normal continuation turns, pre-capture the next scenario now so it's
+	// available inside the TransformStream flush closure.
+	const next = nextFreeTalkScenario(scenario);
+	const totalUserReplies = userTurnCount + 1;
 
-	return wrapWithFreeTalkMetadata(liveStream, (fullText, scenarioComplete) => {
+	return wrapWithFreeTalkMetadata(liveStream, (fullText, modelSignalledComplete) => {
+		const scenarioComplete = modelSignalledComplete && totalUserReplies >= 3;
 		if (scenarioComplete) {
-			// Scenario complete: include next scenario hint data so the app can pre-load it
-			// silently. The hint modal is NOT shown yet — it fires only on the next new-scenario
-			// intro response (see the isNewScenarioIntro branch above).
 			return {
 				fullText,
 				scenarioComplete: true,
-				scenarioTitle: nextScenario.title,
-				hint: nextScenario.hint,
-				usefulPhrases: nextScenario.usefulPhrases,
+				scenarioTitle: next.title,
+				hint: next.hint,
+				usefulPhrases: next.usefulPhrases,
 			};
 		}
 		return { fullText, scenarioComplete: false };
