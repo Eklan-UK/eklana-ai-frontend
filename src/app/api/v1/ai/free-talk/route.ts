@@ -1,6 +1,6 @@
 // POST /api/v1/ai/free-talk
 // Evaluates the user's voice/text response and continues the ICU scenario roleplay.
-// Streams back evaluation + continuation text + audio + metadata (SSE).
+// Streams evaluation + continuation text + audio + metadata (SSE).
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
@@ -46,11 +46,10 @@ async function handler(
 			},
 		});
 	} catch (error: any) {
-		logger.error('Error in Free Talk response handler', {
+		logger.error('[FreeTalk] Error in response handler', {
 			error: error?.message,
 			stack: error?.stack,
 		});
-
 		return NextResponse.json(
 			{
 				success: false,

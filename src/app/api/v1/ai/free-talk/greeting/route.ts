@@ -1,5 +1,6 @@
 // GET /api/v1/ai/free-talk/greeting
-// Streams the opening ICU scenario for Eklan Free Talk (text + audio + metadata SSE).
+// Picks the next ICU scenario, streams the situation text + audio, and ends
+// with a metadata chunk containing scenarioTitle, hint, and usefulPhrases.
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
@@ -27,11 +28,10 @@ async function handler(
 			},
 		});
 	} catch (error: any) {
-		logger.error('Error generating Free Talk greeting', {
+		logger.error('[FreeTalk] Error generating greeting', {
 			error: error?.message,
 			stack: error?.stack,
 		});
-
 		return NextResponse.json(
 			{
 				success: false,
