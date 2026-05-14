@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/layout/Header";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Check, Crown, Zap, Calendar, Loader2 } from "lucide-react";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
@@ -128,7 +129,7 @@ export default function SubscriptionsPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <Header showBack title="Subscriptions" />
 
@@ -257,6 +258,8 @@ export default function SubscriptionsPage() {
         </Card>
 
       </div>
+
+      <BottomNav />
     </div>
   );
 }

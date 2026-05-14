@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronRight, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 export function AssignedDrillsTitleRow({ isSubscribed = true }: { isSubscribed?: boolean }) {
   const t = useTranslations("account");
@@ -21,10 +22,12 @@ export function AssignedDrillsTitleRow({ isSubscribed = true }: { isSubscribed?:
           <ChevronRight className="w-4 h-4" />
         </Link>
       ) : (
-        <span className="text-sm text-muted-foreground flex items-center gap-1 opacity-50 cursor-not-allowed">
-          {t("seeAll")}
-          <Lock className="w-3.5 h-3.5" />
-        </span>
+        <ProLockHoverWrap className="inline-flex" placement="bottom">
+          <span className="text-sm text-muted-foreground flex items-center gap-1 opacity-50 cursor-not-allowed">
+            {t("seeAll")}
+            <Lock className="w-3.5 h-3.5" />
+          </span>
+        </ProLockHoverWrap>
       )}
     </div>
   );

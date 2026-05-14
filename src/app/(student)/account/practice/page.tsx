@@ -6,6 +6,7 @@ import { ChevronRight, Lock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 function PracticeCard({
   href,
@@ -76,7 +77,11 @@ function PracticeCard({
   );
 
   if (locked) {
-    return <div aria-disabled="true">{inner}</div>;
+    return (
+      <ProLockHoverWrap className="block" placement="top">
+        <div aria-disabled="true">{inner}</div>
+      </ProLockHoverWrap>
+    );
   }
 
   return <Link href={href}>{inner}</Link>;

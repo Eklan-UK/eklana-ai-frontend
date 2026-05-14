@@ -26,6 +26,7 @@ import {
 } from "@/utils/drill";
 import { getStatusBadge } from "@/utils/drill-ui";
 import { usePrefetchDrill } from "@/hooks/useDrills";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 export interface DrillCardProps {
   drill: any;
@@ -174,63 +175,82 @@ function DrillCardComponent({
   }, [drill._id, prefetchDrill]);
 
   if (variant === "compact") {
+    const cardBody = (
+      <Card
+        className={`${typeInfo.borderColor} ${
+          locked
+            ? "cursor-not-allowed opacity-80"
+            : "hover:shadow-md transition-shadow cursor-pointer"
+        } ${className}`}
+        onMouseEnter={locked ? undefined : handleMouseEnter}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-lg sm:text-xl flex-shrink-0">{typeInfo.icon}</span>
+            <span className="font-medium text-foreground text-sm sm:text-base truncate">{drill.title}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {showReviewBadge && (
+              <div className="hidden sm:block">
+                <ReviewBadge
+                  reviewStatus={latestAttempt?.reviewStatus}
+                  correctCount={latestAttempt?.correctCount}
+                  totalCount={latestAttempt?.totalCount}
+                />
+              </div>
+            )}
+            {showStartButton && (
+              locked ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled
+                  className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-2 sm:px-4 flex items-center gap-1"
+                >
+                  <Lock className="w-3 h-3" />
+                  Pro
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
+                  {isUpcoming
+                    ? "View"
+                    : isCompleted
+                      ? "Review"
+                    : "Start"}
+                </Button>
+              )
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+
+    if (locked) {
+      return (
+        <ProLockHoverWrap className="block" placement="top">
+          {cardBody}
+        </ProLockHoverWrap>
+      );
+    }
+
     return (
       <Link
         href={drillUrl}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
       >
-        <Card
-          className={`${typeInfo.borderColor} hover:shadow-md transition-shadow cursor-pointer ${className}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-lg sm:text-xl flex-shrink-0">{typeInfo.icon}</span>
-              <span className="font-medium text-foreground text-sm sm:text-base truncate">{drill.title}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {showReviewBadge && (
-                <div className="hidden sm:block">
-                  <ReviewBadge
-                    reviewStatus={latestAttempt?.reviewStatus}
-                    correctCount={latestAttempt?.correctCount}
-                    totalCount={latestAttempt?.totalCount}
-                  />
-                </div>
-              )}
-              {showStartButton && (
-                locked ? (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled
-                    className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-2 sm:px-4 flex items-center gap-1"
-                  >
-                    <Lock className="w-3 h-3" />
-                    Pro
-                  </Button>
-                ) : (
-                  <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
-                    {isUpcoming
-                      ? "View"
-                      : isCompleted
-                        ? "Review"
-                      : "Start"}
-                  </Button>
-                )
-              )}
-            </div>
-          </div>
-        </Card>
+        {cardBody}
       </Link>
     );
   }
 
-  return (
+  const detailedCard = (
     <Card
       key={assignmentId || drill._id}
-      className={`p-3 sm:p-4 hover:shadow-md transition-shadow ${className}`}
-      onMouseEnter={handleMouseEnter}
+      className={`p-3 sm:p-4 transition-shadow ${className} ${
+        locked ? "cursor-not-allowed opacity-90" : "hover:shadow-md"
+      }`}
+      onMouseEnter={locked ? undefined : handleMouseEnter}
     >
       {/* Header: Icon, Title, Status Badge */}
       <div className="flex items-start gap-2 sm:gap-3 mb-3">
@@ -358,6 +378,16 @@ function DrillCardComponent({
       </div>
     </Card>
   );
+
+  if (locked) {
+    return (
+      <ProLockHoverWrap className="block" placement="top">
+        {detailedCard}
+      </ProLockHoverWrap>
+    );
+  }
+
+  return detailedCard;
 }
 
 // Memoize the component to prevent unnecessary re-renders in lists
