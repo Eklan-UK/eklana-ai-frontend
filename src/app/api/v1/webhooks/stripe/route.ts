@@ -143,7 +143,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
-  if (!invoice.customer || !invoice.subscription) return;
+  // In Stripe API 2026-04-22 (dahlia) invoice.subscription was removed;
+  // subscription invoices are identified by invoice.parent.type === 'subscription_details'.
+  if (!invoice.customer || invoice.parent?.type !== 'subscription_details') return;
 
   const customerId = String(invoice.customer);
   const periodEnd = invoice.lines?.data?.[0]?.period?.end
