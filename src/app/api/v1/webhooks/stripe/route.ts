@@ -27,6 +27,15 @@ function fromUnix(ts: number): Date {
   return new Date(ts * 1000);
 }
 
+/**
+ * In Stripe API 2026-04-22 (dahlia) `current_period_end` moved from the
+ * Subscription root to each SubscriptionItem. Read it from the first item.
+ */
+function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date | null {
+  const ts = subscription.items?.data?.[0]?.current_period_end;
+  return typeof ts === 'number' ? fromUnix(ts) : null;
+}
+
 /** Find user by stripeCustomerId. */
 async function findUserByCustomer(customerId: string) {
   return User.findOne({ stripeCustomerId: customerId }).exec();
@@ -46,7 +55,7 @@ async function handleCheckoutSessionCompleted(
   const subscriptionId = String(session.subscription);
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const periodEnd = fromUnix(subscription.current_period_end);
+  const periodEnd = getSubscriptionPeriodEnd(subscription);
   const status = subscription.status;
 
   await connectToDatabase();
@@ -73,7 +82,7 @@ async function handleCheckoutSessionCompleted(
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
   const customerId = String(subscription.customer);
-  const periodEnd = fromUnix(subscription.current_period_end);
+  const periodEnd = getSubscriptionPeriodEnd(subscription);
   const status = subscription.status;
 
   await connectToDatabase();
@@ -87,9 +96,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
   user.stripeSubscriptionStatus = status;
 
   // Idempotency: only extend expiry if the incoming period end is later than stored.
-  const storedExpiry = user.subscriptionExpiresAt ? user.subscriptionExpiresAt.getTime() : 0;
-  if (periodEnd.getTime() > storedExpiry) {
-    user.subscriptionExpiresAt = periodEnd;
+  if (periodEnd !== null) {
+    const storedExpiry = user.subscriptionExpiresAt ? user.subscriptionExpiresAt.getTime() : 0;
+    if (periodEnd.getTime() > storedExpiry) {
+      user.subscriptionExpiresAt = periodEnd;
+    }
   }
 
   // Active/trialing = premium; past_due keeps premium (grace period); others downgrade.
