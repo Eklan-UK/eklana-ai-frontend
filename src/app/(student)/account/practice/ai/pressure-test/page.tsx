@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Header } from "@/components/layout/Header";
 import { useLearnerDrills } from "@/hooks/useDrills";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 import {
   ArrowRight,
   ChevronDown,
@@ -216,10 +218,18 @@ function isPressureTestScenarioDrill(drill: unknown): boolean {
 }
 
 export default function PressureTestSelectionPage() {
+  const router = useRouter();
+  const { data: me, isLoading: meLoading } = useUserCurrent();
   const { data: drillsData, isLoading } = useLearnerDrills();
   const [history, setHistory] = useState<PTHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"practice" | "history">("practice");
+
+  useEffect(() => {
+    if (!meLoading && me?.user?.isSubscribed === false) {
+      router.replace("/account/settings/subscriptions");
+    }
+  }, [meLoading, me, router]);
 
   // Read ?tab= from the URL after mount (avoids useSearchParams SSR issues)
   useEffect(() => {

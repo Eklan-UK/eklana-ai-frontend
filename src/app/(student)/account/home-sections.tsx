@@ -5,6 +5,7 @@ import { getUserFirstName } from "@/utils/user";
 import { getCurrentUser } from "./get-user";
 import { getAssignedDrills } from "./get-drills";
 import { getDrillStatus } from "@/utils/drill";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
 import { DrillCard } from "@/components/drills/DrillCard";
 import { HomeGreetingClient } from "./home-greeting-client";
 import {
@@ -20,11 +21,16 @@ export async function HomeGreetingHeader() {
 }
 
 export async function AssignedDrillsSection() {
-  const { drills } = await getAssignedDrills();
+  const [{ drills }, userData] = await Promise.all([
+    getAssignedDrills(),
+    getCurrentUser(),
+  ]);
+
+  const subscribed = isUserSubscribed(userData?.user);
 
   return (
     <div className="mb-6 md:mb-8">
-      <AssignedDrillsTitleRow />
+      <AssignedDrillsTitleRow isSubscribed={subscribed} />
 
       {drills.length === 0 ? (
         <Card className="text-center py-8">
@@ -61,6 +67,7 @@ export async function AssignedDrillsSection() {
                 status={getDrillStatus(drill)}
                 variant="detailed"
                 showStartButton={true}
+                locked={!subscribed}
               />
             );
           })}

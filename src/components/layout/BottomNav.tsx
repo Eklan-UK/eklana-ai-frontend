@@ -4,7 +4,9 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 
 const HOME_HREF = "/home";
 
@@ -45,6 +47,9 @@ const navDefs: NavDef[] = [
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+  // Default locked while loading to avoid flash of unlocked state.
+  const isSubscribed = !meLoading && me?.user?.isSubscribed === true;
 
   const navItems = useMemo(
     () =>
@@ -68,6 +73,60 @@ export const BottomNav: React.FC = () => {
             : pathname === item.href ||
               (item.href !== HOME_HREF && pathname?.startsWith(item.href));
 
+          const isMyPlan = item.nameKey === "myPlan";
+          const locked = isMyPlan && !isSubscribed;
+
+          const inner = (
+            <>
+              {isActive && !locked && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]" />
+              )}
+
+              <div
+                className={`w-6 h-6 flex items-center justify-center transition-all duration-200 relative ${
+                  isActive && !locked ? "scale-110" : ""
+                }`}
+              >
+                <Image
+                  src={isActive && !locked ? item.iconActive : item.iconInactive}
+                  alt={item.name}
+                  width={24}
+                  height={24}
+                  className={
+                    isActive && !locked
+                      ? "[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]"
+                      : "opacity-50"
+                  }
+                />
+                {locked && (
+                  <span className="absolute -top-1 -right-1 bg-orange-100 rounded-full p-0.5">
+                    <Lock className="w-2.5 h-2.5 text-orange-700" />
+                  </span>
+                )}
+              </div>
+
+              <span
+                className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
+                  isActive && !locked ? "text-[#3B883E]" : "text-muted-foreground"
+                }`}
+              >
+                {item.name}
+              </span>
+            </>
+          );
+
+          if (locked) {
+            return (
+              <div
+                key={item.href}
+                className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0 opacity-50 cursor-not-allowed"
+                aria-disabled="true"
+              >
+                {inner}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={item.href}
@@ -75,35 +134,7 @@ export const BottomNav: React.FC = () => {
               prefetch={true}
               className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0"
             >
-              {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]" />
-              )}
-
-              <div
-                className={`w-6 h-6 flex items-center justify-center transition-all duration-200 ${
-                  isActive ? "scale-110" : ""
-                }`}
-              >
-                <Image
-                  src={isActive ? item.iconActive : item.iconInactive}
-                  alt={item.name}
-                  width={24}
-                  height={24}
-                  className={
-                    isActive
-                      ? "[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]"
-                      : "opacity-50"
-                  }
-                />
-              </div>
-
-              <span
-                className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
-                  isActive ? "text-[#3B883E]" : "text-muted-foreground"
-                }`}
-              >
-                {item.name}
-              </span>
+              {inner}
             </Link>
           );
         })}

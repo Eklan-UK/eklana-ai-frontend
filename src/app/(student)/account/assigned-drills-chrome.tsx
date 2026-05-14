@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-export function AssignedDrillsTitleRow() {
+export function AssignedDrillsTitleRow({ isSubscribed = true }: { isSubscribed?: boolean }) {
   const t = useTranslations("account");
 
   return (
@@ -12,13 +12,20 @@ export function AssignedDrillsTitleRow() {
       <h3 className="text-lg md:text-xl font-bold text-foreground">
         {t("assignedDrills")}
       </h3>
-      <Link
-        href="/account/drills"
-        className="text-sm text-green-600 flex items-center gap-1"
-      >
-        {t("seeAll")}
-        <ChevronRight className="w-4 h-4" />
-      </Link>
+      {isSubscribed ? (
+        <Link
+          href="/account/drills"
+          className="text-sm text-green-600 flex items-center gap-1"
+        >
+          {t("seeAll")}
+          <ChevronRight className="w-4 h-4" />
+        </Link>
+      ) : (
+        <span className="text-sm text-muted-foreground flex items-center gap-1 opacity-50 cursor-not-allowed">
+          {t("seeAll")}
+          <Lock className="w-3.5 h-3.5" />
+        </span>
+      )}
     </div>
   );
 }

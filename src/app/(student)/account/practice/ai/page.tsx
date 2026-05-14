@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Clock, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLearnerDrills } from "@/hooks/useDrills";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { Header } from "@/components/layout/Header";
 
 /* ─── Free Topic definitions ──────────────────────────────────────────────── */
@@ -45,7 +46,14 @@ const FREE_TOPICS = [
 
 export default function FreeTalkSelectionPage() {
   const router = useRouter();
+  const { data: me, isLoading: meLoading } = useUserCurrent();
   const { data: drillsData, isLoading } = useLearnerDrills({ status: "completed" });
+
+  useEffect(() => {
+    if (!meLoading && me?.user?.isSubscribed === false) {
+      router.replace("/account/settings/subscriptions");
+    }
+  }, [meLoading, me, router]);
 
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [roleOptions, setRoleOptions] = useState<{ student: string; ai: string } | null>(null);

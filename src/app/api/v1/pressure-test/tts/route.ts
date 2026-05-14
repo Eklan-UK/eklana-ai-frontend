@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/middleware';
+import { withPremium } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
 
@@ -80,4 +80,4 @@ async function postHandler(
   }
 }
 
-export const POST = withAuth(postHandler);
+export const POST = withPremium(postHandler);

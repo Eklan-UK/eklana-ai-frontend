@@ -16,6 +16,7 @@ import {
   Clock3,
   AlertCircle,
   XCircle,
+  Lock,
 } from "lucide-react";
 import {
   getDrillIcon,
@@ -49,6 +50,7 @@ export interface DrillCardProps {
   showStartButton?: boolean;
   onStartClick?: (drillId: string, assignmentId?: string) => void;
   className?: string;
+  locked?: boolean;
 }
 
 // Review Status Badge Component
@@ -116,6 +118,7 @@ function DrillCardComponent({
   showStartButton = true,
   onStartClick,
   className = "",
+  locked = false,
 }: DrillCardProps) {
   // Memoize computed values to prevent recalculation on every render
   const typeInfo = useMemo(() => getDrillTypeInfo(drill.type), [drill.type]);
@@ -196,13 +199,25 @@ function DrillCardComponent({
                 </div>
               )}
               {showStartButton && (
-                <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
-                  {isUpcoming
-                    ? "View"
-                    : isCompleted
-                      ? "Review"
-                    : "Start"}
-                </Button>
+                locked ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled
+                    className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-2 sm:px-4 flex items-center gap-1"
+                  >
+                    <Lock className="w-3 h-3" />
+                    Pro
+                  </Button>
+                ) : (
+                  <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
+                    {isUpcoming
+                      ? "View"
+                      : isCompleted
+                        ? "Review"
+                      : "Start"}
+                  </Button>
+                )
               )}
             </div>
           </div>
@@ -299,7 +314,17 @@ function DrillCardComponent({
 
         {showStartButton && (
           <div className="flex-shrink-0">
-            {isUpcoming ? (
+            {locked ? (
+              <Button
+                variant="primary"
+                size="sm"
+                disabled
+                className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-3 sm:px-4 flex items-center gap-1.5"
+              >
+                <Lock className="w-3 h-3" />
+                Pro
+              </Button>
+            ) : isUpcoming ? (
               <Link href={`/account/drills/${drill._id}`}>
                 <Button
                   variant="primary"
@@ -317,7 +342,6 @@ function DrillCardComponent({
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // If onStartClick is provided and drill is not completed, use it
                     if (onStartClick && !isCompleted) {
                       e.preventDefault();
                       onStartClick(drill._id, assignmentId);
