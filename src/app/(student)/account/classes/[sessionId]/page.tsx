@@ -3,6 +3,8 @@ import { LearnerSessionClient } from "./learner-session-client";
 import { getCurrentUser } from "@/app/(student)/account/get-user";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "Class session | Eklan",
 };

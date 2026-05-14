@@ -5,6 +5,8 @@ import { getServerPublicBaseUrl } from "@/lib/public-base-url.server";
 import { getCurrentUser } from "@/app/(student)/account/get-user";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
 
+export const dynamic = 'force-dynamic';
+
 async function getDrill(drillId: string, assignmentId?: string) {
   try {
     // Validate drill ID format (MongoDB ObjectId)
