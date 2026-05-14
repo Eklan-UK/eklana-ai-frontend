@@ -5,6 +5,8 @@ import { getAuth } from './better-auth';
 import { logger } from './logger';
 import { fromNodeHeaders } from 'better-auth/node';
 import { connectToDatabase } from './db';
+import { isUserSubscribed } from './user-subscription';
+import User from '@/models/user';
 
 // Extend NextRequest to include user info
 export interface AuthenticatedRequest extends NextRequest {
@@ -318,6 +320,26 @@ export const withAuth = <T = any>(
 		}
 		return handler(req, { ...context, ...authResult });
 	};
+};
+
+// Helper to create subscription-gated API handler (requires active premium plan)
+export const withPremium = <T = any>(
+	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+) => {
+	return withAuth<T>(async (req, context) => {
+		await connectToDatabase();
+		const user = await User.findById(context.userId).select('subscriptionPlan subscriptionExpiresAt').lean().exec();
+		if (!user || !isUserSubscribed(user as any)) {
+			return NextResponse.json(
+				{
+					code: 'SubscriptionRequired',
+					message: 'A Pro subscription is required to access this feature.',
+				},
+				{ status: 402 }
+			);
+		}
+		return handler(req, context);
+	});
 };
 
 // Helper to create role-protected API handler

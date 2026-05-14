@@ -1,7 +1,7 @@
 // POST /api/v1/ai/conversation
 // Handle AI conversation
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/middleware';
+import { withPremium } from '@/lib/api/middleware';
 import { generateConversationResponse } from '@/services/gemini.service';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
@@ -85,5 +85,5 @@ async function handler(
 	}
 }
 
-export const POST = withAuth(handler);
+export const POST = withPremium(handler);
 

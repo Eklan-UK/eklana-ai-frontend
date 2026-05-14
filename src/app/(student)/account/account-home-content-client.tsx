@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
-import { ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronRight, CalendarDays, Lock } from "lucide-react";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 
 export function AccountHomeContentClient({
   children,
@@ -11,21 +12,36 @@ export function AccountHomeContentClient({
   children: React.ReactNode;
 }) {
   const t = useTranslations("account");
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+  const isSubscribed = !meLoading && me?.user?.isSubscribed === true;
 
   return (
     <>
       <div className="mb-4 md:mb-6">
-        <Link href="/account/classes">
+        {isSubscribed ? (
+          <Link href="/account/classes">
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              className="border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
+              {t("viewSessions")}
+            </Button>
+          </Link>
+        ) : (
           <Button
             variant="outline"
             size="lg"
             fullWidth
-            className="border-primary/30 text-primary hover:bg-primary/10"
+            disabled
+            className="border-border text-muted-foreground opacity-50 cursor-not-allowed"
           >
-            <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
+            <Lock className="mr-2 h-4 w-4 shrink-0" />
             {t("viewSessions")}
           </Button>
-        </Link>
+        )}
       </div>
 
       <div className="mb-4 md:mb-6">

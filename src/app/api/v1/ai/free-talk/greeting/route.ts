@@ -2,7 +2,7 @@
 // Picks the next ICU scenario, streams the situation text + audio, and ends
 // with a metadata chunk containing scenarioTitle, hint, and usefulPhrases.
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/middleware';
+import { withPremium } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
 import { generateFreeTalkGreetingStream } from '@/services/gemini.service';
 import { connectToDatabase } from '@/lib/api/db';
@@ -45,6 +45,6 @@ async function handler(
 	}
 }
 
-export const GET = withAuth(handler);
+export const GET = withPremium(handler);
 
 export const maxDuration = 300;

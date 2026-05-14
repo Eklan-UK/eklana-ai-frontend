@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { withAuth } from "@/lib/api/middleware";
+import { withPremium } from "@/lib/api/middleware";
 import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
 import { connectToDatabase } from "@/lib/api/db";
@@ -256,4 +256,4 @@ async function handler(
   }
 }
 
-export const POST = withAuth(handler);
+export const POST = withPremium(handler);

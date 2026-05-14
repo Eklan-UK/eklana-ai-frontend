@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { Types } from "mongoose";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { withAuth } from "@/lib/api/middleware";
+import { withPremium } from "@/lib/api/middleware";
 import { logger } from "@/lib/api/logger";
 import config from "@/lib/api/config";
 import { speechaceService } from "@/lib/api/speechace.service";
@@ -388,5 +388,5 @@ async function handler(
   }
 }
 
-export const POST = withAuth(handler);
+export const POST = withPremium(handler);
 export const maxDuration = 300;

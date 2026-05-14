@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "stripe-best-practices": {
+      "source": "stripe/ai",
+      "sourceType": "github",
+      "skillPath": "skills/stripe-best-practices/SKILL.md",
+      "computedHash": "4cedb294535650bd178718515c248d837325c4093d09b722bd748fc61834af69"
+    },
+    "stripe-subscriptions": {
+      "source": "andrelandgraf/fullstackrecipes",
+      "sourceType": "github",
+      "skillPath": "skills/stripe-subscriptions/SKILL.md",
+      "computedHash": "ddd1564590525a24abe030b7a55dd4081a07a99cadaea3b10b913b45bfa0ab74"
+    },
+    "stripe-webhooks": {
+      "source": "hookdeck/webhook-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stripe-webhooks/SKILL.md",
+      "computedHash": "28364a156bccebbf226280056334fdffd76a2c688d7a6d041aaf2c9fa9f61d82"
+    }
+  }
+}

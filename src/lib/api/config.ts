@@ -112,6 +112,10 @@ export const config = {
 		process.env.GEMINI_TTS_MODEL_PRIMARY?.trim() || 'gemini-2.5-flash-preview-tts',
 	GEMINI_TTS_MODEL_FALLBACK:
 		process.env.GEMINI_TTS_MODEL_FALLBACK?.trim() || 'gemini-3.1-flash-tts-preview',
+	// Stripe
+	STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+	STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+	STRIPE_PREMIUM_MONTHLY_PRICE_ID: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||
