@@ -1,7 +1,7 @@
 /**
- * Permanently remove known demo/test users and related MongoDB documents.
+ * Permanently remove user(s) matching firstName + lastName and related MongoDB documents.
  *
- * Matches users by case-insensitive firstName + lastName (exact pair).
+ * Matches users by case-insensitive firstName + lastName (exact pair from NAME_PAIRS).
  * Skips emails in DELETE_TEST_USERS_PROTECT_EMAILS (default: vandulinus@gmail.com).
  * Skips role "admin" unless --include-admin is passed.
  *
@@ -41,14 +41,9 @@ import Tutor from "../src/models/tutor";
 import LearnerConfidence from "../src/models/learner-confidence";
 import PronunciationAssignment from "../src/models/pronunciation-assignment";
 
+/** Only these firstName + lastName pairs are matched (case-insensitive). */
 const NAME_PAIRS: ReadonlyArray<readonly [string, string]> = [
-	["John", "Apple"],
-	["John", "Doe"],
-	["Test", "User"],
-	["Apple", "John"],
-	["Su", "Doer"],
-	["Linus", "Vandu"],
-	["Linus", "Daniel"],
+	["Abdullahi", "Suleiman"],
 ];
 
 const DRY_RUN = process.argv.includes("--dry-run");

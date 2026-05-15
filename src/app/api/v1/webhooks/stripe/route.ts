@@ -51,12 +51,33 @@ async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
   stripe: Stripe
 ): Promise<void> {
-  if (session.mode !== 'subscription' || !session.customer || !session.subscription) {
+  if (session.mode !== 'subscription' || !session.customer) {
     return;
   }
 
   const customerId = String(session.customer);
-  const subscriptionId = String(session.subscription);
+  // Prefer subscription id on the session; if missing (rare), resolve from Stripe.
+  let subscriptionId: string | null = session.subscription
+    ? String(session.subscription)
+    : null;
+  if (!subscriptionId) {
+    const subs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+      limit: 10,
+    });
+    const pick = subs.data.find((s) =>
+      ['active', 'trialing', 'past_due'].includes(s.status)
+    );
+    subscriptionId = pick?.id ?? null;
+  }
+  if (!subscriptionId) {
+    logger.warn(
+      '[Stripe Webhook] checkout.session.completed — could not resolve subscription',
+      { customerId, sessionId: session.id }
+    );
+    return;
+  }
 
   // Expand items.data so current_period_end is available on each item (required in dahlia API).
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
@@ -156,10 +177,32 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
   });
 }
 
+/** Subscription invoices in Dahlia often use parent.subscription_details; older payloads may use billing_reason or line.subscription. */
+function invoiceIsForSubscription(invoice: Stripe.Invoice): boolean {
+  if (invoice.parent?.type === 'subscription_details') return true;
+  const inv = invoice as Stripe.Invoice & {
+    billing_reason?: string | null;
+    subscription?: string | Stripe.Subscription | null;
+  };
+  if (inv.subscription) return true;
+  const br = inv.billing_reason;
+  if (
+    br === 'subscription_create' ||
+    br === 'subscription_cycle' ||
+    br === 'subscription_update'
+  ) {
+    return true;
+  }
+  for (const line of invoice.lines?.data ?? []) {
+    const sub = (line as Stripe.InvoiceLineItem & { subscription?: string | null })
+      .subscription;
+    if (sub) return true;
+  }
+  return false;
+}
+
 async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
-  // In Stripe API 2026-04-22 (dahlia) invoice.subscription was removed;
-  // subscription invoices are identified by invoice.parent.type === 'subscription_details'.
-  if (!invoice.customer || invoice.parent?.type !== 'subscription_details') return;
+  if (!invoice.customer || !invoiceIsForSubscription(invoice)) return;
 
   const customerId = String(invoice.customer);
   const periodEnd = invoice.lines?.data?.[0]?.period?.end
@@ -230,8 +273,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const stripe = getStripe();
     event = stripe.webhooks.constructEvent(rawBody, signature, config.STRIPE_WEBHOOK_SECRET);
-  } catch (err: any) {
-    logger.warn('[Stripe Webhook] Signature verification failed', { error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('[Stripe Webhook] Signature verification failed', { error: message });
     return NextResponse.json(
       { code: 'Unauthorized', message: 'Webhook signature verification failed.' },
       { status: 400 }
@@ -268,11 +312,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       default:
         logger.info('[Stripe Webhook] Unhandled event type', { type: event.type });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const e = err instanceof Error ? err : new Error(String(err));
     logger.error('[Stripe Webhook] Error processing event', {
       type: event.type,
-      error: err.message,
-      stack: err.stack,
+      error: e.message,
+      stack: e.stack,
     });
     // Return 500 so Stripe retries the event.
     return NextResponse.json({ code: 'ServerError' }, { status: 500 });
