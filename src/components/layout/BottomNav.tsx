@@ -7,6 +7,7 @@ import Image from "next/image";
 import { Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 const HOME_HREF = "/home";
 
@@ -117,13 +118,13 @@ export const BottomNav: React.FC = () => {
 
           if (locked) {
             return (
-              <div
+              <ProLockHoverWrap
                 key={item.href}
                 className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0 opacity-50 cursor-not-allowed"
-                aria-disabled="true"
+                placement="top"
               >
                 {inner}
-              </div>
+              </ProLockHoverWrap>
             );
           }
 

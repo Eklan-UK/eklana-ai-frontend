@@ -4,6 +4,10 @@
 // POST /api/v1/webhooks/stripe
 // Receives signed Stripe webhook events and syncs subscription state to MongoDB.
 // IMPORTANT: Next.js App Router — must read raw body via req.text() before any parsing.
+
+// force-dynamic so Next.js never statically pre-renders this route
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { connectToDatabase } from '@/lib/api/db';
@@ -54,8 +58,13 @@ async function handleCheckoutSessionCompleted(
   const customerId = String(session.customer);
   const subscriptionId = String(session.subscription);
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const periodEnd = getSubscriptionPeriodEnd(subscription);
+  // Expand items.data so current_period_end is available on each item (required in dahlia API).
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ['items.data'],
+  });
+  // Fall back to 31 days from now if Stripe doesn't return a period end (e.g. free trials).
+  const periodEnd = getSubscriptionPeriodEnd(subscription)
+    ?? new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);
   const status = subscription.status;
 
   await connectToDatabase();
@@ -80,10 +89,15 @@ async function handleCheckoutSessionCompleted(
   });
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<void> {
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stripe: Stripe): Promise<void> {
   const customerId = String(subscription.customer);
-  const periodEnd = getSubscriptionPeriodEnd(subscription);
-  const status = subscription.status;
+
+  // Re-retrieve with expanded items to ensure current_period_end is available.
+  const expandedSub = await stripe.subscriptions.retrieve(subscription.id, {
+    expand: ['items.data'],
+  });
+  const periodEnd = getSubscriptionPeriodEnd(expandedSub);
+  const status = expandedSub.status;
 
   await connectToDatabase();
   const user = await findUserByCustomer(customerId);
@@ -236,7 +250,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         break;
 
       case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, stripe);
         break;
 
       case 'customer.subscription.deleted':

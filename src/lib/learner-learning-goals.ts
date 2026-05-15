@@ -48,6 +48,10 @@ export const CURRENT_PLAN_CARD_MESSAGE_PRO =
 export const CURRENT_PLAN_CARD_MESSAGE_FREE =
   "Upgrade to Pro to unlock Eklan Free Talk, Pressure Test, and all AI features.";
 
+/** Native title + hover tooltip for UI locked behind a Pro subscription. */
+export const PRO_FEATURE_LOCK_HOVER_MESSAGE =
+  "Upgrade to Pro to use this feature.";
+
 /** @deprecated Use CURRENT_PLAN_CARD_MESSAGE_PRO / CURRENT_PLAN_CARD_MESSAGE_FREE. */
 export const CURRENT_PLAN_CARD_MESSAGE = CURRENT_PLAN_CARD_MESSAGE_PRO;
 

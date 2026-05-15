@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { ChevronRight, CalendarDays, Lock } from "lucide-react";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 export function AccountHomeContentClient({
   children,
@@ -31,16 +32,18 @@ export function AccountHomeContentClient({
             </Button>
           </Link>
         ) : (
-          <Button
-            variant="outline"
-            size="lg"
-            fullWidth
-            disabled
-            className="border-border text-muted-foreground opacity-50 cursor-not-allowed"
-          >
-            <Lock className="mr-2 h-4 w-4 shrink-0" />
-            {t("viewSessions")}
-          </Button>
+          <ProLockHoverWrap className="block" placement="top">
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              disabled
+              className="border-border text-muted-foreground opacity-50 cursor-not-allowed"
+            >
+              <Lock className="mr-2 h-4 w-4 shrink-0" />
+              {t("viewSessions")}
+            </Button>
+          </ProLockHoverWrap>
         )}
       </div>
 
