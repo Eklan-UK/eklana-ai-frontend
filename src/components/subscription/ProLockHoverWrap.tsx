@@ -1,63 +1,63 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { createPortal } from "react-dom";
 import { PRO_FEATURE_LOCK_HOVER_MESSAGE } from "@/lib/learner-learning-goals";
+import { useFollowCursorUpgradeTip } from "@/hooks/useFollowCursorUpgradeTip";
 
 type Placement = "top" | "bottom";
-
-/** Outer anchor: positions the hover bridge + panel without a gap that drops hover. */
-const placementClass: Record<Placement, string> = {
-  top: "bottom-full left-1/2 flex flex-col items-center pb-1.5 -translate-x-1/2",
-  bottom: "top-full left-1/2 flex flex-col items-center pt-1.5 -translate-x-1/2",
-};
 
 const DEFAULT_SUBSCRIPTION_HREF = "/account/settings/subscriptions";
 
 /**
- * Wraps Pro-locked UI: native title + visible tooltip on hover / focus-within,
- * with a CTA link to the subscription page.
+ * Wraps Pro-locked UI: upgrade copy follows the pointer (fixed portal).
+ * Use {@link ProLockedCtaSwap} on the real control for the "Click me" CTA —
+ * this wrapper no longer renders an inner link in the tooltip.
  */
 export function ProLockHoverWrap({
   children,
   className = "",
-  placement = "top",
-  subscriptionHref = DEFAULT_SUBSCRIPTION_HREF,
+  placement: _placement = "top",
+  subscriptionHref: _subscriptionHref = DEFAULT_SUBSCRIPTION_HREF,
 }: {
   children: ReactNode;
   className?: string;
+  /** @deprecated Kept for API compatibility; cursor tip is not placement-anchored. */
   placement?: Placement;
-  /** Where the upgrade CTA navigates (default: student subscriptions settings). */
+  /** @deprecated Kept for API compatibility; CTA lives on ProLockedCtaSwap. */
   subscriptionHref?: string;
 }) {
+  const { ref, tip } = useFollowCursorUpgradeTip();
+
   return (
     <div
-      className={`group relative ${className}`}
+      ref={ref}
+      className={`relative ${className}`}
       title={PRO_FEATURE_LOCK_HOVER_MESSAGE}
       aria-label={PRO_FEATURE_LOCK_HOVER_MESSAGE}
-      tabIndex={0}
+      tabIndex={-1}
     >
       {children}
-      <div
-        className={`pointer-events-none absolute ${placementClass[placement]} z-[60] opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100`}
-      >
-        <div
-          role="tooltip"
-          className="w-max max-w-[min(260px,calc(100vw-1.5rem))] rounded-lg border border-border bg-card px-2.5 py-2 text-center shadow-lg sm:px-3"
-        >
-          <p className="text-xs font-medium font-satoshi leading-snug text-foreground">
-            {PRO_FEATURE_LOCK_HOVER_MESSAGE}
-          </p>
-          <Link
-            href={subscriptionHref}
-            aria-label="Open subscription and upgrade to Pro"
-            className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold font-nunito text-white shadow-sm transition-colors hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            onClick={(e) => e.stopPropagation()}
+
+      {tip.visible &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="tooltip"
+            aria-live="polite"
+            style={{
+              position: "fixed",
+              left: tip.x,
+              top: tip.y,
+              zIndex: 9999,
+              pointerEvents: "none",
+            }}
+            className="max-w-[min(260px,calc(100vw-1.5rem))] rounded-lg border border-border bg-card px-3 py-1.5 shadow-lg text-xs font-medium font-satoshi leading-snug text-foreground"
           >
-            click me
-          </Link>
-        </div>
-      </div>
+            {PRO_FEATURE_LOCK_HOVER_MESSAGE}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

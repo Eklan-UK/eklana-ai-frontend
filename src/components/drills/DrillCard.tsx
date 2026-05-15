@@ -15,7 +15,6 @@ import {
   CheckCircle,
   Clock3,
   AlertCircle,
-  XCircle,
   Lock,
 } from "lucide-react";
 import {
@@ -27,6 +26,7 @@ import {
 import { getStatusBadge } from "@/utils/drill-ui";
 import { usePrefetchDrill } from "@/hooks/useDrills";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
+import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
 export interface DrillCardProps {
   drill: any;
@@ -179,7 +179,7 @@ function DrillCardComponent({
       <Card
         className={`${typeInfo.borderColor} ${
           locked
-            ? "cursor-not-allowed opacity-80"
+            ? "cursor-default"
             : "hover:shadow-md transition-shadow cursor-pointer"
         } ${className}`}
         onMouseEnter={locked ? undefined : handleMouseEnter}
@@ -201,15 +201,20 @@ function DrillCardComponent({
             )}
             {showStartButton && (
               locked ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled
-                  className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-2 sm:px-4 flex items-center gap-1"
-                >
-                  <Lock className="w-3 h-3" />
-                  Pro
-                </Button>
+                <ProLockHoverWrap className="inline-flex">
+                  <ProLockedCtaSwap density="default">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      tabIndex={-1}
+                      type="button"
+                      className="bg-muted text-muted-foreground cursor-default text-xs sm:text-sm px-2 sm:px-4 flex items-center gap-1 pointer-events-none"
+                    >
+                      <Lock className="w-3 h-3" />
+                      Pro
+                    </Button>
+                  </ProLockedCtaSwap>
+                </ProLockHoverWrap>
               ) : (
                 <Button variant="primary" size="sm" disabled={isUpcoming} className="text-xs sm:text-sm px-2 sm:px-4">
                   {isUpcoming
@@ -226,11 +231,7 @@ function DrillCardComponent({
     );
 
     if (locked) {
-      return (
-        <ProLockHoverWrap className="block" placement="top">
-          {cardBody}
-        </ProLockHoverWrap>
-      );
+      return cardBody;
     }
 
     return (
@@ -248,7 +249,7 @@ function DrillCardComponent({
     <Card
       key={assignmentId || drill._id}
       className={`p-3 sm:p-4 transition-shadow ${className} ${
-        locked ? "cursor-not-allowed opacity-90" : "hover:shadow-md"
+        locked ? "cursor-default" : "hover:shadow-md"
       }`}
       onMouseEnter={locked ? undefined : handleMouseEnter}
     >
@@ -335,15 +336,20 @@ function DrillCardComponent({
         {showStartButton && (
           <div className="flex-shrink-0">
             {locked ? (
-              <Button
-                variant="primary"
-                size="sm"
-                disabled
-                className="bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm px-3 sm:px-4 flex items-center gap-1.5"
-              >
-                <Lock className="w-3 h-3" />
-                Pro
-              </Button>
+              <ProLockHoverWrap className="inline-flex">
+                <ProLockedCtaSwap density="default">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    tabIndex={-1}
+                    type="button"
+                    className="bg-muted text-muted-foreground cursor-default text-xs sm:text-sm px-3 sm:px-4 flex items-center gap-1.5 pointer-events-none"
+                  >
+                    <Lock className="w-3 h-3" />
+                    Pro
+                  </Button>
+                </ProLockedCtaSwap>
+              </ProLockHoverWrap>
             ) : isUpcoming ? (
               <Link href={`/account/drills/${drill._id}`}>
                 <Button
@@ -378,14 +384,6 @@ function DrillCardComponent({
       </div>
     </Card>
   );
-
-  if (locked) {
-    return (
-      <ProLockHoverWrap className="block" placement="top">
-        {detailedCard}
-      </ProLockHoverWrap>
-    );
-  }
 
   return detailedCard;
 }

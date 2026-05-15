@@ -5,6 +5,23 @@ import { useRouter, usePathname } from "next/navigation";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 
 /**
+ * `usePathname()` follows the URL bar. Short aliases are rewritten (next.config)
+ * but the browser still shows `/home`, `/practice`, etc. — normalize before allowlist checks.
+ */
+function subscriptionGuardPathname(pathname: string | null): string {
+  if (!pathname) return "";
+  if (pathname === "/home") return "/account";
+  if (pathname.startsWith("/home/")) {
+    return `/account${pathname.slice("/home".length)}`;
+  }
+  if (pathname === "/practice") return "/account/practice";
+  if (pathname.startsWith("/practice/")) {
+    return `/account/practice${pathname.slice("/practice".length)}`;
+  }
+  return pathname;
+}
+
+/**
  * Paths that are always accessible regardless of subscription status.
  * All other /account/* routes require an active Pro subscription.
  */
@@ -21,6 +38,7 @@ const SUBSCRIPTION_FREE_ROUTES = [
   "/account/profile",
   "/account/payment",
   "/account/faq",
+  "/account/practice", // practice hub + sub-routes (free tier sees locked cards)
   "/account",  // home dashboard (shows upsell)
 ];
 
@@ -38,13 +56,15 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     if (!me?.user) return;
 
+    const path = subscriptionGuardPathname(pathname);
+
     // Allow routes that should be accessible on any plan
     const isFreeRoute = SUBSCRIPTION_FREE_ROUTES.some(
       (route) =>
-        pathname === route ||
+        path === route ||
         // Exact match for "/account" but allow sub-paths via startsWith for
         // routes that have their own deeper pages (e.g. /account/settings/*)
-        (route !== "/account" && pathname?.startsWith(route))
+        (route !== "/account" && path.startsWith(route))
     );
     if (isFreeRoute) return;
 

@@ -10,6 +10,7 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 const HOME_HREF = "/home";
+const PRACTICE_HREF = "/practice";
 
 type NavDef = {
   nameKey: "home" | "practice" | "myPlan" | "profile";
@@ -27,7 +28,7 @@ const navDefs: NavDef[] = [
   },
   {
     nameKey: "practice",
-    href: "/account/practice",
+    href: PRACTICE_HREF,
     iconActive: "/icons/practice.svg",
     iconInactive: "/icons/practice-grey.svg",
   },
@@ -69,10 +70,18 @@ export const BottomNav: React.FC = () => {
       <div className="max-w-md mx-auto px-1 py-1 grid grid-cols-4 items-center gap-0">
         {navItems.map((item) => {
           const isHomeTab = item.href === HOME_HREF;
+          const isPracticeTab = item.href === PRACTICE_HREF;
           const isActive = isHomeTab
             ? pathname === "/home" || pathname === "/account"
-            : pathname === item.href ||
-              (item.href !== HOME_HREF && pathname?.startsWith(item.href));
+            : isPracticeTab
+              ? pathname === "/practice" ||
+                pathname.startsWith("/practice/") ||
+                pathname === "/account/practice" ||
+                pathname.startsWith("/account/practice/")
+              : pathname === item.href ||
+                (item.href !== HOME_HREF &&
+                  item.href !== PRACTICE_HREF &&
+                  pathname?.startsWith(item.href));
 
           const isMyPlan = item.nameKey === "myPlan";
           const locked = isMyPlan && !isSubscribed;
@@ -118,13 +127,17 @@ export const BottomNav: React.FC = () => {
 
           if (locked) {
             return (
-              <ProLockHoverWrap
+              <Link
                 key={item.href}
-                className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0 opacity-50 cursor-not-allowed"
-                placement="top"
+                href="/account/settings/subscriptions"
+                prefetch={true}
+                aria-label="Upgrade to Pro — open subscriptions"
+                className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0 opacity-50"
               >
-                {inner}
-              </ProLockHoverWrap>
+                <ProLockHoverWrap className="flex flex-col items-center gap-0.5 w-full">
+                  {inner}
+                </ProLockHoverWrap>
+              </Link>
             );
           }
 
