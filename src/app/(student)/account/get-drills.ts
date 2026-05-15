@@ -1,81 +1,74 @@
 // Server-side function to get drills assigned to current user via DrillAssignment
-import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
+import { Types } from 'mongoose';
+import { getServerSession } from '@/lib/api/session';
+import {
+  getLearnerMyDrillsPayload,
+  type LearnerMyDrillRow,
+} from '@/lib/server/learner-my-drills.server';
+
+function normalizeLearnerRole(role: string | undefined): 'user' | null {
+  if (!role) return null;
+  if (role === 'learner' || role === 'user') return 'user';
+  return null;
+}
+
+function isPopulatedDrill(
+  drill: unknown
+): drill is Record<string, unknown> & { _id?: unknown; title?: string } {
+  if (!drill || typeof drill !== 'object') return false;
+  const d = drill as Record<string, unknown>;
+  return d._id !== undefined || typeof d.title === 'string';
+}
 
 export async function getAssignedDrills() {
   try {
-    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
-    const cookieStore = await cookies();
-    const cookieHeader = cookieStore.toString();
-
-    // Use the learner drills endpoint which returns drills from DrillAssignment records
-    const response = await fetch(`${origin}/api/v1/drills/learner/my-drills?limit=50`, {
-      credentials: 'include',
-      headers: {
-        Cookie: cookieHeader,
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
+    const { user } = await getServerSession();
+    if (!user?.id || normalizeLearnerRole(user.role) !== 'user') {
       return { drills: [], total: 0 };
     }
 
-    const data = await response.json();
-    
-    // Extract drills from the response structure
-    // The API returns: { code, message, data: { drills: [...], pagination: {...} } }
-    const drills = data.data?.drills || data.drills || [];
-    
-    // Debug logging (remove in production)
-    if (drills.length === 0) {
-      console.log('No drills found in response:', { 
-        hasData: !!data.data, 
-        hasDrills: !!data.drills,
-        responseKeys: Object.keys(data),
-        dataStructure: data 
-      });
+    let userId: Types.ObjectId;
+    try {
+      userId = new Types.ObjectId(user.id);
+    } catch {
+      return { drills: [], total: 0 };
     }
-    
-    // Map to the format expected by the page
-    // Each drill item has: { assignmentId, drill, assignedBy, assignedAt, dueDate, status, completedAt, latestAttempt }
-    const mappedDrills = drills.map((item: any) => {
-      // Ensure we have the drill object - the API returns { assignmentId, drill, ... }
-      const drill = item.drill || item;
-      
-      // If drill is null or undefined, skip this item
-      if (!drill) {
+
+    const { drills, pagination } = await getLearnerMyDrillsPayload(userId, {
+      limit: 50,
+      offset: 0,
+    });
+
+    const mappedDrills = drills.flatMap((item: LearnerMyDrillRow) => {
+      const drill = item.drill;
+
+      if (!isPopulatedDrill(drill)) {
         console.warn('Skipping item with no drill:', item);
-        return null;
+        return [];
       }
-      
-      // Handle case where drill might be an ObjectId string instead of populated object
-      if (typeof drill === 'string' || (drill && !drill._id && !drill.title)) {
-        console.warn('Drill is not properly populated:', drill);
-        return null;
-      }
-      
-      return {
-        ...drill,
-        assignmentId: item.assignmentId || item._id,
-        assignedBy: item.assignedBy,
-        assignedAt: item.assignedAt,
-        dueDate: item.dueDate,
-        assignmentStatus: item.status,
-        completedAt: item.completedAt,
-        latestAttempt: item.latestAttempt,
-      };
-    }).filter((drill: any) => drill !== null); // Remove any null entries
+
+      return [
+        {
+          ...drill,
+          assignmentId: item.assignmentId,
+          assignedBy: item.assignedBy,
+          assignedAt: item.assignedAt,
+          dueDate: item.dueDate,
+          assignmentStatus: item.status,
+          completedAt: item.completedAt,
+          latestAttempt: item.latestAttempt,
+        },
+      ];
+    });
 
     console.log(`Mapped ${mappedDrills.length} drills from ${drills.length} items`);
 
     return {
       drills: mappedDrills,
-      total: data.data?.pagination?.total || data.total || mappedDrills.length,
+      total: pagination.total,
     };
   } catch (error) {
     console.error('Failed to fetch assigned drills:', error);
     return { drills: [], total: 0 };
   }
 }
-
