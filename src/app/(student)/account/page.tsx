@@ -8,14 +8,9 @@ import { HomeConfidenceCard } from "@/components/confidence/HomeConfidenceCard";
 import { HomePronunciationCard } from "@/components/pronunciation/HomePronunciationCard";
 import { HomeAccurateSentenceCard } from "@/components/progress/HomeAccurateSentenceCard";
 import { HomeResponseSpeedCard } from "@/components/progress/HomeResponseSpeedCard";
-import {
-  HomeHeaderSkeleton,
-  AssignedDrillsSkeleton,
-} from "@/components/ui/HomeSkeleton";
-import {
-  HomeGreetingHeader,
-  AssignedDrillsSection,
-} from "./home-sections";
+import { HomeHeaderSkeleton } from "@/components/ui/HomeSkeleton";
+import { HomeGreetingHeader } from "./home-sections";
+import { AssignedDrillsSectionClient } from "./assigned-drills-section-client";
 import { AccountHomeContentClient } from "./account-home-content-client";
 
 // Revalidate every 30 seconds (ISR)
@@ -49,9 +44,7 @@ export default async function HomePage() {
           <HomeResponseSpeedCard />
         </AccountHomeContentClient>
 
-        <Suspense fallback={<AssignedDrillsSkeleton />}>
-          <AssignedDrillsSection />
-        </Suspense>
+        <AssignedDrillsSectionClient />
       </div>
 
       <BottomNav />
