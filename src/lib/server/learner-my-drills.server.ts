@@ -65,7 +65,9 @@ export async function getLearnerMyDrillsPayload(
   );
   const attemptMap = await attemptRepo.getLatestAttemptsForAssignments(assignmentIds);
 
-  const drills = (result.assignments as PopulatedLearnerAssignment[]).map((assignment) => {
+  // Repository types drillId as ObjectId; lean+populate returns a drill subdocument at runtime.
+  const populated = result.assignments as unknown as PopulatedLearnerAssignment[];
+  const drills = populated.map((assignment) => {
     const attemptData = attemptMap.get(assignment._id.toString());
     return {
       assignmentId: assignment._id,
