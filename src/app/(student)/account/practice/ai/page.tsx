@@ -50,7 +50,7 @@ export default function FreeTalkSelectionPage() {
   const { data: drillsData, isLoading } = useLearnerDrills({ status: "completed" });
 
   useEffect(() => {
-    if (!meLoading && me?.user?.isSubscribed === false) {
+    if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
       router.replace("/account/settings/subscriptions");
     }
   }, [meLoading, me, router]);

@@ -157,27 +157,44 @@ export const getAuth = async () => {
         user: {
           create: {
             after: async (user: any) => {
-              // Belt-and-suspenders: ensure role is always set to 'user' for new signups.
               // Better Auth's MongoDB adapter bypasses Mongoose schema defaults, so
-              // we patch the document here if role is somehow still missing.
-              if (!user.role) {
-                try {
-                  await connectToDatabase();
-                  const UserModel = (await import("@/models/user")).default;
-                  await UserModel.updateOne(
-                    { _id: user.id },
-                    { $set: { role: "user" } }
-                  );
-                  logger.info("databaseHook: set default role for new user", {
+              // we always patch missing fields here after every new-user insert.
+              try {
+                await connectToDatabase();
+                const UserModel = (await import("@/models/user")).default;
+
+                const patch: Record<string, unknown> = {};
+
+                // Ensure role is always set (legacy guard, kept in place)
+                if (!user.role) {
+                  patch.role = "user";
+                }
+
+                // Always persist subscription fields so isUserSubscribed() can
+                // reason correctly without relying on absent-field semantics.
+                if (!user.subscriptionPlan) {
+                  patch.subscriptionPlan = "free";
+                }
+                if (user.subscriptionActivatedAt === undefined) {
+                  patch.subscriptionActivatedAt = null;
+                }
+                if (user.subscriptionExpiresAt === undefined) {
+                  patch.subscriptionExpiresAt = null;
+                }
+
+                if (Object.keys(patch).length > 0) {
+                  await UserModel.updateOne({ _id: user.id }, { $set: patch });
+                  logger.info("databaseHook: set defaults for new user", {
                     userId: user.id,
                     email: user.email,
-                  });
-                } catch (err: any) {
-                  logger.error("databaseHook: failed to set default role", {
-                    error: err.message,
-                    userId: user.id,
+                    patch,
                   });
                 }
+              } catch (err: any) {
+                logger.error("databaseHook: failed to set defaults for new user", {
+                  error: err.message,
+                  userId: user.id,
+                });
               }
             },
           },

@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
+import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
 function PracticeCard({
   href,
@@ -69,7 +70,14 @@ function PracticeCard({
         </div>
       </div>
       {locked ? (
-        <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+        <ProLockedCtaSwap density="compact">
+          <span
+            className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground pointer-events-none flex-shrink-0"
+            aria-hidden
+          >
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+          </span>
+        </ProLockedCtaSwap>
       ) : (
         <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
       )}
@@ -78,7 +86,7 @@ function PracticeCard({
 
   if (locked) {
     return (
-      <ProLockHoverWrap className="block" placement="top">
+      <ProLockHoverWrap className="block">
         <div aria-disabled="true">{inner}</div>
       </ProLockHoverWrap>
     );

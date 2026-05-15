@@ -226,7 +226,7 @@ export default function PressureTestSelectionPage() {
   const [activeTab, setActiveTab] = useState<"practice" | "history">("practice");
 
   useEffect(() => {
-    if (!meLoading && me?.user?.isSubscribed === false) {
+    if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
       router.replace("/account/settings/subscriptions");
     }
   }, [meLoading, me, router]);

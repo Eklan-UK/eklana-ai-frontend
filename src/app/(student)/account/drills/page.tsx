@@ -38,7 +38,7 @@ export default function DrillsPage() {
   const { data: me, isLoading: meLoading } = useUserCurrent();
 
   useEffect(() => {
-    if (!meLoading && me?.user?.isSubscribed === false) {
+    if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
       router.replace("/account/settings/subscriptions");
     }
   }, [meLoading, me, router]);

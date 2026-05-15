@@ -8,6 +8,10 @@ import { ArrowLeftIcon } from 'lucide-react';
 interface HeaderProps {
   title?: string;
   showBack?: boolean;
+  /** When set, the back control navigates here instead of `router.back()` (avoids loops when the previous entry re-redirects, e.g. SubscriptionGuard). */
+  backHref?: string;
+  /** If true (default when `backHref` is set), use `router.replace`; otherwise `router.push`. */
+  backReplace?: boolean;
   rightAction?: React.ReactNode;
   className?: string;
   /** When set with total &gt; 0, shows “current of total” on the title row (with rightAction) and a thin progress bar below. */
@@ -17,12 +21,24 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   title,
   showBack = false,
+  backHref,
+  backReplace,
   rightAction,
   className = '',
   progress,
 }) => {
 
   const router = useRouter()
+
+  const handleBack = () => {
+    if (backHref) {
+      const useReplace = backReplace !== false;
+      if (useReplace) router.replace(backHref);
+      else router.push(backHref);
+      return;
+    }
+    router.back();
+  };
 
   const showProgress =
     progress != null && progress.total > 0;
@@ -36,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {showBack && (
-              <Button onClick={() => router.back()} variant='ghost' className="p-2 -ml-2 shrink-0">
+              <Button onClick={handleBack} variant='ghost' className="p-2 -ml-2 shrink-0">
                 <ArrowLeftIcon className="w-6 h-6" />
               </Button>
             )}
