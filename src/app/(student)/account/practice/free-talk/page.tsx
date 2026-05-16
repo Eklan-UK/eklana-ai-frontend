@@ -643,10 +643,8 @@ export default function FreeTalkPage() {
                   ) : (
                     <button
                       type="button"
-                      onPointerDown={() => void startRecording()}
-                      onPointerUp={() => stopRecording()}
-                      onPointerLeave={() => {
-                        if (isRecording) stopRecording();
+                      onClick={() => {
+                        if (isRecording) { stopRecording(); } else { void startRecording(); }
                       }}
                       disabled={isAnalyzingVoice}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-colors ${
@@ -666,12 +664,12 @@ export default function FreeTalkPage() {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                           </span>
-                          Release to send
+                          Tap to stop
                         </>
                       ) : (
                         <>
                           <Mic className="w-5 h-5" />
-                          Hold to speak
+                          Tap to speak
                         </>
                       )}
                     </button>
