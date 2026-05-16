@@ -18,7 +18,7 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 
 		const audioBuffer = await generateGeminiTTSAudio(text.trim(), 'Kore');
 
-		return new NextResponse(audioBuffer, {
+		return new NextResponse(new Uint8Array(audioBuffer), {
 			headers: {
 				'Content-Type': 'audio/wav',
 				'Cache-Control': 'no-cache',
