@@ -6,6 +6,7 @@ import { ChevronRight, Lock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { learnerHasProAccess } from "@/utils/learner-subscription";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
@@ -98,7 +99,7 @@ function PracticeCard({
 export default function PracticePage() {
   const { data: me, isLoading } = useUserCurrent();
   // Default locked while loading to prevent flash of unlocked state.
-  const isSubscribed = !isLoading && me?.user?.isSubscribed === true;
+  const isSubscribed = !isLoading && learnerHasProAccess(me?.user);
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
@@ -112,7 +113,7 @@ export default function PracticePage() {
           <h2 className="text-xl font-bold font-nunito text-foreground mb-4">Choose your mode of practice</h2>
 
           <PracticeCard
-            href="/account/practice/ai"
+            href="/account/practice/free-talk"
             iconBg="bg-[#3B883E]"
             iconSrc="/icons/logo-yellow.svg"
             title="Eklan Free Talk"

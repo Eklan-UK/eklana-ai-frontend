@@ -2336,14 +2336,134 @@ export async function generateGeminiTTSAudio(
 	}
 }
 
-// ─── Eklan Free Talk (ICU scenario practice) ─────────────────────────────────
+// ─── Single-turn chat model stream helper ────────────────────────────────────
 
-interface FreeTalkScenario {
+/**
+ * Sends a single prompt to the Gemini chat model and returns a ReadableStream
+ * of SSE chunks: `data: {"type":"text","data":"..."}\n\n`.
+ * Used for structured evaluation tasks (e.g. grading) that don't need Live API.
+ */
+async function generateWithChatModelStream(prompt: string): Promise<ReadableStream<Uint8Array>> {
+	if (!genAI) throw new Error('Gemini API is not configured');
+
+	const model = genAI.getGenerativeModel({
+		model: CHAT_MODEL,
+		generationConfig: { temperature: 0.4, maxOutputTokens: 1500 },
+	});
+
+	const encoder = new TextEncoder();
+
+	return new ReadableStream({
+		async start(controller) {
+			const send = (obj: { type: string; data: unknown }) => {
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+			};
+			try {
+				const result = await model.generateContentStream(prompt);
+				for await (const chunk of result.stream) {
+					const piece = chunk.text();
+					if (piece) send({ type: 'text', data: piece });
+				}
+			} catch (e: any) {
+				logger.error('[FreeTalk] Chat model stream error', { error: e?.message });
+				send({ type: 'error', data: { message: e?.message ?? 'Stream error' } });
+			} finally {
+				controller.close();
+			}
+		},
+	});
+}
+
+// ─── Eklan Free Talk (ICU scenario practice — grade-based) ───────────────────
+
+type FreeTalkScenarioType =
+	| 'icu_emergency'
+	| 'admission'
+	| 'small_talk_patient'
+	| 'handover'
+	| 'decline_request'
+	| 'phone_doctor'
+	| 'small_talk_colleague';
+
+export interface FreeTalkScenario {
 	title: string;
 	situation: string;
 	hint: string;
 	usefulPhrases: string[];
+	scenarioType: FreeTalkScenarioType;
 }
+
+interface GradingBehaviour {
+	id: number;
+	name: string;
+	description: string;
+}
+
+const GRADING_RUBRICS: Record<FreeTalkScenarioType, GradingBehaviour[]> = {
+	icu_emergency: [
+		{ id: 1, name: 'Recognizes patient deterioration quickly', description: 'Identifies emergency signs such as low oxygen saturation, chest pain, respiratory distress, hypotension, or confusion without delay' },
+		{ id: 2, name: 'Provides immediate appropriate intervention', description: 'Initiates correct first actions such as increasing oxygen, monitoring vital signs, positioning patient safely, or assessing symptoms' },
+		{ id: 3, name: 'Uses calm and reassuring communication', description: 'Speaks calmly, reduces patient anxiety, and maintains emotional control during the emergency' },
+		{ id: 4, name: 'Gives clear patient instructions', description: 'Uses short, direct instructions such as "Take slow deep breaths" or "Please stay still"' },
+		{ id: 5, name: 'Escalates appropriately and promptly', description: 'Calls the doctor, respiratory therapist, rapid response team, or additional support without unnecessary delay' },
+		{ id: 6, name: 'Uses professional ICU terminology', description: 'Correctly uses terms like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm' },
+		{ id: 7, name: 'Maintains organized and safe communication', description: 'Communicates clearly under pressure, prioritizes patient safety, and avoids panic or disorganized responses' },
+	],
+	admission: [
+		{ id: 1, name: 'Introduces self clearly', description: 'States name and role confidently and professionally' },
+		{ id: 2, name: 'Explains role and purpose of interaction', description: 'Clearly explains why they are there and what will happen during admission' },
+		{ id: 3, name: 'Confirms patient identity correctly', description: 'Uses at least two identifiers appropriately (e.g., name and date of birth) to support patient safety' },
+		{ id: 4, name: 'Explains the admission process clearly', description: 'Gives simple, organized explanation of procedures, monitoring, paperwork, or next steps' },
+		{ id: 5, name: 'Uses polite and professional tone', description: 'Maintains respectful, calm, and welcoming bedside communication' },
+		{ id: 6, name: 'Encourages patient questions or concerns', description: 'Invites the patient to ask questions and demonstrates openness to communication' },
+		{ id: 7, name: 'Establishes rapport and patient comfort', description: 'Helps the patient feel welcomed, safe, and supported during admission' },
+	],
+	small_talk_patient: [
+		{ id: 1, name: 'Maintains friendly and approachable tone', description: 'Speaks warmly, calmly, and in a way that helps the patient feel comfortable' },
+		{ id: 2, name: 'Uses appropriate social language', description: 'Uses natural conversational phrases suitable for healthcare settings without sounding overly formal or robotic' },
+		{ id: 3, name: 'Demonstrates active listening', description: 'Responds appropriately to what the patient says and shows attentiveness during conversation' },
+		{ id: 4, name: 'Responds naturally in conversation', description: 'Avoids scripted or awkward responses and maintains smooth conversational flow' },
+		{ id: 5, name: 'Builds rapport with the patient', description: 'Creates positive connection through empathy, humor, encouragement, or shared conversation appropriately' },
+		{ id: 6, name: 'Maintains professionalism throughout interaction', description: 'Keeps appropriate boundaries, respectful tone, and professional bedside behavior' },
+		{ id: 7, name: 'Encourages patient comfort and engagement', description: 'Helps the patient feel relaxed, included, and willing to continue communication' },
+	],
+	handover: [
+		{ id: 1, name: 'Gives concise and focused report', description: 'Communicates important information clearly without unnecessary details or excessive rambling' },
+		{ id: 2, name: 'Organizes information logically', description: 'Presents information in clear sequence (e.g., diagnosis → events → treatment → monitoring needs)' },
+		{ id: 3, name: 'Includes critical patient details', description: 'Mentions important clinical information such as diagnosis, vital changes, medications, procedures, safety concerns, or pending tasks' },
+		{ id: 4, name: 'Uses SBAR/ISBAR communication structure appropriately', description: 'Demonstrates structured handoff communication with clear situation, background, assessment, and recommendations' },
+		{ id: 5, name: 'Answers clarification questions accurately', description: 'Responds appropriately and confidently when the receiving nurse asks follow-up questions' },
+		{ id: 6, name: 'Confirms understanding and continuity of care', description: 'Ensures the receiving nurse understands key concerns, priorities, and ongoing monitoring needs' },
+		{ id: 7, name: 'Maintains professional and collaborative communication', description: 'Uses respectful tone, teamwork language, and professional handoff behavior throughout interaction' },
+	],
+	decline_request: [
+		{ id: 1, name: 'Maintains respectful and calm tone', description: 'Speaks politely and professionally without sounding rude, dismissive, or irritated' },
+		{ id: 2, name: 'States limitation or refusal clearly', description: 'Clearly explains why the request cannot be fulfilled without being vague or overly apologetic' },
+		{ id: 3, name: 'Avoids confrontation or defensive language', description: 'Maintains composure and avoids arguing, blaming, or escalating tension' },
+		{ id: 4, name: 'Provides alternative solution or assistance', description: 'Offers another option, compromise, or next step when appropriate' },
+		{ id: 5, name: 'Maintains professionalism throughout interaction', description: 'Uses appropriate workplace communication and respectful boundaries' },
+		{ id: 6, name: 'Demonstrates teamwork and collaboration', description: 'Shows willingness to support colleagues or patients even when declining the request' },
+		{ id: 7, name: 'Communicates confidently and appropriately', description: 'Delivers refusal clearly and professionally without hesitation, confusion, or passive-aggressive tone' },
+	],
+	phone_doctor: [
+		{ id: 1, name: 'Identifies self, unit, and patient appropriately', description: 'Clearly introduces themselves, unit/department, and patient information at the start of the call' },
+		{ id: 2, name: 'States reason for call immediately', description: 'Quickly explains why they are calling without unnecessary delays or excessive background information' },
+		{ id: 3, name: 'Uses concise SBAR/ISBAR communication', description: 'Organizes information logically using Situation, Background, Assessment, and Recommendation' },
+		{ id: 4, name: 'Gives accurate and relevant patient data', description: 'Provides correct vital signs, symptoms, assessment findings, medications, or changes in condition' },
+		{ id: 5, name: 'Requests recommendation, orders, or action appropriately', description: 'Clearly states what is needed from the physician (evaluation, medication order, intervention, etc.)' },
+		{ id: 6, name: 'Confirms and repeats orders correctly', description: 'Uses read-back/closed-loop communication to verify physician instructions accurately' },
+		{ id: 7, name: 'Maintains calm, professional, and organized communication', description: 'Speaks confidently, remains composed under pressure, and communicates efficiently' },
+	],
+	small_talk_colleague: [
+		{ id: 1, name: 'Greets colleague appropriately', description: 'Uses polite and natural opening greeting' },
+		{ id: 2, name: 'Maintains friendly and professional tone', description: 'Sounds respectful, calm, and collegial' },
+		{ id: 3, name: 'Responds naturally in conversation', description: 'Avoids robotic or overly scripted responses' },
+		{ id: 4, name: 'Demonstrates active listening', description: 'Responds appropriately to what colleague says' },
+		{ id: 5, name: 'Maintains conversational flow', description: 'Keeps conversation going smoothly without awkward breakdowns' },
+		{ id: 6, name: 'Shows teamwork and supportive attitude', description: 'Offers help, encouragement, or collaborative language' },
+		{ id: 7, name: 'Uses clear and understandable communication', description: 'Speech is understandable, organized, and appropriate' },
+	],
+};
 
 const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 	{
@@ -2356,6 +2476,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'Take slow, deep breaths.',
 			"I'm calling the respiratory therapist.",
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Airway Obstruction',
@@ -2367,6 +2488,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'We need to suction your airway.',
 			"You're doing well.",
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Patient Panic During Ventilator Removal',
@@ -2378,6 +2500,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'Take a deep breath.',
 			'Coughing helps clear your lungs.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Alcohol Withdrawal Symptoms',
@@ -2389,6 +2512,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'We are trying to keep you safe.',
 			'This medication may help you relax.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Emergency Team Communication',
@@ -2400,6 +2524,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'Please prepare suction equipment.',
 			'I need respiratory support in room 12.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Medication Questions',
@@ -2411,6 +2536,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'Please call for assistance before standing.',
 			'Do you have any questions about the medication?',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'CRRT Dialysis Concern',
@@ -2422,6 +2548,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'We are monitoring you closely.',
 			'I will stay here with you.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Family Member Anxiety',
@@ -2433,6 +2560,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'His breathing is improving.',
 			'We will continue monitoring him closely.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Refusing Breathing Exercises',
@@ -2444,6 +2572,7 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'Please try a few more breaths.',
 			"You're making good progress.",
 		],
+		scenarioType: 'icu_emergency',
 	},
 	{
 		title: 'Overnight Monitoring',
@@ -2455,73 +2584,112 @@ const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
 			'This helps us respond quickly to emergencies.',
 			'Please call us if you feel short of breath.',
 		],
+		scenarioType: 'icu_emergency',
 	},
 ];
 
 let _freeTalkScenarioIndex = 0;
 
-/** Picks the next scenario in round-robin order (used only by the greeting handler). */
-function pickNextFreeTalkScenario(): FreeTalkScenario {
+/** Picks the next scenario in round-robin order — exported for the greeting route. */
+export function pickNextFreeTalkScenario(): FreeTalkScenario {
 	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
 	_freeTalkScenarioIndex++;
 	return FREE_TALK_SCENARIOS[idx];
 }
 
-/** Case-insensitive lookup — returns undefined if title is not found. */
-function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario | undefined {
-	if (!title) return undefined;
+/** Case-insensitive lookup — falls back to first scenario if title not found. */
+function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario {
+	if (!title) return FREE_TALK_SCENARIOS[0];
 	const norm = title.trim().toLowerCase();
-	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm);
+	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm) ?? FREE_TALK_SCENARIOS[0];
 }
 
-/** Index of `scenario` in the bank (wraps around), used to find the next scenario. */
-function nextFreeTalkScenario(scenario: FreeTalkScenario): FreeTalkScenario {
-	const idx = FREE_TALK_SCENARIOS.indexOf(scenario);
-	return FREE_TALK_SCENARIOS[(idx + 1) % FREE_TALK_SCENARIOS.length];
+// ── Grading prompt ────────────────────────────────────────────────────────────
+
+const GRADE_JSON_TOKEN = 'GRADE_JSON';
+
+function buildFreeTalkGradingPrompt(
+	scenario: FreeTalkScenario,
+	userResponse: string,
+	userName?: string,
+): string {
+	const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+	const behaviourList = behaviours
+		.map(b => `${b.id}. ${b.name}: ${b.description}`)
+		.join('\n');
+
+	let p = `You are Eklan, an ICU clinical communication evaluator.
+
+Scenario: ${scenario.title}
+Situation: ${scenario.situation}
+
+The student responded with:
+"${userResponse}"
+
+Evaluate this response against the 7 clinical communication behaviours below.
+For each behaviour, output one of these ratings:
+- "full"    → clearly and confidently demonstrated (1 point)
+- "partial" → mentioned or implied but incomplete or weak (0.5 points)
+- "none"    → absent, incorrect, or unsafe (0 points)
+
+Behaviours:
+${behaviourList}
+
+Write 2–4 sentences of warm, constructive narrative feedback:
+- Acknowledge what the student did well.
+- Point out what was missing or could be improved.
+- Keep the tone supportive and educational.
+
+Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by a valid JSON object:
+{
+  "behaviours": [
+    { "id": 1, "result": "full" },
+    { "id": 2, "result": "partial" },
+    { "id": 3, "result": "none" },
+    { "id": 4, "result": "full" },
+    { "id": 5, "result": "partial" },
+    { "id": 6, "result": "full" },
+    { "id": 7, "result": "full" }
+  ]
+}
+
+Respond in English only.`;
+
+	if (userName) {
+		p += `\n\nThe trainee's name is ${userName}. You may address them by name in your feedback.`;
+	}
+	return p;
+}
+
+// ── Grade result stream wrapper ───────────────────────────────────────────────
+
+const COMPETENCY_LEVELS = [
+	{ min: 90, label: 'Advanced Clinical Communicator' },
+	{ min: 80, label: 'Safe & Effective Communicator' },
+	{ min: 70, label: 'Developing Communicator' },
+	{ min: 60, label: 'Need Improvement' },
+	{ min: 0,  label: 'Unsafe Communication Risk' },
+] as const;
+
+function scoreToCompetencyLevel(score: number): string {
+	return (COMPETENCY_LEVELS.find(l => score >= l.min) ?? COMPETENCY_LEVELS[COMPETENCY_LEVELS.length - 1]).label;
 }
 
 /**
- * After a scenario completes the AI always celebrates briefly and transitions to the
- * next one (never asks "do you want to stop?"). The next POST call from the app will
- * carry the new `activeScenarioTitle` — detect this by checking whether the last model
- * turn contains transition language that signals the old scenario just ended.
+ * Wraps a Gemini text stream (emitting `text` SSE chunks) and extracts the
+ * GRADE_JSON block. Text chunks before the token are forwarded to the client.
+ * The token line and JSON block are stripped from the text stream, and a
+ * single `metadata` SSE chunk is emitted at the end with the structured grade.
  */
-function isNewScenarioIntroTurn(history: Array<{ role: string; content: string }>): boolean {
-	if (history.length === 0) return false;
-	const lastModel = [...history].reverse().find(m => m.role === 'model');
-	if (!lastModel) return false;
-	const t = lastModel.content.toLowerCase();
-	return (
-		t.includes('another scenario') ||
-		t.includes('next scenario') ||
-		t.includes("let's keep going") ||
-		t.includes("let's move on") ||
-		t.includes('moving on to') ||
-		t.includes('continue with another') ||
-		t.includes('would you like to continue') ||
-		t.includes('happy to stop') ||
-		(t.includes('well done') && t.includes('scenario'))
-	);
-}
-
-/** Sentinel appended by the AI to signal that the current scenario is complete. */
-const SCENARIO_COMPLETE_TOKEN = '[SCENARIO_COMPLETE]';
-
-/**
- * Wraps a Live API ReadableStream (emitting `audio`/`text` SSE lines) with a
- * TransformStream that:
- *  - Passes `audio` chunks through unchanged.
- *  - Strips SCENARIO_COMPLETE_TOKEN from `text` chunks before re-emitting.
- *  - Appends a single `metadata` SSE chunk once the upstream ends.
- */
-function wrapWithFreeTalkMetadata(
-	liveStream: ReadableStream,
-	buildMetadata: (fullText: string, scenarioComplete: boolean) => Record<string, unknown>,
+function wrapWithGradingMetadata(
+	textStream: ReadableStream,
+	scenario: FreeTalkScenario,
 ): ReadableStream {
 	const encoder = new TextEncoder();
 	const decoder = new TextDecoder();
 	const textParts: string[] = [];
-	let scenarioComplete = false;
+	let gradeJson = '';
+	let capturingJson = false;
 
 	const transform = new TransformStream<Uint8Array, Uint8Array>({
 		transform(chunk, controller) {
@@ -2537,213 +2705,118 @@ function wrapWithFreeTalkMetadata(
 				controller.enqueue(chunk);
 				return;
 			}
-			if (parsed.type === 'audio') {
+
+			if (parsed.type !== 'text') {
 				controller.enqueue(chunk);
-			} else if (parsed.type === 'text') {
-				let text = (parsed.data as string) || '';
-				if (text.includes(SCENARIO_COMPLETE_TOKEN)) {
-					scenarioComplete = true;
-					text = text.replace(SCENARIO_COMPLETE_TOKEN, '').trim();
-				}
-				if (text) {
-					textParts.push(text);
+				return;
+			}
+
+			const incoming = (parsed.data as string) ?? '';
+
+			// Once we've seen GRADE_JSON token, accumulate everything into gradeJson buffer
+			if (capturingJson) {
+				gradeJson += incoming;
+				return;
+			}
+
+			// Check if this chunk contains the token
+			if (incoming.includes(GRADE_JSON_TOKEN)) {
+				capturingJson = true;
+				// Split text before the token (emit it) and after (buffer as json)
+				const [before, after] = incoming.split(GRADE_JSON_TOKEN);
+				const cleanBefore = before.trim();
+				if (cleanBefore) {
+					textParts.push(cleanBefore);
 					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ type: 'text', data: text })}\n\n`),
+						encoder.encode(`data: ${JSON.stringify({ type: 'text', data: cleanBefore })}\n\n`),
 					);
 				}
+				if (after) gradeJson += after;
+				return;
 			}
+
+			// Normal text chunk — forward as-is
+			textParts.push(incoming);
+			controller.enqueue(chunk);
 		},
 		flush(controller) {
 			const fullText = textParts.join('').trim();
-			const metadata = buildMetadata(fullText, scenarioComplete);
+			const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+
+			// Parse grade JSON — fall back gracefully if malformed
+			let parsedBehaviours: Array<{ id: number; result: string }> = [];
+			try {
+				const jsonStart = gradeJson.indexOf('{');
+				const jsonEnd = gradeJson.lastIndexOf('}');
+				if (jsonStart !== -1 && jsonEnd !== -1) {
+					const obj = JSON.parse(gradeJson.slice(jsonStart, jsonEnd + 1)) as {
+						behaviours?: Array<{ id: number; result: string }>;
+					};
+					parsedBehaviours = Array.isArray(obj.behaviours) ? obj.behaviours : [];
+				}
+			} catch {
+				logger.warn('[FreeTalk] Failed to parse grade JSON', { gradeJson });
+			}
+
+			const SCORE_MAP: Record<string, number> = { full: 1, partial: 0.5, none: 0 };
+			const gradedBehaviours = behaviours.map(b => {
+				const found = parsedBehaviours.find(p => p.id === b.id);
+				const result = (found?.result ?? 'none') as 'full' | 'partial' | 'none';
+				return {
+					id: b.id,
+					name: b.name,
+					result,
+					score: SCORE_MAP[result] ?? 0,
+				};
+			});
+
+			const rawScore = gradedBehaviours.reduce((sum, b) => sum + b.score, 0);
+			const overallScore = Math.round((rawScore / behaviours.length) * 100);
+			const competencyLevel = scoreToCompetencyLevel(overallScore);
+
+			const metadata = {
+				fullText,
+				grade: {
+					overallScore,
+					competencyLevel,
+					behaviours: gradedBehaviours,
+					rawScore,
+					maxScore: behaviours.length,
+				},
+			};
+
 			controller.enqueue(
 				encoder.encode(`data: ${JSON.stringify({ type: 'metadata', data: metadata })}\n\n`),
 			);
 		},
 	});
 
-	return liveStream.pipeThrough(transform);
+	return textStream.pipeThrough(transform);
 }
 
-// ── Prompt builders ───────────────────────────────────────────────────────────
-
-/** Used on GET /greeting AND on the new-scenario-intro branch of POST. */
-function buildFreeTalkGreetingPrompt(scenario: FreeTalkScenario, userName?: string): string {
-	let p = `You are Eklan, an ICU English language practice tutor. You present realistic clinical scenarios to help nurses practise communicating clearly in emergency situations.
-
-You are about to introduce a new scenario. Read the situation below naturally and clearly, as if setting the scene for the learner. Invite them to respond — but do not give them the answer.
-
-Scenario: ${scenario.title}
-Situation: ${scenario.situation}
-
-Keep your opening brief (3–5 sentences). End with a gentle prompt for the user to respond.
-Respond in English only.`;
-	if (userName) {
-		p += `\n\nThe trainee's name is ${userName}. You may address them by name.`;
-	}
-	return p;
-}
-
-/** Used on every normal continuation turn of POST /api/v1/ai/free-talk. */
-function buildFreeTalkContinuationPrompt(
-	activeScenarioTitle: string,
-	situation: string,
-	userTurnCount: number,
-	userName?: string,
-): string {
-	let p = `You are Eklan, an ICU English language practice tutor.
-You are currently in the middle of the scenario: "${activeScenarioTitle}".
-Situation context: ${situation}
-
-DO NOT introduce a new scenario. DO NOT re-read the full situation text.
-The conversation history below shows what has already been said.
-
-INTERNAL REASONING (do NOT print these labels in your reply):
-1. Evaluate what the user just said — note what was clinically appropriate and what was missing or incorrect.
-2. Decide how the patient or scene would react next.
-3. Decide what to ask the user to do next.
-
-OUTPUT RULES — your reply must:
-- Sound like a real clinical conversation, not a structured report.
-- Start with brief feedback on what the user said (e.g. "Good — calming the patient is the right first step, but you also need to…").
-- If their answer was wrong or incomplete, correct it gently and ask again in simpler terms.
-- If their answer was correct, confirm it clearly and advance the scene.
-- End with a natural question or prompt for the user to respond to.
-- NEVER print "Step 1", "Step 2", "Step 3", "EVALUATE", "ADVANCE", or any structural label.
-- Keep the whole reply to 2–4 natural sentences.
-
-The user has made ${userTurnCount + 1} response(s) so far in this scenario.
-Do not consider the scenario complete until ALL of the following are true:
-- The user has replied at least 5 times, AND
-- All key clinical steps for this scenario have been covered.
-Until both conditions are met, keep the scenario going: add a complication, have the patient react differently, involve a team member, or ask a deeper follow-up question. Push the learner further — one correct answer is never enough.
-
-Only after 5+ user replies AND all key steps are covered:
-- Congratulate the user warmly (1–2 sentences).
-- Ask: "Would you like to continue with another scenario, or are you happy to stop here?"
-- Append the token ${SCENARIO_COMPLETE_TOKEN} as the very last characters of your message — immediately after your final word, no space before it, nothing after it.
-
-Do NOT append ${SCENARIO_COMPLETE_TOKEN} before 5 user replies, even if the user gives a perfect answer.
-
-Respond in English only — even if the user writes in another language.`;
-	if (userName) {
-		p += `\n\nThe trainee's name is ${userName}. Address them by name occasionally.`;
-	}
-	return p;
-}
-
-// ── Exported stream functions ─────────────────────────────────────────────────
+// ── Exported grading function ─────────────────────────────────────────────────
 
 /**
- * Greeting stream — picks the next scenario (round-robin), streams its situation
- * text + audio, and ends with a metadata chunk containing scenarioTitle/hint/usefulPhrases.
- * This is the ONLY place the round-robin picker runs.
+ * Grading stream for POST /api/v1/ai/free-talk.
+ * Uses the standard Gemini chat model (not Live API) — structured evaluation task.
+ * Streams narrative feedback text, then emits a metadata chunk with the grade.
  */
-export async function generateFreeTalkGreetingStream(userName?: string): Promise<ReadableStream> {
-	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
-
-	const scenario = pickNextFreeTalkScenario();
-	const systemPrompt = buildFreeTalkGreetingPrompt(scenario, userName);
-
-	logger.info('[FreeTalk] Generating greeting stream', { scenario: scenario.title, model: LIVE_MODEL });
-
-	const liveStream = await generateWithLiveAPIStream(systemPrompt, [
-		{ role: 'user', parts: [{ text: 'Please present the scenario.' }] },
-	]);
-
-	return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
-		fullText,
-		scenarioTitle: scenario.title,
-		hint: scenario.hint,
-		usefulPhrases: scenario.usefulPhrases,
-	}));
-}
-
-/**
- * Response stream for every POST /api/v1/ai/free-talk call.
- *
- * Rules:
- * - `activeScenarioTitle` anchors the system prompt — the round-robin picker
- *   is NEVER called here.
- * - When `isNewScenarioIntroTurn` detects that the app just signalled a new
- *   scenario (last AI message contained transition language), the current
- *   `activeScenarioTitle` IS the new scenario, so we use it directly with the
- *   greeting prompt template (no +1 offset needed).
- * - On the `scenarioComplete: true` metadata path, the NEXT scenario (one after
- *   the current) is pre-selected for the silent pre-load hint data.
- * - `scenarioComplete: true` is only emitted when the model appended the token
- *   AND the user has replied at least 3 times (server-side guard).
- */
-export async function generateFreeTalkResponseStream(
-	userMessage: string,
-	activeScenarioTitle: string,
-	conversationHistory: Array<{ role: 'user' | 'model'; content: string }> = [],
+export async function generateFreeTalkGradingStream(
+	userResponse: string,
+	scenarioTitle: string,
 	userName?: string,
 ): Promise<ReadableStream> {
 	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
 
-	const scenario =
-		findFreeTalkScenarioByTitle(activeScenarioTitle) ?? FREE_TALK_SCENARIOS[0];
+	const scenario = findFreeTalkScenarioByTitle(scenarioTitle);
+	const prompt = buildFreeTalkGradingPrompt(scenario, userResponse, userName);
 
-	const isNewIntro = isNewScenarioIntroTurn(conversationHistory);
-	const userTurnCount = conversationHistory.filter((m) => m.role === 'user').length;
-	const systemPrompt = isNewIntro
-		? buildFreeTalkGreetingPrompt(scenario, userName)
-		: buildFreeTalkContinuationPrompt(scenario.title, scenario.situation, userTurnCount, userName);
-
-	// Normalise history — Live API requires the first turn to be from the user
-	let validHistory = conversationHistory;
-	if (validHistory.length > 0 && validHistory[0].role === 'model') {
-		const firstUser = validHistory.findIndex((m) => m.role === 'user');
-		validHistory = firstUser > 0 ? validHistory.slice(firstUser) : [];
-	}
-
-	const turns = [
-		...validHistory.map((m) => ({
-			role: m.role === 'user' ? 'user' : 'model',
-			parts: [{ text: m.content }],
-		})),
-		{ role: 'user', parts: [{ text: userMessage }] },
-	];
-
-	logger.info('[FreeTalk] Generating response stream', {
-		model: LIVE_MODEL,
+	logger.info('[FreeTalk] Generating grading stream', {
 		scenario: scenario.title,
-		isNewIntro,
-		userTurnCount,
-		turnsCount: turns.length,
+		scenarioType: scenario.scenarioType,
+		model: CHAT_MODEL,
 	});
 
-	const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
-
-	// New-scenario intro: metadata must look exactly like a greeting response
-	// (scenarioTitle + hint + usefulPhrases, NO scenarioComplete key) —
-	// this is what triggers the hint modal in the mobile app.
-	if (isNewIntro) {
-		return wrapWithFreeTalkMetadata(liveStream, (fullText) => ({
-			fullText,
-			scenarioTitle: scenario.title,
-			hint: scenario.hint,
-			usefulPhrases: scenario.usefulPhrases,
-		}));
-	}
-
-	// For normal continuation turns, pre-capture the next scenario now so it's
-	// available inside the TransformStream flush closure.
-	const next = nextFreeTalkScenario(scenario);
-	const totalUserReplies = userTurnCount + 1;
-
-	return wrapWithFreeTalkMetadata(liveStream, (fullText, modelSignalledComplete) => {
-		const scenarioComplete = modelSignalledComplete && totalUserReplies >= 5;
-		if (scenarioComplete) {
-			return {
-				fullText,
-				scenarioComplete: true,
-				scenarioTitle: next.title,
-				hint: next.hint,
-				usefulPhrases: next.usefulPhrases,
-			};
-		}
-		return { fullText, scenarioComplete: false };
-	});
+	const textStream = await generateWithChatModelStream(prompt);
+	return wrapWithGradingMetadata(textStream, scenario);
 }
