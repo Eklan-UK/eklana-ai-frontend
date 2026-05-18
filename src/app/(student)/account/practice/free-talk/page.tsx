@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   XCircle,
   MinusCircle,
-  Keyboard,
   Loader2,
   Mic,
   Send,
@@ -17,6 +16,7 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
+  Languages,
 } from "lucide-react";
 import { aiService } from "@/services/ai.service";
 import { MarkdownText } from "@/components/ui/MarkdownText";
@@ -168,6 +168,12 @@ function ScoreRing({ score }: { score: number }) {
       </div>
     </div>
   );
+}
+
+function scenarioTypeLabel(scenarioType: string): string {
+  const t = scenarioType.replace(/_/g, " ").trim();
+  if (!t) return "ICU practice";
+  return t.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -432,287 +438,236 @@ export default function FreeTalkPage() {
     void loadScenario();
   };
 
+  const navStepLabel =
+    phase === "ready" ? "1 of 2" : phase === "responding" ? "2 of 2" : null;
+  const progressPct =
+    phase === "ready"
+      ? "42%"
+      : phase === "responding"
+        ? "85%"
+        : phase === "grading"
+          ? "92%"
+          : phase === "result"
+            ? "100%"
+            : "12%";
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-gray-50 text-gray-900 dark:bg-[#0c0e0d] dark:text-[#f0f2f1]">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-white dark:bg-[#131614] border-b border-gray-100 dark:border-[#2a2e2c]">
-        <div className="flex items-center px-4 py-3 max-w-2xl mx-auto">
+    <div className="relative flex min-h-[100dvh] flex-col bg-white text-[#121217] dark:bg-[#0c0e0d] dark:text-[#f0f2f1]">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-[#e7eaed]/80 bg-white dark:border-[#2a2e2c] dark:bg-[#131614]">
+        <div className="mx-auto flex max-w-lg items-center gap-3 px-5 py-2 md:max-w-2xl">
           <button
             type="button"
             onClick={() => setShowLeaveModal(true)}
-            className="p-2.5 -ml-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#d0d9e2]/40 bg-white/80 transition-colors hover:bg-[#fafafa] dark:border-[#3a3f3c] dark:bg-[#1a1d1c] dark:hover:bg-[#242825]"
             aria-label="Back"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-[#9aa39e]" />
+            <ChevronLeft className="h-[18px] w-[18px] text-[#121217] dark:text-[#c8cdc9]" />
           </button>
-          <div className="flex items-center flex-1 ml-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-              <Image src="/logo2.svg" alt="Eklan" width={24} height={24} />
-            </div>
-            <div className="ml-3 min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 dark:text-[#f0f2f1] truncate">
-                Eklan Free Talk
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-[#9aa39e] truncate">
-                {phase === "loading"
-                  ? "Preparing scenario…"
-                  : phase === "ready"
-                  ? "Read the situation below"
-                  : phase === "responding"
-                  ? "Submit your response"
-                  : phase === "grading"
-                  ? "Grading your response…"
-                  : "Your result"}
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex h-5 items-center justify-between gap-2 text-[14px] leading-5 tracking-[-0.15px]">
+              <p className="truncate font-satoshi font-medium text-[#171717] dark:text-[#f0f2f1]">
+                {scenario ? scenarioTypeLabel(scenario.scenarioType) : "Eklan Free Talk"}
               </p>
+              {navStepLabel ? (
+                <p className="shrink-0 font-sans text-[#6a7282] dark:text-[#9aa39e]">{navStepLabel}</p>
+              ) : phase === "grading" ? (
+                <p className="shrink-0 font-sans text-xs text-[#6a7282]">Grading…</p>
+              ) : phase === "result" ? (
+                <p className="shrink-0 font-sans text-xs text-[#6a7282]">Done</p>
+              ) : null}
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#e7eaed]/50 dark:bg-[#2a2e2c]">
+              <div
+                className="h-2 rounded-full bg-[#3b883e] transition-[width] duration-500 ease-out"
+                style={{ width: progressPct }}
+              />
             </div>
           </div>
+          <div className="h-[30px] w-[30px] shrink-0" aria-hidden />
         </div>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-2xl mx-auto w-full">
-        {/* Loading */}
+      <div
+        className={`mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 pt-6 md:max-w-2xl ${
+          phase === "ready" || phase === "responding"
+            ? phase === "responding" && showTextInput
+              ? "pb-40"
+              : "pb-32"
+            : "pb-8"
+        }`}
+      >
         {phase === "loading" && (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400 dark:text-[#9aa39e]">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-            <p className="text-sm">Preparing your scenario…</p>
+          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[#9aa39e]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
+            <p className="text-sm font-satoshi">Preparing your scenario…</p>
           </div>
         )}
 
-        {/* Situation Card (ready phase) */}
         {(phase === "ready" || phase === "responding") && scenario && (
-          <div className="space-y-4">
-            {/* Scenario banner when in responding phase */}
-            {phase === "responding" && (
-              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-0.5">
-                  Active Scenario
-                </p>
-                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
-                  {scenario.title}
-                </p>
-              </div>
-            )}
-
-            {phase === "ready" && (
-              <>
-                {/* Full situation card */}
-                <div className="rounded-2xl bg-white dark:bg-[#131614] border border-gray-200 dark:border-[#2a2e2c] shadow-sm overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2e2c]">
-                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-1">
-                      Scenario
-                    </p>
-                    <div className="flex items-center justify-between gap-3">
-                      <h2 className="text-base font-bold font-nunito text-gray-900 dark:text-[#f0f2f1]">
-                        {scenario.title}
-                      </h2>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          isSpeaking
-                            ? stopTts()
-                            : void speakSituation(scenario.situation)
-                        }
-                        className="shrink-0 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#1a1d1c] transition-colors"
-                        aria-label={isSpeaking ? "Stop reading" : "Read situation aloud"}
-                      >
-                        {isSpeaking ? (
-                          <VolumeX className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Volume2 className="w-5 h-5 text-gray-400 dark:text-[#9aa39e]" />
-                        )}
-                      </button>
-                    </div>
-                    {isSpeaking && (
-                      <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                        </span>
-                        Reading aloud…
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2e2c]">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide mb-2">
-                      Situation
-                    </p>
-                    <p className="text-sm leading-relaxed text-gray-800 dark:text-[#e8ebe9]">
-                      {scenario.situation}
-                    </p>
-                  </div>
-
-                  <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2e2c]">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide mb-2">
-                      What to cover
-                    </p>
-                    <p className="text-sm leading-relaxed text-gray-800 dark:text-[#e8ebe9]">
-                      {scenario.hint}
-                    </p>
-                  </div>
-
-                  {scenario.usefulPhrases.length > 0 && (
-                    <div className="px-5 py-4">
-                      <button
-                        type="button"
-                        onClick={() => setPhrasesExpanded((s) => !s)}
-                        className="flex items-center justify-between w-full text-left"
-                        aria-expanded={phrasesExpanded}
-                      >
-                        <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide">
-                          Useful phrases
-                        </p>
-                        {phrasesExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                      {phrasesExpanded && (
-                        <ul className="mt-3 list-disc pl-5 space-y-1">
-                          {scenario.usefulPhrases.map((p) => (
-                            <li
-                              key={p}
-                              className="text-sm text-gray-700 dark:text-[#c8cdc9]"
-                            >
-                              {p}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
+          <div className="flex flex-col gap-6">
+            <section className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dcfce7] dark:bg-emerald-950/50">
+                  <Image src="/logo2.svg" alt="" width={22} height={22} className="object-contain" />
                 </div>
-
-                {/* Got it CTA */}
-                <button
-                  type="button"
-                  onClick={handleGotIt}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors"
-                >
-                  Got it — I&apos;m ready to respond
-                </button>
-              </>
-            )}
-
-            {/* Input controls (responding phase) */}
-            {phase === "responding" && (
-              <div className="space-y-3 mt-2">
-                <p className="text-sm text-gray-600 dark:text-[#9aa39e] text-center">
-                  Respond to the scenario as you would in a real clinical setting.
-                </p>
-
-                <div className="flex items-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTextInput((s) => !s)}
-                    className="p-3 rounded-xl border border-gray-200 dark:border-[#2a2e2c] text-gray-600 dark:text-[#9aa39e] hover:bg-gray-50 dark:hover:bg-[#1a1d1c]"
-                    aria-label={showTextInput ? "Hide keyboard" : "Show keyboard"}
-                  >
-                    <Keyboard className="w-5 h-5" />
-                  </button>
-
-                  {showTextInput ? (
-                    <>
-                      <textarea
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && e.ctrlKey) {
-                            e.preventDefault();
-                            void handleSendText();
-                          }
-                        }}
-                        placeholder="Type your response… (Ctrl+Enter to send)"
-                        rows={3}
-                        className="flex-1 min-w-0 rounded-xl border border-gray-200 dark:border-[#2a2e2c] bg-white dark:bg-[#0c0e0d] px-3 py-2.5 text-sm text-gray-900 dark:text-[#f0f2f1] resize-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void handleSendText()}
-                        disabled={!inputText.trim()}
-                        className="p-3 rounded-xl bg-emerald-600 text-white disabled:opacity-40 self-end"
-                        aria-label="Send"
-                      >
-                        <Send className="w-5 h-5" />
-                      </button>
-                    </>
-                  ) : (
+                <div className="w-full rounded-2xl rounded-tl-sm border-[0.5px] border-[rgba(231,234,237,0.55)] bg-[rgba(252,252,252,0.92)] p-4 shadow-sm dark:border-[#2a2e2c] dark:bg-[#1a1d1c]/95">
+                  <p className="mb-2 text-sm font-bold leading-5 text-[#3b883e] dark:text-emerald-400">
+                    {scenario.title}
+                  </p>
+                  <p className="text-sm font-satoshi leading-relaxed text-[#171717] dark:text-[#e8ebe9]">
+                    {scenario.situation}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2.5 border-t border-transparent pt-1">
+                    <span className="text-[#9ca3af]" title="Translate (coming soon)">
+                      <Languages className="h-4 w-4" aria-hidden />
+                    </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (isRecording) { stopRecording(); } else { void startRecording(); }
-                      }}
-                      disabled={isAnalyzingVoice}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-colors ${
-                        isRecording
-                          ? "bg-red-600 hover:bg-red-700"
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                      } disabled:opacity-40`}
+                      onClick={() =>
+                        isSpeaking ? stopTts() : void speakSituation(scenario.situation)
+                      }
+                      className="rounded-full p-1 text-[#6b7280] transition-colors hover:bg-black/5 hover:text-[#3b883e] dark:text-[#9aa39e] dark:hover:bg-white/10"
+                      aria-label={isSpeaking ? "Stop reading aloud" : "Read situation aloud"}
                     >
-                      {isAnalyzingVoice ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Analyzing voice…
-                        </>
-                      ) : isRecording ? (
-                        <>
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-                          </span>
-                          Tap to stop
-                        </>
+                      {isSpeaking ? (
+                        <VolumeX className="h-4 w-4 text-[#3b883e]" />
                       ) : (
-                        <>
-                          <Mic className="w-5 h-5" />
-                          Tap to speak
-                        </>
+                        <Volume2 className="h-4 w-4" />
                       )}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
-            )}
+            </section>
+
+            <section className="flex flex-col items-center gap-4">
+              <h2 className="text-center font-nunito text-xl font-bold leading-6 text-[#2a602c] dark:text-emerald-400">
+                Your Turn !
+              </h2>
+              <div className="w-full rounded-2xl rounded-tl-3xl border-[0.5px] border-[rgba(231,234,237,0.55)] bg-[rgba(252,252,252,0.92)] p-4 shadow-sm dark:border-[#2a2e2c] dark:bg-[#1a1d1c]/95">
+                <p className="text-center text-sm font-bold leading-relaxed text-[#6b7280] dark:text-[#9aa39e]">
+                  {scenario.hint}
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => (isSpeaking ? stopTts() : void speakSituation(scenario.hint))}
+                    className="rounded-full p-1 text-[#6b7280] transition-colors hover:bg-black/5 hover:text-[#3b883e] dark:text-[#9aa39e]"
+                    aria-label="Listen to hint"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                  </button>
+                </div>
+                {phase === "responding" && !showTextInput && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTextInput(true)}
+                    className="mt-3 w-full text-center text-xs font-medium text-[#6b7280] underline decoration-[#6b7280]/40 underline-offset-2 hover:text-[#3b883e] dark:text-[#9aa39e]"
+                  >
+                    Can&apos;t use the microphone? Type your response
+                  </button>
+                )}
+              </div>
+
+              {scenario.usefulPhrases.length > 0 && (
+                <div className="w-full rounded-2xl border border-[#e7eaed]/80 bg-[#fafafa]/80 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/80">
+                  <button
+                    type="button"
+                    onClick={() => setPhrasesExpanded((s) => !s)}
+                    className="flex w-full items-center justify-between text-left"
+                    aria-expanded={phrasesExpanded}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
+                      Useful phrases
+                    </span>
+                    {phrasesExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                  {phrasesExpanded && (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#374151] dark:text-[#c8cdc9]">
+                      {scenario.usefulPhrases.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {phase === "responding" && showTextInput && (
+                <div className="w-full rounded-2xl border border-[#e7eaed] bg-[#fafafa]/90 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/90">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
+                    Type your response
+                  </p>
+                  <textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && e.ctrlKey) {
+                        e.preventDefault();
+                        void handleSendText();
+                      }
+                    }}
+                    placeholder="Type here… (Ctrl+Enter to send)"
+                    rows={3}
+                    className="w-full resize-none rounded-2xl border border-[#e7eaed] bg-white px-3 py-2.5 text-sm text-[#171717] outline-none ring-[#3b883e]/20 focus:ring-2 dark:border-[#2a2e2c] dark:bg-[#0c0e0d] dark:text-[#f0f2f1]"
+                  />
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowTextInput(false)}
+                      className="rounded-xl px-3 py-2 text-sm font-medium text-[#6b7280]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSendText()}
+                      disabled={!inputText.trim()}
+                      className="flex items-center gap-2 rounded-xl bg-[#3b883e] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" />
+                      Send
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
         )}
 
-        {/* Grading state */}
         {phase === "grading" && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-            <p className="text-sm text-gray-600 dark:text-[#9aa39e]">
-              Grading your response…
-            </p>
+          <div className="flex flex-col items-center justify-center gap-4 py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
+            <p className="text-sm text-[#6b7280] dark:text-[#9aa39e]">Grading your response…</p>
             {feedbackText && (
-              <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#131614] border border-gray-200 dark:border-[#2a2e2c] px-5 py-4 text-sm text-gray-700 dark:text-[#c8cdc9]">
+              <div className="w-full rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 text-sm text-[#374151] dark:border-[#2a2e2c] dark:bg-[#131614] dark:text-[#c8cdc9]">
                 <MarkdownText>{feedbackText}</MarkdownText>
               </div>
             )}
           </div>
         )}
 
-        {/* Result */}
         {phase === "result" && scenario && (
           <div className="space-y-4 pb-8">
-            {/* Score card */}
-            <div className="rounded-2xl bg-white dark:bg-[#131614] border border-gray-200 dark:border-[#2a2e2c] shadow-sm px-5 py-5">
+            <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-5 shadow-sm dark:border-[#2a2e2c] dark:bg-[#131614]">
               <div className="flex items-center gap-5">
                 {gradeResult && <ScoreRing score={gradeResult.overallScore} />}
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide mb-1">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
                     {scenario.title}
                   </p>
                   {gradeResult && (
                     <>
-                      <p className="text-lg font-bold font-nunito text-gray-900 dark:text-[#f0f2f1] leading-tight">
+                      <p className="font-nunito text-lg font-bold leading-tight text-[#171717] dark:text-[#f0f2f1]">
                         {gradeResult.competencyLevel}
                       </p>
                       <span
-                        className={`mt-1.5 inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                        className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           getCompetencyColors(gradeResult.competencyLevel).bg
                         } ${getCompetencyColors(gradeResult.competencyLevel).text}`}
                       >
@@ -724,22 +679,20 @@ export default function FreeTalkPage() {
               </div>
             </div>
 
-            {/* Feedback */}
             {feedbackText && (
-              <div className="rounded-2xl bg-white dark:bg-[#131614] border border-gray-200 dark:border-[#2a2e2c] px-5 py-4">
-                <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide mb-3">
+              <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 dark:border-[#2a2e2c] dark:bg-[#131614]">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
                   Feedback
                 </p>
-                <div className="text-sm text-gray-800 dark:text-[#c8cdc9] leading-relaxed">
+                <div className="text-sm leading-relaxed text-[#374151] dark:text-[#c8cdc9]">
                   <MarkdownText>{feedbackText}</MarkdownText>
                 </div>
               </div>
             )}
 
-            {/* Behaviour checklist */}
             {gradeResult && gradeResult.behaviours.length > 0 && (
-              <div className="rounded-2xl bg-white dark:bg-[#131614] border border-gray-200 dark:border-[#2a2e2c] px-5 py-4">
-                <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa39e] uppercase tracking-wide mb-3">
+              <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 dark:border-[#2a2e2c] dark:bg-[#131614]">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
                   Clinical Communication Behaviours
                 </p>
                 <div>
@@ -747,34 +700,32 @@ export default function FreeTalkPage() {
                     <BehaviourRow key={b.id} b={b} />
                   ))}
                 </div>
-                {/* Legend */}
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-[#9aa39e]">
+                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#6b7280] dark:text-[#9aa39e]">
                   <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Full (1 pt)
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Full (1 pt)
                   </span>
                   <span className="flex items-center gap-1">
-                    <MinusCircle className="w-3.5 h-3.5 text-yellow-500" /> Partial (0.5 pt)
+                    <MinusCircle className="h-3.5 w-3.5 text-yellow-500" /> Partial (0.5 pt)
                   </span>
                   <span className="flex items-center gap-1">
-                    <XCircle className="w-3.5 h-3.5 text-red-400" /> None (0 pt)
+                    <XCircle className="h-3.5 w-3.5 text-red-400" /> None (0 pt)
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Try another */}
             <button
               type="button"
               onClick={handleTryAnother}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b883e] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2f6f32]"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="h-4 w-4" />
               Try another scenario
             </button>
             <button
               type="button"
               onClick={() => router.push("/account/practice")}
-              className="w-full py-3 rounded-xl border border-gray-200 dark:border-[#2a2e2c] text-gray-700 dark:text-[#c8cdc9] font-semibold text-sm"
+              className="w-full rounded-xl border border-[#e7eaed] py-3 text-sm font-semibold text-[#374151] dark:border-[#2a2e2c] dark:text-[#c8cdc9]"
             >
               Back to Practice
             </button>
@@ -782,17 +733,64 @@ export default function FreeTalkPage() {
         )}
       </div>
 
+      {(phase === "ready" || phase === "responding") && scenario && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {phase === "responding" && isAnalyzingVoice && (
+            <p className="pointer-events-auto mb-2 text-center text-xs text-[#606060] dark:text-[#9aa39e]">
+              Analyzing your voice…
+            </p>
+          )}
+          <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center px-5 md:max-w-2xl">
+            {phase === "ready" ? (
+              <button
+                type="button"
+                onClick={handleGotIt}
+                className="w-full max-w-sm rounded-2xl bg-[#3b883e] py-3.5 text-center text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#2f6f32]"
+              >
+                Got it — I&apos;m ready to respond
+              </button>
+            ) : (
+              <div className="rounded-full bg-[rgba(76,175,80,0.12)] p-1.5 shadow-lg dark:bg-emerald-500/15">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isRecording) stopRecording();
+                    else void startRecording();
+                  }}
+                  disabled={isAnalyzingVoice}
+                  className={`flex h-20 w-20 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-40 ${
+                    isRecording ? "bg-red-600 hover:bg-red-700" : "bg-[#3b883e] hover:bg-[#2f6f32]"
+                  }`}
+                  aria-label={isRecording ? "Stop recording" : "Start recording"}
+                >
+                  {isAnalyzingVoice ? (
+                    <Loader2 className="h-9 w-9 animate-spin" />
+                  ) : isRecording ? (
+                    <span className="relative flex h-3 w-3">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
+                    </span>
+                  ) : (
+                    <Mic className="h-9 w-9" strokeWidth={2} />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Leave modal */}
       {showLeaveModal && (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-black/40"
+            className="fixed inset-0 z-[60] bg-black/40"
             aria-label="Close"
             onClick={() => setShowLeaveModal(false)}
           />
           <div
-            className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-[#131614] border border-gray-100 dark:border-[#2a2e2c] shadow-xl p-6"
+            className="fixed left-1/2 top-1/2 z-[70] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-[#131614] border border-gray-100 dark:border-[#2a2e2c] shadow-xl p-6"
             role="dialog"
             aria-labelledby="leave-title"
           >

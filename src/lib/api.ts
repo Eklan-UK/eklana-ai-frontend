@@ -778,38 +778,6 @@ export const adminAPI = {
     });
   },
 
-  /**
-   * Eklan AI session summaries (Free Talk / topic / drill) for a learner.
-   * Access: admin (any) or tutor (assigned only). Same as drill-assignments.
-   */
-  getLearnerAiSessions: (
-    learnerId: string,
-    params?: { limit?: number; offset?: number; mode?: 'free' | 'topic' | 'drill' }
-  ) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: {
-        sessions: Array<{
-          id: string;
-          mode: string;
-          topic?: string;
-          drillId?: string;
-          summary: import('@/types/ai-session-summary').SessionSummaryPayload;
-          endedAt: string;
-          createdAt: string;
-        }>;
-        total: number;
-        limit: number;
-        offset: number;
-      };
-    }>(`/admin/learners/${learnerId}/ai-sessions`, {
-      method: 'GET',
-      params,
-      cache: false,
-    });
-  },
-
   /** Grammar drill analytics for a learner (aggregated attempts). Admin/tutor. */
   getLearnerGrammarAnalytics: (
     learnerId: string,

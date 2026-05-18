@@ -4,9 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withPremium } from '@/lib/api/middleware';
 import { logger } from '@/lib/api/logger';
-import { generateFreeTalkGradingStream } from '@/services/gemini.service';
+import {
+	generateFreeTalkGradingStream,
+	generateFreeTalkGradingStreamFromScenario,
+	type FreeTalkScenario,
+} from '@/services/gemini.service';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
+import FreeTalkScenarioModel from '@/models/free-talk-scenario';
 
 async function handler(
 	req: NextRequest,
@@ -37,11 +42,26 @@ async function handler(
 		const user = await User.findById(context.userId).select('firstName').lean();
 		const userName = (user?.firstName as string | undefined) || undefined;
 
-		const stream = await generateFreeTalkGradingStream(
-			userResponse.trim(),
-			scenarioTitle.trim(),
-			userName,
-		);
+		// Try to resolve scenario from the DB first; fall back to hardcoded list.
+		let stream: ReadableStream;
+		const dbScenario = await FreeTalkScenarioModel.findOne({
+			title: { $regex: new RegExp(`^${scenarioTitle.trim()}$`, 'i') },
+		}).lean();
+
+		if (dbScenario) {
+			const situation = [dbScenario.background, dbScenario.task].filter(Boolean).join('\n\n');
+			const hint = dbScenario.hint || dbScenario.task || '';
+			const scenarioObj: FreeTalkScenario = {
+				title: dbScenario.title,
+				situation,
+				hint,
+				usefulPhrases: dbScenario.usefulPhrases ?? [],
+				scenarioType: dbScenario.scenarioType as FreeTalkScenario['scenarioType'],
+			};
+			stream = await generateFreeTalkGradingStreamFromScenario(userResponse.trim(), scenarioObj, userName);
+		} else {
+			stream = await generateFreeTalkGradingStream(userResponse.trim(), scenarioTitle.trim(), userName);
+		}
 
 		return new NextResponse(stream, {
 			headers: {

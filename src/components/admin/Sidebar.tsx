@@ -23,6 +23,7 @@ import {
   CreditCard,
   UserPlus,
   Video,
+  MessageSquare,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -38,6 +39,7 @@ const Sidebar: React.FC = () => {
     { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/free-talk" },
     { name: "Classes", icon: Video, path: "/admin/classes" },
     { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
     { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
