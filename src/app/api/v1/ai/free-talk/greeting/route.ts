@@ -7,6 +7,7 @@ import { withPremium } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import { logger } from '@/lib/api/logger';
+import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 
 function scenarioPayload(dbScenario: {
 	_id: Types.ObjectId;
@@ -14,9 +15,9 @@ function scenarioPayload(dbScenario: {
 	background: string;
 	task: string;
 	hint?: string;
-	usefulPhrases?: string[];
+	usefulPhrases?: unknown;
 	scenarioType: string;
-	include?: string[];
+	include?: unknown;
 }) {
 	const situation = [dbScenario.background, dbScenario.task].filter(Boolean).join('\n\n');
 	const hint = dbScenario.hint || dbScenario.task || '';
@@ -25,11 +26,11 @@ function scenarioPayload(dbScenario: {
 		title: dbScenario.title,
 		situation,
 		hint,
-		usefulPhrases: dbScenario.usefulPhrases ?? [],
+		usefulPhrases: normalizeFreeTalkScenarioStringList(dbScenario.usefulPhrases),
 		scenarioType: dbScenario.scenarioType,
 		background: dbScenario.background,
 		task: dbScenario.task,
-		include: dbScenario.include ?? [],
+		include: normalizeFreeTalkScenarioStringList(dbScenario.include),
 	};
 }
 
@@ -45,9 +46,9 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 			background: string;
 			task: string;
 			hint?: string;
-			usefulPhrases?: string[];
+			usefulPhrases?: unknown;
 			scenarioType: string;
-			include?: string[];
+			include?: unknown;
 		} | null = null;
 
 		if (scenarioId) {

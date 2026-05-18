@@ -9,9 +9,9 @@ interface MarkdownTextProps {
   className?: string;
 }
 
-/** Body copy: works with `dark:` layouts even when `html` lacks `.dark` (CSS vars stay light). */
-const MD_BODY = "text-gray-900 dark:text-[#e8ebe9]";
-const MD_MUTED = "text-gray-600 dark:text-[#9aa39e]";
+/** Body copy: high contrast for feedback / instructional text. */
+const MD_BODY = "text-black dark:text-[#e8ebe9]";
+const MD_MUTED = "text-neutral-700 dark:text-[#b8bdb9]";
 
 export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
   // Sanitize the content before rendering
@@ -21,7 +21,7 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
   const sanitizedContent = DOMPurify.sanitize(children);
 
   return (
-    <div className={`prose prose-sm max-w-none ${className}`}>
+    <div className={`max-w-none text-black dark:text-[#e8ebe9] ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

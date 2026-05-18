@@ -1,3 +1,6 @@
+import { normalizeFreeTalkScenarioStringList } from "@/lib/free-talk-scenario-lists";
+import type { FreeTalkAttemptApiRow, FreeTalkGradeResult } from "@/lib/free-talk-history";
+
 const API_BASE_URL = "/api/v1";
 
 /**
@@ -125,6 +128,7 @@ export const aiService = {
     situation: string;
     hint: string;
     usefulPhrases: string[];
+    include: string[];
     scenarioType: string;
   }> {
     const signal = options?.signal;
@@ -150,7 +154,24 @@ export const aiService = {
     if (!data.success || !data.scenario?.id) {
       throw new Error(typeof data.message === "string" ? data.message : "Failed to load scenario");
     }
-    return data.scenario;
+    const sc = data.scenario as {
+      id: string;
+      title: string;
+      situation: string;
+      hint: string;
+      usefulPhrases?: unknown;
+      include?: unknown;
+      scenarioType: string;
+    };
+    return {
+      id: sc.id,
+      title: sc.title,
+      situation: sc.situation,
+      hint: sc.hint,
+      usefulPhrases: normalizeFreeTalkScenarioStringList(sc.usefulPhrases),
+      include: normalizeFreeTalkScenarioStringList(sc.include),
+      scenarioType: sc.scenarioType,
+    };
   },
 
   /**
@@ -218,5 +239,95 @@ export const aiService = {
 
     const data = await response.json();
     return data.data.transcription;
+  },
+
+  /**
+   * List persisted Free Talk attempts for the signed-in learner (Pro).
+   * GET /api/v1/ai/free-talk/attempts
+   */
+  async fetchFreeTalkAttempts(options?: {
+    limit?: number;
+    cursor?: string | null;
+    signal?: AbortSignal;
+  }): Promise<{ attempts: FreeTalkAttemptApiRow[]; nextCursor: string | null }> {
+    const sp = new URLSearchParams();
+    if (options?.limit != null) sp.set("limit", String(options.limit));
+    if (options?.cursor) sp.set("cursor", options.cursor);
+    const qs = sp.toString();
+    const response = await fetch(
+      `${API_BASE_URL}/ai/free-talk/attempts${qs ? `?${qs}` : ""}`,
+      {
+        method: "GET",
+        credentials: "include",
+        signal: options?.signal,
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 402) {
+        throw new Error("Subscription required");
+      }
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.message === "string" ? error.message : "Failed to load Free Talk history"
+      );
+    }
+
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.attempts)) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load Free Talk history");
+    }
+    return {
+      attempts: data.attempts as FreeTalkAttemptApiRow[],
+      nextCursor: typeof data.nextCursor === "string" ? data.nextCursor : null,
+    };
+  },
+
+  /**
+   * Persist a graded Free Talk attempt (optional voice recording as multipart).
+   * POST /api/v1/ai/free-talk/attempts
+   */
+  async saveFreeTalkAttempt(
+    body: {
+      scenarioId: string;
+      scenarioTitle: string;
+      scenarioType: string;
+      feedbackText: string;
+      gradeResult: FreeTalkGradeResult | null;
+      durationMs?: number;
+      usedVoice: boolean;
+    },
+    audioBlob?: Blob | null,
+    signal?: AbortSignal
+  ): Promise<FreeTalkAttemptApiRow> {
+    const formData = new FormData();
+    formData.append("payload", JSON.stringify(body));
+    if (audioBlob && audioBlob.size > 0) {
+      const name = audioBlob.type.includes("webm") ? "recording.webm" : "recording.bin";
+      formData.append("audio", audioBlob, name);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/ai/free-talk/attempts`, {
+      method: "POST",
+      credentials: "include",
+      signal,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      if (response.status === 402) {
+        throw new Error("Subscription required");
+      }
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.message === "string" ? error.message : "Failed to save Free Talk attempt"
+      );
+    }
+
+    const data = await response.json();
+    if (!data.success || !data.attempt?.id) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to save Free Talk attempt");
+    }
+    return data.attempt as FreeTalkAttemptApiRow;
   },
 };

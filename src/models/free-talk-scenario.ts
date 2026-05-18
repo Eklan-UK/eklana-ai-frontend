@@ -8,7 +8,9 @@ export interface IFreeTalkScenario extends Document {
 	title: string;
 	background: string;
 	task: string;
+	/** Trimmed lines; persisted as string[] (see `normalizeFreeTalkScenarioStringList` for legacy string shapes). */
 	include: string[];
+	/** Trimmed lines; persisted as string[] (see `normalizeFreeTalkScenarioStringList` for legacy string shapes). */
 	usefulPhrases: string[];
 	scenarioType: FreeTalkScenarioType;
 	hint: string;

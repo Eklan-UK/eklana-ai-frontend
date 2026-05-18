@@ -880,6 +880,37 @@ export const adminAPI = {
     });
   },
 
+  /** Eklan Free Talk attempts for a learner (admin/tutor). */
+  getLearnerFreeTalkAttempts: (
+    learnerId: string,
+    params?: { limit?: number; cursor?: string | null }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        attempts: Array<{
+          id: string;
+          scenarioId: string;
+          scenarioTitle: string;
+          scenarioType: string;
+          feedbackText: string;
+          gradeResult: unknown;
+          audioUrl: string | null;
+          audioMimeType: string | null;
+          durationMs: number | null;
+          usedVoice: boolean;
+          completedAt: string;
+        }>;
+        nextCursor: string | null;
+      };
+    }>(`/admin/learners/${learnerId}/free-talk-attempts`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
   // Get discovery calls (admin only)
   getDiscoveryCalls: (params?: {
     limit?: number;

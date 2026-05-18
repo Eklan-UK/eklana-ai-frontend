@@ -9,6 +9,7 @@ import { generateFreeTalkGradingStreamFromScenario, type FreeTalkScenario } from
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
 import FreeTalkScenarioModel from '@/models/free-talk-scenario';
+import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 
 async function handler(
 	req: NextRequest,
@@ -55,9 +56,9 @@ async function handler(
 			title: dbScenario.title,
 			situation,
 			hint,
-			usefulPhrases: dbScenario.usefulPhrases ?? [],
+			usefulPhrases: normalizeFreeTalkScenarioStringList(dbScenario.usefulPhrases),
 			scenarioType: dbScenario.scenarioType as FreeTalkScenario['scenarioType'],
-			include: dbScenario.include ?? [],
+			include: normalizeFreeTalkScenarioStringList(dbScenario.include),
 		};
 
 		const stream = await generateFreeTalkGradingStreamFromScenario(
