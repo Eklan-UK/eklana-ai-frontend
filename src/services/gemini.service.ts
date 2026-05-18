@@ -3,7 +3,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
 import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
-import { resolveAiNameList, type DrillFreeTalkOverlay } from '@/domain/ai/free-talk';
+import type { FreeTalkScenarioType } from '@/models/free-talk-scenario.shared';
 // Bundled static binary — works in serverless environments where ffmpeg is not on PATH.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegBin: string = require('ffmpeg-static');
@@ -44,41 +44,6 @@ interface ConversationOptions {
 	systemInstruction?: string;
 }
 
-
-
-interface DrillPracticeOptions {
-	drill: {
-		type: string;
-		title: string;
-		difficulty?: string;
-		context?: string;
-		target_sentences?: any[];
-		roleplay_scenes?: any[];
-		roleplay_dialogue?: any[];
-		student_character_name?: string;
-		ai_character_name?: string;
-		ai_character_names?: string[];
-		matching_pairs?: any[];
-		definition_items?: any[];
-		grammar_items?: any[];
-		sentence_writing_items?: any[];
-		fill_blank_items?: any[];
-		article_title?: string;
-		article_content?: string;
-		listening_drill_title?: string;
-		listening_drill_content?: string;
-		sentence_drill_word?: string;
-	};
-	userMessage: string;
-	conversationHistory?: ConversationMessage[];
-	temperature?: number;
-	pronunciationWeaknesses?: string[];
-	userName?: string;
-	/** From role-play: fixed scene + target words (Free Talk from drill). */
-	freeTalkOverlay?: DrillFreeTalkOverlay;
-	/** User practises as tutor; model plays learner (Alex) in the same drill scenario. */
-	freeTalkReversed?: boolean;
-}
 
 // ─── PCM to WAV conversion ───────────────────────────────────────────────────
 // Live API returns raw PCM L16 audio (24kHz, 16-bit, mono).
@@ -623,212 +588,8 @@ async function transcribeWithLiveAPI(
 	});
 }
 
-// ─── Build drill practice system prompt ──────────────────────────────────────
-
-function buildDrillPracticePrompt(
-	drill: DrillPracticeOptions['drill'],
-	pronunciationWeaknesses?: string[],
-	userName?: string,
-	freeTalkOverlay?: DrillFreeTalkOverlay,
-	freeTalkReversed?: boolean
-): string {
-	if (freeTalkReversed && freeTalkOverlay?.scenarioDescription) {
-		let prompt = '';
-		if (userName) {
-			prompt += `TUTOR / REAL USER: The person speaking to you is named "${userName}". They are your English tutor leading this practice. Address them naturally by name when appropriate.\n\n`;
-		}
-		prompt += `You are Alex, an English learner. The user (${userName || 'your tutor'}) leads the session as the tutor, interviewer, or partner role from the scenario below. You play the learner/candidate/applicant side — the side a student would play in this situation.\n`;
-		prompt += `Behave like a genuine learner: ask questions, show curiosity, and occasionally use vocabulary imperfectly or ask the tutor to confirm a phrase. Do NOT act as the teacher, examiner, or interviewer yourself.\n\n`;
-		prompt += `DRILL (from their human tutor): "${drill.title}" — type: ${drill.type}, difficulty: ${drill.difficulty || 'intermediate'}`;
-		if (drill.context) {
-			prompt += `\nGeneral context: ${drill.context}`;
-		}
-		prompt += `\n\nFOCUSED ROLEPLAY SESSION (stay in this world):\n${freeTalkOverlay.scenarioDescription}`;
-		if (freeTalkOverlay.referenceScript?.trim()) {
-			prompt += `\n\nREFERENCE SCRIPT (shows how the scenario flows — use it to stay on-topic; you speak as the learner side, not as every line verbatim):\n${freeTalkOverlay.referenceScript.trim()}`;
-		}
-		if (freeTalkOverlay.vocabularyList.length > 0) {
-			const lines = freeTalkOverlay.vocabularyList.map(
-				(w, i) => `  ${i + 1}. ${w}`
-			).join('\n');
-			prompt += `\n\nTARGET WORDS (try to use them; sometimes ask ${userName || 'the tutor'} if you used one correctly):\n${lines}`;
-		}
-		prompt += `\n\nGENERATION INSTRUCTION:\nStay in the same setting and premise. Build on what ${userName || 'the tutor'} says. Keep replies short (1–3 sentences) like a real learner speaking. No JSON or markdown.`;
-		if (pronunciationWeaknesses && pronunciationWeaknesses.length > 0) {
-			prompt += `\n\nNote: ${userName || 'The tutor'} may help you with sounds you find difficult: ${pronunciationWeaknesses.join(', ')}.`;
-		}
-		return prompt;
-	}
-
-	// ═══ LAYER 1 — Identity ═══
-	let prompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${drill.type === 'roleplay' ? 'roleplay' : drill.type} drill by their human tutor.`;
-	if (userName) {
-		// Place name rule at the very top of the prompt so the model prioritises it.
-		prompt = `STUDENT NAME: The real student speaking to you is named "${userName}". Always address them as "${userName}" — never use a roleplay character name when directly speaking to the real person.\n\n` + prompt;
-	}
-
-	// ═══ LAYER 2 — Drill Blueprint ═══
-	prompt += `\n\nDRILL BLUEPRINT:\n- Title: "${drill.title}"\n- Type: ${drill.type}\n- Difficulty: ${drill.difficulty || 'intermediate'}`;
-	if (drill.context) {
-		prompt += `\n- Context: ${drill.context}`;
-	}
-
-	// Character information
-	if (drill.student_character_name) {
-		prompt += `\n- Student plays: ${drill.student_character_name}`;
-	}
-	const roleAiNames = resolveAiNameList(drill);
-	if (roleAiNames && roleAiNames.length > 0) {
-		prompt += `\n- AI plays: ${roleAiNames.join(', ')}`;
-	}
-
-	const activeOnly =
-		freeTalkOverlay != null &&
-		typeof freeTalkOverlay.activeSceneIndex === "number" &&
-		freeTalkOverlay.activeSceneIndex >= 0 &&
-		drill.roleplay_scenes &&
-		drill.roleplay_scenes[freeTalkOverlay.activeSceneIndex];
-
-	// Scene descriptions: for Free Talk with a selected scene, only the ACTIVE scene
-	// (avoid mixing e.g. "Interview" + "Technical stand-up" in one session).
-	if (drill.roleplay_scenes && drill.roleplay_scenes.length > 0) {
-		if (activeOnly) {
-			const i = freeTalkOverlay!.activeSceneIndex as number;
-			const scene = drill.roleplay_scenes[i];
-			const parts = [];
-			if (scene.scene_name || scene.title || scene.name) {
-				parts.push(scene.scene_name || scene.title || scene.name);
-			}
-			if (scene.context || scene.description) parts.push(scene.context || scene.description);
-			if (scene.setting) parts.push(`Setting: ${scene.setting}`);
-			prompt += `\n- THIS SESSION's scene only (index ${i} in the drill): ${parts.join(" — ") || JSON.stringify(scene)}`;
-			if (drill.roleplay_scenes.length > 1) {
-				prompt += `\n- Note: this drill has other scenes for other sessions — do not blend their content into this one unless the student explicitly changes topic.`;
-			}
-		} else {
-			const sceneDescriptions = drill.roleplay_scenes.map((scene: any, i: number) => {
-				const parts = [];
-				if (scene.scene_name || scene.title || scene.name) {
-					parts.push(scene.scene_name || scene.title || scene.name);
-				}
-				if (scene.context || scene.description) parts.push(scene.context || scene.description);
-				if (scene.setting) parts.push(`Setting: ${scene.setting}`);
-				return `  ${i + 1}. ${parts.join(' — ') || JSON.stringify(scene)}`;
-			}).join('\n');
-			prompt += `\n- The tutor created scenes about:\n${sceneDescriptions}`;
-		}
-	}
-
-	// Key dialogue patterns: skip when reference script is in FOCUSED, or when a multi-scene drill
-	// has an active scene selected (global `roleplay_dialogue` is usually all scenes at once).
-	const skipGlobalDialogueBlueprint =
-		!!freeTalkOverlay?.referenceScript?.trim() ||
-		(!!activeOnly && (drill.roleplay_scenes?.length ?? 0) > 1);
-	if (
-		drill.roleplay_dialogue &&
-		drill.roleplay_dialogue.length > 0 &&
-		!skipGlobalDialogueBlueprint
-	) {
-		const dialoguePatterns = drill.roleplay_dialogue.map((d: any) => {
-			if (typeof d === 'string') return `  - ${d}`;
-			if (d.speaker && d.text) return `  - ${d.speaker}: "${d.text}"`;
-			if (d.line) return `  - ${d.line}`;
-			return `  - ${JSON.stringify(d)}`;
-		}).join('\n');
-		prompt += `\n- Key dialogue patterns include:\n${dialoguePatterns}`;
-	}
-
-	// Target sentences / vocabulary
-	if (drill.target_sentences && drill.target_sentences.length > 0) {
-		const sentences = drill.target_sentences.map((s: any, i: number) =>
-			`  ${i + 1}. ${typeof s === 'string' ? s : s.text || JSON.stringify(s)}`
-		).join('\n');
-		prompt += `\n- Target sentences/vocabulary:\n${sentences}`;
-	}
-
-	// Other drill content (matching, definitions, grammar, etc.)
-	if (drill.matching_pairs && drill.matching_pairs.length > 0) {
-		prompt += `\n- Vocabulary pairs to incorporate: ${drill.matching_pairs.map((p: any) => `${p.term || p.word} = ${p.definition || p.match}`).join(', ')}`;
-	}
-	if (drill.definition_items && drill.definition_items.length > 0) {
-		prompt += `\n- Key definitions: ${drill.definition_items.map((d: any) => `${d.word || d.term}: ${d.definition}`).join('; ')}`;
-	}
-	if (drill.grammar_items && drill.grammar_items.length > 0) {
-		prompt += `\n- Grammar focus: ${drill.grammar_items.map((g: any) => g.rule || g.pattern || JSON.stringify(g)).join('; ')}`;
-	}
-	if (drill.article_title && drill.article_content) {
-		prompt += `\n- Related article: "${drill.article_title}" — ${drill.article_content.substring(0, 300)}...`;
-	}
-	if (drill.sentence_drill_word) {
-		prompt += `\n- Target word: "${drill.sentence_drill_word}"`;
-	}
-
-	// Optional: Free Talk from a specific tutor scene + word list
-	if (freeTalkOverlay?.scenarioDescription) {
-		prompt += `\n\nFOCUSED ROLEPLAY SESSION (from tutor's material):
-The tutor selected THIS setting for the student's free conversation. You MUST keep the entire session in this setting — do not switch to a different place, role, or premise unless the student explicitly asks.
-
-SETTING:
-${freeTalkOverlay.scenarioDescription}`;
-
-		if (freeTalkOverlay.referenceScript?.trim()) {
-			prompt += `\n\nREFERENCE SCRIPT (tutor-authored lines for this scene — match the same situation, tone, roles, and learning goals; improvise natural follow-ups and replies; do NOT replace with a different job, company, or scenario type):
-${freeTalkOverlay.referenceScript.trim()}`;
-		} else if (
-			typeof freeTalkOverlay.activeSceneIndex === "number" &&
-			drill.roleplay_scenes &&
-			drill.roleplay_scenes.length > 1
-		) {
-			prompt += `\n\n(NOTE: The tutor did not provide line-by-line script for this specific scene. Stay strictly in the SETTING and scene title above. Do not blend in the tutor’s other named scenes, and do not improvise a different company, job, or interview round than described for THIS scene.)`;
-		}
-
-		if (freeTalkOverlay.vocabularyList.length > 0) {
-			const lines = freeTalkOverlay.vocabularyList.map(
-				(w, i) => `  ${i + 1}. ${w}`
-			).join('\n');
-			prompt += `\n\nTARGET WORDS (weave into dialogue; praise when the student uses one correctly; gentle corrections on misuse):
-${lines}`;
-		}
-	}
-
-	// ═══ LAYER 3 — Generation Instruction ═══
-	if (freeTalkOverlay?.scenarioDescription) {
-		prompt += `\n\nGENERATION INSTRUCTION:
-Stay within the FOCUSED ROLEPLAY SESSION above — same round, same premise (e.g. same interview stage, same technical review), same role names as in the REFERENCE SCRIPT when present.
-Continue naturally in the same world and roles. Weave the TARGET WORDS (if any) into the dialogue.
-Do not invent a wholly new scenario on each turn; build on the ongoing conversation.
-If a REFERENCE SCRIPT is provided, treat it as the canonical content for what this practice is about; extend it, don't override it with unrelated topics.`;
-	} else if (drill.type === 'roleplay' || drill.type === 'scenario') {
-		prompt += `\n\nGENERATION INSTRUCTION:
-Create a DIFFERENT but related roleplay scenario in the same context.
-Do NOT repeat the human tutor's exact scenes. Generate a fresh scenario that exercises the same skills.
-Use the same themes, vocabulary, and difficulty level, but create a new situation the student hasn't practiced before.
-For example, if the tutor's drill was about negotiating salary, you might create a scenario about negotiating a project deadline, discussing a promotion, or resolving a budget conflict.`;
-	} else {
-		prompt += `\n\nGENERATION INSTRUCTION:
-Use the drill content as a foundation, but create fresh practice exercises that reinforce the same skills.
-Do NOT simply repeat the exact items from the drill. Generate new examples that exercise the same patterns.
-Keep the practice engaging and conversational — weave the target language into natural dialogue.`;
-	}
-
-	// ═══ LAYER 4 — Teaching Style ═══
-	prompt += `\n\nTEACHING STYLE:
-- Use and encourage the same vocabulary from the drill
-- Give gentle inline corrections for grammar mistakes
-- Praise correct usage of target language
-- Keep it natural and conversational
-- Match the ${drill.difficulty || 'intermediate'} difficulty level
-- Keep responses concise (2-4 sentences typical)
-- Be directive — you lead the practice, don't ask the student what they want to do`;
-
-	if (pronunciationWeaknesses && pronunciationWeaknesses.length > 0) {
-		prompt += `\n- The student has pronunciation weaknesses with: ${pronunciationWeaknesses.join(', ')}. Incorporate words with these sounds when appropriate.`;
-	}
-
-	return prompt;
-}
-
 // ─── Exported functions ──────────────────────────────────────────────────────
+
 
 /**
  * Generate AI conversation response (non-drill, uses text model)
@@ -1054,6 +815,141 @@ export async function transcribeAudio(
 	} catch (error: any) {
 		logger.error('Error transcribing audio', { error: error.message });
 		throw new Error(`Failed to transcribe audio: ${error.message}`);
+	}
+}
+
+export type ListeningAnalyzeQuestion = Record<string, unknown>;
+
+export interface ListeningComprehensionAnswer {
+	questionId?: string | number;
+	questionText: string;
+	userAnswer: string;
+	isCorrect: boolean;
+	score: number;
+	feedback?: string;
+}
+
+export interface ListeningComprehensionResult {
+	transcription: string;
+	overallScore: number;
+	answers: ListeningComprehensionAnswer[];
+	summary?: string;
+}
+
+function normalizeListeningQuestions(raw: unknown[]): Array<{
+	id: string | number;
+	prompt: string;
+	correctAnswer?: string;
+	options?: string[];
+}> {
+	return raw.map((q, index) => {
+		if (typeof q === 'string') {
+			return { id: index, prompt: q };
+		}
+		if (q && typeof q === 'object') {
+			const o = q as Record<string, unknown>;
+			const prompt = String(o.question ?? o.text ?? o.prompt ?? '');
+			const ca = o.correctAnswer ?? o.answer ?? o.expected;
+			const options = Array.isArray(o.options) ? (o.options as unknown[]).map(String) : undefined;
+			return {
+				id: (o.id as string | number) ?? index,
+				prompt,
+				correctAnswer: ca != null && ca !== '' ? String(ca) : undefined,
+				options,
+			};
+		}
+		return { id: index, prompt: String(q) };
+	});
+}
+
+/**
+ * Score spoken answers to listening-comprehension questions using Gemini (inline audio).
+ */
+export async function analyzeListeningComprehension(
+	audioBuffer: Buffer,
+	questions: unknown[],
+	options: { mimeType?: string } = {}
+): Promise<ListeningComprehensionResult> {
+	try {
+		if (!genAI) {
+			throw new Error('Gemini API is not configured');
+		}
+		if (!Array.isArray(questions) || questions.length === 0) {
+			throw new Error('At least one question is required');
+		}
+
+		const mimeType = options.mimeType ?? 'audio/webm';
+		const normalized = normalizeListeningQuestions(questions);
+
+		logger.info('Analyzing listening comprehension', {
+			audioBytes: audioBuffer.length,
+			mimeType,
+			questionCount: normalized.length,
+		});
+
+		const model = genAI.getGenerativeModel({
+			model: DEFAULT_MODEL,
+			generationConfig: {
+				temperature: 0.2,
+				maxOutputTokens: 3000,
+			},
+		});
+
+		const base64Audio = audioBuffer.toString('base64');
+
+		const prompt = `You are an English listening comprehension evaluator.
+
+The student listened to instructional audio (not attached here) and recorded ONE audio clip with their spoken answers to the questions below.
+
+Questions (JSON — use "prompt" as the question text; "correctAnswer" when present is the reference; "options" may list choices for multiple-choice style items):
+${JSON.stringify(normalized, null, 2)}
+
+Listen to the student's audio. Map their speech to each question (order or explicit references). If they only partially answered, score accordingly.
+
+Return ONLY valid JSON with this exact shape:
+{
+  "transcription": "verbatim or best-effort transcript of the student's speech",
+  "overallScore": <integer 0-100>,
+  "answers": [
+    {
+      "questionId": <optional, same as id from input>,
+      "questionText": <string, repeat the prompt>,
+      "userAnswer": <what they said for this item>,
+      "isCorrect": <boolean>,
+      "score": <integer 0-100 per question>,
+      "feedback": <one short sentence>
+    }
+  ],
+  "summary": <one sentence overview>
+}
+
+Include one entry in "answers" for every input question, in the same order as the questions array.`;
+
+		const result = await model.generateContent([
+			prompt,
+			{
+				inlineData: {
+					data: base64Audio,
+					mimeType,
+				},
+			},
+		]);
+
+		const responseText = result.response.text();
+		const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+		if (!jsonMatch) {
+			throw new Error('Failed to parse listening comprehension response');
+		}
+
+		const parsed = JSON.parse(jsonMatch[0]) as ListeningComprehensionResult;
+		if (typeof parsed.transcription !== 'string' || typeof parsed.overallScore !== 'number' || !Array.isArray(parsed.answers)) {
+			throw new Error('Invalid listening comprehension response shape');
+		}
+
+		return parsed;
+	} catch (error: any) {
+		logger.error('Error analyzing listening comprehension', { error: error.message });
+		throw new Error(`Failed to analyze listening comprehension: ${error.message}`);
 	}
 }
 
@@ -1585,551 +1481,6 @@ logger.info('[FreeTalk] ①+② ffmpeg+session ready (parallel)', {
 	});
 }
 
-// ─── Drill voice conversation (Live API + built-in transcription, SSE) ─
-// Same pipeline as generateVoiceConversationSSEStream but with drill-aware
-// system prompt. Converts audio to raw PCM 16kHz before sending.
-export async function generateDrillPracticeVoiceResponseStream(
-	options: {
-		drill: DrillPracticeOptions['drill'];
-		audioBuffer: Buffer;
-		conversationHistory?: ConversationMessage[];
-		pronunciationWeaknesses?: string[];
-		mimeType?: string;   // kept for API compat, format handled internally
-		voiceName?: string;
-		userName?: string;
-		userId?: string;     // used as part of the session cache key
-		drillId?: string;    // used as part of the session cache key
-		freeTalkOverlay?: DrillFreeTalkOverlay;
-		/** User practises as tutor; model plays learner (Alex). */
-		freeTalkReversed?: boolean;
-	}
-): Promise<ReadableStream> {
-	const {
-		drill,
-		audioBuffer,
-		conversationHistory = [],
-		pronunciationWeaknesses,
-		voiceName = 'Kore',
-		userName,
-		userId,
-		drillId,
-		freeTalkOverlay,
-		freeTalkReversed,
-	} = options;
-
-	if (!genAINew) throw new Error('Gemini Live API is not configured');
-
-	const t0 = Date.now();
-
-	// Build system instruction before kicking off parallel work (sync, no I/O).
-	let systemInstruction = buildDrillPracticePrompt(
-		drill,
-		pronunciationWeaknesses,
-		userName,
-		freeTalkOverlay,
-		freeTalkReversed
-	);
-	if (conversationHistory.length > 0) {
-		const recent = conversationHistory.slice(-4);
-		systemInstruction += '\n\nRecent conversation:\n' +
-			recent.map(m => `${m.role === 'user' ? (userName || 'Student') : 'Eklan'}: ${m.content}`).join('\n');
-	}
-	systemInstruction += '\n\nIMPORTANT: The user is speaking via voice. Listen carefully, respond in spoken English. Keep responses concise (2-4 sentences). No JSON or markdown.';
-
-	const overlayKey = freeTalkOverlay?.scenarioDescription
-		? `_ft_${Buffer.from(freeTalkOverlay.scenarioDescription)
-			.toString('base64')
-			.replace(/\+/g, '-')
-			.replace(/\//g, '_')
-			.replace(/=+$/, '')
-			.slice(0, 48)}${freeTalkReversed ? '_rev' : ''}`
-		: '';
-	const cacheKey = (userId && drillId) ? `drill_${userId}_${drillId}${overlayKey}` : `drill_anon_${Date.now()}`;
-
-	// ①+② Run FFmpeg conversion and Live session connect in parallel — session
-	// creation (~500-970 ms) dominates; overlapping FFmpeg (~50-280 ms) hides it.
-	const tSession = Date.now();
-	let pcmBuffer: Buffer;
-	let entry: LiveSessionEntry;
-	try {
-		[pcmBuffer, entry] = await Promise.all([
-			convertAudioToRawPcm16k(audioBuffer).catch((e: any) => {
-				throw new Error(`Drill audio conversion failed: ${e?.message || 'ffmpeg error'}`);
-			}),
-		getOrCreateLiveSession(cacheKey, LIVE_MODEL, {
-			responseModalities: [Modality.AUDIO],
-			speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-			systemInstruction: { parts: [{ text: systemInstruction }] },
-			inputAudioTranscription: {},
-			outputAudioTranscription: {},
-			thinkingConfig: { thinkingBudget: 0 },
-			// Disable server-side VAD so it doesn't fire on natural pauses
-			// mid-recording for long inputs. We signal activity start/end manually.
-			realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
-		}),
-	]);
-} catch (e: any) {
-	throw e;
-}
-logger.info('[Drill] ①+② ffmpeg+session ready (parallel)', {
-	totalMs: Date.now() - t0,
-	inBytes: audioBuffer.length,
-	outBytes: pcmBuffer.length,
-});
-	const pcmBytes = pcmBuffer.length;
-
-	// ③ Create the SSE stream — session is already connected; just route messages.
-	const sseCtx = {
-		streamClosed: false,
-		timeoutHandle: undefined as ReturnType<typeof setTimeout> | undefined,
-		turnCompleteHandle: undefined as ReturnType<typeof setTimeout> | undefined,
-	};
-
-	return new ReadableStream({
-		start(controller) {
-			const sendChunk = (type: 'audio' | 'text' | 'metadata', data: any) => {
-				if (sseCtx.streamClosed) return;
-				try {
-					controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type, data })}\n\n`));
-				} catch (e: unknown) {
-					const err = e as { code?: string };
-					if (err?.code !== 'ERR_INVALID_STATE') throw e;
-				}
-			};
-
-		const fullAssistantText: string[] = [];
-		let fullUserText = '';
-		let metadataSent = false;
-		let tFirstChunk   = 0;
-		let tFirstModelActivity = 0;
-		let firstModelProducing = false;
-
-		const releaseSession = () => {
-			entry.onTurnMessage = null;
-			entry.onTurnError   = null;
-			entry.onTurnClose   = null;
-			if (entry.status === 'busy') entry.status = 'ready';
-		};
-
-		const clearTimers = () => {
-			if (sseCtx.timeoutHandle !== undefined) {
-				clearTimeout(sseCtx.timeoutHandle);
-				sseCtx.timeoutHandle = undefined;
-			}
-			if (sseCtx.turnCompleteHandle !== undefined) {
-				clearTimeout(sseCtx.turnCompleteHandle);
-				sseCtx.turnCompleteHandle = undefined;
-			}
-		};
-
-		const closeStream = (reason?: string) => {
-			if (sseCtx.streamClosed) return;
-			sseCtx.streamClosed = true;
-			clearTimers();
-			releaseSession();
-			// Must evict the Live socket every turn (same as Free Talk) — reusing the cached
-			// session often produced zero audio on subsequent turns (timeout_no_response).
-			evictLiveSessionByKey(cacheKey);
-			if (reason) logger.info('[Drill] stream closed', { reason });
-			try {
-				controller.close();
-			} catch (e: unknown) {
-				const err = e as { code?: string };
-				if (err?.code !== 'ERR_INVALID_STATE') throw e;
-			}
-		};
-
-		// Two-stage timeout: 45 s for first *model* output, then 90 s to complete.
-		const scheduleFirstChunkTimeout = () => {
-			sseCtx.timeoutHandle = setTimeout(() => {
-				sseCtx.timeoutHandle = undefined;
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: '', inputText: '', drillType: drill.type, drillTitle: drill.title, error: 'timeout_no_response' }); }
-				closeStream('timeout_no_response');
-			}, 45_000);
-		};
-		const resetToStreamCompleteTimeout = () => {
-			if (sseCtx.timeoutHandle !== undefined) { clearTimeout(sseCtx.timeoutHandle); }
-			sseCtx.timeoutHandle = setTimeout(() => {
-				sseCtx.timeoutHandle = undefined;
-				if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), drillType: drill.type, drillTitle: drill.title, error: 'timeout_stream_too_long' }); }
-				closeStream('timeout_stream_too_long');
-			}, 90_000);
-		};
-
-		const noteFirstModelProducing = () => {
-			if (firstModelProducing) return;
-			firstModelProducing = true;
-			tFirstModelActivity = Date.now();
-			resetToStreamCompleteTimeout();
-		};
-
-		entry.onTurnMessage = (message: LiveServerMessage) => {
-			const outputText = message.serverContent?.outputTranscription?.text;
-			if (outputText) {
-				noteFirstModelProducing();
-				fullAssistantText.push(outputText);
-				sendChunk('text', outputText);
-			}
-
-			const inputText = (message.serverContent as any)?.inputTranscription?.text;
-			if (inputText) fullUserText += inputText;
-
-			const pcm = getLivePcmDataFromMessage(message);
-			if (pcm) {
-				noteFirstModelProducing();
-				if (!tFirstChunk) {
-					tFirstChunk = Date.now();
-					logger.info('[Drill] ③ first PCM routed to SSE', { ms: tFirstChunk - tSession });
-				}
-				sendChunk('audio', pcm);
-			}
-
-		if (message.serverContent?.turnComplete && !metadataSent) {
-			metadataSent = true;
-			sseCtx.turnCompleteHandle = setTimeout(() => {
-				sseCtx.turnCompleteHandle = undefined;
-				if (sseCtx.streamClosed) return;
-				logger.info('[Drill] ④ turn complete', {
-					totalMs: Date.now() - t0,
-					ffmpegMs: tSession - t0,
-					firstModelOutputMs: tFirstModelActivity ? tFirstModelActivity - tSession : null,
-					firstPcmChunkMs: tFirstChunk ? tFirstChunk - tSession : null,
-				});
-				sendChunk('metadata', {
-					fullText:   fullAssistantText.join('').trim(),
-					inputText:  fullUserText.trim(),
-					drillType:  drill.type,
-					drillTitle: drill.title,
-				});
-				closeStream('turnComplete');
-			}, 150);
-			}
-		};
-
-		entry.onTurnError = (e: ErrorEvent) => {
-			logger.error('[Drill] WS error on turn', { error: e?.message });
-			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.message || 'unknown' }); }
-			closeStream('error');
-		};
-
-		entry.onTurnClose = (e: CloseEvent) => {
-			if (!metadataSent) { metadataSent = true; sendChunk('metadata', { fullText: fullAssistantText.join('').trim(), inputText: fullUserText.trim(), error: e?.reason || `ws_closed_${e?.code ?? 'unknown'}` }); }
-			closeStream('onclose');
-		};
-
-		scheduleFirstChunkTimeout();
-
-		// Send audio bracketed by manual activity signals so the server-side VAD
-		// (which is disabled in the session config) does not fire on natural pauses
-		// mid-recording. activityStart → chunks → activityEnd tells Gemini exactly
-		// when the pre-recorded speech starts and ends.
-		entry.status = 'busy';
-		entry.session.sendRealtimeInput({ activityStart: {} });
-		const PCM_CHUNK_BYTES = 16_000;
-		for (let offset = 0; offset < pcmBuffer.length; offset += PCM_CHUNK_BYTES) {
-			const slice = pcmBuffer.subarray(offset, offset + PCM_CHUNK_BYTES);
-			entry.session.sendRealtimeInput({ audio: { data: slice.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
-		}
-		entry.session.sendRealtimeInput({ activityEnd: {} });
-		logger.info('[Drill] ②→③ audio sent (manual VAD)', { pcmBytes, chunks: Math.ceil(pcmBuffer.length / PCM_CHUNK_BYTES), msSinceStart: Date.now() - t0 });
-		},
-		cancel(reason) {
-			if (sseCtx.streamClosed) return;
-			sseCtx.streamClosed = true;
-			if (sseCtx.timeoutHandle !== undefined) {
-				clearTimeout(sseCtx.timeoutHandle);
-				sseCtx.timeoutHandle = undefined;
-			}
-			if (sseCtx.turnCompleteHandle !== undefined) {
-				clearTimeout(sseCtx.turnCompleteHandle);
-				sseCtx.turnCompleteHandle = undefined;
-			}
-			entry.onTurnMessage = null;
-			entry.onTurnError   = null;
-			entry.onTurnClose   = null;
-			if (entry.status === 'busy') entry.status = 'ready';
-			evictLiveSessionByKey(cacheKey);
-			logger.info('[Drill] stream cancelled', { reason: String(reason) });
-		},
-	});
-}
-
-// ─── Listening comprehension (uses text model) ──────────────────────────────
-
-/**
- * Analyze listening comprehension from audio
- */
-export async function analyzeListeningComprehension(
-	audioBuffer: Buffer,
-	questions: Array<{ question: string; correctAnswer: string }>
-): Promise<{
-	answers: Array<{ question: string; answer: string; isCorrect: boolean }>;
-	overallScore: number;
-	feedback: string;
-}> {
-	try {
-		if (!genAI) {
-			throw new Error('Gemini API is not configured');
-		}
-
-		const model = genAI.getGenerativeModel({
-			model: DEFAULT_MODEL,
-			generationConfig: {
-				temperature: 0.2,
-				maxOutputTokens: 1000,
-			},
-		});
-
-		const base64Audio = audioBuffer.toString('base64');
-		const mimeType = 'audio/m4a';
-
-		const prompt = `Listen to this audio recording and answer the following comprehension questions.
-
-Questions:
-${questions.map((q, i) => `${i + 1}. ${q.question} (Expected: ${q.correctAnswer})`).join('\n')}
-
-Respond in this exact JSON format:
-{
-  "answers": [
-    {"question": "the question", "answer": "the answer from the audio", "isCorrect": true/false}
-  ],
-  "overallScore": 85,
-  "feedback": "overall feedback about comprehension"
-}`;
-
-		const result = await model.generateContent([
-			prompt,
-			{
-				inlineData: {
-					data: base64Audio,
-					mimeType,
-				},
-			},
-		]);
-
-		const responseText = result.response.text();
-		const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-		if (!jsonMatch) {
-			throw new Error('Failed to parse listening comprehension response');
-		}
-
-		return JSON.parse(jsonMatch[0]);
-	} catch (error: any) {
-		logger.error('Error analyzing listening comprehension', { error: error.message });
-		throw new Error(`Failed to analyze listening comprehension: ${error.message}`);
-	}
-}
-
-// ─── Drill practice (Live API only — no gemini-2.5-flash) ───────────────────
-
-/**
- * Generate drill-aware conversation response with native audio.
- * Uses ONLY the Live API — single model for both text + audio.
- */
-export async function generateDrillPracticeResponseStream(options: DrillPracticeOptions): Promise<ReadableStream> {
-	try {
-		if (!config.GEMINI_API_KEY) {
-			throw new Error('Gemini API is not configured');
-		}
-
-		const { drill, userMessage, conversationHistory = [], pronunciationWeaknesses, userName, freeTalkOverlay, freeTalkReversed } = options;
-
-		const systemPrompt = buildDrillPracticePrompt(drill, pronunciationWeaknesses, userName, freeTalkOverlay, freeTalkReversed);
-
-		// Build conversation history for Live API turns
-		let validHistory = conversationHistory;
-		if (validHistory.length > 0 && validHistory[0].role === 'model') {
-			const firstUserIndex = validHistory.findIndex((msg) => msg.role === 'user');
-			if (firstUserIndex > 0) {
-				validHistory = validHistory.slice(firstUserIndex);
-			} else if (firstUserIndex === -1) {
-				validHistory = [];
-			}
-		}
-
-		const history = validHistory.map((msg) => ({
-			role: msg.role === 'user' ? 'user' : 'model',
-			parts: [{ text: msg.content }],
-		}));
-
-		const turns = [
-			...history,
-			{
-				role: 'user',
-				parts: [{ text: userMessage }],
-			},
-		];
-
-		logger.info('Generating drill practice response via Live API (Stream)...', {
-			drillType: drill.type,
-			model: LIVE_MODEL,
-			turnsCount: turns.length,
-		});
-
-		const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
-		
-		// Create a transform stream to inject the drill metadata as the very first chunk
-		const transformStream = new TransformStream({
-			start(controller) {
-				const metadataChunk = JSON.stringify({
-					type: 'metadata',
-					data: {
-						drillType: drill.type,
-						drillTitle: drill.title,
-					}
-				});
-				controller.enqueue(new TextEncoder().encode(`data: ${metadataChunk}\n\n`));
-			}
-		});
-
-		return liveStream.pipeThrough(transformStream);
-
-	} catch (error: any) {
-		logger.error('Error generating drill practice response (Stream)', {
-			error: error.message,
-			stack: error.stack,
-			drillType: options.drill.type,
-		});
-		throw new Error(`Failed to generate drill practice response: ${error.message}`);
-	}
-}
-
-export async function generateDrillPracticeGreetingStream(
-	drill: DrillPracticeOptions['drill'],
-	userName?: string,
-	freeTalkOverlay?: DrillFreeTalkOverlay,
-	freeTalkReversed?: boolean
-): Promise<ReadableStream> {
-	try {
-		if (!config.GEMINI_API_KEY) {
-			throw new Error('Gemini API is not configured');
-		}
-
-		const typeLabel: Record<string, string> = {
-			roleplay: 'roleplay practice',
-			vocabulary: 'vocabulary practice',
-			grammar: 'grammar practice',
-			matching: 'word matching practice',
-			definition: 'definition practice',
-			sentence_writing: 'sentence building practice',
-			fill_blank: 'fill-in-the-blank practice',
-			summary: 'reading discussion',
-			listening: 'listening comprehension chat',
-			sentence: 'sentence practice',
-		};
-
-		const label = typeLabel[drill.type] || 'English practice';
-
-		let systemPrompt = `You are Eklan, an AI English speaking practice partner. The student has been assigned a ${label} drill by their human tutor.`;
-		if (userName) {
-			systemPrompt += `\n\nThe student's name is ${userName}. Address them by their name occasionally.`;
-		}
-
-		if (freeTalkOverlay?.scenarioDescription && freeTalkReversed) {
-			const vocabLine =
-				freeTalkOverlay.vocabularyList.length > 0
-					? `\n\nTARGET WORDS you may try to use (and sometimes ask about): ${freeTalkOverlay.vocabularyList.join(', ')}.`
-					: '';
-			const scriptBlock =
-				freeTalkOverlay.referenceScript?.trim()
-					? `\n\nREFERENCE SCRIPT (context for the situation — you play the learner side, not every speaker):\n${freeTalkOverlay.referenceScript.trim()}`
-					: '';
-			systemPrompt = `${userName ? `Your tutor is named "${userName}". Address them naturally; they lead this practice while you play the learner role.\n\n` : ''}You are Alex, an English learner. You are practising in the scenario below; the user is your tutor or partner in the situation and leads the conversation while you respond as the learner/candidate side.
-
-DRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nGeneral context: ${drill.context}` : ''}
-
-FOCUSED FREE TALK SETTING (stay in this exact situation):
-${freeTalkOverlay.scenarioDescription}${scriptBlock}${vocabLine}
-
-Your opening (2 short sentences max):
-1. Greet as Alex, eager or a little nervous to practise in this setting
-2. Invite ${userName || 'them'} to start, or ask one small opening question as the learner would
-
-CRITICAL: You are NOT the interviewer or teacher. Do NOT ask "What would you like to practice?".`;
-		} else if (freeTalkOverlay?.scenarioDescription) {
-			const vocabLine =
-				freeTalkOverlay.vocabularyList.length > 0
-					? `\n\nTARGET WORDS to feature in this session: ${freeTalkOverlay.vocabularyList.join(', ')}.`
-					: '';
-			const scriptBlock =
-				freeTalkOverlay.referenceScript?.trim()
-					? `\n\nTUTOR SCRIPT (this is what the drill is about — start in-character consistent with it; same interview/technical/role as the lines below):\n${freeTalkOverlay.referenceScript.trim()}`
-					: "";
-			systemPrompt += `\n\nDRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nGeneral context: ${drill.context}` : ''}
-
-FOCUSED FREE TALK SETTING (use this exact situation — do not invent a different scene):
-${freeTalkOverlay.scenarioDescription}${scriptBlock}${vocabLine}
-
-Your opening should be brief and directive (2-3 sentences max):
-1. Acknowledge you're continuing practice tied to their tutor's material
-2. Drop them straight into THIS setting in character and give one clear first thing to say or do
-
-CRITICAL: Do NOT ask "What would you like to practice?" — YOU lead. Stay in the setting above.`;
-		} else {
-		systemPrompt += `\n\nDRILL: "${drill.title}" (${drill.difficulty || 'intermediate'} level)${drill.context ? `\nContext: ${drill.context}` : ''}
-
-Your opening should be brief and directive (2-3 sentences max):
-1. Tell the student what today's session is about
-2. Create a FRESH scenario related to the drill topic (don't repeat the tutor's exact scenes)
-3. Immediately set the scene and give them their FIRST task
-
-CRITICAL: Do NOT ask "What would you like to practice?" — YOU lead the session. Jump right into a new scenario.
-Example tone: "Alright! Today we're working on office negotiation. I'm going to set up a scenario for you — you're an employee asking your manager for a deadline extension. Let's begin. I'll be your manager. Go ahead and start the conversation."`;
-		}
-
-		const turns = [
-			{
-				role: 'user',
-				parts: [{ text: 'Start the practice session.' }],
-			},
-		];
-
-		logger.info('Generating greeting via Live API (Stream)...', { drillType: drill.type, model: LIVE_MODEL });
-
-		const liveStream = await generateWithLiveAPIStream(systemPrompt, turns);
-
-		// Create a transform stream to inject the drill metadata as the very first chunk
-		const transformStream = new TransformStream({
-			start(controller) {
-				const metadataChunk = JSON.stringify({
-					type: 'metadata',
-					data: {
-						drillType: drill.type,
-						drillTitle: drill.title,
-					}
-				});
-				controller.enqueue(new TextEncoder().encode(`data: ${metadataChunk}\n\n`));
-			}
-		});
-
-		return liveStream.pipeThrough(transformStream);
-		
-	} catch (error: any) {
-		logger.error('Error generating drill practice greeting (Stream)', {
-			error: error.message,
-			drillType: drill.type,
-		});
-		
-		// Fallback stream
-		return new ReadableStream({
-			start(controller) {
-				const metadataChunk = JSON.stringify({
-					type: 'metadata',
-					data: { drillType: drill.type, drillTitle: drill.title }
-				});
-				const textChunk = JSON.stringify({
-					type: 'text',
-					data: `Alright! Today we're working on "${drill.title}". I've got some exercises ready for you. Let's jump right in!`
-				});
-				
-				controller.enqueue(new TextEncoder().encode(`data: ${metadataChunk}\n\n`));
-				controller.enqueue(new TextEncoder().encode(`data: ${textChunk}\n\n`));
-				controller.close();
-			}
-		});
-	}
-}
-
 // ─── Topic practice (Live API stream for mobile app) ─────────────────────────
 
 export async function generateTopicPracticeGreetingStream(topic: string = 'daily-life', userName?: string): Promise<ReadableStream> {
@@ -2376,21 +1727,14 @@ async function generateWithChatModelStream(prompt: string): Promise<ReadableStre
 
 // ─── Eklan Free Talk (ICU scenario practice — grade-based) ───────────────────
 
-type FreeTalkScenarioType =
-	| 'icu_emergency'
-	| 'admission'
-	| 'small_talk_patient'
-	| 'handover'
-	| 'decline_request'
-	| 'phone_doctor'
-	| 'small_talk_colleague';
-
 export interface FreeTalkScenario {
 	title: string;
 	situation: string;
 	hint: string;
 	usefulPhrases: string[];
 	scenarioType: FreeTalkScenarioType;
+	/** Admin-defined bullets — woven into the grading prompt when present. */
+	include?: string[];
 }
 
 interface GradingBehaviour {
@@ -2465,143 +1809,8 @@ const GRADING_RUBRICS: Record<FreeTalkScenarioType, GradingBehaviour[]> = {
 	],
 };
 
-const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
-	{
-		title: 'Sudden Oxygen Drop',
-		situation: "Mr. Miller's oxygen saturation suddenly drops from 96% to 82%. He looks frightened and begins breathing rapidly.",
-		hint: 'Calm the patient. Explain what is happening. Call for help if necessary.',
-		usefulPhrases: [
-			'Stay calm.',
-			'Your oxygen level is dropping.',
-			'Take slow, deep breaths.',
-			"I'm calling the respiratory therapist.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Airway Obstruction',
-		situation: 'The patient begins coughing heavily and cannot speak clearly. You suspect mucus is blocking the airway.',
-		hint: 'Explain the problem. Encourage coughing. Prepare suction equipment.',
-		usefulPhrases: [
-			'There may be an airway obstruction.',
-			'Keep coughing slowly.',
-			'We need to suction your airway.',
-			"You're doing well.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Patient Panic During Ventilator Removal',
-		situation: 'The patient becomes anxious after the ventilator is removed and says, "I can\'t breathe!"',
-		hint: 'Reassure the patient. Encourage controlled breathing. Explain why coughing is important.',
-		usefulPhrases: [
-			"You're safe now.",
-			'Try not to panic.',
-			'Take a deep breath.',
-			'Coughing helps clear your lungs.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Alcohol Withdrawal Symptoms',
-		situation: 'The patient becomes irritable and angry. He says he wants alcohol and refuses treatment.',
-		hint: 'Remain calm and professional. Explain withdrawal symptoms. Offer reassurance.',
-		usefulPhrases: [
-			"I understand you're frustrated.",
-			'Withdrawal symptoms can cause anxiety.',
-			'We are trying to keep you safe.',
-			'This medication may help you relax.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Emergency Team Communication',
-		situation: "You notice the patient's condition worsening rapidly and must inform the ICU team immediately.",
-		hint: "Report the patient's condition clearly. Request support quickly.",
-		usefulPhrases: [
-			'The patient is desaturating rapidly.',
-			'We may have an airway obstruction.',
-			'Please prepare suction equipment.',
-			'I need respiratory support in room 12.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Medication Questions',
-		situation: 'The patient asks why he needs medication and worries about side effects.',
-		hint: 'Explain the medication simply. Discuss possible side effects safely.',
-		usefulPhrases: [
-			'This medication helps reduce anxiety.',
-			'You may feel sleepy or dizzy.',
-			'Please call for assistance before standing.',
-			'Do you have any questions about the medication?',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'CRRT Dialysis Concern',
-		situation: 'Mrs. Thompson becomes nervous after seeing the CRRT machine.',
-		hint: 'Explain CRRT calmly. Reassure the patient.',
-		usefulPhrases: [
-			'This machine provides continuous dialysis.',
-			'CRRT is gentler for ICU patients.',
-			'We are monitoring you closely.',
-			'I will stay here with you.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Family Member Anxiety',
-		situation: "The patient's daughter looks worried after the emergency situation.",
-		hint: 'Update the family member professionally. Reassure her calmly.',
-		usefulPhrases: [
-			'His condition is stable now.',
-			'We responded quickly to the emergency.',
-			'His breathing is improving.',
-			'We will continue monitoring him closely.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Refusing Breathing Exercises',
-		situation: 'The patient says he is too tired to continue breathing exercises.',
-		hint: 'Encourage cooperation. Explain the importance of the exercises.',
-		usefulPhrases: [
-			'These exercises help prevent pneumonia.',
-			'Your lungs sound clearer now.',
-			'Please try a few more breaths.',
-			"You're making good progress.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Overnight Monitoring',
-		situation: 'The patient asks why ICU staff continue checking him overnight.',
-		hint: 'Explain ICU monitoring procedures. Reassure the patient.',
-		usefulPhrases: [
-			'We need to monitor your condition overnight.',
-			'We are checking your vital signs regularly.',
-			'This helps us respond quickly to emergencies.',
-			'Please call us if you feel short of breath.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-];
-
-let _freeTalkScenarioIndex = 0;
-
-/** Picks the next scenario in round-robin order — exported for the greeting route. */
-export function pickNextFreeTalkScenario(): FreeTalkScenario {
-	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
-	_freeTalkScenarioIndex++;
-	return FREE_TALK_SCENARIOS[idx];
-}
-
-/** Case-insensitive lookup — falls back to first scenario if title not found. */
-function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario {
-	if (!title) return FREE_TALK_SCENARIOS[0];
-	const norm = title.trim().toLowerCase();
-	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm) ?? FREE_TALK_SCENARIOS[0];
+function freeTalkBehavioursForScenario(scenario: FreeTalkScenario): GradingBehaviour[] {
+	return GRADING_RUBRICS[scenario.scenarioType] ?? GRADING_RUBRICS.icu_emergency;
 }
 
 // ── Grading prompt ────────────────────────────────────────────────────────────
@@ -2613,47 +1822,65 @@ function buildFreeTalkGradingPrompt(
 	userResponse: string,
 	userName?: string,
 ): string {
-	const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+	const behaviours = freeTalkBehavioursForScenario(scenario);
 	const behaviourList = behaviours
 		.map(b => `${b.id}. ${b.name}: ${b.description}`)
 		.join('\n');
 
-	let p = `You are Eklan, an ICU clinical communication evaluator.
+	const includeBlock =
+		scenario.include && scenario.include.length > 0
+			? `\n\nPoints the student should aim to cover (when relevant to their response):\n${scenario.include.map((line, i) => `${i + 1}. ${line}`).join('\n')}`
+			: '';
+
+	let p = `You are Eklan, a fair and accurate ICU clinical communication evaluator. Your job is to assess exactly what the student said and give honest, tailored scores.
 
 Scenario: ${scenario.title}
-Situation: ${scenario.situation}
+Situation: ${scenario.situation}${includeBlock}
 
 The student responded with:
 "${userResponse}"
 
-Evaluate this response against the 7 clinical communication behaviours below.
-For each behaviour, output one of these ratings:
-- "full"    → clearly and confidently demonstrated (1 point)
-- "partial" → mentioned or implied but incomplete or weak (0.5 points)
-- "none"    → absent, incorrect, or unsafe (0 points)
+STEP 1 — RELEVANCE CHECK (do this first, silently):
+Before scoring, decide which of the 7 behaviours below are actually testable in this specific scenario. Some scenarios naturally call for only 3–5 of them. Mark each behaviour as:
+- "relevant": this behaviour is expected and meaningful in this situation
+- "not_applicable": this behaviour cannot reasonably be demonstrated in this scenario (e.g. "Escalates to the doctor" is not applicable in a small-talk scenario)
 
-Behaviours:
+STEP 2 — SCORING RULES:
+Only score behaviours you marked "relevant". For each relevant behaviour:
+- "full"    → clearly and confidently demonstrated (1 point)
+- "partial" → genuinely attempted — even if brief, incomplete, or stated as future intent ("I will…", "I would…") (0.5 points)
+- "none"    → relevant but truly absent from the response (0 points)
+
+For behaviours marked "not_applicable": always set result to "not_applicable" in the JSON.
+
+IMPORTANT:
+- Future-tense statements ("I will give oxygen", "I would call the doctor") COUNT as partial for the relevant behaviour.
+- Only mark ALL relevant behaviours as "none" if the response is completely empty, incoherent, or off-topic.
+- Do NOT give "full" unless the behaviour was clearly and explicitly demonstrated.
+
+The 7 behaviours:
 ${behaviourList}
 
-Write 2–4 sentences of warm, constructive narrative feedback:
-- Acknowledge what the student did well.
-- Point out what was missing or could be improved.
-- Keep the tone supportive and educational.
+Write 2–4 sentences of honest, specific feedback:
+- Reference the student's actual words — tailor this to THEIR specific response.
+- Acknowledge genuine strengths or partial attempts.
+- Clearly state what was missing or needs improvement.
+- Base praise and critique only on the relevant behaviours for this scenario.
 
-Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by a valid JSON object:
+Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by a valid JSON object using exactly this structure:
 {
   "behaviours": [
-    { "id": 1, "result": "full" },
-    { "id": 2, "result": "partial" },
+    { "id": 1, "result": "none" },
+    { "id": 2, "result": "none" },
     { "id": 3, "result": "none" },
-    { "id": 4, "result": "full" },
-    { "id": 5, "result": "partial" },
-    { "id": 6, "result": "full" },
-    { "id": 7, "result": "full" }
+    { "id": 4, "result": "none" },
+    { "id": 5, "result": "none" },
+    { "id": 6, "result": "none" },
+    { "id": 7, "result": "none" }
   ]
 }
 
-Respond in English only.`;
+Use "full", "partial", "none", or "not_applicable" as the result values. Respond in English only.`;
 
 	if (userName) {
 		p += `\n\nThe trainee's name is ${userName}. You may address them by name in your feedback.`;
@@ -2741,7 +1968,7 @@ function wrapWithGradingMetadata(
 		},
 		flush(controller) {
 			const fullText = textParts.join('').trim();
-			const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+			const behaviours = freeTalkBehavioursForScenario(scenario);
 
 			// Parse grade JSON — fall back gracefully if malformed
 			let parsedBehaviours: Array<{ id: number; result: string }> = [];
@@ -2761,17 +1988,19 @@ function wrapWithGradingMetadata(
 			const SCORE_MAP: Record<string, number> = { full: 1, partial: 0.5, none: 0 };
 			const gradedBehaviours = behaviours.map(b => {
 				const found = parsedBehaviours.find(p => p.id === b.id);
-				const result = (found?.result ?? 'none') as 'full' | 'partial' | 'none';
+				const result = (found?.result ?? 'none') as 'full' | 'partial' | 'none' | 'not_applicable';
 				return {
 					id: b.id,
 					name: b.name,
 					result,
-					score: SCORE_MAP[result] ?? 0,
+					score: result === 'not_applicable' ? 0 : (SCORE_MAP[result] ?? 0),
 				};
 			});
 
-			const rawScore = gradedBehaviours.reduce((sum, b) => sum + b.score, 0);
-			const overallScore = Math.round((rawScore / behaviours.length) * 100);
+			const relevantBehaviours = gradedBehaviours.filter(b => b.result !== 'not_applicable');
+			const relevantCount = relevantBehaviours.length || behaviours.length;
+			const rawScore = relevantBehaviours.reduce((sum, b) => sum + b.score, 0);
+			const overallScore = Math.round((rawScore / relevantCount) * 100);
 			const competencyLevel = scoreToCompetencyLevel(overallScore);
 
 			const metadata = {
@@ -2781,7 +2010,7 @@ function wrapWithGradingMetadata(
 					competencyLevel,
 					behaviours: gradedBehaviours,
 					rawScore,
-					maxScore: behaviours.length,
+					maxScore: relevantCount,
 				},
 			};
 
@@ -2797,21 +2026,18 @@ function wrapWithGradingMetadata(
 // ── Exported grading function ─────────────────────────────────────────────────
 
 /**
- * Grading stream for POST /api/v1/ai/free-talk.
- * Uses the standard Gemini chat model (not Live API) — structured evaluation task.
- * Streams narrative feedback text, then emits a metadata chunk with the grade.
+ * Grade with a fully-resolved scenario object (from admin-configured DB documents).
  */
-export async function generateFreeTalkGradingStream(
+export async function generateFreeTalkGradingStreamFromScenario(
 	userResponse: string,
-	scenarioTitle: string,
+	scenario: FreeTalkScenario,
 	userName?: string,
 ): Promise<ReadableStream> {
 	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
 
-	const scenario = findFreeTalkScenarioByTitle(scenarioTitle);
 	const prompt = buildFreeTalkGradingPrompt(scenario, userResponse, userName);
 
-	logger.info('[FreeTalk] Generating grading stream', {
+	logger.info('[FreeTalk] Generating grading stream (from scenario object)', {
 		scenario: scenario.title,
 		scenarioType: scenario.scenarioType,
 		model: CHAT_MODEL,

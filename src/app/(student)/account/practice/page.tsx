@@ -121,16 +121,13 @@ export default function PracticePage() {
             meta={[""]}
             locked={!isSubscribed}
           />
-        </div>
 
-        {/* ── Pressure Test Card ── */}
-        <div className="mb-8">
           <PracticeCard
-            href="/account/practice/ai/pressure-test"
+            href="/account/practice/comment-screen"
             iconBg="bg-[#2A602C]"
             iconSrc="/Pressure_test_logo.svg"
             title="Eklan Pressure Test"
-            subtitle="Test your response speed in a real-life scenario."
+            subtitle="Coming soon"
             meta={[]}
             iconWidth={40}
             iconHeight={38}

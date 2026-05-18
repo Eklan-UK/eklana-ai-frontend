@@ -1,87 +1,11 @@
-// Use relative path for Next.js API routes
 const API_BASE_URL = "/api/v1";
 
-interface ConversationMessage {
-  role: "user" | "model";
-  content: string;
-}
-
-interface ConversationOptions {
-  messages: ConversationMessage[];
-  temperature?: number;
-  maxTokens?: number;
-  signal?: AbortSignal;
-  systemInstruction?: string;
-}
-
-
 /**
- * AI service for conversations and drill practice
+ * AI service — Eklan Free Talk (grading) and shared SSE stream helper.
  */
 export const aiService = {
   /**
-   * Send a message in a conversation
-   */
-  async sendConversationMessage(options: ConversationOptions): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/ai/conversation`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(options),
-    });
-
-    if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Failed to get AI response" }));
-      throw new Error(error.message || "Failed to get AI response");
-    }
-
-    const data = await response.json();
-    return data.data.response;
-  },
-
-  /**
-   * Stream a message in a non-drill text conversation (SSE).
-   */
-  async streamConversationMessage(
-    options: ConversationOptions,
-    onChunk: (chunk: { type: string; data: unknown }) => void
-  ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/ai/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      signal: options.signal,
-      body: JSON.stringify({
-        messages: options.messages,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        ...(options.systemInstruction
-          ? { systemInstruction: options.systemInstruction }
-          : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(
-          typeof error.message === "string" ? error.message : "Failed to get chat stream"
-        );
-      }
-      throw new Error(`Failed to get chat stream: ${response.status}`);
-    }
-
-    await this._processSSEStream(response, onChunk, options.signal);
-  },
-
-  /**
-   * Process Server-Sent Events (SSE) stream
+   * Internal: consume an SSE stream and call onChunk for each event.
    */
   async _processSSEStream(
     response: Response,
@@ -118,14 +42,13 @@ export const aiService = {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process complete SSE messages (separated by \n\n)
         let eventEndIndex;
         while ((eventEndIndex = buffer.indexOf("\n\n")) !== -1) {
           const eventString = buffer.slice(0, eventEndIndex);
-          buffer = buffer.slice(eventEndIndex + 2); // remove processed event + \n\n
+          buffer = buffer.slice(eventEndIndex + 2);
 
           if (eventString.startsWith("data: ")) {
-            const dataString = eventString.slice(6); // remove 'data: '
+            const dataString = eventString.slice(6);
             try {
               const chunk = JSON.parse(dataString) as { type: string; data: unknown };
               if (chunk.type === "error") {
@@ -162,200 +85,52 @@ export const aiService = {
   },
 
   /**
-   * Send a message in a drill-aware conversation (Streaming)
+   * ICU Free Talk — ordered scenario ids for the student flow (GET /api/v1/ai/free-talk/scenarios).
    */
-  async streamDrillPracticeMessage(
-    options: {
-      drillId: string;
-      userMessage: string;
-      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
-      temperature?: number;
-      signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
-    },
-    onChunk: (chunk: { type: string; data: any }) => void
-  ): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/ai/drill-practice`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  async fetchFreeTalkScenarioSummaries(signal?: AbortSignal): Promise<
+    { id: string; title: string; scenarioType: string }[]
+  > {
+    const response = await fetch(`${API_BASE_URL}/ai/free-talk/scenarios`, {
+      method: "GET",
       credentials: "include",
-      signal: options.signal,
-      body: JSON.stringify({
-        drillId: options.drillId,
-        userMessage: options.userMessage,
-        conversationHistory: options.conversationHistory || [],
-        temperature: options.temperature,
-        ...(options.freeTalkContext
-          ? { freeTalkContext: options.freeTalkContext }
-          : {}),
-      }),
+      signal,
     });
 
     if (!response.ok) {
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to get drill practice stream");
+      if (response.status === 402) {
+        throw new Error("Subscription required");
       }
-      throw new Error(`Failed to get drill practice stream: ${response.status}`);
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.message === "string" ? error.message : "Failed to load scenario list"
+      );
     }
 
-    await this._processSSEStream(response, onChunk, options.signal);
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.scenarios)) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load scenario list");
+    }
+    return data.scenarios;
   },
 
   /**
-   * Get initial greeting for drill-aware conversation (Streaming)
+   * ICU Free Talk — fetch one scenario (JSON). GET /api/v1/ai/free-talk/greeting
+   * Pass scenarioId to load a specific document; omit for a random scenario (legacy callers).
    */
-  async streamDrillPracticeGreeting(
-    drillId: string,
-    onChunk: (chunk: { type: string; data: any }) => void,
-    signal?: AbortSignal,
-    freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean }
-  ): Promise<void> {
-    const qs = new URLSearchParams();
-    qs.set("drillId", drillId);
-    if (freeTalkContext?.scenarioId != null && freeTalkContext.scenarioId !== "") {
-      qs.set("scenarioId", freeTalkContext.scenarioId);
-    }
-    if (freeTalkContext?.vocabularyList?.length) {
-      qs.set("vocab", JSON.stringify(freeTalkContext.vocabularyList));
-    }
-    if (freeTalkContext?.reversed) {
-      qs.set("reversed", "1");
-    }
-    const response = await fetch(
-      `${API_BASE_URL}/ai/drill-practice/greeting?${qs.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        signal,
-      }
-    );
-
-    if (!response.ok) {
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to get drill greeting stream");
-      }
-      throw new Error(`Failed to get drill greeting stream: ${response.status}`);
-    }
-
-    await this._processSSEStream(response, onChunk, signal);
-  },
-
-  /**
-   * Voice conversation via Gemini Live: built-in transcription + audio streaming.
-   */
-  async streamVoiceConversationMessage(
-    options: {
-      audioBlob: Blob;
-      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
-      context?: string;
-      signal?: AbortSignal;
-    },
-    onChunk: (chunk: { type: string; data: any }) => void
-  ): Promise<void> {
-    const formData = new FormData();
-    formData.append("audio", options.audioBlob, "recording.webm");
-    formData.append(
-      "conversationHistory",
-      JSON.stringify(options.conversationHistory || [])
-    );
-    if (options.context) formData.append("context", options.context);
-
-    const response = await fetch(`${API_BASE_URL}/ai/voice/conversation`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-      signal: options.signal,
-    });
-
-    if (!response.ok) {
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        const error = await response.json();
-        const msg = error.message || "Failed to get voice conversation stream";
-        throw new Error(
-          response.status === 503
-            ? "The service is temporarily unavailable. Please try again in a moment."
-            : response.status === 401
-            ? "Session expired. Please refresh the page and try again."
-            : msg
-        );
-      }
-      throw new Error(`Failed to get voice conversation stream: ${response.status}`);
-    }
-
-    await this._processSSEStream(response, onChunk, options.signal);
-  },
-
-  /**
-   * Drill practice voice via Gemini Live: built-in transcription + audio streaming.
-   */
-  async streamDrillPracticeVoiceMessage(
-    options: {
-      drillId: string;
-      audioBlob: Blob;
-      conversationHistory?: Array<{ role: "user" | "model"; content: string }>;
-      temperature?: number;
-      signal?: AbortSignal;
-      freeTalkContext?: { scenarioId: string; vocabularyList: string[]; reversed?: boolean };
-    },
-    onChunk: (chunk: { type: string; data: any }) => void
-  ): Promise<void> {
-    const formData = new FormData();
-    formData.append("drillId", options.drillId);
-    formData.append("audio", options.audioBlob, "recording.webm");
-    formData.append(
-      "conversationHistory",
-      JSON.stringify(options.conversationHistory || [])
-    );
-    if (options.temperature !== undefined) {
-      formData.append("temperature", String(options.temperature));
-    }
-    if (options.freeTalkContext) {
-      formData.append("freeTalkContext", JSON.stringify(options.freeTalkContext));
-    }
-
-    const response = await fetch(`${API_BASE_URL}/ai/drill-practice/voice`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-      signal: options.signal,
-    });
-
-    if (!response.ok) {
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        const error = await response.json();
-        const msg = error.message || "Failed to get drill voice stream";
-        throw new Error(
-          response.status === 503
-            ? "The service is temporarily unavailable. Please try again in a moment."
-            : response.status === 401
-            ? "Session expired. Please refresh the page and try again."
-            : msg
-        );
-      }
-      throw new Error(`Failed to get drill voice stream: ${response.status}`);
-    }
-
-    await this._processSSEStream(response, onChunk, options.signal);
-  },
-
-  /**
-   * ICU Free Talk — fetch next scenario (JSON). GET /api/v1/ai/free-talk/greeting
-   */
-  async fetchFreeTalkScenario(signal?: AbortSignal): Promise<{
+  async fetchFreeTalkScenario(
+    options?: { scenarioId?: string; signal?: AbortSignal }
+  ): Promise<{
+    id: string;
     title: string;
     situation: string;
     hint: string;
     usefulPhrases: string[];
     scenarioType: string;
   }> {
-    const response = await fetch(`${API_BASE_URL}/ai/free-talk/greeting`, {
+    const signal = options?.signal;
+    const scenarioId = options?.scenarioId?.trim();
+    const qs = scenarioId ? `?scenarioId=${encodeURIComponent(scenarioId)}` : "";
+    const response = await fetch(`${API_BASE_URL}/ai/free-talk/greeting${qs}`, {
       method: "GET",
       credentials: "include",
       signal,
@@ -372,6 +147,9 @@ export const aiService = {
     }
 
     const data = await response.json();
+    if (!data.success || !data.scenario?.id) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load scenario");
+    }
     return data.scenario;
   },
 
@@ -383,7 +161,7 @@ export const aiService = {
   async streamFreeTalkGrading(
     options: {
       userResponse: string;
-      scenarioTitle: string;
+      scenarioId: string;
       signal?: AbortSignal;
     },
     onChunk: (chunk: { type: string; data: unknown }) => void
@@ -398,7 +176,7 @@ export const aiService = {
       signal: options.signal,
       body: JSON.stringify({
         userResponse: options.userResponse,
-        scenarioTitle: options.scenarioTitle,
+        scenarioId: options.scenarioId,
       }),
     });
 
