@@ -85,16 +85,52 @@ export const aiService = {
   },
 
   /**
-   * ICU Free Talk — fetch next scenario (JSON). GET /api/v1/ai/free-talk/greeting
+   * ICU Free Talk — ordered scenario ids for the student flow (GET /api/v1/ai/free-talk/scenarios).
    */
-  async fetchFreeTalkScenario(signal?: AbortSignal): Promise<{
+  async fetchFreeTalkScenarioSummaries(signal?: AbortSignal): Promise<
+    { id: string; title: string; scenarioType: string }[]
+  > {
+    const response = await fetch(`${API_BASE_URL}/ai/free-talk/scenarios`, {
+      method: "GET",
+      credentials: "include",
+      signal,
+    });
+
+    if (!response.ok) {
+      if (response.status === 402) {
+        throw new Error("Subscription required");
+      }
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof error.message === "string" ? error.message : "Failed to load scenario list"
+      );
+    }
+
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.scenarios)) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load scenario list");
+    }
+    return data.scenarios;
+  },
+
+  /**
+   * ICU Free Talk — fetch one scenario (JSON). GET /api/v1/ai/free-talk/greeting
+   * Pass scenarioId to load a specific document; omit for a random scenario (legacy callers).
+   */
+  async fetchFreeTalkScenario(
+    options?: { scenarioId?: string; signal?: AbortSignal }
+  ): Promise<{
+    id: string;
     title: string;
     situation: string;
     hint: string;
     usefulPhrases: string[];
     scenarioType: string;
   }> {
-    const response = await fetch(`${API_BASE_URL}/ai/free-talk/greeting`, {
+    const signal = options?.signal;
+    const scenarioId = options?.scenarioId?.trim();
+    const qs = scenarioId ? `?scenarioId=${encodeURIComponent(scenarioId)}` : "";
+    const response = await fetch(`${API_BASE_URL}/ai/free-talk/greeting${qs}`, {
       method: "GET",
       credentials: "include",
       signal,
@@ -111,6 +147,9 @@ export const aiService = {
     }
 
     const data = await response.json();
+    if (!data.success || !data.scenario?.id) {
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load scenario");
+    }
     return data.scenario;
   },
 
@@ -122,7 +161,7 @@ export const aiService = {
   async streamFreeTalkGrading(
     options: {
       userResponse: string;
-      scenarioTitle: string;
+      scenarioId: string;
       signal?: AbortSignal;
     },
     onChunk: (chunk: { type: string; data: unknown }) => void
@@ -137,7 +176,7 @@ export const aiService = {
       signal: options.signal,
       body: JSON.stringify({
         userResponse: options.userResponse,
-        scenarioTitle: options.scenarioTitle,
+        scenarioId: options.scenarioId,
       }),
     });
 

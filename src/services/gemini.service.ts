@@ -3,6 +3,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
 import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
+import type { FreeTalkScenarioType } from '@/models/free-talk-scenario.shared';
 // Bundled static binary — works in serverless environments where ffmpeg is not on PATH.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegBin: string = require('ffmpeg-static');
@@ -1726,21 +1727,14 @@ async function generateWithChatModelStream(prompt: string): Promise<ReadableStre
 
 // ─── Eklan Free Talk (ICU scenario practice — grade-based) ───────────────────
 
-type FreeTalkScenarioType =
-	| 'icu_emergency'
-	| 'admission'
-	| 'small_talk_patient'
-	| 'handover'
-	| 'decline_request'
-	| 'phone_doctor'
-	| 'small_talk_colleague';
-
 export interface FreeTalkScenario {
 	title: string;
 	situation: string;
 	hint: string;
 	usefulPhrases: string[];
 	scenarioType: FreeTalkScenarioType;
+	/** Admin-defined bullets — woven into the grading prompt when present. */
+	include?: string[];
 }
 
 interface GradingBehaviour {
@@ -1815,143 +1809,8 @@ const GRADING_RUBRICS: Record<FreeTalkScenarioType, GradingBehaviour[]> = {
 	],
 };
 
-const FREE_TALK_SCENARIOS: FreeTalkScenario[] = [
-	{
-		title: 'Sudden Oxygen Drop',
-		situation: "Mr. Miller's oxygen saturation suddenly drops from 96% to 82%. He looks frightened and begins breathing rapidly.",
-		hint: 'Calm the patient. Explain what is happening. Call for help if necessary.',
-		usefulPhrases: [
-			'Stay calm.',
-			'Your oxygen level is dropping.',
-			'Take slow, deep breaths.',
-			"I'm calling the respiratory therapist.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Airway Obstruction',
-		situation: 'The patient begins coughing heavily and cannot speak clearly. You suspect mucus is blocking the airway.',
-		hint: 'Explain the problem. Encourage coughing. Prepare suction equipment.',
-		usefulPhrases: [
-			'There may be an airway obstruction.',
-			'Keep coughing slowly.',
-			'We need to suction your airway.',
-			"You're doing well.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Patient Panic During Ventilator Removal',
-		situation: 'The patient becomes anxious after the ventilator is removed and says, "I can\'t breathe!"',
-		hint: 'Reassure the patient. Encourage controlled breathing. Explain why coughing is important.',
-		usefulPhrases: [
-			"You're safe now.",
-			'Try not to panic.',
-			'Take a deep breath.',
-			'Coughing helps clear your lungs.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Alcohol Withdrawal Symptoms',
-		situation: 'The patient becomes irritable and angry. He says he wants alcohol and refuses treatment.',
-		hint: 'Remain calm and professional. Explain withdrawal symptoms. Offer reassurance.',
-		usefulPhrases: [
-			"I understand you're frustrated.",
-			'Withdrawal symptoms can cause anxiety.',
-			'We are trying to keep you safe.',
-			'This medication may help you relax.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Emergency Team Communication',
-		situation: "You notice the patient's condition worsening rapidly and must inform the ICU team immediately.",
-		hint: "Report the patient's condition clearly. Request support quickly.",
-		usefulPhrases: [
-			'The patient is desaturating rapidly.',
-			'We may have an airway obstruction.',
-			'Please prepare suction equipment.',
-			'I need respiratory support in room 12.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Medication Questions',
-		situation: 'The patient asks why he needs medication and worries about side effects.',
-		hint: 'Explain the medication simply. Discuss possible side effects safely.',
-		usefulPhrases: [
-			'This medication helps reduce anxiety.',
-			'You may feel sleepy or dizzy.',
-			'Please call for assistance before standing.',
-			'Do you have any questions about the medication?',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'CRRT Dialysis Concern',
-		situation: 'Mrs. Thompson becomes nervous after seeing the CRRT machine.',
-		hint: 'Explain CRRT calmly. Reassure the patient.',
-		usefulPhrases: [
-			'This machine provides continuous dialysis.',
-			'CRRT is gentler for ICU patients.',
-			'We are monitoring you closely.',
-			'I will stay here with you.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Family Member Anxiety',
-		situation: "The patient's daughter looks worried after the emergency situation.",
-		hint: 'Update the family member professionally. Reassure her calmly.',
-		usefulPhrases: [
-			'His condition is stable now.',
-			'We responded quickly to the emergency.',
-			'His breathing is improving.',
-			'We will continue monitoring him closely.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Refusing Breathing Exercises',
-		situation: 'The patient says he is too tired to continue breathing exercises.',
-		hint: 'Encourage cooperation. Explain the importance of the exercises.',
-		usefulPhrases: [
-			'These exercises help prevent pneumonia.',
-			'Your lungs sound clearer now.',
-			'Please try a few more breaths.',
-			"You're making good progress.",
-		],
-		scenarioType: 'icu_emergency',
-	},
-	{
-		title: 'Overnight Monitoring',
-		situation: 'The patient asks why ICU staff continue checking him overnight.',
-		hint: 'Explain ICU monitoring procedures. Reassure the patient.',
-		usefulPhrases: [
-			'We need to monitor your condition overnight.',
-			'We are checking your vital signs regularly.',
-			'This helps us respond quickly to emergencies.',
-			'Please call us if you feel short of breath.',
-		],
-		scenarioType: 'icu_emergency',
-	},
-];
-
-let _freeTalkScenarioIndex = 0;
-
-/** Picks the next scenario in round-robin order — exported for the greeting route. */
-export function pickNextFreeTalkScenario(): FreeTalkScenario {
-	const idx = _freeTalkScenarioIndex % FREE_TALK_SCENARIOS.length;
-	_freeTalkScenarioIndex++;
-	return FREE_TALK_SCENARIOS[idx];
-}
-
-/** Case-insensitive lookup — falls back to first scenario if title not found. */
-function findFreeTalkScenarioByTitle(title: string): FreeTalkScenario {
-	if (!title) return FREE_TALK_SCENARIOS[0];
-	const norm = title.trim().toLowerCase();
-	return FREE_TALK_SCENARIOS.find(s => s.title.toLowerCase() === norm) ?? FREE_TALK_SCENARIOS[0];
+function freeTalkBehavioursForScenario(scenario: FreeTalkScenario): GradingBehaviour[] {
+	return GRADING_RUBRICS[scenario.scenarioType] ?? GRADING_RUBRICS.icu_emergency;
 }
 
 // ── Grading prompt ────────────────────────────────────────────────────────────
@@ -1963,15 +1822,20 @@ function buildFreeTalkGradingPrompt(
 	userResponse: string,
 	userName?: string,
 ): string {
-	const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+	const behaviours = freeTalkBehavioursForScenario(scenario);
 	const behaviourList = behaviours
 		.map(b => `${b.id}. ${b.name}: ${b.description}`)
 		.join('\n');
 
+	const includeBlock =
+		scenario.include && scenario.include.length > 0
+			? `\n\nPoints the student should aim to cover (when relevant to their response):\n${scenario.include.map((line, i) => `${i + 1}. ${line}`).join('\n')}`
+			: '';
+
 	let p = `You are Eklan, a fair and accurate ICU clinical communication evaluator. Your job is to assess exactly what the student said and give honest, tailored scores.
 
 Scenario: ${scenario.title}
-Situation: ${scenario.situation}
+Situation: ${scenario.situation}${includeBlock}
 
 The student responded with:
 "${userResponse}"
@@ -2104,7 +1968,7 @@ function wrapWithGradingMetadata(
 		},
 		flush(controller) {
 			const fullText = textParts.join('').trim();
-			const behaviours = GRADING_RUBRICS[scenario.scenarioType];
+			const behaviours = freeTalkBehavioursForScenario(scenario);
 
 			// Parse grade JSON — fall back gracefully if malformed
 			let parsedBehaviours: Array<{ id: number; result: string }> = [];
@@ -2162,12 +2026,7 @@ function wrapWithGradingMetadata(
 // ── Exported grading function ─────────────────────────────────────────────────
 
 /**
- * Grading stream for POST /api/v1/ai/free-talk.
- * Uses the standard Gemini chat model (not Live API) — structured evaluation task.
- * Streams narrative feedback text, then emits a metadata chunk with the grade.
- */
-/**
- * Grade with a fully-resolved scenario object (used when the scenario comes from the DB).
+ * Grade with a fully-resolved scenario object (from admin-configured DB documents).
  */
 export async function generateFreeTalkGradingStreamFromScenario(
 	userResponse: string,
@@ -2179,26 +2038,6 @@ export async function generateFreeTalkGradingStreamFromScenario(
 	const prompt = buildFreeTalkGradingPrompt(scenario, userResponse, userName);
 
 	logger.info('[FreeTalk] Generating grading stream (from scenario object)', {
-		scenario: scenario.title,
-		scenarioType: scenario.scenarioType,
-		model: CHAT_MODEL,
-	});
-
-	const textStream = await generateWithChatModelStream(prompt);
-	return wrapWithGradingMetadata(textStream, scenario);
-}
-
-export async function generateFreeTalkGradingStream(
-	userResponse: string,
-	scenarioTitle: string,
-	userName?: string,
-): Promise<ReadableStream> {
-	if (!config.GEMINI_API_KEY) throw new Error('Gemini API is not configured');
-
-	const scenario = findFreeTalkScenarioByTitle(scenarioTitle);
-	const prompt = buildFreeTalkGradingPrompt(scenario, userResponse, userName);
-
-	logger.info('[FreeTalk] Generating grading stream', {
 		scenario: scenario.title,
 		scenarioType: scenario.scenarioType,
 		model: CHAT_MODEL,

@@ -1,174 +1,33 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ChevronLeft,
-  CheckCircle2,
-  XCircle,
-  MinusCircle,
-  Loader2,
-  Mic,
-  Send,
+  BookOpen,
   ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  Volume2,
-  VolumeX,
-  Languages,
+  ChevronRight,
+  CheckCircle2,
+  Loader2,
+  MessageSquare,
+  Minus,
+  MinusCircle,
+  Plus,
+  XCircle,
 } from "lucide-react";
-import { aiService } from "@/services/ai.service";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { Card } from "@/components/ui/Card";
+import { Header } from "@/components/layout/Header";
 import { MarkdownText } from "@/components/ui/MarkdownText";
+import { aiService } from "@/services/ai.service";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import { useAuthStore } from "@/store/auth-store";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
-import { releaseMediaStream } from "@/lib/ios-audio-utils";
-import { toast } from "sonner";
+import {
+  loadFreeTalkHistory,
+  type FreeTalkHistoryEntryV1,
+} from "@/lib/free-talk-history";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type Phase = "loading" | "ready" | "responding" | "grading" | "result";
-
-interface Scenario {
-  title: string;
-  situation: string;
-  hint: string;
-  usefulPhrases: string[];
-  scenarioType: string;
-}
-
-interface GradedBehaviour {
-  id: number;
-  name: string;
-  result: "full" | "partial" | "none";
-  score: number;
-}
-
-interface GradeResult {
-  overallScore: number;
-  competencyLevel: string;
-  behaviours: GradedBehaviour[];
-  rawScore: number;
-  maxScore: number;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const COMPETENCY_COLORS: Record<string, { bg: string; text: string; ring: string }> = {
-  "Advanced Clinical Communicator": {
-    bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    text: "text-emerald-700 dark:text-emerald-400",
-    ring: "ring-emerald-500",
-  },
-  "Safe & Effective Communicator": {
-    bg: "bg-green-50 dark:bg-green-950/30",
-    text: "text-green-700 dark:text-green-400",
-    ring: "ring-green-500",
-  },
-  "Developing Communicator": {
-    bg: "bg-yellow-50 dark:bg-yellow-950/30",
-    text: "text-yellow-700 dark:text-yellow-500",
-    ring: "ring-yellow-500",
-  },
-  "Need Improvement": {
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    text: "text-orange-700 dark:text-orange-400",
-    ring: "ring-orange-500",
-  },
-  "Unsafe Communication Risk": {
-    bg: "bg-red-50 dark:bg-red-950/30",
-    text: "text-red-700 dark:text-red-400",
-    ring: "ring-red-500",
-  },
-};
-
-function getCompetencyColors(level: string) {
-  return (
-    COMPETENCY_COLORS[level] ?? {
-      bg: "bg-gray-50 dark:bg-gray-900/30",
-      text: "text-gray-700 dark:text-gray-300",
-      ring: "ring-gray-400",
-    }
-  );
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function BehaviourRow({ b }: { b: GradedBehaviour }) {
-  const icons = {
-    full: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
-    partial: <MinusCircle className="w-5 h-5 text-yellow-500 shrink-0" />,
-    none: <XCircle className="w-5 h-5 text-red-400 shrink-0" />,
-  };
-  const labels = { full: "1 pt", partial: "0.5 pt", none: "0 pt" };
-  return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 dark:border-[#2a2e2c] last:border-0">
-      {icons[b.result]}
-      <span className="flex-1 text-sm text-gray-800 dark:text-[#c8cdc9] leading-snug">
-        {b.name}
-      </span>
-      <span
-        className={`text-xs font-semibold shrink-0 ${
-          b.result === "full"
-            ? "text-emerald-600 dark:text-emerald-400"
-            : b.result === "partial"
-            ? "text-yellow-600 dark:text-yellow-400"
-            : "text-gray-400"
-        }`}
-      >
-        {labels[b.result]}
-      </span>
-    </div>
-  );
-}
-
-function ScoreRing({ score }: { score: number }) {
-  const radius = 36;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (score / 100) * circumference;
-  const color =
-    score >= 90
-      ? "#10b981"
-      : score >= 80
-      ? "#22c55e"
-      : score >= 70
-      ? "#eab308"
-      : score >= 60
-      ? "#f97316"
-      : "#ef4444";
-
-  return (
-    <div className="relative w-24 h-24 shrink-0">
-      <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
-        <circle
-          cx="48"
-          cy="48"
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="8"
-          fill="none"
-          className="text-gray-200 dark:text-[#2a2e2c]"
-        />
-        <circle
-          cx="48"
-          cy="48"
-          r={radius}
-          stroke={color}
-          strokeWidth="8"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${progress} ${circumference}`}
-          style={{ transition: "stroke-dasharray 0.8s ease" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-xl font-bold text-gray-900 dark:text-[#f0f2f1]">{score}</span>
-        <span className="text-[10px] text-gray-500 dark:text-[#9aa39e]">/ 100</span>
-      </div>
-    </div>
-  );
-}
+type FreeTalkHubTab = "ongoing" | "history";
 
 function scenarioTypeLabel(scenarioType: string): string {
   const t = scenarioType.replace(/_/g, " ").trim();
@@ -176,33 +35,104 @@ function scenarioTypeLabel(scenarioType: string): string {
   return t.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+function HistoryAccordionItem({
+  entry,
+  isOpen,
+  onToggle,
+  last,
+}: {
+  entry: FreeTalkHistoryEntryV1;
+  isOpen: boolean;
+  onToggle: () => void;
+  last?: boolean;
+}) {
+  const g = entry.gradeResult;
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex w-full items-start justify-between gap-3 rounded-lg border p-3 text-left transition-colors ${
+          isOpen
+            ? "rounded-b-none border-b-0 border-border"
+            : "border-border bg-card shadow-sm"
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-semibold text-foreground leading-snug">{entry.scenarioTitle}</span>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {new Date(entry.completedAt).toLocaleString(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+            {g != null ? ` · ${g.overallScore}/100` : ""}
+          </p>
+        </div>
+        {isOpen ? (
+          <Minus className="mt-0.5 h-4 w-4 shrink-0 text-[#22c55e]" aria-hidden />
+        ) : (
+          <Plus className="mt-0.5 h-4 w-4 shrink-0 text-[#22c55e]" aria-hidden />
+        )}
+      </button>
+      {isOpen && (
+        <div className="space-y-4 rounded-b-lg border border-t-0 border-border bg-card px-3 pb-4 pt-2">
+          {g && (
+            <div className="rounded-xl border border-border bg-muted/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+              <p className="mt-1 font-nunito text-base font-bold text-foreground">{g.competencyLevel}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Score {g.overallScore}/100 · {g.rawScore} / {g.maxScore} pts
+              </p>
+              {g.behaviours.length > 0 && (
+                <ul className="mt-3 space-y-2 border-t border-border pt-3">
+                  {g.behaviours.map((b) => (
+                    <li key={b.id} className="flex items-start gap-2 text-xs text-foreground">
+                      {b.result === "full" ? (
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      ) : b.result === "partial" ? (
+                        <MinusCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-yellow-500" />
+                      ) : (
+                        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+                      )}
+                      <span className="leading-snug">{b.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {entry.feedbackText.trim().length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Feedback
+              </p>
+              <div className="text-sm leading-relaxed text-foreground">
+                <MarkdownText>{entry.feedbackText}</MarkdownText>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {!last && !isOpen && <div className="h-1" />}
+    </div>
+  );
+}
 
-export default function FreeTalkPage() {
+export default function FreeTalkHubPage() {
   const router = useRouter();
   const { data: me, isLoading: meLoading } = useUserCurrent();
-  const { user: authUser } = useAuthStore();
-  void authUser;
-
-  const abortRef = useRef<AbortController | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const [phase, setPhase] = useState<Phase>("loading");
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [scenario, setScenario] = useState<Scenario | null>(null);
-  const [phrasesExpanded, setPhrasesExpanded] = useState(false);
-  const [inputText, setInputText] = useState("");
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isAnalyzingVoice, setIsAnalyzingVoice] = useState(false);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-
   const pro = !meLoading && learnerHasProAccess(me?.user);
+  const learnerId =
+    me?.user != null && (me.user._id != null || me.user.id != null)
+      ? String(me.user._id ?? me.user.id)
+      : "";
+
+  const [activeTab, setActiveTab] = useState<FreeTalkHubTab>("ongoing");
+  const [scenariosLoading, setScenariosLoading] = useState(true);
+  const [scenariosError, setScenariosError] = useState<string | null>(null);
+  const [summaries, setSummaries] = useState<{ id: string; title: string; scenarioType: string }[]>([]);
+  const [history, setHistory] = useState<FreeTalkHistoryEntryV1[]>([]);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!meLoading && me?.user != null && !learnerHasProAccess(me.user)) {
@@ -210,618 +140,167 @@ export default function FreeTalkPage() {
     }
   }, [meLoading, me, router]);
 
-  const stopTts = useCallback(() => {
-    if (ttsAudioRef.current) {
-      ttsAudioRef.current.pause();
-      ttsAudioRef.current.src = "";
-      ttsAudioRef.current = null;
+  const refreshHistory = useCallback(() => {
+    if (!learnerId) {
+      setHistory([]);
+      return;
     }
-    setIsSpeaking(false);
-  }, []);
+    setHistory(loadFreeTalkHistory(learnerId));
+  }, [learnerId]);
 
-  /** Fetches TTS audio blob without playing — call during loading to pre-warm. */
-  const fetchTtsBlob = useCallback(async (text: string): Promise<Blob | null> => {
-    try {
-      const resp = await fetch('/api/v1/ai/free-talk/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text }),
-      });
-      if (!resp.ok) return null;
-      return await resp.blob();
-    } catch {
-      return null;
-    }
-  }, []);
+  useEffect(() => {
+    refreshHistory();
+  }, [refreshHistory]);
 
-  /** Plays a pre-fetched audio blob immediately. */
-  const playBlob = useCallback((blob: Blob) => {
-    stopTts();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    ttsAudioRef.current = audio;
-    setIsSpeaking(true);
-    audio.onended = () => {
-      URL.revokeObjectURL(url);
-      ttsAudioRef.current = null;
-      setIsSpeaking(false);
-    };
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      ttsAudioRef.current = null;
-      setIsSpeaking(false);
-    };
-    audio.play().catch(() => setIsSpeaking(false));
-  }, [stopTts]);
-
-  const speakSituation = useCallback(async (text: string) => {
-    const blob = await fetchTtsBlob(text);
-    if (blob) playBlob(blob);
-  }, [fetchTtsBlob, playBlob]);
-
-  const loadScenario = useCallback(async () => {
-    stopTts();
-    setPhase("loading");
-    setScenario(null);
-    setFeedbackText("");
-    setGradeResult(null);
-    setInputText("");
-    setShowTextInput(false);
-    setPhrasesExpanded(false);
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    try {
-      // Fetch scenario, then pre-fetch TTS during loading so audio plays the instant the card appears
-      const s = await aiService.fetchFreeTalkScenario(abortRef.current.signal);
-      const audioBlob = await fetchTtsBlob(s.situation);
-      setScenario(s);
-      setPhase("ready");
-      if (audioBlob) playBlob(audioBlob);
-    } catch (e: unknown) {
-      if ((e as { name?: string })?.name === "AbortError") return;
-      const msg = e instanceof Error ? e.message : "";
-      if (msg === "Subscription required") {
-        router.replace("/account/settings/subscriptions");
-        return;
-      }
-      toast.error(msg || "Failed to load scenario. Please try again.");
-      setPhase("loading");
-    }
-  }, [router, fetchTtsBlob, playBlob, stopTts]);
-
-  const scenarioLoaded = useRef(false);
   useEffect(() => {
     if (!pro || meLoading) return;
-    if (scenarioLoaded.current) return;
-    scenarioLoaded.current = true;
-    void loadScenario();
-    return () => {
-      abortRef.current?.abort();
-      scenarioLoaded.current = false;
-    };
-  }, [pro, meLoading, loadScenario]);
-
-  const handleGotIt = () => {
-    stopTts();
-    setPhase("responding");
-  };
-
-  const submitResponse = useCallback(
-    async (response: string) => {
-      if (!scenario || !response.trim()) return;
-      setPhase("grading");
-      setFeedbackText("");
-      setGradeResult(null);
-
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-      const signal = abortRef.current.signal;
-
-      let accumulated = "";
-
-      try {
-        await aiService.streamFreeTalkGrading(
-          { userResponse: response.trim(), scenarioTitle: scenario.title, signal },
-          (chunk) => {
-            if (chunk.type === "text" && typeof chunk.data === "string") {
-              accumulated += chunk.data;
-              setFeedbackText(accumulated);
-            } else if (chunk.type === "metadata") {
-              const d = chunk.data as {
-                fullText?: string;
-                grade?: GradeResult;
-              };
-              if (d?.fullText) setFeedbackText(d.fullText);
-              if (d?.grade) setGradeResult(d.grade);
-              setPhase("result");
-            }
-          }
-        );
-        // If metadata chunk was missing, still move to result with whatever text we have
-        setPhase((p) => (p === "grading" ? "result" : p));
-      } catch (e: unknown) {
+    const ac = new AbortController();
+    setScenariosLoading(true);
+    setScenariosError(null);
+    aiService
+      .fetchFreeTalkScenarioSummaries(ac.signal)
+      .then((list) => {
+        setSummaries(list);
+        setScenariosError(null);
+      })
+      .catch((e: unknown) => {
         if ((e as { name?: string })?.name === "AbortError") return;
-        const msg = e instanceof Error ? e.message : "";
-        if (msg === "Subscription required") {
-          router.replace("/account/settings/subscriptions");
-          return;
-        }
-        toast.error(msg || "Grading failed. Please try again.");
-        setPhase("responding");
-      }
-    },
-    [scenario, router]
+        const msg = e instanceof Error ? e.message : "Failed to load scenarios.";
+        setScenariosError(msg);
+        setSummaries([]);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setScenariosLoading(false);
+      });
+    return () => ac.abort();
+  }, [pro, meLoading]);
+
+  const stats = useMemo(
+    () => ({
+      ongoing: summaries.length,
+      history: history.length,
+    }),
+    [summaries.length, history.length]
   );
 
-  const handleSendText = async () => {
-    const trimmed = inputText.trim();
-    if (!trimmed || phase !== "responding") return;
-    setInputText("");
-    await submitResponse(trimmed);
+  const tabLabels: Record<FreeTalkHubTab, string> = {
+    ongoing: "Ongoing",
+    history: "History",
   };
-
-  const startRecording = async () => {
-    if (phase !== "responding" || isAnalyzingVoice) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      chunksRef.current = [];
-      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "";
-      const rec = mime
-        ? new MediaRecorder(stream, { mimeType: mime })
-        : new MediaRecorder(stream);
-      mediaRecorderRef.current = rec;
-
-      rec.ondataavailable = (ev) => {
-        if (ev.data.size > 0) chunksRef.current.push(ev.data);
-      };
-
-      rec.onstop = async () => {
-        setIsRecording(false);
-        releaseMediaStream(mediaStreamRef.current);
-        mediaStreamRef.current = null;
-        const blob = new Blob(chunksRef.current, {
-          type: rec.mimeType || "audio/webm",
-        });
-        chunksRef.current = [];
-        if (!blob.size) return;
-
-        setIsAnalyzingVoice(true);
-        let transcript = "";
-        try {
-          transcript = (await aiService.transcribeAudio(blob)).trim();
-        } catch {
-          transcript = "";
-        }
-        setIsAnalyzingVoice(false);
-
-        if (!transcript) {
-          toast.error("Could not transcribe your voice. Please try again or use text input.");
-          return;
-        }
-        await submitResponse(transcript);
-      };
-
-      rec.start();
-      setIsRecording(true);
-    } catch (e: unknown) {
-      const err = e as { name?: string };
-      if (err?.name === "NotAllowedError") {
-        toast.error("Microphone access denied. You can use the keyboard instead.");
-        setShowTextInput(true);
-      } else {
-        toast.error("Could not access the microphone.");
-      }
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const confirmLeave = () => {
-    setShowLeaveModal(false);
-    stopTts();
-    abortRef.current?.abort();
-    router.push("/account/practice");
-  };
-
-  const handleTryAnother = () => {
-    stopTts();
-    void loadScenario();
-  };
-
-  const navStepLabel =
-    phase === "ready" ? "1 of 2" : phase === "responding" ? "2 of 2" : null;
-  const progressPct =
-    phase === "ready"
-      ? "42%"
-      : phase === "responding"
-        ? "85%"
-        : phase === "grading"
-          ? "92%"
-          : phase === "result"
-            ? "100%"
-            : "12%";
-
-  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-white text-[#121217] dark:bg-[#0c0e0d] dark:text-[#f0f2f1]">
-      <header className="sticky top-0 z-30 shrink-0 border-b border-[#e7eaed]/80 bg-white dark:border-[#2a2e2c] dark:bg-[#131614]">
-        <div className="mx-auto flex max-w-lg items-center gap-3 px-5 py-2 md:max-w-2xl">
-          <button
-            type="button"
-            onClick={() => setShowLeaveModal(true)}
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#d0d9e2]/40 bg-white/80 transition-colors hover:bg-[#fafafa] dark:border-[#3a3f3c] dark:bg-[#1a1d1c] dark:hover:bg-[#242825]"
-            aria-label="Back"
-          >
-            <ChevronLeft className="h-[18px] w-[18px] text-[#121217] dark:text-[#c8cdc9]" />
-          </button>
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex h-5 items-center justify-between gap-2 text-[14px] leading-5 tracking-[-0.15px]">
-              <p className="truncate font-satoshi font-medium text-[#171717] dark:text-[#f0f2f1]">
-                {scenario ? scenarioTypeLabel(scenario.scenarioType) : "Eklan Free Talk"}
-              </p>
-              {navStepLabel ? (
-                <p className="shrink-0 font-sans text-[#6a7282] dark:text-[#9aa39e]">{navStepLabel}</p>
-              ) : phase === "grading" ? (
-                <p className="shrink-0 font-sans text-xs text-[#6a7282]">Grading…</p>
-              ) : phase === "result" ? (
-                <p className="shrink-0 font-sans text-xs text-[#6a7282]">Done</p>
-              ) : null}
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-[#e7eaed]/50 dark:bg-[#2a2e2c]">
-              <div
-                className="h-2 rounded-full bg-[#3b883e] transition-[width] duration-500 ease-out"
-                style={{ width: progressPct }}
-              />
-            </div>
-          </div>
-          <div className="h-[30px] w-[30px] shrink-0" aria-hidden />
-        </div>
-      </header>
+    <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+      <div className="h-6" />
+      <Header title="Eklan Free Talk" showBack backHref="/account/practice" />
 
-      <div
-        className={`mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 pt-6 md:max-w-2xl ${
-          phase === "ready" || phase === "responding"
-            ? phase === "responding" && showTextInput
-              ? "pb-40"
-              : "pb-32"
-            : "pb-8"
-        }`}
-      >
-        {phase === "loading" && (
-          <div className="flex flex-col items-center justify-center gap-4 py-24 text-[#9aa39e]">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
-            <p className="text-sm font-satoshi">Preparing your scenario…</p>
-          </div>
-        )}
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-foreground mb-3">Scenarios</h2>
 
-        {(phase === "ready" || phase === "responding") && scenario && (
-          <div className="flex flex-col gap-6">
-            <section className="flex flex-col gap-2">
-              <div className="flex flex-col gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dcfce7] dark:bg-emerald-950/50">
-                  <Image src="/logo2.svg" alt="" width={22} height={22} className="object-contain" />
-                </div>
-                <div className="w-full rounded-2xl rounded-tl-sm border-[0.5px] border-[rgba(231,234,237,0.55)] bg-[rgba(252,252,252,0.92)] p-4 shadow-sm dark:border-[#2a2e2c] dark:bg-[#1a1d1c]/95">
-                  <p className="mb-2 text-sm font-bold leading-5 text-[#3b883e] dark:text-emerald-400">
-                    {scenario.title}
-                  </p>
-                  <p className="text-sm font-satoshi leading-relaxed text-[#171717] dark:text-[#e8ebe9]">
-                    {scenario.situation}
-                  </p>
-                  <div className="mt-4 flex items-center gap-2.5 border-t border-transparent pt-1">
-                    <span className="text-[#9ca3af]" title="Translate (coming soon)">
-                      <Languages className="h-4 w-4" aria-hidden />
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isSpeaking ? stopTts() : void speakSituation(scenario.situation)
-                      }
-                      className="rounded-full p-1 text-[#6b7280] transition-colors hover:bg-black/5 hover:text-[#3b883e] dark:text-[#9aa39e] dark:hover:bg-white/10"
-                      aria-label={isSpeaking ? "Stop reading aloud" : "Read situation aloud"}
-                    >
-                      {isSpeaking ? (
-                        <VolumeX className="h-4 w-4 text-[#3b883e]" />
-                      ) : (
-                        <Volume2 className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="flex flex-col items-center gap-4">
-              <h2 className="text-center font-nunito text-xl font-bold leading-6 text-[#2a602c] dark:text-emerald-400">
-                Your Turn !
-              </h2>
-              <div className="w-full rounded-2xl rounded-tl-3xl border-[0.5px] border-[rgba(231,234,237,0.55)] bg-[rgba(252,252,252,0.92)] p-4 shadow-sm dark:border-[#2a2e2c] dark:bg-[#1a1d1c]/95">
-                <p className="text-center text-sm font-bold leading-relaxed text-[#6b7280] dark:text-[#9aa39e]">
-                  {scenario.hint}
-                </p>
-                <div className="mt-4 flex items-center justify-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => (isSpeaking ? stopTts() : void speakSituation(scenario.hint))}
-                    className="rounded-full p-1 text-[#6b7280] transition-colors hover:bg-black/5 hover:text-[#3b883e] dark:text-[#9aa39e]"
-                    aria-label="Listen to hint"
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-1 mb-4 flex gap-1">
+            {(["ongoing", "history"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 px-2 sm:px-4 py-3 rounded-xl text-xs sm:text-sm font-medium transition-all ${
+                  activeTab === tab
+                    ? "bg-[#22c55e] text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <span>{tabLabels[tab]}</span>
+                {stats[tab] > 0 && (
+                  <span
+                    className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${
+                      activeTab === tab ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                    }`}
                   >
-                    <Volume2 className="h-4 w-4" />
-                  </button>
-                </div>
-                {phase === "responding" && !showTextInput && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTextInput(true)}
-                    className="mt-3 w-full text-center text-xs font-medium text-[#6b7280] underline decoration-[#6b7280]/40 underline-offset-2 hover:text-[#3b883e] dark:text-[#9aa39e]"
-                  >
-                    Can&apos;t use the microphone? Type your response
-                  </button>
+                    {stats[tab]}
+                  </span>
                 )}
-              </div>
-
-              {scenario.usefulPhrases.length > 0 && (
-                <div className="w-full rounded-2xl border border-[#e7eaed]/80 bg-[#fafafa]/80 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/80">
-                  <button
-                    type="button"
-                    onClick={() => setPhrasesExpanded((s) => !s)}
-                    className="flex w-full items-center justify-between text-left"
-                    aria-expanded={phrasesExpanded}
-                  >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                      Useful phrases
-                    </span>
-                    {phrasesExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                    )}
-                  </button>
-                  {phrasesExpanded && (
-                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#374151] dark:text-[#c8cdc9]">
-                      {scenario.usefulPhrases.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {phase === "responding" && showTextInput && (
-                <div className="w-full rounded-2xl border border-[#e7eaed] bg-[#fafafa]/90 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/90">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                    Type your response
-                  </p>
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.ctrlKey) {
-                        e.preventDefault();
-                        void handleSendText();
-                      }
-                    }}
-                    placeholder="Type here… (Ctrl+Enter to send)"
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-[#e7eaed] bg-white px-3 py-2.5 text-sm text-[#171717] outline-none ring-[#3b883e]/20 focus:ring-2 dark:border-[#2a2e2c] dark:bg-[#0c0e0d] dark:text-[#f0f2f1]"
-                  />
-                  <div className="mt-3 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowTextInput(false)}
-                      className="rounded-xl px-3 py-2 text-sm font-medium text-[#6b7280]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleSendText()}
-                      disabled={!inputText.trim()}
-                      className="flex items-center gap-2 rounded-xl bg-[#3b883e] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                    >
-                      <Send className="h-4 w-4" />
-                      Send
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
+              </button>
+            ))}
           </div>
-        )}
 
-        {phase === "grading" && (
-          <div className="flex flex-col items-center justify-center gap-4 py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
-            <p className="text-sm text-[#6b7280] dark:text-[#9aa39e]">Grading your response…</p>
-            {feedbackText && (
-              <div className="w-full rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 text-sm text-[#374151] dark:border-[#2a2e2c] dark:bg-[#131614] dark:text-[#c8cdc9]">
-                <MarkdownText>{feedbackText}</MarkdownText>
-              </div>
-            )}
-          </div>
-        )}
-
-        {phase === "result" && scenario && (
-          <div className="space-y-4 pb-8">
-            <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-5 shadow-sm dark:border-[#2a2e2c] dark:bg-[#131614]">
-              <div className="flex items-center gap-5">
-                {gradeResult && <ScoreRing score={gradeResult.overallScore} />}
-                <div className="min-w-0">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                    {scenario.title}
+          {activeTab === "ongoing" && (
+            <>
+              {scenariosLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#22c55e]" />
+                </div>
+              ) : scenariosError || summaries.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No scenarios available</h3>
+                  <p className="text-muted-foreground text-sm">
+                    {scenariosError ||
+                      "No free talk scenarios are configured yet. Check back after your instructor adds them."}
                   </p>
-                  {gradeResult && (
-                    <>
-                      <p className="font-nunito text-lg font-bold leading-tight text-[#171717] dark:text-[#f0f2f1]">
-                        {gradeResult.competencyLevel}
-                      </p>
-                      <span
-                        className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          getCompetencyColors(gradeResult.competencyLevel).bg
-                        } ${getCompetencyColors(gradeResult.competencyLevel).text}`}
-                      >
-                        {gradeResult.rawScore} / {gradeResult.maxScore} pts
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {feedbackText && (
-              <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 dark:border-[#2a2e2c] dark:bg-[#131614]">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                  Feedback
-                </p>
-                <div className="text-sm leading-relaxed text-[#374151] dark:text-[#c8cdc9]">
-                  <MarkdownText>{feedbackText}</MarkdownText>
-                </div>
-              </div>
-            )}
-
-            {gradeResult && gradeResult.behaviours.length > 0 && (
-              <div className="rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 dark:border-[#2a2e2c] dark:bg-[#131614]">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                  Clinical Communication Behaviours
-                </p>
-                <div>
-                  {gradeResult.behaviours.map((b) => (
-                    <BehaviourRow key={b.id} b={b} />
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {summaries.map((s) => (
+                    <Link
+                      key={s.id}
+                      href={`/account/practice/free-talk/session?scenarioId=${encodeURIComponent(s.id)}`}
+                      className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-300 flex items-center justify-center shrink-0 shadow-inner">
+                        <MessageSquare className="w-7 h-7 text-emerald-800" aria-hidden />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
+                          {s.title}
+                        </h3>
+                        <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+                          • {scenarioTypeLabel(s.scenarioType)}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+                    </Link>
                   ))}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#6b7280] dark:text-[#9aa39e]">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Full (1 pt)
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MinusCircle className="h-3.5 w-3.5 text-yellow-500" /> Partial (0.5 pt)
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <XCircle className="h-3.5 w-3.5 text-red-400" /> None (0 pt)
-                  </span>
-                </div>
-              </div>
-            )}
+              )}
+            </>
+          )}
 
-            <button
-              type="button"
-              onClick={handleTryAnother}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b883e] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2f6f32]"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Try another scenario
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/account/practice")}
-              className="w-full rounded-xl border border-[#e7eaed] py-3 text-sm font-semibold text-[#374151] dark:border-[#2a2e2c] dark:text-[#c8cdc9]"
-            >
-              Back to Practice
-            </button>
-          </div>
-        )}
+          {activeTab === "history" && (
+            <>
+              {!learnerId ? (
+                <Card className="p-8 text-center">
+                  <p className="text-muted-foreground text-sm">Sign in to see your practice history.</p>
+                </Card>
+              ) : history.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No history yet</h3>
+                  <p className="text-muted-foreground text-sm">
+                    When you finish a scenario, your feedback and scores appear here. History is saved on this
+                    device for your account.
+                  </p>
+                </Card>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {history.map((entry, i) => (
+                    <HistoryAccordionItem
+                      key={entry.id}
+                      entry={entry}
+                      isOpen={openHistoryId === entry.id}
+                      onToggle={() =>
+                        setOpenHistoryId((cur) => (cur === entry.id ? null : entry.id))
+                      }
+                      last={i === history.length - 1}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {(phase === "ready" || phase === "responding") && scenario && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {phase === "responding" && isAnalyzingVoice && (
-            <p className="pointer-events-auto mb-2 text-center text-xs text-[#606060] dark:text-[#9aa39e]">
-              Analyzing your voice…
-            </p>
-          )}
-          <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center px-5 md:max-w-2xl">
-            {phase === "ready" ? (
-              <button
-                type="button"
-                onClick={handleGotIt}
-                className="w-full max-w-sm rounded-2xl bg-[#3b883e] py-3.5 text-center text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#2f6f32]"
-              >
-                Got it — I&apos;m ready to respond
-              </button>
-            ) : (
-              <div className="rounded-full bg-[rgba(76,175,80,0.12)] p-1.5 shadow-lg dark:bg-emerald-500/15">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isRecording) stopRecording();
-                    else void startRecording();
-                  }}
-                  disabled={isAnalyzingVoice}
-                  className={`flex h-20 w-20 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-40 ${
-                    isRecording ? "bg-red-600 hover:bg-red-700" : "bg-[#3b883e] hover:bg-[#2f6f32]"
-                  }`}
-                  aria-label={isRecording ? "Stop recording" : "Start recording"}
-                >
-                  {isAnalyzingVoice ? (
-                    <Loader2 className="h-9 w-9 animate-spin" />
-                  ) : isRecording ? (
-                    <span className="relative flex h-3 w-3">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                      <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
-                    </span>
-                  ) : (
-                    <Mic className="h-9 w-9" strokeWidth={2} />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Leave modal */}
-      {showLeaveModal && (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-[60] bg-black/40"
-            aria-label="Close"
-            onClick={() => setShowLeaveModal(false)}
-          />
-          <div
-            className="fixed left-1/2 top-1/2 z-[70] w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-[#131614] border border-gray-100 dark:border-[#2a2e2c] shadow-xl p-6"
-            role="dialog"
-            aria-labelledby="leave-title"
-          >
-            <h2
-              id="leave-title"
-              className="text-lg font-bold font-nunito text-gray-900 dark:text-[#f0f2f1] mb-2"
-            >
-              Leave this session?
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-[#9aa39e] mb-6">
-              Your progress in this session won&apos;t be saved.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={confirmLeave}
-                className="w-full py-3 rounded-xl bg-red-600 text-white font-semibold text-sm"
-              >
-                Leave
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowLeaveModal(false)}
-                className="w-full py-3 rounded-xl border border-gray-200 dark:border-[#2a2e2c] text-gray-800 dark:text-[#c8cdc9] font-semibold text-sm"
-              >
-                Keep going
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <BottomNav />
     </div>
   );
 }
