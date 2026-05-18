@@ -9,6 +9,7 @@ import {
   Calendar,
   BookOpen,
   Mic,
+  MessageSquare,
   BarChart3,
   AlertCircle,
   Pencil,
@@ -22,9 +23,9 @@ import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics"
 import { SentenceAnalyticsComponent } from "@/components/admin/sentence-analytics";
 import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
+import { LearnerFreeTalkAttemptsSection } from "@/components/admin/learner-free-talk-attempts";
 import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
-import { LearnerAiSessionsSection } from "@/components/admin/learner-ai-sessions";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -260,7 +261,13 @@ export default function LearnerProfilePage() {
         <LearnerProgressSummary learnerId={learnerId} learnerName={name} />
       </div>
 
-      <LearnerAiSessionsSection learnerId={learnerId} />
+      {/* Eklan Free Talk */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" /> Eklan Free Talk
+        </h2>
+        <LearnerFreeTalkAttemptsSection learnerId={learnerId} learnerName={name} />
+      </div>
 
       {/* Drill Submissions & Analytics */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">

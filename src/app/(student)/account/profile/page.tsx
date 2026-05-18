@@ -22,7 +22,7 @@ import { useLearnerTimeStudied } from "@/hooks/useLearnerTimeStudied";
 import { useUserStreak } from "@/hooks/useUserStreak";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import {
-  CURRENT_PLAN_CARD_MESSAGE,
+  getPlanCardMessage,
   planTitleFromUser,
 } from "@/lib/learner-learning-goals";
 
@@ -51,11 +51,16 @@ export default function ProfilePage() {
   const { data: timeSeconds, isLoading: timeLoading } = useLearnerTimeStudied();
   const { data: streak, isLoading: streakLoading } = useUserStreak();
 
+  // Use me?.user (from /api/v1/users/current) for subscription state — it includes
+  // isSubscribed and subscriptionPlan. Fall back to authUser only for display fields.
   const user = me?.user ?? authUser;
+  const subscriptionUser = me?.user ?? null;
+  const isSubscribed = subscriptionUser?.isSubscribed === true;
   const initials = getUserInitials(user);
   const displayName = getUserDisplayName(user);
   const userEmail = user?.email || "";
-  const planTitle = planTitleFromUser(user);
+  const planTitle = planTitleFromUser(subscriptionUser);
+  const planMessage = getPlanCardMessage(isSubscribed);
 
   const overall =
     typeof pronunciation?.overallScore === "number" &&
@@ -99,7 +104,13 @@ export default function ProfilePage() {
               <p className="text-green-100 text-sm md:text-base mb-2">
                 {userEmail}
               </p>
-              <span className="inline-block bg-orange-100 text-orange-950 px-3 py-1 rounded-full text-xs font-semibold">
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                  isSubscribed
+                    ? "bg-green-100 text-green-900"
+                    : "bg-orange-100 text-orange-950"
+                }`}
+              >
                 {planTitle}
               </span>
             </div>
@@ -155,7 +166,7 @@ export default function ProfilePage() {
               {planTitle}
             </h3>
             <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-              {CURRENT_PLAN_CARD_MESSAGE}
+              {planMessage}
             </p>
           </Card>
         </Link>

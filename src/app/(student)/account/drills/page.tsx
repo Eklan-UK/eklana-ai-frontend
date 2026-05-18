@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Loader2, BookOpen } from "lucide-react";
 import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useLearnerClasses } from "@/hooks/useClasses";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { getDrillStatus } from "@/utils/drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
@@ -32,6 +34,15 @@ function drillPlanTab(item: {
 }
 
 export default function DrillsPage() {
+  const router = useRouter();
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+
+  useEffect(() => {
+    if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
+      router.replace("/account/settings/subscriptions");
+    }
+  }, [meLoading, me, router]);
+
   const [activeTab, setActiveTab] = useState<PlanTab>("ongoing");
   const prefetchDrill = usePrefetchDrill();
 

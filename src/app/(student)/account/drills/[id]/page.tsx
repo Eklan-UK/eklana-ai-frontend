@@ -1,7 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import DrillPracticeInterface from "@/components/drills/DrillPracticeInterface";
 import { getServerPublicBaseUrl } from "@/lib/public-base-url.server";
+import { getCurrentUser } from "@/app/(student)/account/get-user";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
+
+export const dynamic = 'force-dynamic';
 
 async function getDrill(drillId: string, assignmentId?: string) {
   try {
@@ -84,6 +88,11 @@ export default async function DrillDetailPage({
 
   if (!id) {
     return notFound();
+  }
+
+  const userData = await getCurrentUser();
+  if (!isUserSubscribed(userData?.user)) {
+    redirect("/account/settings/subscriptions");
   }
 
   const drillData = await getDrill(id, assignmentId);

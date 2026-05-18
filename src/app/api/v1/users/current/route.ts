@@ -41,6 +41,7 @@ async function handler(
       subscriptionPlan: user.subscriptionPlan || "free",
       subscriptionActivatedAt: user.subscriptionActivatedAt || null,
       subscriptionExpiresAt: user.subscriptionExpiresAt || null,
+      stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,
       isSubscribed: subscribed,
     };
 

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
-import { ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronRight, CalendarDays, Lock } from "lucide-react";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
+import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
 export function AccountHomeContentClient({
   children,
@@ -11,21 +14,41 @@ export function AccountHomeContentClient({
   children: React.ReactNode;
 }) {
   const t = useTranslations("account");
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+  const isSubscribed = !meLoading && me?.user?.isSubscribed === true;
 
   return (
     <>
       <div className="mb-4 md:mb-6">
-        <Link href="/account/classes">
-          <Button
-            variant="outline"
-            size="lg"
-            fullWidth
-            className="border-primary/30 text-primary hover:bg-primary/10"
-          >
-            <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
-            {t("viewSessions")}
-          </Button>
-        </Link>
+        {isSubscribed ? (
+          <Link href="/account/classes">
+            <Button
+              variant="outline"
+              size="lg"
+              fullWidth
+              className="border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <CalendarDays className="mr-2 h-5 w-5 shrink-0" />
+              {t("viewSessions")}
+            </Button>
+          </Link>
+        ) : (
+          <ProLockHoverWrap className="block">
+            <ProLockedCtaSwap density="full">
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                tabIndex={-1}
+                type="button"
+                className="border-border text-muted-foreground opacity-80 cursor-default pointer-events-none"
+              >
+                <Lock className="mr-2 h-4 w-4 shrink-0" />
+                {t("viewSessions")}
+              </Button>
+            </ProLockedCtaSwap>
+          </ProLockHoverWrap>
+        )}
       </div>
 
       <div className="mb-4 md:mb-6">

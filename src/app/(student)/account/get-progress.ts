@@ -1,6 +1,10 @@
 // Server-side function to get user progress from completed drills
-import { cookies } from 'next/headers';
-import { getServerPublicBaseUrl } from '@/lib/public-base-url.server';
+import { Types } from 'mongoose';
+import { getServerSession } from '@/lib/api/session';
+import {
+  getLearnerMyDrillsPayload,
+  type LearnerMyDrillRow,
+} from '@/lib/server/learner-my-drills.server';
 
 export interface UserProgress {
   drillsCompleted: number;
@@ -16,64 +20,76 @@ export interface UserProgress {
   };
 }
 
+function normalizeLearnerRole(role: string | undefined): 'user' | null {
+  if (!role) return null;
+  if (role === 'learner' || role === 'user') return 'user';
+  return null;
+}
+
+function rowScore(d: LearnerMyDrillRow): number {
+  const legacy = d as LearnerMyDrillRow & { score?: number };
+  return legacy.latestAttempt?.score ?? legacy.score ?? 0;
+}
+
+function drillDocType(d: LearnerMyDrillRow): string | undefined {
+  if (!d.drill || typeof d.drill !== 'object') return undefined;
+  const t = (d.drill as { type?: string }).type;
+  return typeof t === 'string' ? t : undefined;
+}
+
 export async function getUserProgress(): Promise<UserProgress> {
   try {
-    const origin = (await getServerPublicBaseUrl()).replace(/\/$/, '');
-    const cookieStore = await cookies();
-    const cookieHeader = cookieStore.toString();
-
-    // Fetch user's drills to calculate progress
-    const response = await fetch(`${origin}/api/v1/drills/learner/my-drills?limit=100`, {
-      credentials: 'include',
-      headers: {
-        Cookie: cookieHeader,
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
+    const { user } = await getServerSession();
+    if (!user?.id || normalizeLearnerRole(user.role) !== 'user') {
       return getDefaultProgress();
     }
 
-    const data = await response.json();
-    const drills = data.data?.drills || data.drills || [];
+    let userId: Types.ObjectId;
+    try {
+      userId = new Types.ObjectId(user.id);
+    } catch {
+      return getDefaultProgress();
+    }
 
-    // Calculate progress metrics
-    const completedDrills = drills.filter((d: any) => 
-      d.status === 'completed' || d.completedAt
+    const { drills } = await getLearnerMyDrillsPayload(userId, {
+      limit: 100,
+      offset: 0,
+    });
+
+    const completedDrills = drills.filter(
+      (d) => d.status === 'completed' || Boolean(d.completedAt)
     );
-    
+
     const drillsCompleted = completedDrills.length;
     const drillsTotal = drills.length;
-    const completionRate = drillsTotal > 0 
-      ? Math.round((drillsCompleted / drillsTotal) * 100) 
-      : 0;
+    const completionRate =
+      drillsTotal > 0 ? Math.round((drillsCompleted / drillsTotal) * 100) : 0;
 
-    // Calculate average score from completed drills with scores
-    const drillsWithScores = completedDrills.filter((d: any) => 
-      d.latestAttempt?.score != null || d.score != null
-    );
-    
-    const averageScore = drillsWithScores.length > 0
-      ? Math.round(
-          drillsWithScores.reduce((sum: number, d: any) => 
-            sum + (d.latestAttempt?.score || d.score || 0), 0
-          ) / drillsWithScores.length
-        )
-      : 0;
+    const drillsWithScores = completedDrills.filter((d) => {
+      const ext = d as LearnerMyDrillRow & { score?: number };
+      return ext.latestAttempt?.score != null || ext.score != null;
+    });
 
-    // Calculate pronunciation score from vocabulary and roleplay drills
-    const pronunciationDrills = completedDrills.filter((d: any) => 
-      d.drill?.type === 'vocabulary' || d.drill?.type === 'roleplay'
-    );
-    
-    const pronunciationScore = pronunciationDrills.length > 0
-      ? Math.round(
-          pronunciationDrills.reduce((sum: number, d: any) => 
-            sum + (d.latestAttempt?.score || d.score || 0), 0
-          ) / pronunciationDrills.length
-        )
-      : 0;
+    const averageScore =
+      drillsWithScores.length > 0
+        ? Math.round(
+            drillsWithScores.reduce((sum, d) => sum + rowScore(d), 0) /
+              drillsWithScores.length
+          )
+        : 0;
+
+    const pronunciationDrills = completedDrills.filter((d) => {
+      const t = drillDocType(d);
+      return t === 'vocabulary' || t === 'roleplay';
+    });
+
+    const pronunciationScore =
+      pronunciationDrills.length > 0
+        ? Math.round(
+            pronunciationDrills.reduce((sum, d) => sum + rowScore(d), 0) /
+              pronunciationDrills.length
+          )
+        : 0;
 
     // Calculate confidence score (based on overall performance and completion rate)
     const confidenceScore = Math.round(
@@ -118,37 +134,43 @@ function getDefaultProgress(): UserProgress {
   };
 }
 
-function calculateStreak(completedDrills: any[]): number {
+function calculateStreak(completedDrills: LearnerMyDrillRow[]): number {
   if (completedDrills.length === 0) return 0;
 
   // Sort by completion date
   const sortedDrills = [...completedDrills]
-    .filter(d => d.completedAt)
-    .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+    .filter((d) => d.completedAt)
+    .sort(
+      (a, b) =>
+        new Date(b.completedAt as Date).getTime() -
+        new Date(a.completedAt as Date).getTime()
+    );
 
   if (sortedDrills.length === 0) return 0;
 
   let streak = 0;
-  let currentDate = new Date();
+  const currentDate = new Date();
   currentDate.setHours(0, 0, 0, 0);
 
   // Get unique completion dates
   const completionDates = new Set(
-    sortedDrills.map(d => {
-      const date = new Date(d.completedAt);
+    sortedDrills.map((d) => {
+      const date = new Date(d.completedAt as Date);
       date.setHours(0, 0, 0, 0);
       return date.getTime();
     })
   );
 
   // Count consecutive days from today
-  for (let i = 0; i <= 30; i++) { // Check up to 30 days
+  for (let i = 0; i <= 30; i++) {
+    // Check up to 30 days
     const checkDate = new Date(currentDate);
     checkDate.setDate(checkDate.getDate() - i);
-    
+
     if (completionDates.has(checkDate.getTime())) {
       streak++;
-    } else if (i > 0) { // Allow missing today
+    } else if (i > 0) {
+      // Allow missing today
       break;
     }
   }
@@ -156,30 +178,37 @@ function calculateStreak(completedDrills: any[]): number {
   return streak;
 }
 
-function calculateWeeklyChange(completedDrills: any[]): { pronunciation: number; confidence: number } {
+function calculateWeeklyChange(
+  completedDrills: LearnerMyDrillRow[]
+): { pronunciation: number; confidence: number } {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
   // This week's drills
-  const thisWeekDrills = completedDrills.filter(d => 
-    d.completedAt && new Date(d.completedAt) > oneWeekAgo
+  const thisWeekDrills = completedDrills.filter(
+    (d) => d.completedAt && new Date(d.completedAt) > oneWeekAgo
   );
 
   // Last week's drills
-  const lastWeekDrills = completedDrills.filter(d => 
-    d.completedAt && 
-    new Date(d.completedAt) > twoWeeksAgo && 
-    new Date(d.completedAt) <= oneWeekAgo
+  const lastWeekDrills = completedDrills.filter(
+    (d) =>
+      d.completedAt &&
+      new Date(d.completedAt) > twoWeeksAgo &&
+      new Date(d.completedAt) <= oneWeekAgo
   );
 
-  const thisWeekAvg = thisWeekDrills.length > 0
-    ? thisWeekDrills.reduce((sum, d) => sum + (d.latestAttempt?.score || d.score || 0), 0) / thisWeekDrills.length
-    : 0;
+  const thisWeekAvg =
+    thisWeekDrills.length > 0
+      ? thisWeekDrills.reduce((sum, d) => sum + rowScore(d), 0) /
+        thisWeekDrills.length
+      : 0;
 
-  const lastWeekAvg = lastWeekDrills.length > 0
-    ? lastWeekDrills.reduce((sum, d) => sum + (d.latestAttempt?.score || d.score || 0), 0) / lastWeekDrills.length
-    : 0;
+  const lastWeekAvg =
+    lastWeekDrills.length > 0
+      ? lastWeekDrills.reduce((sum, d) => sum + rowScore(d), 0) /
+        lastWeekDrills.length
+      : 0;
 
   const change = thisWeekAvg - lastWeekAvg;
 

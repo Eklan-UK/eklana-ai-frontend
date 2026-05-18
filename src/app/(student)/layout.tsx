@@ -3,6 +3,7 @@ import "../globals.css";
 import { VerificationGuard } from "@/components/guards/VerificationGuard";
 import { OnboardingGuard } from "@/components/guards/OnboardingGuard";
 import { RoleGuard } from "@/components/guards/RoleGuard";
+import { SubscriptionGuard } from "@/components/guards/SubscriptionGuard";
 import { StreakActivityPing } from "@/components/streak/StreakActivityPing";
 import { StudentIntlProvider } from "@/components/providers/StudentIntlProvider";
 
@@ -20,8 +21,10 @@ export default function StudentLayout({
     <RoleGuard allowedRoles={['user']}>
       <VerificationGuard>
         <OnboardingGuard>
-          <StreakActivityPing />
-          <StudentIntlProvider>{children}</StudentIntlProvider>
+          <SubscriptionGuard>
+            <StreakActivityPing />
+            <StudentIntlProvider>{children}</StudentIntlProvider>
+          </SubscriptionGuard>
         </OnboardingGuard>
       </VerificationGuard>
     </RoleGuard>

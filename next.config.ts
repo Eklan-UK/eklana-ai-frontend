@@ -145,9 +145,16 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  /** Student "Home" alias: URL bar shows /home, same page as /account */
+  /**
+   * Short URL aliases (URL bar shows the short path; internally serves /account/*).
+   * SubscriptionGuard normalizes these for allowlist checks (see subscriptionGuardPathname).
+   */
   async rewrites() {
-    return [{ source: '/home', destination: '/account' }];
+    return [
+      { source: '/home', destination: '/account' },
+      { source: '/practice', destination: '/account/practice' },
+      { source: '/practice/:path*', destination: '/account/practice/:path*' },
+    ];
   },
   async redirects() {
     return [

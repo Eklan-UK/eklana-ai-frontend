@@ -778,38 +778,6 @@ export const adminAPI = {
     });
   },
 
-  /**
-   * Eklan AI session summaries (Free Talk / topic / drill) for a learner.
-   * Access: admin (any) or tutor (assigned only). Same as drill-assignments.
-   */
-  getLearnerAiSessions: (
-    learnerId: string,
-    params?: { limit?: number; offset?: number; mode?: 'free' | 'topic' | 'drill' }
-  ) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: {
-        sessions: Array<{
-          id: string;
-          mode: string;
-          topic?: string;
-          drillId?: string;
-          summary: import('@/types/ai-session-summary').SessionSummaryPayload;
-          endedAt: string;
-          createdAt: string;
-        }>;
-        total: number;
-        limit: number;
-        offset: number;
-      };
-    }>(`/admin/learners/${learnerId}/ai-sessions`, {
-      method: 'GET',
-      params,
-      cache: false,
-    });
-  },
-
   /** Grammar drill analytics for a learner (aggregated attempts). Admin/tutor. */
   getLearnerGrammarAnalytics: (
     learnerId: string,
@@ -906,6 +874,37 @@ export const adminAPI = {
         attemptsConsidered: number;
       };
     }>(`/admin/learners/${learnerId}/matching-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Eklan Free Talk attempts for a learner (admin/tutor). */
+  getLearnerFreeTalkAttempts: (
+    learnerId: string,
+    params?: { limit?: number; cursor?: string | null }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        attempts: Array<{
+          id: string;
+          scenarioId: string;
+          scenarioTitle: string;
+          scenarioType: string;
+          feedbackText: string;
+          gradeResult: unknown;
+          audioUrl: string | null;
+          audioMimeType: string | null;
+          durationMs: number | null;
+          usedVoice: boolean;
+          completedAt: string;
+        }>;
+        nextCursor: string | null;
+      };
+    }>(`/admin/learners/${learnerId}/free-talk-attempts`, {
       method: 'GET',
       params,
       cache: false,

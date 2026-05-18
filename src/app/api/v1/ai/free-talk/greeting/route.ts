@@ -1,50 +1,90 @@
 // GET /api/v1/ai/free-talk/greeting
-// Picks the next ICU scenario, streams the situation text + audio, and ends
-// with a metadata chunk containing scenarioTitle, hint, and usefulPhrases.
+// Returns a scenario as plain JSON from admin-configured MongoDB documents.
+// Optional query: scenarioId — load that document; omitted — random pick (legacy / mobile).
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/middleware';
-import { logger } from '@/lib/api/logger';
-import { generateFreeTalkGreetingStream } from '@/services/gemini.service';
+import { Types } from 'mongoose';
+import { withPremium } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
-import User from '@/models/user';
+import FreeTalkScenario from '@/models/free-talk-scenario';
+import { logger } from '@/lib/api/logger';
+import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 
-async function handler(
-	req: NextRequest,
-	context: { userId: any; userRole: string },
-): Promise<NextResponse> {
-	void req;
+function scenarioPayload(dbScenario: {
+	_id: Types.ObjectId;
+	title: string;
+	background: string;
+	task: string;
+	hint?: string;
+	usefulPhrases?: unknown;
+	scenarioType: string;
+	include?: unknown;
+}) {
+	const situation = [dbScenario.background, dbScenario.task].filter(Boolean).join('\n\n');
+	const hint = dbScenario.hint || dbScenario.task || '';
+	return {
+		id: String(dbScenario._id),
+		title: dbScenario.title,
+		situation,
+		hint,
+		usefulPhrases: normalizeFreeTalkScenarioStringList(dbScenario.usefulPhrases),
+		scenarioType: dbScenario.scenarioType,
+		background: dbScenario.background,
+		task: dbScenario.task,
+		include: normalizeFreeTalkScenarioStringList(dbScenario.include),
+	};
+}
+
+async function handler(req: NextRequest): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
-		const user = await User.findById(context.userId).select('firstName').lean();
-		const userName = (user?.firstName as string | undefined) || undefined;
 
-		const stream = await generateFreeTalkGreetingStream(userName);
+		const scenarioId = req.nextUrl.searchParams.get('scenarioId')?.trim();
 
-		return new NextResponse(stream, {
-			headers: {
-				'Content-Type': 'text/event-stream',
-				'Cache-Control': 'no-cache',
-				'Connection': 'keep-alive',
-			},
+		let dbScenario: {
+			_id: Types.ObjectId;
+			title: string;
+			background: string;
+			task: string;
+			hint?: string;
+			usefulPhrases?: unknown;
+			scenarioType: string;
+			include?: unknown;
+		} | null = null;
+
+		if (scenarioId) {
+			if (!Types.ObjectId.isValid(scenarioId)) {
+				return NextResponse.json({ success: false, message: 'Invalid scenario id.' }, { status: 400 });
+			}
+			dbScenario = await FreeTalkScenario.findById(scenarioId).lean().exec();
+		} else {
+			const [picked] = await FreeTalkScenario.aggregate([{ $sample: { size: 1 } }]);
+			dbScenario = picked ?? null;
+		}
+
+		if (!dbScenario) {
+			return NextResponse.json(
+				{
+					success: false,
+					message:
+						'No free talk scenarios are available yet. Please ask an administrator to create scenarios in the admin panel.',
+				},
+				{ status: 404 },
+			);
+		}
+
+		return NextResponse.json({
+			success: true,
+			scenario: scenarioPayload(dbScenario),
 		});
-	} catch (error: any) {
-		logger.error('[FreeTalk] Error generating greeting', {
-			error: error?.message,
-			stack: error?.stack,
+	} catch (err: unknown) {
+		logger.error('[FreeTalk] greeting handler failed', {
+			error: err instanceof Error ? err.message : String(err),
 		});
 		return NextResponse.json(
-			{
-				success: false,
-				message:
-					error?.message?.includes('429') || error?.message?.includes('quota')
-						? 'AI service is temporarily busy. Please wait a moment and try again.'
-						: 'Failed to start Free Talk session. Please try again.',
-			},
-			{ status: 500 },
+			{ success: false, message: 'Unable to load a free talk scenario. Please try again later.' },
+			{ status: 503 },
 		);
 	}
 }
 
-export const GET = withAuth(handler);
-
-export const maxDuration = 300;
+export const GET = withPremium(handler);

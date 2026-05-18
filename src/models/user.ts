@@ -48,6 +48,9 @@ export interface IUser extends Document {
   subscriptionPaymentMethod?: string | null;
   subscriptionAdminNote?: string | null;
   subscriptionUpdatedBy?: Types.ObjectId | null;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
   pressureTestLevel?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -218,6 +221,19 @@ const userSchema = new Schema<IUser>(
     subscriptionUpdatedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
+    },
+    stripeCustomerId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    stripeSubscriptionId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    stripeSubscriptionStatus: {
+      type: String,
     },
     pressureTestLevel: {
       type: Number,

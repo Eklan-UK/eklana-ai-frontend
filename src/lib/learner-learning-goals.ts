@@ -37,24 +37,33 @@ export function formatProfileLearningGoalsShort(profile: {
   return "Not set";
 }
 
-/** When set, learners (`role === "user"`) see this plan label in profile and settings (billing not final). */
-export const STUDENT_PLAN_LABEL_OVERRIDE: string | null = "Pro";
+/** @deprecated Override removed — plan label now reflects real Stripe subscription state. */
+export const STUDENT_PLAN_LABEL_OVERRIDE: string | null = null;
 
-/** Copy shown under the current plan on profile and subscriptions (no billing dates). */
-export const CURRENT_PLAN_CARD_MESSAGE =
-  "You're all set—dive in and make the most of every practice session.";
+/** Copy shown under the current plan when the user is subscribed (Pro). */
+export const CURRENT_PLAN_CARD_MESSAGE_PRO =
+  "You have full access to AI features — dive in!";
+
+/** Copy shown under the current plan when the user is on the free plan. */
+export const CURRENT_PLAN_CARD_MESSAGE_FREE =
+  "Upgrade to Pro to unlock Eklan Free Talk, Pressure Test, and all AI features.";
+
+/** Native title + hover tooltip for UI locked behind a Pro subscription. */
+export const PRO_FEATURE_LOCK_HOVER_MESSAGE =
+  "Upgrade to Pro to use this feature.";
+
+/** @deprecated Use CURRENT_PLAN_CARD_MESSAGE_PRO / CURRENT_PLAN_CARD_MESSAGE_FREE. */
+export const CURRENT_PLAN_CARD_MESSAGE = CURRENT_PLAN_CARD_MESSAGE_PRO;
+
+export function getPlanCardMessage(isSubscribed: boolean): string {
+  return isSubscribed ? CURRENT_PLAN_CARD_MESSAGE_PRO : CURRENT_PLAN_CARD_MESSAGE_FREE;
+}
 
 export function planTitleFromUser(user: any | null | undefined): string {
   if (!user) return "—";
-  if (
-    STUDENT_PLAN_LABEL_OVERRIDE &&
-    (user.role === "user" || user.role === "learner")
-  ) {
-    return STUDENT_PLAN_LABEL_OVERRIDE;
-  }
   const plan = (user.subscriptionPlan || "free").toLowerCase();
-  if (plan === "premium" || (user.isSubscribed && plan !== "free")) {
-    return "Premium";
+  if (plan === "premium" || user.isSubscribed === true) {
+    return "Pro";
   }
   return "Free";
 }

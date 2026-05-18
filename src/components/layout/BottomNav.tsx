@@ -4,9 +4,13 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 
 const HOME_HREF = "/home";
+const PRACTICE_HREF = "/practice";
 
 type NavDef = {
   nameKey: "home" | "practice" | "myPlan" | "profile";
@@ -24,7 +28,7 @@ const navDefs: NavDef[] = [
   },
   {
     nameKey: "practice",
-    href: "/account/practice",
+    href: PRACTICE_HREF,
     iconActive: "/icons/practice.svg",
     iconInactive: "/icons/practice-grey.svg",
   },
@@ -45,6 +49,9 @@ const navDefs: NavDef[] = [
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+  // Default locked while loading to avoid flash of unlocked state.
+  const isSubscribed = !meLoading && me?.user?.isSubscribed === true;
 
   const navItems = useMemo(
     () =>
@@ -63,10 +70,76 @@ export const BottomNav: React.FC = () => {
       <div className="max-w-md mx-auto px-1 py-1 grid grid-cols-4 items-center gap-0">
         {navItems.map((item) => {
           const isHomeTab = item.href === HOME_HREF;
+          const isPracticeTab = item.href === PRACTICE_HREF;
           const isActive = isHomeTab
             ? pathname === "/home" || pathname === "/account"
-            : pathname === item.href ||
-              (item.href !== HOME_HREF && pathname?.startsWith(item.href));
+            : isPracticeTab
+              ? pathname === "/practice" ||
+                pathname.startsWith("/practice/") ||
+                pathname === "/account/practice" ||
+                pathname.startsWith("/account/practice/")
+              : pathname === item.href ||
+                (item.href !== HOME_HREF &&
+                  item.href !== PRACTICE_HREF &&
+                  pathname?.startsWith(item.href));
+
+          const isMyPlan = item.nameKey === "myPlan";
+          const locked = isMyPlan && !isSubscribed;
+
+          const inner = (
+            <>
+              {isActive && !locked && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]" />
+              )}
+
+              <div
+                className={`w-6 h-6 flex items-center justify-center transition-all duration-200 relative ${
+                  isActive && !locked ? "scale-110" : ""
+                }`}
+              >
+                <Image
+                  src={isActive && !locked ? item.iconActive : item.iconInactive}
+                  alt={item.name}
+                  width={24}
+                  height={24}
+                  className={
+                    isActive && !locked
+                      ? "[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]"
+                      : "opacity-50"
+                  }
+                />
+                {locked && (
+                  <span className="absolute -top-1 -right-1 bg-orange-100 rounded-full p-0.5">
+                    <Lock className="w-2.5 h-2.5 text-orange-700" />
+                  </span>
+                )}
+              </div>
+
+              <span
+                className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
+                  isActive && !locked ? "text-[#3B883E]" : "text-muted-foreground"
+                }`}
+              >
+                {item.name}
+              </span>
+            </>
+          );
+
+          if (locked) {
+            return (
+              <Link
+                key={item.href}
+                href="/account/settings/subscriptions"
+                prefetch={true}
+                aria-label="Upgrade to Pro — open subscriptions"
+                className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0 opacity-50"
+              >
+                <ProLockHoverWrap className="flex flex-col items-center gap-0.5 w-full">
+                  {inner}
+                </ProLockHoverWrap>
+              </Link>
+            );
+          }
 
           return (
             <Link
@@ -75,35 +148,7 @@ export const BottomNav: React.FC = () => {
               prefetch={true}
               className="flex flex-col items-center gap-0.5 py-2 px-0.5 relative min-w-0"
             >
-              {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-8 rounded-full bg-[#3B883E]" />
-              )}
-
-              <div
-                className={`w-6 h-6 flex items-center justify-center transition-all duration-200 ${
-                  isActive ? "scale-110" : ""
-                }`}
-              >
-                <Image
-                  src={isActive ? item.iconActive : item.iconInactive}
-                  alt={item.name}
-                  width={24}
-                  height={24}
-                  className={
-                    isActive
-                      ? "[filter:invert(40%)_sepia(80%)_saturate(400%)_hue-rotate(90deg)_brightness(85%)]"
-                      : "opacity-50"
-                  }
-                />
-              </div>
-
-              <span
-                className={`text-[9px] sm:text-[10px] font-medium font-satoshi transition-colors duration-200 leading-tight text-center ${
-                  isActive ? "text-[#3B883E]" : "text-muted-foreground"
-                }`}
-              >
-                {item.name}
-              </span>
+              {inner}
             </Link>
           );
         })}
