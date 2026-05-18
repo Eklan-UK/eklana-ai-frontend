@@ -9,3 +9,9 @@ export const FREE_TALK_SCENARIO_TYPES = [
 ] as const;
 
 export type FreeTalkScenarioType = (typeof FREE_TALK_SCENARIO_TYPES)[number];
+
+/** Normalize `include` / `usefulPhrases` from pasted text, JSON strings, or legacy array shapes. */
+export {
+	normalizeFreeTalkScenarioStringList,
+	freeTalkStringListToMultiline,
+} from '@/lib/free-talk-scenario-lists';

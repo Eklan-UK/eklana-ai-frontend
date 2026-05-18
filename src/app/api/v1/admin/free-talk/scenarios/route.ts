@@ -6,6 +6,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
 import FreeTalkScenario, { FREE_TALK_SCENARIO_TYPES } from '@/models/free-talk-scenario';
+import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 import { Types } from 'mongoose';
 
 // ── GET ──────────────────────────────────────────────────────────────────────
@@ -21,7 +22,13 @@ async function getHandler(
 			.lean()
 			.exec();
 
-		return NextResponse.json({ code: 'Success', data: scenarios }, { status: 200 });
+		const data = scenarios.map((doc) => ({
+			...doc,
+			include: normalizeFreeTalkScenarioStringList(doc.include),
+			usefulPhrases: normalizeFreeTalkScenarioStringList(doc.usefulPhrases),
+		}));
+
+		return NextResponse.json({ code: 'Success', data }, { status: 200 });
 	} catch (error: any) {
 		logger.error('[FreeTalkScenarios] GET error', { error: error.message });
 		return NextResponse.json({ code: 'ServerError', message: 'Failed to fetch scenarios' }, { status: 500 });
@@ -30,12 +37,17 @@ async function getHandler(
 
 // ── POST ─────────────────────────────────────────────────────────────────────
 
+const listField = z
+	.union([z.string(), z.array(z.coerce.string()), z.null()])
+	.optional()
+	.transform((v) => normalizeFreeTalkScenarioStringList(v));
+
 const createSchema = z.object({
 	title: z.string().min(1, 'Title is required').max(200),
 	background: z.string().min(1, 'Background is required'),
 	task: z.string().min(1, 'Task is required'),
-	include: z.array(z.string()).default([]),
-	usefulPhrases: z.array(z.string()).default([]),
+	include: listField,
+	usefulPhrases: listField,
 	scenarioType: z.enum([...FREE_TALK_SCENARIO_TYPES] as [string, ...string[]]),
 	hint: z.string().default(''),
 });

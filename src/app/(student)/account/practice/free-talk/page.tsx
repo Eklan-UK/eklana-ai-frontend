@@ -24,6 +24,7 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
 import {
   loadFreeTalkHistory,
+  mapFreeTalkAttemptApiToHistoryEntry,
   type FreeTalkHistoryEntryV1,
 } from "@/lib/free-talk-history";
 
@@ -101,12 +102,25 @@ function HistoryAccordionItem({
               )}
             </div>
           )}
-          {entry.feedbackText.trim().length > 0 && (
+          {entry.audioUrl ? (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Your response (audio)
+              </p>
+              <audio controls className="h-9 w-full max-w-md rounded-md" src={entry.audioUrl} />
+              {entry.durationMs != null && entry.durationMs > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Duration ~{Math.round(entry.durationMs / 1000)}s
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {entry.feedbackText.trim().length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-black dark:text-[#e8ebe9]">
                 Feedback
               </p>
-              <div className="text-sm leading-relaxed text-foreground">
+              <div className="text-sm leading-relaxed text-black dark:text-[#e8ebe9]">
                 <MarkdownText>{entry.feedbackText}</MarkdownText>
               </div>
             </div>
@@ -140,16 +154,32 @@ export default function FreeTalkHubPage() {
     }
   }, [meLoading, me, router]);
 
-  const refreshHistory = useCallback(() => {
+  const refreshHistory = useCallback(async () => {
     if (!learnerId) {
       setHistory([]);
       return;
     }
-    setHistory(loadFreeTalkHistory(learnerId));
+    try {
+      const { attempts } = await aiService.fetchFreeTalkAttempts({ limit: 50 });
+      const serverEntries = attempts.map(mapFreeTalkAttemptApiToHistoryEntry);
+      const localEntries = loadFreeTalkHistory(learnerId);
+      const serverKeys = new Set(
+        serverEntries.map((e) => `${e.scenarioId}|${e.completedAt}`)
+      );
+      const extras = localEntries.filter(
+        (l) => !serverKeys.has(`${l.scenarioId}|${l.completedAt}`)
+      );
+      const merged = [...serverEntries, ...extras].sort(
+        (a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+      );
+      setHistory(merged);
+    } catch {
+      setHistory(loadFreeTalkHistory(learnerId));
+    }
   }, [learnerId]);
 
   useEffect(() => {
-    refreshHistory();
+    void refreshHistory();
   }, [refreshHistory]);
 
   useEffect(() => {
@@ -276,8 +306,9 @@ export default function FreeTalkHubPage() {
                   <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">No history yet</h3>
                   <p className="text-muted-foreground text-sm">
-                    When you finish a scenario, your feedback and scores appear here. History is saved on this
-                    device for your account.
+                    When you finish a scenario, your feedback and scores appear here. Signed-in learners
+                    sync to your account; older items on this device only may still show until they are saved
+                    online.
                   </p>
                 </Card>
               ) : (

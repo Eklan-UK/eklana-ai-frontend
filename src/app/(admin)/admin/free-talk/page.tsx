@@ -1,9 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, X, Trash2, Loader2, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Loader2, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
-import { FREE_TALK_SCENARIO_TYPES, type FreeTalkScenarioType } from "@/models/free-talk-scenario.shared";
+import {
+  FREE_TALK_SCENARIO_TYPES,
+  type FreeTalkScenarioType,
+  normalizeFreeTalkScenarioStringList,
+  freeTalkStringListToMultiline,
+} from "@/models/free-talk-scenario.shared";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,77 +51,10 @@ const emptyForm = () => ({
   scenarioType: "" as FreeTalkScenarioType | "",
   background: "",
   task: "",
-  includeInput: "",
-  include: [] as string[],
-  phraseInput: "",
-  usefulPhrases: [] as string[],
+  includeText: "",
+  usefulPhrasesText: "",
   hint: "",
 });
-
-// ─── Subcomponent: dynamic tag list ───────────────────────────────────────────
-
-function TagList({
-  items,
-  inputValue,
-  placeholder,
-  onInputChange,
-  onAdd,
-  onRemove,
-}: {
-  items: string[];
-  inputValue: string;
-  placeholder: string;
-  onInputChange: (v: string) => void;
-  onAdd: () => void;
-  onRemove: (item: string) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onAdd();
-            }
-          }}
-          placeholder={placeholder}
-          className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-        />
-        <button
-          type="button"
-          onClick={onAdd}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#3d8c40] text-white hover:bg-[#2f6f32]"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-      {items.length > 0 && (
-        <ul className="space-y-1.5">
-          {items.map((item) => (
-            <li
-              key={item}
-              className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700"
-            >
-              <span className="flex-1">{item}</span>
-              <button
-                type="button"
-                onClick={() => onRemove(item)}
-                className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                aria-label="Remove"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -153,18 +91,6 @@ export default function AdminFreeTalkPage() {
   const set = (field: keyof ReturnType<typeof emptyForm>, value: unknown) =>
     setForm((f) => ({ ...f, [field]: value }));
 
-  const addInclude = () => {
-    const v = form.includeInput.trim();
-    if (!v || form.include.includes(v)) return;
-    setForm((f) => ({ ...f, include: [...f.include, v], includeInput: "" }));
-  };
-
-  const addPhrase = () => {
-    const v = form.phraseInput.trim();
-    if (!v || form.usefulPhrases.includes(v)) return;
-    setForm((f) => ({ ...f, usefulPhrases: [...f.usefulPhrases, v], phraseInput: "" }));
-  };
-
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,6 +99,9 @@ export default function AdminFreeTalkPage() {
     if (!form.scenarioType) { toast.error("Scenario type is required"); return; }
     if (!form.background.trim()) { toast.error("Background is required"); return; }
     if (!form.task.trim()) { toast.error("Task is required"); return; }
+
+    const include = normalizeFreeTalkScenarioStringList(form.includeText);
+    const usefulPhrases = normalizeFreeTalkScenarioStringList(form.usefulPhrasesText);
 
     setSubmitting(true);
     try {
@@ -184,8 +113,8 @@ export default function AdminFreeTalkPage() {
           scenarioType: form.scenarioType,
           background: form.background.trim(),
           task: form.task.trim(),
-          include: form.include,
-          usefulPhrases: form.usefulPhrases,
+          include,
+          usefulPhrases,
           hint: form.hint.trim(),
         }),
       });
@@ -311,28 +240,31 @@ export default function AdminFreeTalkPage() {
             {/* Include */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700">Include</label>
-              <p className="text-xs text-gray-400">Bullet items the student should cover in their response</p>
-              <TagList
-                items={form.include}
-                inputValue={form.includeInput}
-                placeholder="e.g. Her current pain level"
-                onInputChange={(v) => set("includeInput", v)}
-                onAdd={addInclude}
-                onRemove={(item) => set("include", form.include.filter((i) => i !== item))}
+              <p className="text-xs text-gray-400">
+                Paste or type freely (your own bullets, numbers, or paragraphs). Line breaks split into separate
+                items for the app; blank lines are ignored.
+              </p>
+              <textarea
+                value={form.includeText}
+                onChange={(e) => set("includeText", e.target.value)}
+                placeholder={"Her current pain level\nVitals and monitoring\nPending investigations"}
+                rows={6}
+                className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
               />
             </div>
 
             {/* Useful Phrases */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700">Useful Handover Phrases</label>
-              <p className="text-xs text-gray-400">Example phrases the student can use</p>
-              <TagList
-                items={form.usefulPhrases}
-                inputValue={form.phraseInput}
-                placeholder={`e.g. "Her pain increased overnight."`}
-                onInputChange={(v) => set("phraseInput", v)}
-                onAdd={addPhrase}
-                onRemove={(item) => set("usefulPhrases", form.usefulPhrases.filter((p) => p !== item))}
+              <p className="text-xs text-gray-400">
+                Paste or type freely. Line breaks split into separate items; blank lines are ignored.
+              </p>
+              <textarea
+                value={form.usefulPhrasesText}
+                onChange={(e) => set("usefulPhrasesText", e.target.value)}
+                placeholder={`Her pain increased overnight.\nI'd like to hand over Sarah Thompson.`}
+                rows={6}
+                className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
               />
             </div>
 
@@ -456,11 +388,9 @@ export default function AdminFreeTalkPage() {
                         {sc.include.length > 0 && (
                           <div>
                             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Include</p>
-                            <ul className="list-disc space-y-1 pl-5">
-                              {sc.include.map((item) => (
-                                <li key={item}>{item}</li>
-                              ))}
-                            </ul>
+                            <p className="whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 leading-relaxed">
+                              {freeTalkStringListToMultiline(sc.include)}
+                            </p>
                           </div>
                         )}
                         {sc.usefulPhrases.length > 0 && (
@@ -468,11 +398,9 @@ export default function AdminFreeTalkPage() {
                             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
                               Useful Phrases
                             </p>
-                            <ul className="list-disc space-y-1 pl-5">
-                              {sc.usefulPhrases.map((p) => (
-                                <li key={p}>{p}</li>
-                              ))}
-                            </ul>
+                            <p className="whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 leading-relaxed">
+                              {freeTalkStringListToMultiline(sc.usefulPhrases)}
+                            </p>
                           </div>
                         )}
                         {sc.hint && (

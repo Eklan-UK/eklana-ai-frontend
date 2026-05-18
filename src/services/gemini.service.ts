@@ -1829,10 +1829,10 @@ function buildFreeTalkGradingPrompt(
 
 	const includeBlock =
 		scenario.include && scenario.include.length > 0
-			? `\n\nPoints the student should aim to cover (when relevant to their response):\n${scenario.include.map((line, i) => `${i + 1}. ${line}`).join('\n')}`
+			? `\n\nPoints the student should aim to cover (when relevant to their response):\n${scenario.include.join('\n')}`
 			: '';
 
-	let p = `You are Eklan, a fair and accurate ICU clinical communication evaluator. Your job is to assess exactly what the student said and give honest, tailored scores.
+	let p = `You are Eklan, a fair and accurate ICU clinical communication evaluator. Your job is to assess exactly what the student said and give honest, personalized tailored scores and feedback.
 
 Scenario: ${scenario.title}
 Situation: ${scenario.situation}${includeBlock}
@@ -1847,8 +1847,8 @@ Before scoring, decide which of the 7 behaviours below are actually testable in 
 
 STEP 2 — SCORING RULES:
 Only score behaviours you marked "relevant". For each relevant behaviour:
-- "full"    → clearly and confidently demonstrated (1 point)
-- "partial" → genuinely attempted — even if brief, incomplete, or stated as future intent ("I will…", "I would…") (0.5 points)
+- "full"    → clearly demonstrated as required (1 point)
+- "partial" → genuinely attempted — even if brief, incomplete, or stated as future intent ("I will…", "I would…"). Also recognize when studnet show concern, demonstrate friendliness and comfort to the patient, nurse colleague, doctor, patient's families and friends(0.5 points)
 - "none"    → relevant but truly absent from the response (0 points)
 
 For behaviours marked "not_applicable": always set result to "not_applicable" in the JSON.
@@ -1864,7 +1864,7 @@ ${behaviourList}
 Write 2–4 sentences of honest, specific feedback:
 - Reference the student's actual words — tailor this to THEIR specific response.
 - Acknowledge genuine strengths or partial attempts.
-- Clearly state what was missing or needs improvement.
+- Clearly state what was missing or needs improvement. Also include specific examples of a model response given the context of the scenerio and the student's response.
 - Base praise and critique only on the relevant behaviours for this scenario.
 
 Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by a valid JSON object using exactly this structure:

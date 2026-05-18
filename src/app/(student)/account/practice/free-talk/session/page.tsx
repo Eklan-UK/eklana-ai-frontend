@@ -26,6 +26,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
 import { releaseMediaStream } from "@/lib/ios-audio-utils";
 import { appendFreeTalkHistoryEntry } from "@/lib/free-talk-history";
+import { freeTalkStringListToMultiline } from "@/models/free-talk-scenario.shared";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ interface Scenario {
   situation: string;
   hint: string;
   usefulPhrases: string[];
+  include: string[];
   scenarioType: string;
 }
 
@@ -205,6 +207,7 @@ function FreeTalkSessionInner() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
   const latestFeedbackRef = useRef("");
   const latestGradeRef = useRef<GradeResult | null>(null);
@@ -214,7 +217,8 @@ function FreeTalkSessionInner() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [scenario, setScenario] = useState<Scenario | null>(null);
-  const [phrasesExpanded, setPhrasesExpanded] = useState(false);
+  const [includeAccordionOpen, setIncludeAccordionOpen] = useState(false);
+  const [phrasesAccordionOpen, setPhrasesAccordionOpen] = useState(false);
   const [inputText, setInputText] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -296,7 +300,8 @@ function FreeTalkSessionInner() {
       setGradeResult(null);
       setInputText("");
       setShowTextInput(false);
-      setPhrasesExpanded(false);
+      setIncludeAccordionOpen(false);
+      setPhrasesAccordionOpen(false);
       setScenarioIndex(i);
 
       abortRef.current?.abort();
@@ -333,7 +338,8 @@ function FreeTalkSessionInner() {
     setGradeResult(null);
     setInputText("");
     setShowTextInput(false);
-    setPhrasesExpanded(false);
+    setIncludeAccordionOpen(false);
+    setPhrasesAccordionOpen(false);
 
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -378,7 +384,10 @@ function FreeTalkSessionInner() {
   };
 
   const submitResponse = useCallback(
-    async (response: string) => {
+    async (
+      response: string,
+      voice?: { blob: Blob; mimeType: string; durationMs: number } | null
+    ) => {
       if (!scenario || !response.trim()) return;
       const scen = scenario;
       const attemptId = ++submitAttemptIdRef.current;
@@ -397,19 +406,35 @@ function FreeTalkSessionInner() {
       let aborted = false;
       let streamCompleted = false;
 
-      const persistAttemptHistory = () => {
+      const persistAttemptHistory = async () => {
         if (!learnerId) return;
         if (historyPersistedForAttemptRef.current === attemptId) return;
         const fb = latestFeedbackRef.current;
         const gr = latestGradeRef.current;
         if (!fb.trim() && !gr) return;
-        appendFreeTalkHistoryEntry(learnerId, {
-          scenarioId: scen.id,
-          scenarioTitle: scen.title,
-          scenarioType: scen.scenarioType,
-          feedbackText: fb,
-          gradeResult: gr,
-        });
+
+        try {
+          await aiService.saveFreeTalkAttempt(
+            {
+              scenarioId: scen.id,
+              scenarioTitle: scen.title,
+              scenarioType: scen.scenarioType,
+              feedbackText: fb,
+              gradeResult: gr,
+              durationMs: voice?.durationMs,
+              usedVoice: Boolean(voice?.blob?.size),
+            },
+            voice?.blob ?? null
+          );
+        } catch {
+          appendFreeTalkHistoryEntry(learnerId, {
+            scenarioId: scen.id,
+            scenarioTitle: scen.title,
+            scenarioType: scen.scenarioType,
+            feedbackText: fb,
+            gradeResult: gr,
+          });
+        }
         historyPersistedForAttemptRef.current = attemptId;
       };
 
@@ -455,7 +480,7 @@ function FreeTalkSessionInner() {
         setPhase("responding");
       }
       if (!aborted && streamCompleted) {
-        persistAttemptHistory();
+        await persistAttemptHistory();
       }
     },
     [scenario, router, learnerId]
@@ -496,6 +521,10 @@ function FreeTalkSessionInner() {
           type: rec.mimeType || "audio/webm",
         });
         chunksRef.current = [];
+        const started = recordingStartedAtRef.current;
+        recordingStartedAtRef.current = null;
+        const durationMs =
+          typeof started === "number" ? Math.max(0, Math.round(Date.now() - started)) : 0;
         if (!blob.size) return;
 
         setIsAnalyzingVoice(true);
@@ -511,10 +540,15 @@ function FreeTalkSessionInner() {
           toast.error("Could not transcribe your voice. Please try again or use text input.");
           return;
         }
-        await submitResponse(transcript);
+        await submitResponse(transcript, {
+          blob,
+          mimeType: rec.mimeType || blob.type || "audio/webm",
+          durationMs,
+        });
       };
 
       rec.start();
+      recordingStartedAtRef.current = Date.now();
       setIsRecording(true);
     } catch (e: unknown) {
       const err = e as { name?: string };
@@ -650,6 +684,9 @@ function FreeTalkSessionInner() {
         {(phase === "ready" || phase === "responding") && scenario && (
           <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
+                Background
+              </p>
               <div className="flex flex-col gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dcfce7] dark:bg-emerald-950/50">
                   <Image src="/logo2.svg" alt="" width={22} height={22} className="object-contain" />
@@ -684,6 +721,60 @@ function FreeTalkSessionInner() {
               </div>
             </section>
 
+            {scenario.include.length > 0 && (
+              <section className="w-full">
+                <div className="w-full rounded-2xl border border-[#e7eaed]/80 bg-[#fafafa]/80 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/80">
+                  <button
+                    type="button"
+                    onClick={() => setIncludeAccordionOpen((s) => !s)}
+                    className="flex w-full items-center justify-between text-left"
+                    aria-expanded={includeAccordionOpen}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
+                      Include
+                    </span>
+                    {includeAccordionOpen ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                  {includeAccordionOpen && (
+                    <p className="mt-3 whitespace-pre-wrap border-t border-[#e7eaed]/80 pt-3 text-sm leading-relaxed text-[#374151] dark:border-[#2a2e2c]/80 dark:text-[#c8cdc9]">
+                      {freeTalkStringListToMultiline(scenario.include)}
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {scenario.usefulPhrases.length > 0 && (
+              <section className="w-full">
+                <div className="w-full rounded-2xl border border-[#e7eaed]/80 bg-[#fafafa]/80 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/80">
+                  <button
+                    type="button"
+                    onClick={() => setPhrasesAccordionOpen((s) => !s)}
+                    className="flex w-full items-center justify-between text-left"
+                    aria-expanded={phrasesAccordionOpen}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
+                      Useful phrases
+                    </span>
+                    {phrasesAccordionOpen ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                  {phrasesAccordionOpen && (
+                    <p className="mt-3 whitespace-pre-wrap border-t border-[#e7eaed]/80 pt-3 text-sm leading-relaxed text-[#374151] dark:border-[#2a2e2c]/80 dark:text-[#c8cdc9]">
+                      {freeTalkStringListToMultiline(scenario.usefulPhrases)}
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+
             <section className="flex flex-col items-center gap-4">
               <h2 className="text-center font-nunito text-xl font-bold leading-6 text-[#2a602c] dark:text-emerald-400">
                 Your Turn !
@@ -712,33 +803,6 @@ function FreeTalkSessionInner() {
                   </button>
                 )}
               </div>
-
-              {scenario.usefulPhrases.length > 0 && (
-                <div className="w-full rounded-2xl border border-[#e7eaed]/80 bg-[#fafafa]/80 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/80">
-                  <button
-                    type="button"
-                    onClick={() => setPhrasesExpanded((s) => !s)}
-                    className="flex w-full items-center justify-between text-left"
-                    aria-expanded={phrasesExpanded}
-                  >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
-                      Useful phrases
-                    </span>
-                    {phrasesExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                    )}
-                  </button>
-                  {phrasesExpanded && (
-                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#374151] dark:text-[#c8cdc9]">
-                      {scenario.usefulPhrases.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
 
               {phase === "responding" && showTextInput && (
                 <div className="w-full rounded-2xl border border-[#e7eaed] bg-[#fafafa]/90 p-4 dark:border-[#2a2e2c] dark:bg-[#131614]/90">
@@ -787,7 +851,7 @@ function FreeTalkSessionInner() {
             <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
             <p className="text-sm text-[#6b7280] dark:text-[#9aa39e]">Grading your response…</p>
             {feedbackText && (
-              <div className="w-full rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 text-sm text-[#374151] dark:border-[#2a2e2c] dark:bg-[#131614] dark:text-[#c8cdc9]">
+              <div className="w-full rounded-2xl border border-[#e7eaed] bg-white px-5 py-4 text-sm text-black dark:border-[#2a2e2c] dark:bg-[#131614] dark:text-[#e8ebe9]">
                 <MarkdownText>{feedbackText}</MarkdownText>
               </div>
             )}
@@ -826,7 +890,7 @@ function FreeTalkSessionInner() {
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#6b7280] dark:text-[#9aa39e]">
                   Feedback
                 </p>
-                <div className="text-sm leading-relaxed text-[#374151] dark:text-[#c8cdc9]">
+                <div className="text-sm leading-relaxed text-black dark:text-[#e8ebe9]">
                   <MarkdownText>{feedbackText}</MarkdownText>
                 </div>
               </div>

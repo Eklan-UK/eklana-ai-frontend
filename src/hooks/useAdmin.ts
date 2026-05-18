@@ -221,6 +221,24 @@ export function useLearnerMatchingAnalytics(
   });
 }
 
+/** Eklan Free Talk attempts (feedback + optional recording) for admin learner profile. */
+export function useLearnerFreeTalkAttempts(learnerId: string) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "free-talk-attempts"],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerFreeTalkAttempts(learnerId, { limit: 200 });
+      const payload = response.data;
+      const attempts = Array.isArray(payload?.attempts) ? payload.attempts : [];
+      return {
+        attempts,
+        nextCursor: payload?.nextCursor ?? null,
+      };
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
 // Update a learner's name (admin)
 export function useUpdateLearnerName(learnerId: string) {
   const queryClient = useQueryClient();

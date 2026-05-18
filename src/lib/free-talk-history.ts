@@ -27,7 +27,41 @@ export type FreeTalkHistoryEntryV1 = {
   completedAt: string;
   feedbackText: string;
   gradeResult: FreeTalkGradeResult | null;
+  /** Present when synced from server / Cloudinary */
+  audioUrl?: string | null;
+  durationMs?: number | null;
+  usedVoice?: boolean;
 };
+
+/** API row from GET /api/v1/ai/free-talk/attempts or admin learner endpoint */
+export type FreeTalkAttemptApiRow = {
+  id: string;
+  scenarioId: string;
+  scenarioTitle: string;
+  scenarioType: string;
+  completedAt: string;
+  feedbackText: string;
+  gradeResult: FreeTalkGradeResult | null;
+  audioUrl: string | null;
+  durationMs: number | null;
+  usedVoice: boolean;
+};
+
+export function mapFreeTalkAttemptApiToHistoryEntry(row: FreeTalkAttemptApiRow): FreeTalkHistoryEntryV1 {
+  return {
+    v: 1,
+    id: row.id,
+    scenarioId: row.scenarioId,
+    scenarioTitle: row.scenarioTitle,
+    scenarioType: row.scenarioType,
+    completedAt: row.completedAt,
+    feedbackText: row.feedbackText,
+    gradeResult: row.gradeResult,
+    audioUrl: row.audioUrl,
+    durationMs: row.durationMs,
+    usedVoice: row.usedVoice,
+  };
+}
 
 const STORAGE_PREFIX = "eklana-free-talk-history:v1:";
 

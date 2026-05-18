@@ -9,6 +9,7 @@ import {
   Calendar,
   BookOpen,
   Mic,
+  MessageSquare,
   BarChart3,
   AlertCircle,
   Pencil,
@@ -22,6 +23,7 @@ import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics"
 import { SentenceAnalyticsComponent } from "@/components/admin/sentence-analytics";
 import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
+import { LearnerFreeTalkAttemptsSection } from "@/components/admin/learner-free-talk-attempts";
 import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
 import { toast } from "sonner";
@@ -257,6 +259,14 @@ export default function LearnerProfilePage() {
           <BarChart3 className="w-5 h-5" /> Overall Progress
         </h2>
         <LearnerProgressSummary learnerId={learnerId} learnerName={name} />
+      </div>
+
+      {/* Eklan Free Talk */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" /> Eklan Free Talk
+        </h2>
+        <LearnerFreeTalkAttemptsSection learnerId={learnerId} learnerName={name} />
       </div>
 
       {/* Drill Submissions & Analytics */}
