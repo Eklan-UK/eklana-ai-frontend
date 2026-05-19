@@ -5,11 +5,12 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
-import FreeTalkScenario, { FREE_TALK_SCENARIO_TYPES } from '@/models/free-talk-scenario';
-import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
+import FreeTalkScenario from '@/models/free-talk-scenario';
+import {
+	freeTalkScenarioBodySchema,
+	serializeFreeTalkScenario,
+} from '@/lib/free-talk-scenario-api-schema';
 import { Types } from 'mongoose';
-
-// ── GET ──────────────────────────────────────────────────────────────────────
 
 async function getHandler(
 	_req: NextRequest,
@@ -22,11 +23,7 @@ async function getHandler(
 			.lean()
 			.exec();
 
-		const data = scenarios.map((doc) => ({
-			...doc,
-			include: normalizeFreeTalkScenarioStringList(doc.include),
-			usefulPhrases: normalizeFreeTalkScenarioStringList(doc.usefulPhrases),
-		}));
+		const data = scenarios.map((doc) => serializeFreeTalkScenario(doc as Record<string, unknown>));
 
 		return NextResponse.json({ code: 'Success', data }, { status: 200 });
 	} catch (error: any) {
@@ -35,39 +32,38 @@ async function getHandler(
 	}
 }
 
-// ── POST ─────────────────────────────────────────────────────────────────────
-
-const listField = z
-	.union([z.string(), z.array(z.coerce.string()), z.null()])
-	.optional()
-	.transform((v) => normalizeFreeTalkScenarioStringList(v));
-
-const createSchema = z.object({
-	title: z.string().min(1, 'Title is required').max(200),
-	background: z.string().min(1, 'Background is required'),
-	task: z.string().min(1, 'Task is required'),
-	include: listField,
-	usefulPhrases: listField,
-	scenarioType: z.enum([...FREE_TALK_SCENARIO_TYPES] as [string, ...string[]]),
-	hint: z.string().default(''),
-});
-
 async function postHandler(
 	req: NextRequest,
 	ctx: { userId: Types.ObjectId; userRole: string }
 ): Promise<NextResponse> {
 	try {
 		const body = await req.json();
-		const validated = createSchema.parse(body);
+		const validated = freeTalkScenarioBodySchema.parse(body);
 
 		await connectToDatabase();
 
+		const assignedLearnerIds = validated.allLearners ? [] : validated.assignedLearnerIds;
+
 		const scenario = await FreeTalkScenario.create({
-			...validated,
+			title: validated.title,
+			background: validated.background,
+			task: validated.task,
+			include: validated.include,
+			usefulPhrases: validated.usefulPhrases,
+			scenarioType: validated.scenarioType,
+			hint: validated.hint,
+			allLearners: validated.allLearners,
+			assignedLearnerIds,
 			createdBy: ctx.userId,
 		});
 
-		return NextResponse.json({ code: 'Success', data: scenario }, { status: 201 });
+		return NextResponse.json(
+			{
+				code: 'Success',
+				data: serializeFreeTalkScenario(scenario.toObject() as Record<string, unknown>),
+			},
+			{ status: 201 }
+		);
 	} catch (error: any) {
 		if (error instanceof z.ZodError) {
 			const firstIssue = (error as z.ZodError).issues?.[0];

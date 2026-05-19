@@ -14,6 +14,10 @@ export interface IFreeTalkScenario extends Document {
 	usefulPhrases: string[];
 	scenarioType: FreeTalkScenarioType;
 	hint: string;
+	/** When true, all learners see this scenario. When false, only `assignedLearnerIds`. */
+	allLearners: boolean;
+	/** User ids (role user) who can access the scenario when `allLearners` is false. */
+	assignedLearnerIds: Types.ObjectId[];
 	createdBy?: Types.ObjectId;
 	createdAt: Date;
 	updatedAt: Date;
@@ -54,6 +58,14 @@ const FreeTalkScenarioSchema = new Schema<IFreeTalkScenario>(
 			default: '',
 			trim: true,
 		},
+		allLearners: {
+			type: Boolean,
+			default: true,
+		},
+		assignedLearnerIds: {
+			type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+			default: [],
+		},
 		createdBy: {
 			type: Schema.Types.ObjectId,
 			ref: 'User',
@@ -62,6 +74,9 @@ const FreeTalkScenarioSchema = new Schema<IFreeTalkScenario>(
 	},
 	{ timestamps: true }
 );
+
+FreeTalkScenarioSchema.index({ assignedLearnerIds: 1 });
+FreeTalkScenarioSchema.index({ allLearners: 1 });
 
 const FreeTalkScenario =
 	models.FreeTalkScenario ||
