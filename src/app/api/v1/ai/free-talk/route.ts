@@ -10,6 +10,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
 import FreeTalkScenarioModel from '@/models/free-talk-scenario';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
+import { freeTalkScenarioVisibleToLearner } from '@/lib/free-talk-scenario-assignment';
 
 async function handler(
 	req: NextRequest,
@@ -48,6 +49,9 @@ async function handler(
 		const dbScenario = await FreeTalkScenarioModel.findById(id).lean();
 		if (!dbScenario) {
 			return NextResponse.json({ success: false, message: 'Scenario not found' }, { status: 404 });
+		}
+		if (!freeTalkScenarioVisibleToLearner(dbScenario, context.userId)) {
+			return NextResponse.json({ success: false, message: 'Scenario not available' }, { status: 403 });
 		}
 
 		const situation = [dbScenario.background, dbScenario.task].filter(Boolean).join('\n\n');

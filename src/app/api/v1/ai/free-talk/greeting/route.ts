@@ -8,6 +8,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import { logger } from '@/lib/api/logger';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
+import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
 
 function scenarioPayload(dbScenario: {
 	_id: Types.ObjectId;
@@ -34,10 +35,14 @@ function scenarioPayload(dbScenario: {
 	};
 }
 
-async function handler(req: NextRequest): Promise<NextResponse> {
+async function handler(
+	req: NextRequest,
+	context: { userId: Types.ObjectId; userRole: string },
+): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
 
+		const learnerFilter = freeTalkScenarioLearnerFilter(context.userId);
 		const scenarioId = req.nextUrl.searchParams.get('scenarioId')?.trim();
 
 		let dbScenario: {
@@ -55,9 +60,12 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 			if (!Types.ObjectId.isValid(scenarioId)) {
 				return NextResponse.json({ success: false, message: 'Invalid scenario id.' }, { status: 400 });
 			}
-			dbScenario = await FreeTalkScenario.findById(scenarioId).lean().exec();
+			dbScenario = await FreeTalkScenario.findOne({ _id: scenarioId, ...learnerFilter }).lean().exec();
 		} else {
-			const [picked] = await FreeTalkScenario.aggregate([{ $sample: { size: 1 } }]);
+			const [picked] = await FreeTalkScenario.aggregate([
+				{ $match: learnerFilter },
+				{ $sample: { size: 1 } },
+			]);
 			dbScenario = picked ?? null;
 		}
 

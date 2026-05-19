@@ -76,7 +76,7 @@ function HistoryAccordionItem({
         )}
       </button>
       {isOpen && (
-        <div className="space-y-4 rounded-b-lg border border-t-0 border-border bg-card px-3 pb-4 pt-2">
+        <div className="space-y-4 rounded-b-lg border border-t-0 border-border bg-card px-3 pb-4 pt-2 text-neutral-950 dark:text-[#e8ebe9]">
           {g && (
             <div className="rounded-xl border border-border bg-muted/40 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
@@ -117,10 +117,10 @@ function HistoryAccordionItem({
           ) : null}
           {entry.feedbackText.trim().length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-black dark:text-[#e8ebe9]">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-800 dark:text-[#9aa39e]">
                 Feedback
               </p>
-              <div className="text-sm leading-relaxed text-black dark:text-[#e8ebe9]">
+              <div className="text-sm leading-relaxed text-[#0a0a0a] dark:text-[#e8ebe9] [&_a]:text-primary [&_a:hover]:underline">
                 <MarkdownText>{entry.feedbackText}</MarkdownText>
               </div>
             </div>
