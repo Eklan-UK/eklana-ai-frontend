@@ -298,7 +298,7 @@ export default function AdminFreeTalkPage() {
                 {editingId && (
                   <button
                     type="button"
-                    onClick={resetForm}
+                    onClick={() => resetForm()}
                     className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
                   >
                     <X className="h-4 w-4" />
