@@ -7,6 +7,8 @@
 
 // force-dynamic so Next.js never statically pre-renders this route
 export const dynamic = 'force-dynamic';
+// Mongoose + Stripe SDK require Node runtime (not Edge).
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -251,6 +253,15 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
+
+/** Ops smoke test: confirms the route is deployed (Stripe only POSTs signed events). */
+export async function GET(): Promise<NextResponse> {
+  return NextResponse.json({
+    ok: true,
+    endpoint: '/api/v1/webhooks/stripe',
+    methods: ['POST'],
+  });
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!config.STRIPE_SECRET_KEY || !config.STRIPE_WEBHOOK_SECRET) {

@@ -9,8 +9,8 @@ interface MarkdownTextProps {
   className?: string;
 }
 
-/** Body copy: high contrast for feedback / instructional text. */
-const MD_BODY = "text-black dark:text-[#e8ebe9]";
+/** Body copy: high contrast for feedback / instructional text (hex avoids theme quirks in accordions). */
+const MD_BODY = "text-[#0a0a0a] dark:text-[#e8ebe9]";
 const MD_MUTED = "text-neutral-700 dark:text-[#b8bdb9]";
 
 export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
@@ -21,7 +21,7 @@ export function MarkdownText({ children, className = "" }: MarkdownTextProps) {
   const sanitizedContent = DOMPurify.sanitize(children);
 
   return (
-    <div className={`max-w-none text-black dark:text-[#e8ebe9] ${className}`}>
+    <div className={`max-w-none text-[#0a0a0a] dark:text-[#e8ebe9] ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

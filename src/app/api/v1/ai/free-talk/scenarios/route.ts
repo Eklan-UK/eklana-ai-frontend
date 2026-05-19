@@ -5,12 +5,16 @@ import { withPremium } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import { logger } from '@/lib/api/logger';
+import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
 
-async function handler(_req: NextRequest): Promise<NextResponse> {
+async function handler(
+	_req: NextRequest,
+	context: { userId: import('mongoose').Types.ObjectId; userRole: string },
+): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
 
-		const rows = await FreeTalkScenario.find()
+		const rows = await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(context.userId))
 			.sort({ createdAt: 1 })
 			.select({ title: 1, scenarioType: 1 })
 			.lean()
