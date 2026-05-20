@@ -6,6 +6,8 @@ import { useLearnerDrills } from "@/hooks/useDrills";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { getDrillStatus } from "@/utils/drill";
 import { DrillCard } from "@/components/drills/DrillCard";
+import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
+import { isFreeTalkPlanItem, sortAssignedPlanItems } from "@/lib/learner-assigned-plan";
 import {
   AssignedDrillsTitleRow,
   AssignedDrillsEmptyMessage,
@@ -41,12 +43,7 @@ export function AssignedDrillsSectionClient() {
     return <AssignedDrillsSkeleton />;
   }
 
-  const sorted = [...drills].sort((a: any, b: any) => {
-    const dateA = new Date(a.assignedAt || a.drill?.date || 0).getTime();
-    const dateB = new Date(b.assignedAt || b.drill?.date || 0).getTime();
-    return dateB - dateA;
-  });
-  const top = sorted.slice(0, 4);
+  const top = sortAssignedPlanItems(drills).slice(0, 4);
 
   return (
     <div className="mb-6 md:mb-8">
@@ -66,6 +63,20 @@ export function AssignedDrillsSectionClient() {
       ) : (
         <div className="space-y-3 mb-4">
           {top.map((item: any) => {
+            if (isFreeTalkPlanItem(item)) {
+              const scenarioId = String(item.assignmentId ?? item.drill?._id ?? "");
+              return (
+                <PlanFreeTalkRow
+                  key={`free-talk-${scenarioId}`}
+                  scenarioId={scenarioId}
+                  title={item.drill?.title ?? "Free Talk"}
+                  scenarioType={item.drill?.scenarioType ?? ""}
+                  completionDate={item.drill?.completionDate ?? item.dueDate}
+                  completedAt={item.completedAt}
+                  locked={!subscribed}
+                />
+              );
+            }
             const drillDoc = item.drill ?? item;
             const assignmentId =
               item.assignmentId != null ? String(item.assignmentId) : undefined;

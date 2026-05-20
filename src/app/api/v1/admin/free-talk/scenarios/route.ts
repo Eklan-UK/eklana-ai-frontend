@@ -10,6 +10,7 @@ import {
 	freeTalkScenarioBodySchema,
 	serializeFreeTalkScenario,
 } from '@/lib/free-talk-scenario-api-schema';
+import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 import { Types } from 'mongoose';
 
 async function getHandler(
@@ -18,6 +19,7 @@ async function getHandler(
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
+		await purgeExpiredFreeTalkScenarios();
 		const scenarios = await FreeTalkScenario.find()
 			.sort({ createdAt: -1 })
 			.lean()
@@ -52,6 +54,7 @@ async function postHandler(
 			usefulPhrases: validated.usefulPhrases,
 			scenarioType: validated.scenarioType,
 			hint: validated.hint,
+			completionDate: validated.completionDate,
 			allLearners: validated.allLearners,
 			assignedLearnerIds,
 			createdBy: ctx.userId,

@@ -11,6 +11,8 @@ import User from '@/models/user';
 import FreeTalkScenarioModel from '@/models/free-talk-scenario';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 import { freeTalkScenarioVisibleToLearner } from '@/lib/free-talk-scenario-assignment';
+import { isFreeTalkScenarioExpired } from '@/lib/free-talk-scenario-completion';
+import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 
 async function handler(
 	req: NextRequest,
@@ -43,6 +45,7 @@ async function handler(
 		}
 
 		await connectToDatabase();
+		await purgeExpiredFreeTalkScenarios();
 		const user = await User.findById(context.userId).select('firstName').lean();
 		const userName = (user?.firstName as string | undefined) || undefined;
 
@@ -52,6 +55,9 @@ async function handler(
 		}
 		if (!freeTalkScenarioVisibleToLearner(dbScenario, context.userId)) {
 			return NextResponse.json({ success: false, message: 'Scenario not available' }, { status: 403 });
+		}
+		if (isFreeTalkScenarioExpired(dbScenario.completionDate as Date | undefined)) {
+			return NextResponse.json({ success: false, message: 'Scenario is no longer available' }, { status: 410 });
 		}
 
 		const situation = [dbScenario.background, dbScenario.task].filter(Boolean).join('\n\n');

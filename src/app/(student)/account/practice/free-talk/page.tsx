@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -15,6 +16,10 @@ import {
   Plus,
   XCircle,
 } from "lucide-react";
+import {
+  formatFreeTalkDueLabel,
+  isFreeTalkScenarioDueSoon,
+} from "@/lib/free-talk-scenario-completion";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Header } from "@/components/layout/Header";
@@ -144,7 +149,9 @@ export default function FreeTalkHubPage() {
   const [activeTab, setActiveTab] = useState<FreeTalkHubTab>("ongoing");
   const [scenariosLoading, setScenariosLoading] = useState(true);
   const [scenariosError, setScenariosError] = useState<string | null>(null);
-  const [summaries, setSummaries] = useState<{ id: string; title: string; scenarioType: string }[]>([]);
+  const [summaries, setSummaries] = useState<
+    { id: string; title: string; scenarioType: string; completionDate?: string | null }[]
+  >([]);
   const [history, setHistory] = useState<FreeTalkHistoryEntryV1[]>([]);
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
 
@@ -204,6 +211,11 @@ export default function FreeTalkHubPage() {
       });
     return () => ac.abort();
   }, [pro, meLoading]);
+
+  const completedScenarioIds = useMemo(
+    () => new Set(history.map((h) => h.scenarioId)),
+    [history],
+  );
 
   const stats = useMemo(
     () => ({
@@ -270,26 +282,38 @@ export default function FreeTalkHubPage() {
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {summaries.map((s) => (
-                    <Link
-                      key={s.id}
-                      href={`/account/practice/free-talk/session?scenarioId=${encodeURIComponent(s.id)}`}
-                      className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-300 flex items-center justify-center shrink-0 shadow-inner">
-                        <MessageSquare className="w-7 h-7 text-emerald-800" aria-hidden />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
-                          {s.title}
-                        </h3>
-                        <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
-                          • {scenarioTypeLabel(s.scenarioType)}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
-                    </Link>
-                  ))}
+                  {summaries.map((s) => {
+                    const completed = completedScenarioIds.has(s.id);
+                    const showDue =
+                      s.completionDate != null &&
+                      isFreeTalkScenarioDueSoon(s.completionDate, completed);
+                    return (
+                      <Link
+                        key={s.id}
+                        href={`/account/practice/free-talk/session?scenarioId=${encodeURIComponent(s.id)}`}
+                        className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-300 flex items-center justify-center shrink-0 shadow-inner">
+                          <MessageSquare className="w-7 h-7 text-emerald-800" aria-hidden />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
+                            {s.title}
+                          </h3>
+                          <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+                            • {scenarioTypeLabel(s.scenarioType)}
+                          </p>
+                          {showDue && (
+                            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-900 dark:text-amber-200">
+                              <AlertCircle className="w-3 h-3 shrink-0" />
+                              Due {formatFreeTalkDueLabel(s.completionDate!)}
+                            </p>
+                          )}
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </>
