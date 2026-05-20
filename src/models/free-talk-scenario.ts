@@ -18,6 +18,8 @@ export interface IFreeTalkScenario extends Document {
 	allLearners: boolean;
 	/** User ids (role user) who can access the scenario when `allLearners` is false. */
 	assignedLearnerIds: Types.ObjectId[];
+	/** End of availability; document is removed after this instant (TTL + read-time purge). */
+	completionDate: Date;
 	createdBy?: Types.ObjectId;
 	createdAt: Date;
 	updatedAt: Date;
@@ -71,12 +73,17 @@ const FreeTalkScenarioSchema = new Schema<IFreeTalkScenario>(
 			ref: 'User',
 			default: null,
 		},
+		completionDate: {
+			type: Date,
+			required: [true, 'Completion date is required'],
+		},
 	},
 	{ timestamps: true }
 );
 
 FreeTalkScenarioSchema.index({ assignedLearnerIds: 1 });
 FreeTalkScenarioSchema.index({ allLearners: 1 });
+FreeTalkScenarioSchema.index({ completionDate: 1 }, { expireAfterSeconds: 0 });
 
 const FreeTalkScenario =
 	models.FreeTalkScenario ||

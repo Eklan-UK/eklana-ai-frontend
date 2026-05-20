@@ -24,8 +24,11 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
         drillsData = response;
       }
 
-      // Normalize drill data structure
+      // Normalize drill data structure (preserve free_talk_scenario rows from API)
       return drillsData.map((item: any) => {
+        if (item.itemType === "free_talk_scenario") {
+          return item;
+        }
         if (item.drill && typeof item.drill === "object") {
           return item;
         }
@@ -181,6 +184,9 @@ export function usePrefetchLearnerDrills() {
           drillsData = response;
         }
         return drillsData.map((item: any) => {
+          if (item.itemType === "free_talk_scenario") {
+            return item;
+          }
           if (item.drill && typeof item.drill === "object") {
             return item;
           }

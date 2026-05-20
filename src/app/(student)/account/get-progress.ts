@@ -5,6 +5,7 @@ import {
   getLearnerMyDrillsPayload,
   type LearnerMyDrillRow,
 } from '@/lib/server/learner-my-drills.server';
+import { isFreeTalkPlanItem } from '@/lib/learner-assigned-plan';
 
 export interface UserProgress {
   drillsCompleted: number;
@@ -51,10 +52,13 @@ export async function getUserProgress(): Promise<UserProgress> {
       return getDefaultProgress();
     }
 
-    const { drills } = await getLearnerMyDrillsPayload(userId, {
+    const { drills: allRows } = await getLearnerMyDrillsPayload(userId, {
       limit: 100,
       offset: 0,
     });
+    const drills = allRows.filter(
+      (d) => !isFreeTalkPlanItem(d as { itemType?: string; drill?: { type?: string } }),
+    );
 
     const completedDrills = drills.filter(
       (d) => d.status === 'completed' || Boolean(d.completedAt)

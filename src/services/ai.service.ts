@@ -91,7 +91,7 @@ export const aiService = {
    * ICU Free Talk — ordered scenario ids for the student flow (GET /api/v1/ai/free-talk/scenarios).
    */
   async fetchFreeTalkScenarioSummaries(signal?: AbortSignal): Promise<
-    { id: string; title: string; scenarioType: string }[]
+    { id: string; title: string; scenarioType: string; completionDate?: string | null }[]
   > {
     const response = await fetch(`${API_BASE_URL}/ai/free-talk/scenarios`, {
       method: "GET",

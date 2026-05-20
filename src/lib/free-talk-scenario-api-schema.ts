@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { FREE_TALK_SCENARIO_TYPES } from '@/models/free-talk-scenario.shared';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 import { normalizeAssignedLearnerIds } from '@/lib/free-talk-scenario-assignment';
+import { parseFreeTalkCompletionDateInput } from '@/lib/free-talk-scenario-completion';
 import { Types } from 'mongoose';
+
+const completionDateField = z
+	.union([z.string().min(1), z.coerce.date()])
+	.transform((v) => parseFreeTalkCompletionDateInput(v instanceof Date ? v : v));
 
 const listField = z
 	.union([z.string(), z.array(z.coerce.string()), z.null()])
@@ -40,6 +45,7 @@ export const freeTalkScenarioBodySchema = z
 		usefulPhrases: listField,
 		scenarioType: z.enum([...FREE_TALK_SCENARIO_TYPES] as [string, ...string[]]),
 		hint: z.string().default(''),
+		completionDate: completionDateField,
 		...assignmentFields,
 	})
 	.superRefine(refineAssignment);
@@ -53,6 +59,7 @@ export const freeTalkScenarioPatchSchema = z
 		usefulPhrases: listField.optional(),
 		scenarioType: z.enum([...FREE_TALK_SCENARIO_TYPES] as [string, ...string[]]).optional(),
 		hint: z.string().optional(),
+		completionDate: completionDateField.optional(),
 		allLearners: z.boolean().optional(),
 		assignedLearnerIds: z
 			.array(z.string())
@@ -72,6 +79,7 @@ export const freeTalkScenarioPatchSchema = z
 export function serializeFreeTalkScenario(doc: Record<string, unknown>) {
 	const assigned = (doc.assignedLearnerIds as Types.ObjectId[] | undefined) ?? [];
 	const forEveryone = doc.allLearners !== false;
+	const completionDate = doc.completionDate as Date | undefined;
 	return {
 		...doc,
 		include: normalizeFreeTalkScenarioStringList(doc.include),
@@ -79,5 +87,6 @@ export function serializeFreeTalkScenario(doc: Record<string, unknown>) {
 		/** Explicit boolean: true = everyone, false = selected learners only */
 		allLearners: forEveryone,
 		assignedLearnerIds: forEveryone ? [] : assigned.map((id) => String(id)),
+		completionDate: completionDate ? completionDate.toISOString() : null,
 	};
 }

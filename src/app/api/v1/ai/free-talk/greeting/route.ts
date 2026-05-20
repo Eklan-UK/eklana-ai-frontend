@@ -9,6 +9,7 @@ import FreeTalkScenario from '@/models/free-talk-scenario';
 import { logger } from '@/lib/api/logger';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
+import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 
 function scenarioPayload(dbScenario: {
 	_id: Types.ObjectId;
@@ -41,6 +42,7 @@ async function handler(
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
+		await purgeExpiredFreeTalkScenarios();
 
 		const learnerFilter = freeTalkScenarioLearnerFilter(context.userId);
 		const scenarioId = req.nextUrl.searchParams.get('scenarioId')?.trim();

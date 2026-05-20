@@ -6,6 +6,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import { logger } from '@/lib/api/logger';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
+import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 
 async function handler(
 	_req: NextRequest,
@@ -13,10 +14,11 @@ async function handler(
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
+		await purgeExpiredFreeTalkScenarios();
 
 		const rows = await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(context.userId))
 			.sort({ createdAt: 1 })
-			.select({ title: 1, scenarioType: 1 })
+			.select({ title: 1, scenarioType: 1, completionDate: 1 })
 			.lean()
 			.exec();
 
@@ -37,6 +39,12 @@ async function handler(
 				id: String(doc._id),
 				title: doc.title,
 				scenarioType: doc.scenarioType,
+				completionDate:
+					doc.completionDate instanceof Date
+						? doc.completionDate.toISOString()
+						: doc.completionDate
+							? new Date(doc.completionDate as string).toISOString()
+							: null,
 			})),
 		});
 	} catch (err: unknown) {
