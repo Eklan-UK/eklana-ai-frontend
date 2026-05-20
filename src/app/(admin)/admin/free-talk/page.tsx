@@ -12,6 +12,7 @@ import {
   Check,
   Pencil,
   X,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -34,8 +35,16 @@ interface Scenario {
   hint: string;
   allLearners: boolean;
   assignedLearnerIds: string[];
+  completionDate: string | null;
   createdAt: string;
 }
+
+type ScenarioFormFields = ReturnType<typeof emptyForm>;
+
+type ScenarioDraft = {
+  id: string;
+  form: ScenarioFormFields;
+};
 
 const SCENARIO_TYPE_LABELS: Record<FreeTalkScenarioType, string> = {
   icu_emergency: "ICU Emergency",
@@ -65,7 +74,30 @@ const emptyForm = () => ({
   includeText: "",
   usefulPhrasesText: "",
   hint: "",
+  completionDate: "",
 });
+
+function newDraftId() {
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function completionDateToInputValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function formatCompletionDateLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 function learnerDisplayName(learner: { firstName?: string; lastName?: string; email?: string }) {
   const name = `${learner.firstName ?? ""} ${learner.lastName ?? ""}`.trim();
@@ -80,6 +112,9 @@ export default function AdminFreeTalkPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [drafts, setDrafts] = useState<ScenarioDraft[]>(() => [
+    { id: newDraftId(), form: emptyForm() },
+  ]);
   const [allLearners, setAllLearners] = useState(true);
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>([]);
   const [learnerSearch, setLearnerSearch] = useState("");
@@ -128,9 +163,29 @@ export default function AdminFreeTalkPage() {
   const resetForm = (options?: { keepAssignment?: boolean }) => {
     setForm(emptyForm());
     setEditingId(null);
+    setDrafts([{ id: newDraftId(), form: emptyForm() }]);
     if (!options?.keepAssignment) {
       resetAssignment();
     }
+  };
+
+  const addDraft = () => {
+    setDrafts((prev) => [...prev, { id: newDraftId(), form: emptyForm() }]);
+  };
+
+  const removeDraft = (draftId: string) => {
+    setDrafts((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((d) => d.id !== draftId);
+    });
+  };
+
+  const updateDraftForm = (draftId: string, field: keyof ScenarioFormFields, value: unknown) => {
+    setDrafts((prev) =>
+      prev.map((d) =>
+        d.id === draftId ? { ...d, form: { ...d.form, [field]: value } } : d,
+      ),
+    );
   };
 
   const loadScenarioForEdit = (sc: Scenario) => {
@@ -144,6 +199,7 @@ export default function AdminFreeTalkPage() {
       includeText: freeTalkStringListToMultiline(sc.include),
       usefulPhrasesText: freeTalkStringListToMultiline(sc.usefulPhrases),
       hint: sc.hint ?? "",
+      completionDate: completionDateToInputValue(sc.completionDate),
     });
     setAllLearners(sc.allLearners !== false);
     setSelectedLearnerIds(sc.allLearners === false ? [...sc.assignedLearnerIds] : []);
@@ -168,40 +224,51 @@ export default function AdminFreeTalkPage() {
     }
   };
 
-  const buildPayload = () => {
-    const include = normalizeFreeTalkScenarioStringList(form.includeText);
-    const usefulPhrases = normalizeFreeTalkScenarioStringList(form.usefulPhrasesText);
+  const buildPayloadFromFields = (fields: ScenarioFormFields) => {
+    const include = normalizeFreeTalkScenarioStringList(fields.includeText);
+    const usefulPhrases = normalizeFreeTalkScenarioStringList(fields.usefulPhrasesText);
     return {
-      title: form.title.trim(),
-      scenarioType: form.scenarioType,
-      background: form.background.trim(),
-      task: form.task.trim(),
+      title: fields.title.trim(),
+      scenarioType: fields.scenarioType,
+      background: fields.background.trim(),
+      task: fields.task.trim(),
       include,
       usefulPhrases,
-      hint: form.hint.trim(),
+      hint: fields.hint.trim(),
+      completionDate: fields.completionDate,
       allLearners,
       assignedLearnerIds: allLearners ? [] : selectedLearnerIds,
     };
   };
 
+  const validateFormFields = (fields: ScenarioFormFields, label?: string) => {
+    const prefix = label ? `${label}: ` : "";
+    if (!fields.title.trim()) {
+      toast.error(`${prefix}Title is required`);
+      return false;
+    }
+    if (!fields.scenarioType) {
+      toast.error(`${prefix}Scenario type is required`);
+      return false;
+    }
+    if (!fields.background.trim()) {
+      toast.error(`${prefix}Background is required`);
+      return false;
+    }
+    if (!fields.task.trim()) {
+      toast.error(`${prefix}Task is required`);
+      return false;
+    }
+    if (!fields.completionDate) {
+      toast.error(`${prefix}Completion date is required`);
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("Title is required");
-      return;
-    }
-    if (!form.scenarioType) {
-      toast.error("Scenario type is required");
-      return;
-    }
-    if (!form.background.trim()) {
-      toast.error("Background is required");
-      return;
-    }
-    if (!form.task.trim()) {
-      toast.error("Task is required");
-      return;
-    }
+    if (!validateFormFields(form)) return;
     if (!allLearners && selectedLearnerIds.length === 0) {
       toast.error("Select at least one learner, or choose Everyone");
       return;
@@ -209,7 +276,7 @@ export default function AdminFreeTalkPage() {
 
     setSubmitting(true);
     try {
-      const payload = buildPayload();
+      const payload = buildPayloadFromFields(form);
       const url = editingId
         ? `/api/v1/admin/free-talk/scenarios/${editingId}`
         : "/api/v1/admin/free-talk/scenarios";
@@ -241,6 +308,46 @@ export default function AdminFreeTalkPage() {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to save scenario";
       toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateAll = async () => {
+    if (!allLearners && selectedLearnerIds.length === 0) {
+      toast.error("Select at least one learner, or choose Everyone");
+      return;
+    }
+    for (let i = 0; i < drafts.length; i++) {
+      if (!validateFormFields(drafts[i].form, `Scenario ${i + 1}`)) return;
+    }
+
+    setSubmitting(true);
+    let created = 0;
+    try {
+      for (const draft of drafts) {
+        const res = await fetch("/api/v1/admin/free-talk/scenarios", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildPayloadFromFields(draft.form)),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message ?? "Failed to save scenario");
+        created += 1;
+      }
+      toast.success(
+        created === 1 ? "Scenario created" : `${created} scenarios created`,
+      );
+      resetForm({ keepAssignment: true });
+      await fetchScenarios();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to create scenarios";
+      toast.error(
+        created > 0
+          ? `${message} (${created} of ${drafts.length} saved)`
+          : message,
+      );
+      if (created > 0) await fetchScenarios();
     } finally {
       setSubmitting(false);
     }
@@ -290,12 +397,10 @@ export default function AdminFreeTalkPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
           {/* Main column */}
           <div className="space-y-8 min-w-0">
-            <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-                <h2 className="text-base font-semibold text-gray-900">
-                  {editingId ? "Edit Scenario" : "Create New Scenario"}
-                </h2>
-                {editingId && (
+            {editingId ? (
+              <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                  <h2 className="text-base font-semibold text-gray-900">Edit Scenario</h2>
                   <button
                     type="button"
                     onClick={() => resetForm()}
@@ -304,125 +409,321 @@ export default function AdminFreeTalkPage() {
                     <X className="h-4 w-4" />
                     Cancel edit
                   </button>
-                )}
-              </div>
+                </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Scenario Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.title}
+                        onChange={(e) => set("title", e.target.value)}
+                        placeholder="e.g. Worsening Abdominal Pain During the Night"
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700">
+                        Scenario Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={form.scenarioType}
+                        onChange={(e) => set("scenarioType", e.target.value as FreeTalkScenarioType)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                      >
+                        <option value="">Select type…</option>
+                        {FREE_TALK_SCENARIO_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {SCENARIO_TYPE_LABELS[t]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700">
+                        Completion Date <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={form.completionDate}
+                          onChange={(e) => set("completionDate", e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                        />
+                        <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-gray-700">
-                      Scenario Title <span className="text-red-500">*</span>
+                      Background <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={(e) => set("title", e.target.value)}
-                      placeholder="e.g. Worsening Abdominal Pain During the Night"
-                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                    <textarea
+                      value={form.background}
+                      onChange={(e) => set("background", e.target.value)}
+                      rows={4}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-gray-700">
-                      Scenario Type <span className="text-red-500">*</span>
+                      Task <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={form.scenarioType}
-                      onChange={(e) => set("scenarioType", e.target.value as FreeTalkScenarioType)}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                    >
-                      <option value="">Select type…</option>
-                      {FREE_TALK_SCENARIO_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {SCENARIO_TYPE_LABELS[t]}
-                        </option>
-                      ))}
-                    </select>
+                    <textarea
+                      value={form.task}
+                      onChange={(e) => set("task", e.target.value)}
+                      rows={2}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                    />
                   </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">Include</label>
+                    <textarea
+                      value={form.includeText}
+                      onChange={(e) => set("includeText", e.target.value)}
+                      rows={4}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">Useful Handover Phrases</label>
+                    <textarea
+                      value={form.usefulPhrasesText}
+                      onChange={(e) => set("usefulPhrasesText", e.target.value)}
+                      rows={4}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">
+                      Hint <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={form.hint}
+                      onChange={(e) => set("hint", e.target.value)}
+                      rows={2}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex items-center gap-2 rounded-xl bg-[#3d8c40] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2f6f32] disabled:opacity-50"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <Pencil className="h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            ) : (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-gray-900">New Scenarios</h2>
+                  <p className="text-xs text-gray-500">
+                    {drafts.length} draft{drafts.length !== 1 ? "s" : ""} · shared assignment
+                  </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">
-                    Background <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={form.background}
-                    onChange={(e) => set("background", e.target.value)}
-                    rows={4}
-                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                  />
-                </div>
+                <div className="space-y-4">
+                  {drafts.map((draft, index) => (
+                    <div
+                      key={draft.id}
+                      className="rounded-2xl border border-gray-200 bg-white shadow-sm"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+                        <h3 className="text-sm font-semibold text-gray-800">
+                          Scenario {index + 1}
+                        </h3>
+                        {drafts.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeDraft(draft.id)}
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                            aria-label={`Remove scenario ${index + 1}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">
-                    Task <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={form.task}
-                    onChange={(e) => set("task", e.target.value)}
-                    rows={2}
-                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                  />
-                </div>
+                      <div className="space-y-4 px-5 py-5">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5 sm:col-span-2">
+                            <label className="text-sm font-medium text-gray-700">
+                              Scenario Title <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={draft.form.title}
+                              onChange={(e) => updateDraftForm(draft.id, "title", e.target.value)}
+                              placeholder="e.g. Worsening Abdominal Pain During the Night"
+                              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                            />
+                          </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Include</label>
-                  <textarea
-                    value={form.includeText}
-                    onChange={(e) => set("includeText", e.target.value)}
-                    rows={4}
-                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                  />
-                </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700">
+                              Scenario Type <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={draft.form.scenarioType}
+                              onChange={(e) =>
+                                updateDraftForm(
+                                  draft.id,
+                                  "scenarioType",
+                                  e.target.value as FreeTalkScenarioType,
+                                )
+                              }
+                              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                            >
+                              <option value="">Select type…</option>
+                              {FREE_TALK_SCENARIO_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {SCENARIO_TYPE_LABELS[t]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">Useful Handover Phrases</label>
-                  <textarea
-                    value={form.usefulPhrasesText}
-                    onChange={(e) => set("usefulPhrasesText", e.target.value)}
-                    rows={4}
-                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                  />
-                </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700">
+                              Completion Date <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="date"
+                                value={draft.form.completionDate}
+                                onChange={(e) =>
+                                  updateDraftForm(draft.id, "completionDate", e.target.value)
+                                }
+                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                              />
+                              <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            </div>
+                          </div>
+                        </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-700">
-                    Hint <span className="font-normal text-gray-400">(optional)</span>
-                  </label>
-                  <textarea
-                    value={form.hint}
-                    onChange={(e) => set("hint", e.target.value)}
-                    rows={2}
-                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
-                  />
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            Background <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={draft.form.background}
+                            onChange={(e) => updateDraftForm(draft.id, "background", e.target.value)}
+                            rows={3}
+                            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            Task <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={draft.form.task}
+                            onChange={(e) => updateDraftForm(draft.id, "task", e.target.value)}
+                            rows={2}
+                            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">Include</label>
+                          <textarea
+                            value={draft.form.includeText}
+                            onChange={(e) => updateDraftForm(draft.id, "includeText", e.target.value)}
+                            rows={4}
+                            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            Useful Handover Phrases
+                          </label>
+                          <textarea
+                            value={draft.form.usefulPhrasesText}
+                            onChange={(e) =>
+                              updateDraftForm(draft.id, "usefulPhrasesText", e.target.value)
+                            }
+                            rows={4}
+                            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-gray-700">
+                            Hint <span className="font-normal text-gray-400">(optional)</span>
+                          </label>
+                          <textarea
+                            value={draft.form.hint}
+                            onChange={(e) => updateDraftForm(draft.id, "hint", e.target.value)}
+                            rows={2}
+                            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3d8c40] focus:ring-1 focus:ring-[#3d8c40]/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex justify-end">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleCreateAll}
                     disabled={submitting}
                     className="flex items-center gap-2 rounded-xl bg-[#3d8c40] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2f6f32] disabled:opacity-50"
                   >
                     {submitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving…
-                      </>
-                    ) : editingId ? (
-                      <>
-                        <Pencil className="h-4 w-4" />
-                        Save Changes
+                        Creating…
                       </>
                     ) : (
                       <>
                         <Plus className="h-4 w-4" />
-                        Create Scenario
+                        Create {drafts.length === 1 ? "Scenario" : `All (${drafts.length})`}
                       </>
                     )}
                   </button>
                 </div>
-              </form>
-            </section>
+              </section>
+            )}
+
+            {!editingId && (
+              <div className="flex justify-center py-2">
+                <button
+                  type="button"
+                  onClick={addDraft}
+                  className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-dashed border-[#3d8c40]/40 bg-emerald-50 text-[#3d8c40] shadow-sm transition-colors hover:border-[#3d8c40] hover:bg-emerald-100"
+                  aria-label="Add another scenario draft"
+                >
+                  <Plus className="h-7 w-7" />
+                </button>
+              </div>
+            )}
 
             <section>
               <h2 className="mb-4 text-base font-semibold text-gray-900">
@@ -469,6 +770,10 @@ export default function AdminFreeTalkPage() {
                             </span>
                             <span className="truncate text-sm font-semibold text-gray-900">{sc.title}</span>
                             <span className="hidden shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 sm:inline-flex">
+                              <Calendar className="h-3 w-3" />
+                              {formatCompletionDateLabel(sc.completionDate)}
+                            </span>
+                            <span className="hidden shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 md:inline-flex">
                               <Users className="h-3 w-3" />
                               {assignmentSummary(sc)}
                             </span>
@@ -506,6 +811,10 @@ export default function AdminFreeTalkPage() {
                         {isExpanded && (
                           <div className="space-y-4 border-t border-gray-100 px-5 pb-5 pt-4 text-sm text-gray-700">
                             <p className="text-xs text-gray-500">
+                              <Calendar className="mr-1 inline h-3.5 w-3.5" />
+                              Completes:{" "}
+                              <strong>{formatCompletionDateLabel(sc.completionDate)}</strong>
+                              {" · "}
                               <Users className="mr-1 inline h-3.5 w-3.5" />
                               Assigned to: <strong>{assignmentSummary(sc)}</strong>
                             </p>
@@ -538,7 +847,12 @@ export default function AdminFreeTalkPage() {
                   Who can access
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  Applies to {editingId ? "the scenario you are editing" : "the new scenario"}
+                  Applies to{" "}
+                  {editingId
+                    ? "the scenario you are editing"
+                    : drafts.length === 1
+                      ? "the new scenario"
+                      : `all ${drafts.length} drafts`}
                 </p>
               </div>
 

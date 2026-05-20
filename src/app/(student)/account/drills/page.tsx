@@ -14,6 +14,8 @@ import { trackActivity } from "@/utils/activity-cache";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { pickNextLearnerSession } from "@/lib/classes/pick-next-learner-session";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
+import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
+import { isFreeTalkPlanItem, sortAssignedPlanItems } from "@/lib/learner-assigned-plan";
 import { LearnerNextSessionCard } from "@/components/classes/LearnerNextSessionCard";
 import { StreakBadge } from "@/components/streak/StreakBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -21,12 +23,14 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 type PlanTab = "ongoing" | "reviewed" | "completed";
 
 function drillPlanTab(item: {
+  itemType?: string;
   completedAt?: string;
   dueDate?: string;
   status?: string;
-  drill: { date: string };
+  drill: { date: string; type?: string };
   latestAttempt?: { reviewStatus?: "pending" | "reviewed" };
 }): PlanTab {
+  if (isFreeTalkPlanItem(item)) return "ongoing";
   const status = getDrillStatus(item);
   if (status !== "completed") return "ongoing";
   if (item.latestAttempt?.reviewStatus === "reviewed") return "reviewed";
@@ -65,13 +69,9 @@ export default function DrillsPage() {
     [teachingClasses],
   );
 
-  const filteredDrills = drills
-    .filter((item) => drillPlanTab(item) === activeTab)
-    .sort((a, b) => {
-      const dateA = new Date(a.assignedAt || a.drill?.date || 0).getTime();
-      const dateB = new Date(b.assignedAt || b.drill?.date || 0).getTime();
-      return dateB - dateA;
-    });
+  const filteredDrills = sortAssignedPlanItems(
+    drills.filter((item) => drillPlanTab(item) === activeTab),
+  );
 
   const stats = {
     ongoing: drills.filter((d) => drillPlanTab(d) === "ongoing").length,
@@ -179,25 +179,40 @@ export default function DrillsPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {filteredDrills.map((item) => (
-                <PlanDrillRow
-                  key={item.assignmentId}
-                  drill={item.drill}
-                  assignmentId={item.assignmentId}
-                  dueDate={item.dueDate}
-                  completedAt={item.completedAt}
-                  status={item.status}
-                  onPrefetch={prefetchDrill}
-                  onNavigate={() =>
-                    trackActivity("drill", item.drill._id, "started", {
-                      title: item.drill?.title,
-                      drillTitle: item.drill?.title,
-                      type: item.drill?.type,
-                      assignmentId: item.assignmentId,
-                    })
-                  }
-                />
-              ))}
+              {filteredDrills.map((item) => {
+                const key = String(item.assignmentId ?? item.drill?._id ?? "");
+                if (isFreeTalkPlanItem(item)) {
+                  return (
+                    <PlanFreeTalkRow
+                      key={`free-talk-${key}`}
+                      scenarioId={key}
+                      title={item.drill?.title ?? "Free Talk"}
+                      scenarioType={item.drill?.scenarioType ?? ""}
+                      completionDate={item.drill?.completionDate ?? item.dueDate}
+                      completedAt={item.completedAt}
+                    />
+                  );
+                }
+                return (
+                  <PlanDrillRow
+                    key={key}
+                    drill={item.drill}
+                    assignmentId={item.assignmentId}
+                    dueDate={item.dueDate}
+                    completedAt={item.completedAt}
+                    status={item.status}
+                    onPrefetch={prefetchDrill}
+                    onNavigate={() =>
+                      trackActivity("drill", item.drill._id, "started", {
+                        title: item.drill?.title,
+                        drillTitle: item.drill?.title,
+                        type: item.drill?.type,
+                        assignmentId: item.assignmentId,
+                      })
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </div>

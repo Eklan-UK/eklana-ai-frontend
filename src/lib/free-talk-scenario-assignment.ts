@@ -19,12 +19,25 @@ export function freeTalkScenarioVisibleToLearner(
 	return ids.some((id) => String(id) === learnerUserId.toString());
 }
 
-/** Mongo filter: scenarios visible to a learner (user id). */
+/** Scenarios still within their completion window (legacy rows without date stay visible). */
+export function freeTalkScenarioActiveDateFilter() {
+	const now = new Date();
+	return {
+		$or: [{ completionDate: { $exists: false } }, { completionDate: { $gt: now } }],
+	};
+}
+
+/** Mongo filter: scenarios visible to a learner (user id), not yet expired. */
 export function freeTalkScenarioLearnerFilter(learnerUserId: Types.ObjectId) {
 	return {
-		$or: [
-			{ allLearners: { $ne: false } },
-			{ assignedLearnerIds: learnerUserId },
+		$and: [
+			freeTalkScenarioActiveDateFilter(),
+			{
+				$or: [
+					{ allLearners: { $ne: false } },
+					{ assignedLearnerIds: learnerUserId },
+				],
+			},
 		],
 	};
 }
