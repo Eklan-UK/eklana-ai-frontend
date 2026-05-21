@@ -139,13 +139,13 @@ function ScoreRing({ score }: { score: number }) {
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
   const color =
-    score >= 90
+    score >= 85
       ? "#10b981"
-      : score >= 80
-      ? "#22c55e"
       : score >= 70
+      ? "#22c55e"
+      : score >= 55
       ? "#eab308"
-      : score >= 60
+      : score >= 40
       ? "#f97316"
       : "#ef4444";
 

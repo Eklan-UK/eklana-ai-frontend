@@ -1807,61 +1807,64 @@ function buildFreeTalkGradingPrompt(
 		.map(b => `${b.id}. ${b.name}: ${b.description}`)
 		.join('\n');
 
-	const includeBlock =
-		scenario.include && scenario.include.length > 0
-			? `\n\nPoints the student should aim to cover (when relevant to their response):\n${scenario.include.join('\n')}`
+	const hintBlock =
+		scenario.hint?.trim()
+			? `\n\nInstructor hint (what good communication looks like in this scenario — use as grading context, not as a word-for-word checklist):\n${scenario.hint.trim()}`
 			: '';
 
-	let p = `You are Eklan, a fair and accurate ICU clinical communication evaluator. Your job is to assess exactly what the student said and give honest, personalized tailored scores and feedback.
+	const usefulPhrasesBlock =
+		scenario.usefulPhrases && scenario.usefulPhrases.length > 0
+			? `\n\nUseful phrases provided to the student (using these or close paraphrases should count positively toward relevant behaviours):\n${scenario.usefulPhrases.map(p => `- ${p}`).join('\n')}`
+			: '';
+
+	const includeBlock =
+		scenario.include && scenario.include.length > 0
+			? `\n\nAdmin scoring checklist — instructor-defined points the response should cover:\n${scenario.include.map(p => `- ${p}`).join('\n')}\nWhen a bullet is clearly addressed (exact wording, close paraphrase, or equivalent clinical meaning), treat that as strong evidence for "full" or "partial" on the rubric behaviours it supports. Missing checklist items may lower scores on relevant behaviours but do not require separate JSON fields.`
+			: '';
+
+	let p = `You are Eklan, a fair and supportive ICU clinical communication evaluator. Assess what the student actually said; give honest, personalized scores and constructive feedback.
 
 Scenario: ${scenario.title}
-Situation: ${scenario.situation}${includeBlock}
+Situation: ${scenario.situation}${hintBlock}${usefulPhrasesBlock}${includeBlock}
 
 The student responded with:
 "${userResponse}"
 
 STEP 1 — RELEVANCE CHECK (do this first, silently):
-Before scoring, decide which of the 4 behaviours below are actually testable in this specific scenario. Some scenarios naturally call for only 3–5 of them. Mark each behaviour as:
-- "relevant": this behaviour is expected and meaningful in this situation
-- "not_applicable": this behaviour cannot reasonably be demonstrated in this scenario (e.g. "Escalates to the doctor" is not applicable in a small-talk scenario)
+For each of the 4 rubric behaviours below, decide if it is testable in THIS scenario and response:
+- "relevant": expected and meaningful here
+- "not_applicable": cannot reasonably be demonstrated (e.g. ICU escalation language in casual small talk). Use sparingly — only when the behaviour truly does not fit this custom scenario.
 
-STEP 2 — SCORING RULES:
-Only score behaviours you marked "relevant". For each relevant behaviour:
-- "full"    → clearly demonstrated as required (1 point)
-- "partial" → genuinely attempted — even if brief, incomplete, or stated as future intent ("I will…", "I would…"). Also recognize when studnet show concern, demonstrate friendliness and comfort to the patient, nurse colleague, doctor, patient's families and friends(0.5 points)
-- "none"    → relevant but truly absent from the response (0 points)
+STEP 2 — SCORING RULES (relevant behaviours only):
+- "full"    → clearly demonstrated OR reasonably paraphrased, including natural use of provided useful phrases or coverage of admin checklist points that map to this behaviour (1 point)
+- "partial" → genuinely attempted — brief, incomplete, or future intent ("I will…", "I would…"); shows appropriate concern, clarity, or professionalism even if not perfect (0.5 points)
+- "none"    → relevant but absent or off-topic for that behaviour (0 points)
 
-For behaviours marked "not_applicable": always set result to "not_applicable" in the JSON.
+For "not_applicable" behaviours: set result to "not_applicable" in the JSON (excluded from the score).
 
 IMPORTANT:
-- Future-tense statements ("I will give oxygen", "I would call the doctor") COUNT as partial for the relevant observablebehaviour.
-- Only mark ALL relevant observable behaviours as "none" if the response is completely empty, incoherent, or off-topic.
-- Do NOT give "full" unless the behaviour was clearly and explicitly demonstrated.
-- Do not penalize the student for asking a question and immediately moving on without waiting for an answer, as this assessment evaluates a one-way response rather than a back-and-forth dialogue.
-	For example:
-	To understand how to apply this rule, look at this specific scenario:
-	1. The Scenario: The student is roleplaying a medical scenario where they are talking to a sick patient. They ask the patient, "What is your pain level?" but instead of pausing the prompt to let the patient reply, the student immediately follows up with the rest of their assessment or care plan in the exact same response.
-	2. Why it happens: Because the student is submitting a single, comprehensive response rather than having a live, interactive conversation, they have to pack all their thoughts into one turn.
-	3. The Grading Logic: A human or rigid AI might think, "It's unrealistic to ask a question and not wait for the patient to answer, so I should dock points." However, Gemini needs to ignore that constraint here. The student should receive full credit for gathering information (asking about pain), and should not lose points for immediately continuing their thought, because the format of the assignment literally forces them into a one-way conversation.
+- Future-tense statements ("I will give oxygen", "I would call the doctor") COUNT as partial for the relevant behaviour.
+- Only mark ALL relevant behaviours "none" if the response is empty, incoherent, or wholly off-topic.
+- Award "full" when the behaviour is clearly shown OR reasonably paraphrased — you do not need the student's exact rubric wording.
+- Using provided useful phrases and covering admin checklist bullets should positively affect behaviour results where they apply.
+- Do not penalize asking a question and continuing in the same turn; this is a one-way response, not live dialogue.
 
-- All feedback must include a score calculated using the scoring rules in STEP 2.
-
-The 4 behaviours:
+The 4 rubric behaviours:
 ${behaviourList}
 
-Write 2–4 sentences of honest, specific feedback:
-- Reference the student's actual words — tailor this to THEIR specific response.
-- Acknowledge genuine strengths or partial attempts.
-- Clearly state what was missing or needs improvement. Also include specific examples of a model response given the context of the scenerio and the student's response.
-- Base praise and critique only on the relevant behaviours for this scenario.
+Write 2–4 sentences of feedback:
+- Start by acknowledging genuine strengths or partial attempts (reference their actual words).
+- Then note specific gaps and one concrete model phrase or sentence they could use next time.
+- Keep a balanced, encouraging tone — not purely punitive.
+- Tie praise and critique to relevant behaviours, useful phrases, and checklist coverage where applicable.
 
-Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by a valid JSON object using exactly this structure:
+Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immediately by valid JSON in exactly this structure (example shows mixed results — yours must reflect the actual response):
 {
   "behaviours": [
-    { "id": 1, "result": "none" },
-    { "id": 2, "result": "none" },
-    { "id": 3, "result": "none" },
-    { "id": 4, "result": "none" },
+    { "id": 1, "result": "full" },
+    { "id": 2, "result": "partial" },
+    { "id": 3, "result": "not_applicable" },
+    { "id": 4, "result": "partial" }
   ]
 }
 
@@ -1876,10 +1879,10 @@ Use "full", "partial", "none", or "not_applicable" as the result values. Respond
 // ── Grade result stream wrapper ───────────────────────────────────────────────
 
 const COMPETENCY_LEVELS = [
-	{ min: 90, label: 'Advanced Clinical Communicator' },
-	{ min: 80, label: 'Safe & Effective Communicator' },
-	{ min: 70, label: 'Developing Communicator' },
-	{ min: 60, label: 'Need Improvement' },
+	{ min: 85, label: 'Advanced Clinical Communicator' },
+	{ min: 70, label: 'Safe & Effective Communicator' },
+	{ min: 55, label: 'Need Improvement' },
+	{ min: 40, label: 'Developing Communicator' },
 	{ min: 0,  label: 'Unsafe Communication Risk' },
 ] as const;
 
@@ -1988,12 +1991,15 @@ function wrapWithGradingMetadata(
 			const overallScore = Math.round((rawScore / relevantCount) * 100);
 			const competencyLevel = scoreToCompetencyLevel(overallScore);
 
+			// Exclude not_applicable from client/API payload (attempts schema: full | partial | none only)
+			const scorableBehaviours = gradedBehaviours.filter(b => b.result !== 'not_applicable');
+
 			const metadata = {
 				fullText,
 				grade: {
 					overallScore,
 					competencyLevel,
-					behaviours: gradedBehaviours,
+					behaviours: scorableBehaviours,
 					rawScore,
 					maxScore: relevantCount,
 				},
