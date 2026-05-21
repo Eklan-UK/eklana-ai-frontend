@@ -1747,65 +1747,45 @@ const GRADING_RUBRICS: Record<FreeTalkScenarioType, GradingBehaviour[]> = {
 	icu_emergency: [
 		{ id: 1, name: 'Recognizes patient deterioration quickly', description: 'Identifies emergency signs such as low oxygen saturation, chest pain, respiratory distress, hypotension, or confusion without delay' },
 		{ id: 2, name: 'Provides immediate appropriate intervention', description: 'Initiates correct first actions such as increasing oxygen, monitoring vital signs, positioning patient safely, or assessing symptoms' },
-		{ id: 3, name: 'Uses calm and reassuring communication', description: 'Speaks calmly, reduces patient anxiety, and maintains emotional control during the emergency' },
-		{ id: 4, name: 'Gives clear patient instructions', description: 'Uses short, direct instructions such as "Take slow deep breaths" or "Please stay still"' },
-		{ id: 5, name: 'Escalates appropriately and promptly', description: 'Calls the doctor, respiratory therapist, rapid response team, or additional support without unnecessary delay' },
-		{ id: 6, name: 'Uses professional ICU terminology', description: 'Correctly uses terms like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm' },
-		{ id: 7, name: 'Maintains organized and safe communication', description: 'Communicates clearly under pressure, prioritizes patient safety, and avoids panic or disorganized responses' },
+		{ id: 3, name: 'Gives clear patient instructions', description: 'Uses short, direct instructions such as "Take slow deep breaths" or "Please stay still"' },
+		{ id: 4, name: 'Uses professional ICU terminology', description: 'Correctly uses terms like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm' },
 	],
 	admission: [
 		{ id: 1, name: 'Introduces self clearly', description: 'States name and role confidently and professionally' },
 		{ id: 2, name: 'Explains role and purpose of interaction', description: 'Clearly explains why they are there and what will happen during admission' },
 		{ id: 3, name: 'Confirms patient identity correctly', description: 'Uses at least two identifiers appropriately (e.g., name and date of birth) to support patient safety' },
-		{ id: 4, name: 'Explains the admission process clearly', description: 'Gives simple, organized explanation of procedures, monitoring, paperwork, or next steps' },
-		{ id: 5, name: 'Uses polite and professional tone', description: 'Maintains respectful, calm, and welcoming bedside communication' },
-		{ id: 6, name: 'Encourages patient questions or concerns', description: 'Invites the patient to ask questions and demonstrates openness to communication' },
-		{ id: 7, name: 'Establishes rapport and patient comfort', description: 'Helps the patient feel welcomed, safe, and supported during admission' },
+		{ id: 4, name: 'Encourages patient questions or concerns', description: 'Invites the patient to ask questions and demonstrates openness to communication' },
 	],
 	small_talk_patient: [
-		{ id: 1, name: 'Maintains friendly and approachable tone', description: 'Speaks warmly, calmly, and in a way that helps the patient feel comfortable' },
-		{ id: 2, name: 'Uses appropriate social language', description: 'Uses natural conversational phrases suitable for healthcare settings without sounding overly formal or robotic' },
-		{ id: 3, name: 'Demonstrates active listening', description: 'Responds appropriately to what the patient says and shows attentiveness during conversation' },
-		{ id: 4, name: 'Responds naturally in conversation', description: 'Avoids scripted or awkward responses and maintains smooth conversational flow' },
-		{ id: 5, name: 'Builds rapport with the patient', description: 'Creates positive connection through empathy, humor, encouragement, or shared conversation appropriately' },
-		{ id: 6, name: 'Maintains professionalism throughout interaction', description: 'Keeps appropriate boundaries, respectful tone, and professional bedside behavior' },
-		{ id: 7, name: 'Encourages patient comfort and engagement', description: 'Helps the patient feel relaxed, included, and willing to continue communication' },
+		{ id: 1, name: 'Uses appropriate social language', description: 'Uses natural conversational phrases suitable for healthcare settings without sounding overly formal or robotic' },
+		{ id: 2, name: 'Responds naturally in conversation', description: 'Avoids scripted or awkward responses and maintains smooth conversational flow' },
+		{ id: 3, name: 'Maintains professionalism throughout interaction', description: 'Keeps appropriate boundaries, respectful tone, and professional bedside behavior' },
+		{ id: 4, name: 'Encourages patient comfort and engagement', description: 'Helps the patient feel relaxed, included, and willing to continue communication' },
 	],
 	handover: [
 		{ id: 1, name: 'Gives concise and focused report', description: 'Communicates important information clearly without unnecessary details or excessive rambling' },
 		{ id: 2, name: 'Organizes information logically', description: 'Presents information in clear sequence (e.g., diagnosis → events → treatment → monitoring needs)' },
 		{ id: 3, name: 'Includes critical patient details', description: 'Mentions important clinical information such as diagnosis, vital changes, medications, procedures, safety concerns, or pending tasks' },
 		{ id: 4, name: 'Uses SBAR/ISBAR communication structure appropriately', description: 'Demonstrates structured handoff communication with clear situation, background, assessment, and recommendations' },
-		{ id: 5, name: 'Answers clarification questions accurately', description: 'Responds appropriately and confidently when the receiving nurse asks follow-up questions' },
-		{ id: 6, name: 'Confirms understanding and continuity of care', description: 'Ensures the receiving nurse understands key concerns, priorities, and ongoing monitoring needs' },
-		{ id: 7, name: 'Maintains professional and collaborative communication', description: 'Uses respectful tone, teamwork language, and professional handoff behavior throughout interaction' },
+		
 	],
 	decline_request: [
 		{ id: 1, name: 'Maintains respectful and calm tone', description: 'Speaks politely and professionally without sounding rude, dismissive, or irritated' },
 		{ id: 2, name: 'States limitation or refusal clearly', description: 'Clearly explains why the request cannot be fulfilled without being vague or overly apologetic' },
 		{ id: 3, name: 'Avoids confrontation or defensive language', description: 'Maintains composure and avoids arguing, blaming, or escalating tension' },
 		{ id: 4, name: 'Provides alternative solution or assistance', description: 'Offers another option, compromise, or next step when appropriate' },
-		{ id: 5, name: 'Maintains professionalism throughout interaction', description: 'Uses appropriate workplace communication and respectful boundaries' },
-		{ id: 6, name: 'Demonstrates teamwork and collaboration', description: 'Shows willingness to support colleagues or patients even when declining the request' },
-		{ id: 7, name: 'Communicates confidently and appropriately', description: 'Delivers refusal clearly and professionally without hesitation, confusion, or passive-aggressive tone' },
 	],
 	phone_doctor: [
 		{ id: 1, name: 'Identifies self, unit, and patient appropriately', description: 'Clearly introduces themselves, unit/department, and patient information at the start of the call' },
 		{ id: 2, name: 'States reason for call immediately', description: 'Quickly explains why they are calling without unnecessary delays or excessive background information' },
-		{ id: 3, name: 'Uses concise SBAR/ISBAR communication', description: 'Organizes information logically using Situation, Background, Assessment, and Recommendation' },
-		{ id: 4, name: 'Gives accurate and relevant patient data', description: 'Provides correct vital signs, symptoms, assessment findings, medications, or changes in condition' },
-		{ id: 5, name: 'Requests recommendation, orders, or action appropriately', description: 'Clearly states what is needed from the physician (evaluation, medication order, intervention, etc.)' },
-		{ id: 6, name: 'Confirms and repeats orders correctly', description: 'Uses read-back/closed-loop communication to verify physician instructions accurately' },
-		{ id: 7, name: 'Maintains calm, professional, and organized communication', description: 'Speaks confidently, remains composed under pressure, and communicates efficiently' },
+		{ id: 3, name: 'Gives accurate and relevant patient data', description: 'Provides correct vital signs, symptoms, assessment findings, medications, or changes in condition' },
+		{ id: 4, name: 'Requests recommendation, orders, or action appropriately', description: 'Clearly states what is needed from the physician (evaluation, medication order, intervention, etc.)' },
 	],
 	small_talk_colleague: [
-		{ id: 1, name: 'Greets colleague appropriately', description: 'Uses polite and natural opening greeting' },
-		{ id: 2, name: 'Maintains friendly and professional tone', description: 'Sounds respectful, calm, and collegial' },
-		{ id: 3, name: 'Responds naturally in conversation', description: 'Avoids robotic or overly scripted responses' },
-		{ id: 4, name: 'Demonstrates active listening', description: 'Responds appropriately to what colleague says' },
-		{ id: 5, name: 'Maintains conversational flow', description: 'Keeps conversation going smoothly without awkward breakdowns' },
-		{ id: 6, name: 'Shows teamwork and supportive attitude', description: 'Offers help, encouragement, or collaborative language' },
-		{ id: 7, name: 'Uses clear and understandable communication', description: 'Speech is understandable, organized, and appropriate' },
+		{ id: 1, name: 'Maintains friendly and professional tone', description: 'Sounds respectful, calm, and collegial' },
+		{ id: 2, name: 'Responds naturally in conversation', description: 'Avoids robotic or overly scripted responses' },
+		{ id: 3, name: 'Maintains conversational flow', description: 'Keeps conversation going smoothly without awkward breakdowns' },
+		{ id: 4, name: 'Uses clear and understandable communication', description: 'Speech is understandable, organized, and appropriate' },
 	],
 };
 
@@ -1841,7 +1821,7 @@ The student responded with:
 "${userResponse}"
 
 STEP 1 — RELEVANCE CHECK (do this first, silently):
-Before scoring, decide which of the 7 behaviours below are actually testable in this specific scenario. Some scenarios naturally call for only 3–5 of them. Mark each behaviour as:
+Before scoring, decide which of the 4 behaviours below are actually testable in this specific scenario. Some scenarios naturally call for only 3–5 of them. Mark each behaviour as:
 - "relevant": this behaviour is expected and meaningful in this situation
 - "not_applicable": this behaviour cannot reasonably be demonstrated in this scenario (e.g. "Escalates to the doctor" is not applicable in a small-talk scenario)
 
@@ -1866,7 +1846,7 @@ IMPORTANT:
 
 - All feedback must include a score calculated using the scoring rules in STEP 2.
 
-The 7 behaviours:
+The 4 behaviours:
 ${behaviourList}
 
 Write 2–4 sentences of honest, specific feedback:
@@ -1882,9 +1862,6 @@ Then output the exact token ${GRADE_JSON_TOKEN} on its own line, followed immedi
     { "id": 2, "result": "none" },
     { "id": 3, "result": "none" },
     { "id": 4, "result": "none" },
-    { "id": 5, "result": "none" },
-    { "id": 6, "result": "none" },
-    { "id": 7, "result": "none" }
   ]
 }
 
