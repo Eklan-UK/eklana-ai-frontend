@@ -1854,9 +1854,17 @@ Only score behaviours you marked "relevant". For each relevant behaviour:
 For behaviours marked "not_applicable": always set result to "not_applicable" in the JSON.
 
 IMPORTANT:
-- Future-tense statements ("I will give oxygen", "I would call the doctor") COUNT as partial for the relevant behaviour.
-- Only mark ALL relevant behaviours as "none" if the response is completely empty, incoherent, or off-topic.
+- Future-tense statements ("I will give oxygen", "I would call the doctor") COUNT as partial for the relevant observablebehaviour.
+- Only mark ALL relevant observable behaviours as "none" if the response is completely empty, incoherent, or off-topic.
 - Do NOT give "full" unless the behaviour was clearly and explicitly demonstrated.
+- Do not penalize the student for asking a question and immediately moving on without waiting for an answer, as this assessment evaluates a one-way response rather than a back-and-forth dialogue.
+	For example:
+	To understand how to apply this rule, look at this specific scenario:
+	1. The Scenario: The student is roleplaying a medical scenario where they are talking to a sick patient. They ask the patient, "What is your pain level?" but instead of pausing the prompt to let the patient reply, the student immediately follows up with the rest of their assessment or care plan in the exact same response.
+	2. Why it happens: Because the student is submitting a single, comprehensive response rather than having a live, interactive conversation, they have to pack all their thoughts into one turn.
+	3. The Grading Logic: A human or rigid AI might think, "It's unrealistic to ask a question and not wait for the patient to answer, so I should dock points." However, Gemini needs to ignore that constraint here. The student should receive full credit for gathering information (asking about pain), and should not lose points for immediately continuing their thought, because the format of the assignment literally forces them into a one-way conversation.
+
+- All feedback must include a score calculated using the scoring rules in STEP 2.
 
 The 7 behaviours:
 ${behaviourList}
