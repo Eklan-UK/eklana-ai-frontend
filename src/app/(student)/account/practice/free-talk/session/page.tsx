@@ -77,20 +77,10 @@ const COMPETENCY_COLORS: Record<string, { bg: string; text: string; ring: string
     text: "text-green-700 dark:text-green-400",
     ring: "ring-green-500",
   },
-  "Developing Communicator": {
-    bg: "bg-yellow-50 dark:bg-yellow-950/30",
-    text: "text-yellow-700 dark:text-yellow-500",
-    ring: "ring-yellow-500",
-  },
   "Need Improvement": {
     bg: "bg-orange-50 dark:bg-orange-950/30",
     text: "text-orange-700 dark:text-orange-400",
     ring: "ring-orange-500",
-  },
-  "Unsafe Communication Risk": {
-    bg: "bg-red-50 dark:bg-red-950/30",
-    text: "text-red-700 dark:text-red-400",
-    ring: "ring-red-500",
   },
 };
 
@@ -139,15 +129,7 @@ function ScoreRing({ score }: { score: number }) {
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
   const color =
-    score >= 85
-      ? "#10b981"
-      : score >= 70
-      ? "#22c55e"
-      : score >= 55
-      ? "#eab308"
-      : score >= 40
-      ? "#f97316"
-      : "#ef4444";
+    score >= 90 ? "#10b981" : score >= 60 ? "#22c55e" : "#f97316";
 
   return (
     <div className="relative w-24 h-24 shrink-0">
