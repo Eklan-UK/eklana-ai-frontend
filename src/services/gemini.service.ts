@@ -1879,11 +1879,9 @@ Use "full", "partial", "none", or "not_applicable" as the result values. Respond
 // ── Grade result stream wrapper ───────────────────────────────────────────────
 
 const COMPETENCY_LEVELS = [
-	{ min: 85, label: 'Advanced Clinical Communicator' },
-	{ min: 70, label: 'Safe & Effective Communicator' },
-	{ min: 55, label: 'Need Improvement' },
-	{ min: 40, label: 'Developing Communicator' },
-	{ min: 0,  label: 'Unsafe Communication Risk' },
+	{ min: 90, label: 'Advanced Clinical Communicator' },
+	{ min: 60, label: 'Safe & Effective Communicator' },
+	{ min: 0, label: 'Need Improvement' },
 ] as const;
 
 function scoreToCompetencyLevel(score: number): string {
