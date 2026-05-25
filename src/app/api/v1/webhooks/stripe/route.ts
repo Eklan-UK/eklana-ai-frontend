@@ -16,6 +16,10 @@ import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
+import {
+  extendSubscriptionExpiresAt,
+  shouldSkipStripeDowngrade,
+} from '@/lib/api/subscription-reconciliation';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -97,10 +101,21 @@ async function handleCheckoutSessionCompleted(
     return;
   }
 
-  user.subscriptionPlan = 'premium';
   user.stripeSubscriptionId = subscriptionId;
   user.stripeSubscriptionStatus = status;
-  user.subscriptionActivatedAt = new Date();
+
+  if (shouldSkipStripeDowngrade(user)) {
+    extendSubscriptionExpiresAt(user, periodEnd);
+    await user.save();
+    logger.info(
+      '[Stripe Webhook] checkout.session.completed — Stripe fields updated; Apple/manual expiry retained',
+      { userId: String(user._id), subscriptionId }
+    );
+    return;
+  }
+
+  user.subscriptionPlan = 'premium';
+  user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? new Date();
   user.subscriptionExpiresAt = periodEnd;
   user.subscriptionPaymentMethod = 'stripe';
   await user.save();
@@ -132,20 +147,25 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
   user.stripeSubscriptionId = subscription.id;
   user.stripeSubscriptionStatus = status;
 
-  // Idempotency: only extend expiry if the incoming period end is later than stored.
   if (periodEnd !== null) {
-    const storedExpiry = user.subscriptionExpiresAt ? user.subscriptionExpiresAt.getTime() : 0;
-    if (periodEnd.getTime() > storedExpiry) {
-      user.subscriptionExpiresAt = periodEnd;
-    }
+    extendSubscriptionExpiresAt(user, periodEnd);
   }
 
-  // Active/trialing = premium; past_due keeps premium (grace period); others downgrade.
   if (status === 'active' || status === 'trialing') {
-    user.subscriptionPlan = 'premium';
+    if (!shouldSkipStripeDowngrade(user)) {
+      user.subscriptionPlan = 'premium';
+      user.subscriptionPaymentMethod = 'stripe';
+    }
   } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
-    user.subscriptionPlan = 'free';
-    user.subscriptionExpiresAt = null;
+    if (shouldSkipStripeDowngrade(user)) {
+      logger.info(
+        '[Stripe Webhook] subscription.updated — skipped downgrade; Apple/manual still active',
+        { userId: String(user._id), status }
+      );
+    } else {
+      user.subscriptionPlan = 'free';
+      user.subscriptionExpiresAt = null;
+    }
   }
 
   await user.save();
@@ -167,11 +187,24 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     return;
   }
 
-  user.subscriptionPlan = 'free';
   user.stripeSubscriptionId = undefined;
   user.stripeSubscriptionStatus = 'canceled';
+
+  if (shouldSkipStripeDowngrade(user)) {
+    await user.save();
+    logger.info(
+      '[Stripe Webhook] subscription.deleted — Stripe cleared; Apple/manual expiry retained',
+      { userId: String(user._id) }
+    );
+    return;
+  }
+
+  user.subscriptionPlan = 'free';
   user.subscriptionExpiresAt = null;
   user.subscriptionActivatedAt = null;
+  if (user.subscriptionPaymentMethod === 'stripe') {
+    user.subscriptionPaymentMethod = undefined;
+  }
   await user.save();
 
   logger.info('[Stripe Webhook] subscription.deleted — downgraded to free', {
@@ -220,13 +253,11 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
     return;
   }
 
-  // Idempotency: only advance expiry, never move it backward.
-  const storedExpiry = user.subscriptionExpiresAt ? user.subscriptionExpiresAt.getTime() : 0;
-  if (periodEnd.getTime() > storedExpiry) {
-    user.subscriptionExpiresAt = periodEnd;
+  extendSubscriptionExpiresAt(user, periodEnd);
+  if (!shouldSkipStripeDowngrade(user)) {
+    user.subscriptionPlan = 'premium';
+    user.subscriptionPaymentMethod = 'stripe';
   }
-
-  user.subscriptionPlan = 'premium';
   await user.save();
 
   logger.info('[Stripe Webhook] invoice.paid — expiry extended', {

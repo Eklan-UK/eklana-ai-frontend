@@ -2,7 +2,8 @@
 
 ## 1. Goals
 
-- Use Stripe as the **single source of truth** for payment and subscription state.
+- Use Stripe as the payment rail for **Android and web** (not iOS digital subscriptions — see [APPLE_IAP_IOS_IMPLEMENTATION.md](./APPLE_IAP_IOS_IMPLEMENTATION.md)).
+- Use Stripe as the **single source of truth** for payment and subscription state on those platforms; server entitlement (`subscriptionPlan`, `isSubscribed`) is shared across all clients after any rail activates premium.
 - Gate premium experiences behind a Stripe-managed subscription. Initial features in scope:
   - **Eklan Free Talk** — AI conversation practice sessions
   - **Eklan Pressure Test** — timed, high-pressure speaking drills

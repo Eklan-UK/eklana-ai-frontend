@@ -51,6 +51,10 @@ export interface IUser extends Document {
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
+  subscriptionProvider?: string | null;
+  appleOriginalTransactionId?: string;
+  appleLatestTransactionId?: string;
+  appleSubscriptionStatus?: string;
   pressureTestLevel?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -233,6 +237,20 @@ const userSchema = new Schema<IUser>(
       sparse: true,
     },
     stripeSubscriptionStatus: {
+      type: String,
+    },
+    subscriptionProvider: {
+      type: String,
+    },
+    appleOriginalTransactionId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    appleLatestTransactionId: {
+      type: String,
+    },
+    appleSubscriptionStatus: {
       type: String,
     },
     pressureTestLevel: {
