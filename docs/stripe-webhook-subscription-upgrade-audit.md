@@ -43,7 +43,7 @@
 
    ```bash
    # Should return JSON { ok: true, ... } — NOT HTML 404
-   curl -sS https://app.eklan.ai/api/v1/webhooks/stripe
+   `curl -sS https://app.eklan.ai/api/v1/webhooks/stripe`
 
    # Should return 400 JSON (missing stripe-signature) — NOT 404
    curl -sS -X POST https://app.eklan.ai/api/v1/webhooks/stripe \

@@ -13,6 +13,7 @@
     "test:gates": "node scripts/test-subscription-gates.mjs"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@firebase/messaging": "^0.12.23",
     "@google/genai": "^1.42.0",
     "@google/generative-ai": "^0.24.1",

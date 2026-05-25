@@ -116,6 +116,16 @@ export const config = {
 	STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
 	STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
 	STRIPE_PREMIUM_MONTHLY_PRICE_ID: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
+	// Apple In-App Purchase (App Store Server API — separate from Sign in with Apple OAuth)
+	APPLE_APP_STORE_ISSUER_ID: process.env.APPLE_APP_STORE_ISSUER_ID,
+	APPLE_APP_STORE_KEY_ID: process.env.APPLE_APP_STORE_KEY_ID,
+	APPLE_APP_STORE_PRIVATE_KEY: process.env.APPLE_APP_STORE_PRIVATE_KEY,
+	APPLE_BUNDLE_ID: process.env.APPLE_BUNDLE_ID,
+	APPLE_PRO_MONTHLY_PRODUCT_ID: process.env.APPLE_PRO_MONTHLY_PRODUCT_ID,
+	APPLE_APP_STORE_SHARED_SECRET: process.env.APPLE_APP_STORE_SHARED_SECRET,
+	APPLE_APP_STORE_ENVIRONMENT: process.env.APPLE_APP_STORE_ENVIRONMENT || 'sandbox',
+	/** Required by SignedDataVerifier in Production only (numeric App Store app id). */
+	APPLE_APP_APPLE_ID: process.env.APPLE_APP_APPLE_ID,
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||
