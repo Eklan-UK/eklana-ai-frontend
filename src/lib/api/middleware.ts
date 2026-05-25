@@ -328,7 +328,12 @@ export const withPremium = <T = any>(
 ) => {
 	return withAuth<T>(async (req, context) => {
 		await connectToDatabase();
-		const user = await User.findById(context.userId).select('subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus').lean().exec();
+		const user = await User.findById(context.userId)
+			.select(
+				'subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId'
+			)
+			.lean()
+			.exec();
 		if (!user || !isUserSubscribed(user as any)) {
 			return NextResponse.json(
 				{

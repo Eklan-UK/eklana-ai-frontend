@@ -15,6 +15,10 @@ import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import {
+  extendSubscriptionExpiresAt,
+  shouldSkipStripeDowngrade,
+} from '@/lib/api/subscription-reconciliation';
 
 const inputSchema = z
   .object({
@@ -128,9 +132,33 @@ async function handler(
   if (activeSub) {
     const periodEnd = getPeriodEnd(activeSub) ?? new Date(Date.now() + 31 * 24 * 60 * 60 * 1000);
 
-    user.subscriptionPlan = 'premium';
     user.stripeSubscriptionId = activeSub.id;
     user.stripeSubscriptionStatus = activeSub.status;
+
+    if (shouldSkipStripeDowngrade(user)) {
+      extendSubscriptionExpiresAt(user, periodEnd);
+      await user.save();
+      logger.info('[stripe-sync] Stripe fields updated; Apple/manual expiry retained', {
+        adminId: String(context.userId),
+        userId: String(user._id),
+      });
+      return NextResponse.json({
+        code: 'Success',
+        message:
+          'Stripe subscription synced. Premium retained via Apple or manual expiry (later period end).',
+        before,
+        after: {
+          subscriptionPlan: user.subscriptionPlan,
+          stripeCustomerId: user.stripeCustomerId,
+          stripeSubscriptionId: user.stripeSubscriptionId,
+          stripeSubscriptionStatus: user.stripeSubscriptionStatus,
+          subscriptionExpiresAt: user.subscriptionExpiresAt,
+          subscriptionPaymentMethod: user.subscriptionPaymentMethod,
+        },
+      });
+    }
+
+    user.subscriptionPlan = 'premium';
     user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? fromUnix(activeSub.created);
     user.subscriptionExpiresAt = periodEnd;
     user.subscriptionPaymentMethod = 'stripe';

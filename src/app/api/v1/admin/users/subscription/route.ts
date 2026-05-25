@@ -7,6 +7,11 @@ import User from "@/models/user";
 import { logger } from "@/lib/api/logger";
 import { Types } from "mongoose";
 import { z } from "zod";
+import {
+  extendSubscriptionExpiresAt,
+  subscriptionExpiresAtMs,
+} from "@/lib/api/subscription-reconciliation";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
 
 const updateSubscriptionSchema = z.object({
   userId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -55,15 +60,24 @@ async function handler(
     } else {
       const activation = new Date();
       const expiry = addMonths(activation, input.months);
+      const prevExpiryMs = subscriptionExpiresAtMs(user);
 
-      user.subscriptionPlan = "premium";
-      user.subscriptionActivatedAt = activation;
-      user.subscriptionExpiresAt = expiry;
-      user.subscriptionMonthsPaidFor = input.months;
-      user.subscriptionAmountPaid = input.amount ?? 0;
-      user.subscriptionPaymentMethod = input.paymentMethod || undefined;
+      extendSubscriptionExpiresAt(user, expiry);
+
+      if (expiry.getTime() > prevExpiryMs) {
+        user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? activation;
+        user.subscriptionMonthsPaidFor = input.months;
+        user.subscriptionAmountPaid = input.amount ?? 0;
+        user.subscriptionPaymentMethod = input.paymentMethod || "manual";
+        user.subscriptionProvider = "manual";
+      }
+
       user.subscriptionAdminNote = input.note || undefined;
       user.subscriptionUpdatedBy = context.userId;
+
+      if (isUserSubscribed(user) || expiry.getTime() > Date.now()) {
+        user.subscriptionPlan = "premium";
+      }
     }
 
     await user.save();
@@ -87,7 +101,7 @@ async function handler(
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
@@ -99,9 +113,10 @@ async function handler(
       );
     }
 
+    const err = error instanceof Error ? error : new Error(String(error));
     logger.error("Error updating subscription", {
-      error: error.message,
-      stack: error.stack,
+      error: err.message,
+      stack: err.stack,
     });
 
     return NextResponse.json(
