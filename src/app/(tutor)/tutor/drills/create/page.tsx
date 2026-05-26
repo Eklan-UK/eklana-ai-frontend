@@ -900,27 +900,25 @@ function CreateDrillPageContent() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <Label className="text-base font-semibold">
-                        AI Character Names * (1-3 characters)
+                        AI Character Names *
                       </Label>
-                      {(formData.ai_character_names || []).length < 3 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFormData({
-                              ...formData,
-                              ai_character_names: [
-                                ...(formData.ai_character_names || []),
-                                "",
-                              ],
-                            });
-                          }}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add AI Character
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            ai_character_names: [
+                              ...(formData.ai_character_names || []),
+                              "",
+                            ],
+                          });
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add AI Character
+                      </Button>
                     </div>
                     {(formData.ai_character_names || []).map((name, index) => (
                       <div key={index} className="flex items-center gap-3 mb-2">

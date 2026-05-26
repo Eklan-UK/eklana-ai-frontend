@@ -4,6 +4,11 @@
  * and extracts structured data for drill creation
  */
 
+import {
+  parseRoleplayAiSpeakerId,
+  type RoleplaySpeakerId,
+} from "@/lib/roleplay-speakers";
+
 // Dynamic imports for server-side only packages
 // These packages are only available in Node.js environment (server-side)
 let pdfParse: any;
@@ -91,7 +96,7 @@ export interface MatchingPair {
 }
 
 export interface DialogueTurn {
-  speaker: "student" | "ai_0" | "ai_1" | "ai_2" | "ai_3";
+  speaker: RoleplaySpeakerId;
   text: string;
   translation?: string;
 }
@@ -493,19 +498,15 @@ class DocumentParserService {
 
       // Dialogue line
       const speakerMatch = line.match(
-        /^(student|ai|ai_0|ai_1|ai_2|ai_3|waiter|customer|teacher):\s*(.+)/i
+        /^(student|ai|ai_\d+|waiter|customer|teacher):\s*(.+)/i,
       );
       if (speakerMatch) {
         const speaker = speakerMatch[1].toLowerCase();
         const text = speakerMatch[2].trim();
 
-        let speakerEnum: DialogueTurn["speaker"] = "student";
-        if (speaker.startsWith("ai")) {
-          if (speaker === "ai" || speaker === "ai_0") speakerEnum = "ai_0";
-          else if (speaker === "ai_1") speakerEnum = "ai_1";
-          else if (speaker === "ai_2") speakerEnum = "ai_2";
-          else if (speaker === "ai_3") speakerEnum = "ai_3";
-        }
+        const speakerEnum: DialogueTurn["speaker"] = speaker.startsWith("ai")
+          ? parseRoleplayAiSpeakerId(speaker) ?? "ai_0"
+          : "student";
 
         currentDialogue.push({
           speaker: speakerEnum,
@@ -686,13 +687,9 @@ class DocumentParserService {
       const speaker = String(row[0] || "student").toLowerCase();
       const text = String(row[1] || "").trim();
 
-      let speakerEnum: DialogueTurn["speaker"] = "student";
-      if (speaker.startsWith("ai")) {
-        if (speaker === "ai" || speaker === "ai_0") speakerEnum = "ai_0";
-        else if (speaker === "ai_1") speakerEnum = "ai_1";
-        else if (speaker === "ai_2") speakerEnum = "ai_2";
-        else if (speaker === "ai_3") speakerEnum = "ai_3";
-      }
+      const speakerEnum: DialogueTurn["speaker"] = speaker.startsWith("ai")
+        ? parseRoleplayAiSpeakerId(speaker) ?? "ai_0"
+        : "student";
 
       if (text) {
         dialogue.push({

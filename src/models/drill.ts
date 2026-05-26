@@ -1,5 +1,9 @@
 // models/drill.model.ts
 import { Schema, model, models, Document, Types } from "mongoose";
+import {
+  validateRoleplaySpeakerId,
+  type RoleplaySpeakerId,
+} from "@/lib/roleplay-speakers";
 // Import User model to ensure it's registered before this schema references it
 import '@/models/user';
 
@@ -9,7 +13,11 @@ const DialogueTurnSchema = new Schema(
     speaker: {
       type: String,
       required: true,
-      enum: ["student", "ai_0", "ai_1", "ai_2", "ai_3"],
+      validate: {
+        validator: validateRoleplaySpeakerId,
+        message:
+          'Speaker must be "student" or "ai_<index>" (e.g. ai_0, ai_1, …)',
+      },
       description:
         'Speaker identifier - "student" for student lines, "ai_0", "ai_1", etc. for AI characters',
     },
@@ -340,7 +348,7 @@ export interface IDrill extends Document {
 
   // Roleplay Drill Fields
   roleplay_dialogue: Array<{
-    speaker: "student" | "ai_0" | "ai_1" | "ai_2" | "ai_3";
+    speaker: RoleplaySpeakerId;
     text: string;
     translation?: string;
     audioUrl?: string;
@@ -349,7 +357,7 @@ export interface IDrill extends Document {
     scene_name: string;
     context?: string;
     dialogue: Array<{
-      speaker: "student" | "ai_0" | "ai_1" | "ai_2" | "ai_3";
+      speaker: RoleplaySpeakerId;
       text: string;
       translation?: string;
       audioUrl?: string;
