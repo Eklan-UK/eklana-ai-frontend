@@ -431,9 +431,7 @@ const DrillBuilder: React.FC = () => {
   };
 
   const addAiCharacter = () => {
-    if (aiCharacterNames.length < 3) {
-      setAiCharacterNames([...aiCharacterNames, ""]);
-    }
+    setAiCharacterNames([...aiCharacterNames, ""]);
   };
 
   const removeAiCharacter = (index: number) => {
@@ -1284,14 +1282,13 @@ const DrillBuilder: React.FC = () => {
                   <label className="block text-xs font-bold text-gray-600">
                     AI Character Names<span className="text-red-500">*</span>
                   </label>
-                  {aiCharacterNames.length < 3 && (
-                    <button
-                      onClick={addAiCharacter}
-                      className="flex items-center gap-1 px-3 py-1 bg-gray-50 text-[#3d8c40] text-xs font-bold rounded-lg hover:bg-emerald-50"
-                    >
-                      <Plus className="w-3 h-3" /> Add Character
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={addAiCharacter}
+                    className="flex items-center gap-1 px-3 py-1 bg-gray-50 text-[#3d8c40] text-xs font-bold rounded-lg hover:bg-emerald-50"
+                  >
+                    <Plus className="w-3 h-3" /> Add Character
+                  </button>
                 </div>
                 {aiCharacterNames.map((name, idx) => (
                   <div key={idx} className="flex items-center gap-2 mb-2">
