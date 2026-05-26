@@ -14,6 +14,7 @@ import { DrillService } from '@/domain/drills/drill.service';
 import { DrillRepository } from '@/domain/drills/drill.repository';
 import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
+import { roleplaySpeakerIdSchema } from '@/lib/roleplay-speakers';
 
 // Validation schemas
 const targetSentenceSchema = z.object({
@@ -35,7 +36,7 @@ const pronunciationItemSchema = z.object({
 });
 
 const dialogueTurnSchema = z.object({
-	speaker: z.enum(['student', 'ai_0', 'ai_1', 'ai_2', 'ai_3']),
+	speaker: roleplaySpeakerIdSchema,
 	text: z.string().min(1),
 	translation: z.string().optional(),
 	audioUrl: z.string().optional(),
