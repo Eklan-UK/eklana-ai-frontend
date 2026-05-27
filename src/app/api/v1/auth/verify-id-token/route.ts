@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 import { getAuth } from "@/lib/api/better-auth";
 import { logger } from "@/lib/api/logger";
 import { connectToDatabase } from "@/lib/api/db";
-import config from "@/lib/api/config";
+import config, { parseGoogleClientIds } from "@/lib/api/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +23,14 @@ interface UserInfo {
  * Verify Google ID token
  */
 async function verifyGoogleIdToken(idToken: string): Promise<UserInfo> {
-  const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
-  
+  // GOOGLE_CLIENT_IDS env is a comma-separated string; split + trim in parseGoogleClientIds()
+  const audiences = parseGoogleClientIds();
+  const client = new OAuth2Client(audiences[0]);
+
   try {
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: config.GOOGLE_CLIENT_ID,
+      audience: audiences,
     });
     
     const payload = ticket.getPayload();
@@ -237,7 +239,7 @@ export async function POST(req: NextRequest) {
     let userInfo: UserInfo;
     
     if (provider === "google") {
-      if (!config.GOOGLE_CLIENT_ID) {
+      if (parseGoogleClientIds().length === 0) {
         return NextResponse.json(
           { error: "Google OAuth not configured" },
           { status: 500 }
