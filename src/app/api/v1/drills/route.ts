@@ -102,7 +102,7 @@ const fillBlankItemSchema = z.object({
 
 const keyPhraseItemSchema = z.object({
 	prompt: z.string().min(1),
-	promptTranslation: z.string().optional(),
+	respondentName: z.string().optional(),
 	options: z.array(z.string().min(1)).min(2),
 	correctAnswer: z.string().min(1),
 	promptAudioUrl: z.string().optional(),

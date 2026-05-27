@@ -157,12 +157,12 @@ const DrillBuilder: React.FC = () => {
   // Key Phrases
   interface KeyPhraseItem {
     prompt: string;
-    promptTranslation?: string;
+    respondentName?: string;
     options: string[];
     correctAnswer: string;
   }
   const [keyPhraseItems, setKeyPhraseItems] = useState<KeyPhraseItem[]>([
-    { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" },
+    { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
   ]);
 
   // Common fields
@@ -378,11 +378,11 @@ const DrillBuilder: React.FC = () => {
           drill.key_phrase_items.length > 0
             ? drill.key_phrase_items.map((item: any) => ({
               prompt: item.prompt || "",
-              promptTranslation: item.promptTranslation || "",
+              respondentName: item.respondentName || "",
               options: item.options?.length >= 2 ? item.options : ["", ""],
               correctAnswer: item.correctAnswer || "",
             }))
-            : [{ prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" }]
+            : [{ respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" }]
         );
       }
     }
@@ -962,7 +962,7 @@ const DrillBuilder: React.FC = () => {
           .filter((item) => item.prompt.trim())
           .map((item) => ({
             prompt: item.prompt.trim(),
-            promptTranslation: item.promptTranslation?.trim() || undefined,
+            respondentName: item.respondentName?.trim() || undefined,
             options: item.options.filter((o) => o.trim()),
             correctAnswer: item.correctAnswer.trim(),
           }));
@@ -2138,6 +2138,21 @@ const DrillBuilder: React.FC = () => {
                   </div>
 
                   <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Respondent name (optional)</label>
+                    <input
+                      type="text"
+                      value={item.respondentName || ""}
+                      onChange={(e) => {
+                        const updated = [...keyPhraseItems];
+                        updated[itemIndex].respondentName = e.target.value;
+                        setKeyPhraseItems(updated);
+                      }}
+                      placeholder="e.g. Waiter, Colleague, Interviewer"
+                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt (situation / question)<span className="text-red-500">*</span></label>
                     <textarea
                       rows={2}
@@ -2149,21 +2164,6 @@ const DrillBuilder: React.FC = () => {
                       }}
                       placeholder="e.g. A customer asks for the bill."
                       className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl resize-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt Translation (Optional)</label>
-                    <input
-                      type="text"
-                      value={item.promptTranslation || ""}
-                      onChange={(e) => {
-                        const updated = [...keyPhraseItems];
-                        updated[itemIndex].promptTranslation = e.target.value;
-                        setKeyPhraseItems(updated);
-                      }}
-                      placeholder="Translation of the prompt"
-                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
                     />
                   </div>
 
@@ -2239,7 +2239,7 @@ const DrillBuilder: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setKeyPhraseItems([...keyPhraseItems, { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" }])}
+                onClick={() => setKeyPhraseItems([...keyPhraseItems, { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" }])}
                 className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white text-sm rounded-xl hover:bg-emerald-600"
               >
                 <Plus className="w-4 h-4" />

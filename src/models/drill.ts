@@ -254,10 +254,10 @@ const KeyPhraseItemSchema = new Schema(
       required: true,
       description: "Stimulus text shown to the learner (situation / question)",
     },
-    promptTranslation: {
+    respondentName: {
       type: String,
       default: "",
-      description: "Optional translation of the prompt",
+      description: "Name of the person speaking the prompt (e.g. Waiter, Colleague)",
     },
     options: {
       type: [String],
@@ -468,7 +468,7 @@ export interface IDrill extends Document {
   // Key Phrases Drill Fields
   key_phrase_items: Array<{
     prompt: string;
-    promptTranslation?: string;
+    respondentName?: string;
     options: string[];
     correctAnswer: string;
     promptAudioUrl?: string;

@@ -112,7 +112,7 @@ interface DrillFormData {
   }>;
   key_phrase_items?: Array<{
     prompt: string;
-    promptTranslation?: string;
+    respondentName?: string;
     options: string[];
     correctAnswer: string;
   }>;
@@ -208,7 +208,7 @@ function CreateDrillPageContent() {
         },
       ],
       key_phrase_items: [
-        { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" },
+        { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
       ],
     };
   });
@@ -295,7 +295,7 @@ function CreateDrillPageContent() {
           },
         ],
         key_phrase_items: drill.key_phrase_items || [
-          { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" },
+          { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
         ],
       });
     }
@@ -2152,7 +2152,7 @@ function CreateDrillPageContent() {
                       ...formData,
                       key_phrase_items: [
                         ...(formData.key_phrase_items || []),
-                        { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" },
+                        { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
                       ],
                     })
                   }
@@ -2188,6 +2188,19 @@ function CreateDrillPageContent() {
                       </div>
 
                       <div>
+                        <Label>Respondent name (optional)</Label>
+                        <Input
+                          value={item.respondentName || ""}
+                          onChange={(e) => {
+                            const items = [...(formData.key_phrase_items || [])];
+                            items[itemIndex].respondentName = e.target.value;
+                            setFormData({ ...formData, key_phrase_items: items });
+                          }}
+                          placeholder="e.g. Waiter, Colleague, Interviewer"
+                        />
+                      </div>
+
+                      <div>
                         <Label>Prompt (situation / question) *</Label>
                         <Textarea
                           value={item.prompt}
@@ -2199,19 +2212,6 @@ function CreateDrillPageContent() {
                           placeholder="e.g. A customer asks for the bill."
                           rows={2}
                           required
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Prompt Translation (Optional)</Label>
-                        <Input
-                          value={item.promptTranslation || ""}
-                          onChange={(e) => {
-                            const items = [...(formData.key_phrase_items || [])];
-                            items[itemIndex].promptTranslation = e.target.value;
-                            setFormData({ ...formData, key_phrase_items: items });
-                          }}
-                          placeholder="Translation of the prompt"
                         />
                       </div>
 

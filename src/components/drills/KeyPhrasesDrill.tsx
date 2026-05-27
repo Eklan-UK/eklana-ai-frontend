@@ -41,6 +41,9 @@ interface ItemResult {
 const MAX_RECORDING_SECONDS = 120;
 const PASS_THRESHOLD = 65;
 
+/** Compact, borderless cards for key phrases practice UI */
+const KP_GHOST_CARD = "w-full bg-transparent border-0 shadow-none";
+
 export default function KeyPhrasesDrill({
   drill,
   assignmentId,
@@ -484,12 +487,11 @@ export default function KeyPhrasesDrill({
           itemId={`${drill._id}-kp-${currentIndex}`}
           itemType="sentence"
           content={currentItem.prompt}
-          translation={currentItem.promptTranslation}
           sourceDrillId={drill._id}
         />
       }
     >
-      <div className="space-y-6 pb-10">
+      <div className="w-full space-y-6 pb-10">
         <DrillProgress
           current={currentIndex + 1}
           total={items.length}
@@ -497,145 +499,211 @@ export default function KeyPhrasesDrill({
           embedded
         />
 
-        <Card className="p-6 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-lg font-semibold text-foreground leading-snug flex-1">
+        <Card padding="none" className={`${KP_GHOST_CARD} space-y-2`}>
+          <p className="text-sm font-semibold text-foreground">
+            {currentItem.respondentName?.trim()
+              ? `${currentItem.respondentName.trim()} says`
+              : "Speaker says"}
+          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="min-w-0 flex-1 text-lg font-semibold text-foreground leading-snug break-words pr-1">
               {currentItem.prompt}
             </p>
             <TTSButton
               text={currentItem.prompt}
               audioUrl={currentItem.promptAudioUrl}
+              className="shrink-0"
             />
           </div>
-          {currentItem.promptTranslation && (
-            <p className="text-sm text-muted-foreground">
-              {currentItem.promptTranslation}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Tap the correct response, then record yourself saying it aloud.
-          </p>
         </Card>
 
-        <div className="space-y-3">
-          {currentItem.options.map((option: string, idx: number) => {
-            const isSelected = selectedOption === option;
-            const isCorrectOption = option === currentItem.correctAnswer;
-            const hasResult = !!pronunciationScore;
+        <div className="w-full space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">Your response</h3>
+          <div className="flex flex-col gap-2.5">
+            {currentItem.options.map((option: string, idx: number) => {
+              const isSelected = selectedOption === option;
+              const isCorrectOption = option === currentItem.correctAnswer;
+              const hasResult = !!pronunciationScore;
 
-            let cardStyle =
-              "border-2 transition-colors cursor-pointer rounded-2xl p-4 text-sm font-medium";
-            if (hasResult) {
-              cardStyle += isCorrectOption
-                ? " border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                : isSelected
-                  ? " border-red-400 bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200"
-                  : " border-border bg-muted/50 text-muted-foreground";
-            } else if (isSelected) {
-              cardStyle += " border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-200";
-            } else {
-              cardStyle +=
-                " border-border bg-card text-foreground hover:border-sky-300 hover:bg-sky-50/50 dark:hover:bg-sky-950/20";
-            }
+              let cardStyle =
+                "box-border w-full min-h-[3.75rem] rounded-2xl border-2 px-4 py-3.5 text-sm font-medium flex items-center gap-3 text-left transition-colors ";
+              if (hasResult) {
+                cardStyle += isCorrectOption
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                  : isSelected
+                    ? "border-red-400 bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200"
+                    : "border-border/80 bg-muted/50 text-muted-foreground";
+              } else if (isSelected) {
+                cardStyle += "border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-200";
+              } else {
+                cardStyle +=
+                  "border-border bg-card text-foreground hover:border-sky-300 hover:bg-sky-50/50 dark:hover:bg-sky-950/20";
+              }
 
-            return (
-              <button
-                key={idx}
-                type="button"
-                className={cardStyle + " w-full text-left flex items-center gap-3"}
-                disabled={!!pronunciationScore}
-                onClick={() => {
-                  if (!pronunciationScore) {
-                    setSelectedOption(option);
-                    setPronunciationScore(null);
-                    discardPendingRecording();
-                  }
-                }}
-              >
-                {hasResult && isCorrectOption && (
-                  <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                )}
-                {hasResult && isSelected && !isCorrectOption && (
-                  <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                )}
-                {(!hasResult || (!isSelected && !isCorrectOption)) && (
-                  <span className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center text-xs flex-shrink-0">
-                    {String.fromCharCode(65 + idx)}
+              const showCheck = hasResult && isCorrectOption;
+              const showX = hasResult && isSelected && !isCorrectOption;
+              const showLetter = !showCheck && !showX;
+
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  className={cardStyle + (hasResult ? "" : " cursor-pointer")}
+                  disabled={!!pronunciationScore}
+                  onClick={() => {
+                    if (!pronunciationScore) {
+                      setSelectedOption(option);
+                      setPronunciationScore(null);
+                      discardPendingRecording();
+                    }
+                  }}
+                >
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center"
+                    aria-hidden={!showLetter}
+                  >
+                    {showCheck && <CheckCircle className="h-5 w-5 text-emerald-500" />}
+                    {showX && <XCircle className="h-5 w-5 text-red-500" />}
+                    {showLetter && (
+                      <span className="box-border flex h-8 w-8 items-center justify-center rounded-full border-2 border-current text-xs font-semibold leading-none">
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                    )}
                   </span>
-                )}
-                {option}
-              </button>
-            );
-          })}
+                  <span className="min-w-0 flex-1 py-0.5 leading-snug break-words">
+                    {option}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {selectedOption && !pronunciationScore && (
-          <Card className="p-5 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Now read your chosen response aloud:{" "}
-              <span className="font-semibold text-foreground">"{selectedOption}"</span>
-            </p>
+        {/* Fixed-height action area so selection / scoring does not shift layout */}
+        <div className="w-full min-h-[160px] flex flex-col">
+          {selectedOption && !pronunciationScore && (
+            <Card padding="none" className={`${KP_GHOST_CARD} min-h-[160px] space-y-2`}>
+              <p className="text-sm text-muted-foreground">
+                Read your chosen response aloud:{" "}
+                <span className="font-semibold text-foreground">"{selectedOption}"</span>
+              </p>
 
-            {awaitingSubmit && recordingPreviewUrl ? (
-              <div className="space-y-3">
-                <RecordingPreviewBar
-                  key={recordingPreviewUrl}
-                  src={recordingPreviewUrl}
-                  onDiscard={discardPendingRecording}
-                />
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={() => void submitPendingForAnalysis()}
-                  disabled={isAnalyzing}
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Submit for feedback
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                {isRecording ? (
-                  <Button
-                    variant="outline"
-                    onClick={stopRecording}
-                    className="flex items-center gap-2 text-red-600 border-red-200"
-                  >
-                    <Square className="w-4 h-4" />
-                    Stop ({MAX_RECORDING_SECONDS - recordingSeconds}s)
-                  </Button>
+              <div>
+                {awaitingSubmit && recordingPreviewUrl ? (
+                  <div className="space-y-3">
+                    <RecordingPreviewBar
+                      key={recordingPreviewUrl}
+                      src={recordingPreviewUrl}
+                      onDiscard={discardPendingRecording}
+                    />
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      onClick={() => void submitPendingForAnalysis()}
+                      disabled={isAnalyzing}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Analyzing…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Submit for feedback
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 ) : (
-                  <Button
-                    onClick={() => void startRecording()}
-                    disabled={isAnalyzing}
-                    className="flex items-center gap-2"
-                  >
-                    {isAnalyzing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                  <div className="flex items-center gap-3 min-h-12">
+                    {isRecording ? (
+                      <Button
+                        variant="outline"
+                        onClick={stopRecording}
+                        className="flex items-center gap-2 text-red-600 border-red-200"
+                      >
+                        <Square className="w-4 h-4" />
+                        Stop ({MAX_RECORDING_SECONDS - recordingSeconds}s)
+                      </Button>
                     ) : (
-                      <Mic className="w-4 h-4" />
+                      <Button
+                        onClick={() => void startRecording()}
+                        disabled={isAnalyzing}
+                        className="flex items-center gap-2"
+                      >
+                        {isAnalyzing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                        {isAnalyzing ? "Analyzing…" : "Record"}
+                      </Button>
                     )}
-                    {isAnalyzing ? "Analyzing…" : "Record"}
-                  </Button>
-                )}
-                {isRecording && (
-                  <span className="text-sm text-red-500 font-medium animate-pulse">
-                    Recording… {recordingSeconds}s
-                  </span>
+                    {isRecording && (
+                      <span className="text-sm text-red-500 font-medium animate-pulse">
+                        Recording… {recordingSeconds}s
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </Card>
-        )}
+            </Card>
+          )}
+
+          {!selectedOption && !pronunciationScore && (
+            <Card
+              padding="none"
+              className={`${KP_GHOST_CARD} flex min-h-[160px] items-center justify-center`}
+            >
+              <p className="text-sm text-muted-foreground text-center">
+                Select a response above to record yourself.
+              </p>
+            </Card>
+          )}
+
+          {pronunciationScore && (
+            <Card padding="none" className={`${KP_GHOST_CARD} min-h-[160px] space-y-3`}>
+              <div className="flex items-start gap-3">
+                {passed ? (
+                  <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <p
+                    className={`font-semibold ${passed ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}
+                  >
+                    {currentResult?.isCorrect
+                      ? passed
+                        ? "Passed!"
+                        : `Pronunciation: ${pronunciationScore.speechace_score.pronunciation.toFixed(0)}% — try again`
+                      : `Wrong choice — correct: "${currentItem.correctAnswer}"`}
+                  </p>
+                  {currentResult?.isCorrect && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Pronunciation score:{" "}
+                      {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                {!passed && (
+                  <Button variant="outline" onClick={handleTryAgain} className="flex-1">
+                    Try Again
+                  </Button>
+                )}
+                {passed && (
+                  <Button variant="primary" onClick={handleNext} className="flex-1">
+                    {currentIndex < items.length - 1 ? "Next Question" : "Review"}
+                  </Button>
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
 
         {inDrillReviewRow && (
           <div className="space-y-2">
@@ -647,48 +715,6 @@ export default function KeyPhrasesDrill({
               lineLabel="Response"
             />
           </div>
-        )}
-
-        {pronunciationScore && (
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center gap-3">
-              {passed ? (
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
-              ) : (
-                <XCircle className="w-5 h-5 text-red-500" />
-              )}
-              <div>
-                <p
-                  className={`font-semibold ${passed ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}
-                >
-                  {currentResult?.isCorrect
-                    ? passed
-                      ? "Passed!"
-                      : `Pronunciation: ${pronunciationScore.speechace_score.pronunciation.toFixed(0)}% — try again`
-                    : `Wrong choice — correct: "${currentItem.correctAnswer}"`}
-                </p>
-                {currentResult?.isCorrect && (
-                  <p className="text-sm text-muted-foreground">
-                    Pronunciation score:{" "}
-                    {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-1">
-              {!passed && (
-                <Button variant="outline" onClick={handleTryAgain} className="flex-1">
-                  Try Again
-                </Button>
-              )}
-              {passed && (
-                <Button variant="primary" onClick={handleNext} className="flex-1">
-                  {currentIndex < items.length - 1 ? "Next Question" : "Review"}
-                </Button>
-              )}
-            </div>
-          </Card>
         )}
       </div>
     </DrillLayout>
