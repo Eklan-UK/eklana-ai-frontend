@@ -52,6 +52,28 @@ export const parseWhitelistOrigins = (): string[] => {
 	return origins;
 };
 
+/**
+ * OAuth client IDs accepted as Google ID token `aud` (web Better Auth + mobile/Expo).
+ * Set GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID plus optional
+ * GOOGLE_MOBILE_CLIENT_ID / GOOGLE_EXPO_CLIENT_ID.
+ */
+export const parseGoogleClientIds = (): string[] => {
+	const fromList = process.env.GOOGLE_CLIENT_IDS?.split(',')
+		.map((id) => id.trim())
+		.filter(Boolean);
+	if (fromList?.length) {
+		return [...new Set(fromList)];
+	}
+	const ids = [
+		process.env.GOOGLE_CLIENT_ID,
+		process.env.GOOGLE_MOBILE_CLIENT_ID,
+		process.env.GOOGLE_EXPO_CLIENT_ID,
+	]
+		.map((id) => id?.trim())
+		.filter((id): id is string => Boolean(id));
+	return [...new Set(ids)];
+};
+
 export const config = {
 	NODE_ENV: process.env.NODE_ENV || 'development',
 	WHITELIST_ORIGINS: parseWhitelistOrigins(),
@@ -77,6 +99,8 @@ export const config = {
 	BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || process.env.JWT_ACCESS_SECRET,
 	// OAuth: Better Auth sign-in (Google login only — no Calendar scopes)
 	GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+	/** All client IDs valid for POST /api/v1/auth/verify-id-token (web + mobile). */
+	GOOGLE_CLIENT_IDS: parseGoogleClientIds(),
 	GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
 	// OAuth: Tutor Google Calendar connect (separate Google Cloud OAuth client)
 	GOOGLE_CALENDAR_CLIENT_ID: process.env.GOOGLE_CALENDAR_CLIENT_ID,
