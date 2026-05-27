@@ -3,13 +3,20 @@
 import { ReactNode } from "react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
+import {
+  drillContentWidthClasses,
+  type DrillContentWidth,
+} from "@/components/drills/shared/drill-content-width";
+
+export type { DrillContentWidth } from "@/components/drills/shared/drill-content-width";
+export { drillContentWidthClasses } from "@/components/drills/shared/drill-content-width";
 
 interface DrillLayoutProps {
   title: string;
   children: ReactNode;
   className?: string;
   backgroundGradient?: string;
-  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
+  maxWidth?: DrillContentWidth;
   /** Hide the bottom navigation bar during active practice */
   hideNavigation?: boolean;
   /** Show a minimal header without back button */
@@ -21,16 +28,6 @@ interface DrillLayoutProps {
   /** Optional control on the right side of the header (e.g. bookmark). */
   headerRight?: ReactNode;
 }
-
-const maxWidthClasses = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-xl",
-  "2xl": "max-w-2xl",
-  "3xl": "max-w-3xl",
-  "4xl": "max-w-4xl",
-};
 
 /**
  * Shared layout wrapper for all drill components
@@ -62,8 +59,11 @@ export function DrillLayout({
         showBack={showBack}
         progress={progress}
         rightAction={headerRight}
+        contentWidth={maxWidth}
       />
-      <div className={`max-w-md md:max-w-2xl mx-auto flex flex-1 flex-col px-4 md:px-8 py-6 ${className}`}>
+      <div
+        className={`${drillContentWidthClasses[maxWidth]} flex flex-1 flex-col px-4 md:px-8 py-6 ${className}`}
+      >
         {children}
       </div>
       {!hideNavigation && <BottomNav />}

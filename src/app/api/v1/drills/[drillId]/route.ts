@@ -29,6 +29,7 @@ const updateDrillSchema = z.object({
 		"sentence",
 		"listening",
 		"fill_blank",
+		"key_phrases",
 	]).optional(),
 	difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
 	date: z.string().datetime().optional(),
@@ -111,6 +112,13 @@ const updateDrillSchema = z.object({
 		})).min(1),
 		translation: z.string().optional(),
 		audioUrl: z.string().optional(),
+	})).optional(),
+	key_phrase_items: z.array(z.object({
+		prompt: z.string().min(1),
+		respondentName: z.string().optional(),
+		options: z.array(z.string().min(1)).min(2),
+		correctAnswer: z.string().min(1),
+		promptAudioUrl: z.string().optional(),
 	})).optional(),
 });
 
@@ -196,6 +204,7 @@ async function putHandler(
 	if (validated.article_content !== undefined) updateData.article_content = validated.article_content;
 	if (validated.article_audio_url !== undefined) updateData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) updateData.fill_blank_items = validated.fill_blank_items;
+	if (validated.key_phrase_items !== undefined) updateData.key_phrase_items = validated.key_phrase_items;
 
 	const existing = await drillRepo.findById(drillId);
 	if (!existing) {

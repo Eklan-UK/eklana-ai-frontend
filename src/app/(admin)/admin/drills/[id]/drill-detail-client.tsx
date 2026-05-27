@@ -443,6 +443,54 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             </Card>
           )}
 
+        {drill.type === "key_phrases" &&
+          drill.key_phrase_items &&
+          drill.key_phrase_items.length > 0 && (
+            <Card className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Key Phrase Questions ({drill.key_phrase_items.length})
+              </h2>
+              <div className="space-y-4">
+                {drill.key_phrase_items.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                        Question {idx + 1}
+                      </p>
+                      {item.respondentName?.trim() && (
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                          Respondent: {item.respondentName.trim()}
+                        </p>
+                      )}
+                      <p className="font-semibold text-gray-900">{item.prompt}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-2">Options</p>
+                      <ul className="space-y-1">
+                        {(item.options || []).map((opt: string, optIdx: number) => (
+                          <li
+                            key={optIdx}
+                            className={`text-sm px-3 py-1.5 rounded-lg ${
+                              opt === item.correctAnswer
+                                ? "bg-emerald-100 text-emerald-800 font-medium"
+                                : "bg-white text-gray-700 border border-gray-100"
+                            }`}
+                          >
+                            {opt}
+                            {opt === item.correctAnswer ? " ✓" : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
         {drill.type === "summary" && (
           <Card className="mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Article</h2>

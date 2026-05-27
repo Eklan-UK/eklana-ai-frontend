@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/Button";
 import type { TextScore } from "@/services/speechace.service";
 import { PronunciationWordBreakdown } from "./PronunciationWordBreakdown";
 import { transcriptFromTextScore } from "./speechaceTranscript";
+import {
+  drillContentWidthClasses,
+  type DrillContentWidth,
+} from "@/components/drills/shared/drill-content-width";
 
 /** Row for review accordions (roleplay: scene/turn; vocab/pron: item index / line index). */
 export interface PerformanceReviewAnalyticsRow {
@@ -35,6 +39,8 @@ export interface DrillPerformanceReviewProps {
   onDone: () => void;
   onPracticeAgain: () => void;
   isSubmitting: boolean;
+  /** Match DrillLayout maxWidth so review uses full drill column. */
+  contentWidth?: DrillContentWidth;
 }
 
 const DONUT_SIZE = 176;
@@ -207,7 +213,9 @@ export function DrillPerformanceReview({
   onDone,
   onPracticeAgain,
   isSubmitting,
+  contentWidth = "md",
 }: DrillPerformanceReviewProps) {
+  const widthClass = drillContentWidthClasses[contentWidth];
   const isViewer = viewMode === "viewer";
   const [expandedListIndex, setExpandedListIndex] = useState(-1);
   const [expandedLineKey, setExpandedLineKey] = useState<string | null>(null);
@@ -226,7 +234,7 @@ export function DrillPerformanceReview({
 
   return (
     <>
-      <div className={`${isViewer ? "pb-6" : "pb-40"} max-w-md mx-auto w-full`}>
+      <div className={`${isViewer ? "pb-6" : "pb-40"} ${widthClass}`}>
         {hasData ? (
           <OverallScoreDonut score={avgScore} statsLine={statsLine} />
         ) : (
@@ -303,7 +311,7 @@ export function DrillPerformanceReview({
 
       {isViewer ? (
         <div className="border-t border-border bg-card px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="max-w-md mx-auto w-full">
+          <div className={widthClass}>
             <Button
               variant="primary"
               size="lg"
@@ -318,7 +326,7 @@ export function DrillPerformanceReview({
         </div>
       ) : (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-          <div className="max-w-md mx-auto w-full px-4 space-y-2.5">
+          <div className={`${widthClass} px-4 md:px-8 space-y-2.5`}>
             <Button
               variant="primary"
               size="lg"

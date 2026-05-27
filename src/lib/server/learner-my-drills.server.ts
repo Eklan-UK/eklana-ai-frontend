@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
 import type { DrillAssignment as AssignmentRow } from '@/domain/assignments/assignment.types';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
+import Drill from '@/models/drill';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
@@ -44,6 +45,35 @@ export type LearnerMyDrillRow = LearnerMyDrillsPayload['drills'][number];
 
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 
+const LEARNER_DRILL_SELECT =
+  'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names';
+
+function isPopulatedDrillDoc(
+  value: unknown,
+): value is Record<string, unknown> & { _id?: Types.ObjectId; title?: string; type?: string } {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    'title' in value &&
+    typeof (value as { title?: unknown }).title === 'string' &&
+    (value as { title: string }).title.length > 0
+  );
+}
+
+function drillRefId(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') return Types.ObjectId.isValid(value) ? value : null;
+  if (typeof value === 'object' && '_id' in value) {
+    const id = (value as { _id?: unknown })._id;
+    if (id != null) return String(id);
+  }
+  if (typeof (value as { toString?: () => string }).toString === 'function') {
+    const id = String(value);
+    return Types.ObjectId.isValid(id) ? id : null;
+  }
+  return null;
+}
+
 export type LearnerFreeTalkPlanRow = LearnerMyDrillRow & {
 	itemType: typeof FREE_TALK_PLAN_ITEM_TYPE;
 };
@@ -77,11 +107,47 @@ export async function getLearnerMyDrillsPayload(
 
   // Repository types drillId as ObjectId; lean+populate returns a drill subdocument at runtime.
   const populated = result.assignments as unknown as PopulatedLearnerAssignment[];
+
+  const missingDrillIds = [
+    ...new Set(
+      populated
+        .map((assignment) => {
+          if (isPopulatedDrillDoc(assignment.drillId)) return null;
+          return drillRefId(assignment.drillId);
+        })
+        .filter((id): id is string => id != null),
+    ),
+  ];
+
+  const drillById = new Map<string, Record<string, unknown>>();
+  if (missingDrillIds.length > 0) {
+    const docs = await Drill.find({
+      _id: { $in: missingDrillIds.map((id) => new Types.ObjectId(id)) },
+    })
+      .select(LEARNER_DRILL_SELECT)
+      .lean()
+      .exec();
+    for (const doc of docs) {
+      drillById.set(String(doc._id), doc as Record<string, unknown>);
+    }
+  }
+
+  const resolveDrillDoc = (assignment: PopulatedLearnerAssignment) => {
+    if (isPopulatedDrillDoc(assignment.drillId)) {
+      return assignment.drillId;
+    }
+    const id = drillRefId(assignment.drillId);
+    if (id && drillById.has(id)) {
+      return drillById.get(id)!;
+    }
+    return assignment.drillId;
+  };
+
   const drills = populated.map((assignment) => {
     const attemptData = attemptMap.get(assignment._id.toString());
     return {
       assignmentId: assignment._id,
-      drill: assignment.drillId,
+      drill: resolveDrillDoc(assignment),
       assignedBy: assignment.assignedBy,
       assignedAt: assignment.assignedAt,
       dueDate: assignment.dueDate,

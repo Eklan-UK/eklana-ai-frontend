@@ -2,26 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight, Clock3 } from "lucide-react";
-import { getDrillIcon, getDrillTypeInfo, getDrillStatus, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
-
-const TYPE_LABEL: Record<string, string> = {
-  vocabulary: "Vocabulary",
-  roleplay: "Speaking",
-  matching: "Matching",
-  definition: "Vocabulary",
-  summary: "Summarising",
-  grammar: "Grammar",
-  sentence_writing: "Writing",
-  pronunciation: "Pronunciation",
-  listening: "Listening",
-};
-
-function humanizeDrillType(type: string): string {
-  return (
-    TYPE_LABEL[type] ||
-    type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-  );
-}
+import { getDrillIcon, getDrillTypeInfo, getDrillStatus, getDrillTypeLabel, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const CATEGORY_TEXT: Record<string, string> = {
   green: "text-violet-600",
@@ -31,6 +12,9 @@ const CATEGORY_TEXT: Record<string, string> = {
   indigo: "text-amber-600",
   pink: "text-pink-600",
   teal: "text-teal-700",
+  violet: "text-violet-600",
+  amber: "text-amber-700",
+  emerald: "text-emerald-700",
   gray: "text-muted-foreground",
 };
 
@@ -42,6 +26,9 @@ const THUMB_GRADIENT: Record<string, string> = {
   indigo: "from-amber-200 to-yellow-200",
   pink: "from-pink-200 to-rose-300",
   teal: "from-cyan-200 to-teal-300",
+  violet: "from-violet-200 to-purple-300",
+  amber: "from-amber-200 to-yellow-200",
+  emerald: "from-emerald-200 to-green-300",
   gray: "from-muted to-muted dark:from-slate-600 dark:to-slate-700",
 };
 
@@ -106,7 +93,7 @@ export function PlanDrillRow({
           {drill.title}
         </h3>
         <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
-          • {humanizeDrillType(drill.type)}
+          • {getDrillTypeLabel(drill.type)}
         </p>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <Clock3 className="w-3.5 h-3.5 shrink-0" />

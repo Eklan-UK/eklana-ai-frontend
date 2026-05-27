@@ -12,6 +12,7 @@ const DRILL_TYPE_LABELS: Record<string, string> = {
   definition: "Definition",
   sentence_writing: "Sentence Building",
   fill_blank: "Fill-in-the-Blank",
+  key_phrases: "Key Phrases",
   summary: "Reading",
   listening: "Listening",
   sentence: "Sentence",

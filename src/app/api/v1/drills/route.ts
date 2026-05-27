@@ -100,9 +100,25 @@ const fillBlankItemSchema = z.object({
 	audioUrl: z.string().optional(),
 });
 
+const keyPhraseItemSchema = z.object({
+	prompt: z.string().min(1),
+	respondentName: z.string().optional(),
+	options: z.array(z.string().min(1)).min(2),
+	correctAnswer: z.string().min(1),
+	promptAudioUrl: z.string().optional(),
+}).superRefine((data, ctx) => {
+	if (!data.options.includes(data.correctAnswer)) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "correctAnswer must be one of the options",
+			path: ["correctAnswer"],
+		});
+	}
+});
+
 const createDrillSchema = z.object({
 	title: z.string().min(1).max(200),
-	type: z.enum(['vocabulary', 'pronunciation', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank']),
+	type: z.enum(['vocabulary', 'pronunciation', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank', 'key_phrases']),
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
 	duration_days: z.number().int().min(1).optional(),
@@ -132,6 +148,7 @@ const createDrillSchema = z.object({
 	article_content: z.string().optional(),
 	article_audio_url: z.string().optional(),
 	fill_blank_items: z.array(fillBlankItemSchema).optional(),
+	key_phrase_items: z.array(keyPhraseItemSchema).optional(),
 	is_active: z.boolean().optional(),
 }).superRefine((data, ctx) => {
 	if (data.type === 'vocabulary') {
@@ -251,6 +268,7 @@ async function postHandler(
 	if (validated.article_content !== undefined) drillData.article_content = validated.article_content;
 	if (validated.article_audio_url !== undefined) drillData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) drillData.fill_blank_items = validated.fill_blank_items;
+	if (validated.key_phrase_items !== undefined) drillData.key_phrase_items = validated.key_phrase_items;
 
 	// Create drill
 	const result = await drillService.createDrill({

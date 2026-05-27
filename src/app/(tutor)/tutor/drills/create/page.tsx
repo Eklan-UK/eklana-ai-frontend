@@ -110,6 +110,12 @@ interface DrillFormData {
     }>;
     translation?: string;
   }>;
+  key_phrase_items?: Array<{
+    prompt: string;
+    respondentName?: string;
+    options: string[];
+    correctAnswer: string;
+  }>;
 }
 
 function CreateDrillPageContent() {
@@ -201,6 +207,9 @@ function CreateDrillPageContent() {
           translation: "",
         },
       ],
+      key_phrase_items: [
+        { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
+      ],
     };
   });
 
@@ -284,6 +293,9 @@ function CreateDrillPageContent() {
             ],
             translation: "",
           },
+        ],
+        key_phrase_items: drill.key_phrase_items || [
+          { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
         ],
       });
     }
@@ -549,6 +561,24 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
         delete submitData.sentence_drill_word;
+        delete submitData.key_phrase_items;
+      } else if (formData.type === "key_phrases") {
+        delete submitData.target_sentences;
+        delete submitData.pronunciation_items;
+        delete submitData.roleplay_dialogue;
+        delete submitData.roleplay_scenes;
+        delete submitData.student_character_name;
+        delete submitData.ai_character_names;
+        delete submitData.matching_pairs;
+        delete submitData.definition_items;
+        delete submitData.grammar_items;
+        delete submitData.sentence_writing_items;
+        delete submitData.article_content;
+        delete submitData.article_title;
+        delete submitData.listening_drill_title;
+        delete submitData.listening_drill_content;
+        delete submitData.sentence_drill_word;
+        delete submitData.fill_blank_items;
       } else if (formData.type === "pronunciation") {
         delete submitData.target_sentences;
         delete submitData.roleplay_dialogue;
@@ -581,6 +611,7 @@ function CreateDrillPageContent() {
         delete submitData.listening_drill_title;
         delete submitData.listening_drill_content;
         delete submitData.fill_blank_items;
+        delete submitData.key_phrase_items;
       }
 
       // Pre-generate drill audio URLs for all supported drill types before save.
@@ -639,6 +670,7 @@ function CreateDrillPageContent() {
   const isMatching = formData.type === "matching";
   const isDefinition = formData.type === "definition";
   const isFillBlank = formData.type === "fill_blank";
+  const isKeyPhrases = formData.type === "key_phrases";
   const isSummary = formData.type === "summary";
   const isGrammar = formData.type === "grammar";
   const isSentenceWriting = formData.type === "sentence_writing";
@@ -844,6 +876,7 @@ function CreateDrillPageContent() {
                     <option value="sentence">Sentence (Review)</option>
                     <option value="listening">Listening</option>
                     <option value="fill_blank">Fill in the Blank</option>
+                    <option value="key_phrases">Key Phrases</option>
                   </Select>
                 </div>
 
@@ -2103,6 +2136,163 @@ function CreateDrillPageContent() {
                     summarize.
                   </p>
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {isKeyPhrases && (
+            <Card className="p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Key Phrase Questions *</h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      key_phrase_items: [
+                        ...(formData.key_phrase_items || []),
+                        { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
+                      ],
+                    })
+                  }
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Question
+                </Button>
+              </div>
+              <div className="space-y-6">
+                {(formData.key_phrase_items || []).map((item, itemIndex) => (
+                  <Card key={itemIndex} className="border-emerald-100">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-semibold text-gray-900">Question {itemIndex + 1}</h4>
+                        {(formData.key_phrase_items || []).length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                key_phrase_items: (formData.key_phrase_items || []).filter(
+                                  (_, i) => i !== itemIndex
+                                ),
+                              })
+                            }
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label>Respondent name (optional)</Label>
+                        <Input
+                          value={item.respondentName || ""}
+                          onChange={(e) => {
+                            const items = [...(formData.key_phrase_items || [])];
+                            items[itemIndex].respondentName = e.target.value;
+                            setFormData({ ...formData, key_phrase_items: items });
+                          }}
+                          placeholder="e.g. Waiter, Colleague, Interviewer"
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Prompt (situation / question) *</Label>
+                        <Textarea
+                          value={item.prompt}
+                          onChange={(e) => {
+                            const items = [...(formData.key_phrase_items || [])];
+                            items[itemIndex].prompt = e.target.value;
+                            setFormData({ ...formData, key_phrase_items: items });
+                          }}
+                          placeholder="e.g. A customer asks for the bill."
+                          rows={2}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Options * (min 2)</Label>
+                        <div className="space-y-2 mt-1">
+                          {item.options.map((opt, optIndex) => (
+                            <div key={optIndex} className="flex gap-2">
+                              <Input
+                                value={opt}
+                                onChange={(e) => {
+                                  const items = [...(formData.key_phrase_items || [])];
+                                  const wasCorrect =
+                                    items[itemIndex].correctAnswer === items[itemIndex].options[optIndex];
+                                  items[itemIndex].options[optIndex] = e.target.value;
+                                  if (wasCorrect) items[itemIndex].correctAnswer = e.target.value;
+                                  setFormData({ ...formData, key_phrase_items: items });
+                                }}
+                                placeholder={`Option ${optIndex + 1}`}
+                                className="flex-1"
+                              />
+                              {item.options.length > 2 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const items = [...(formData.key_phrase_items || [])];
+                                    const removed = items[itemIndex].options[optIndex];
+                                    items[itemIndex].options = items[itemIndex].options.filter(
+                                      (_, i) => i !== optIndex
+                                    );
+                                    if (items[itemIndex].correctAnswer === removed)
+                                      items[itemIndex].correctAnswer = "";
+                                    setFormData({ ...formData, key_phrase_items: items });
+                                  }}
+                                  className="text-red-500"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const items = [...(formData.key_phrase_items || [])];
+                              items[itemIndex].options.push("");
+                              setFormData({ ...formData, key_phrase_items: items });
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Add Option
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Correct Answer *</Label>
+                        <Select
+                          value={item.correctAnswer}
+                          onChange={(e) => {
+                            const items = [...(formData.key_phrase_items || [])];
+                            items[itemIndex].correctAnswer = e.target.value;
+                            setFormData({ ...formData, key_phrase_items: items });
+                          }}
+                          required
+                        >
+                          <option value="">— select correct answer —</option>
+                          {item.options.filter((o) => o.trim()).map((opt, i) => (
+                            <option key={i} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
               </div>
             </Card>
           )}
