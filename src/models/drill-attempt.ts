@@ -174,6 +174,21 @@ export interface IDrillAttempt extends Document {
 		score?: number;
 	};
 
+	keyPhrasesResults?: {
+		items: Array<{
+			prompt: string;
+			selectedAnswer: string;
+			correctAnswer: string;
+			isCorrect: boolean;
+			pronunciationScore?: number;
+			textScore?: Record<string, unknown>;
+			attempts: number;
+		}>;
+		totalItems: number;
+		correctItems: number;
+		score: number;
+	};
+
 	/** Frozen copy of in-drill Review Performance (Speechace groups) for admin/tutor replay */
 	performanceReviewSnapshot?: Record<string, unknown>;
 
@@ -429,6 +444,22 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			],
 			totalBlanks: Number,
 			correctBlanks: Number,
+			score: Number,
+		},
+		keyPhrasesResults: {
+			items: [
+				{
+					prompt: String,
+					selectedAnswer: String,
+					correctAnswer: String,
+					isCorrect: Boolean,
+					pronunciationScore: Number,
+					textScore: Schema.Types.Mixed,
+					attempts: Number,
+				},
+			],
+			totalItems: Number,
+			correctItems: Number,
 			score: Number,
 		},
 		performanceReviewSnapshot: {

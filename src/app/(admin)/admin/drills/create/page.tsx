@@ -154,6 +154,17 @@ const DrillBuilder: React.FC = () => {
     },
   ]);
 
+  // Key Phrases
+  interface KeyPhraseItem {
+    prompt: string;
+    promptTranslation?: string;
+    options: string[];
+    correctAnswer: string;
+  }
+  const [keyPhraseItems, setKeyPhraseItems] = useState<KeyPhraseItem[]>([
+    { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" },
+  ]);
+
   // Common fields
   const [drillTitle, setDrillTitle] = useState("");
   const [drillType, setDrillType] = useState("vocabulary");
@@ -361,6 +372,17 @@ const DrillBuilder: React.FC = () => {
                 translation: "",
               },
             ]
+        );
+      } else if (drill.type === "key_phrases" && drill.key_phrase_items) {
+        setKeyPhraseItems(
+          drill.key_phrase_items.length > 0
+            ? drill.key_phrase_items.map((item: any) => ({
+              prompt: item.prompt || "",
+              promptTranslation: item.promptTranslation || "",
+              options: item.options?.length >= 2 ? item.options : ["", ""],
+              correctAnswer: item.correctAnswer || "",
+            }))
+            : [{ prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" }]
         );
       }
     }
@@ -806,6 +828,26 @@ const DrillBuilder: React.FC = () => {
           }
         }
       }
+    } else if (drillType === "key_phrases") {
+      if (keyPhraseItems.length === 0 || !keyPhraseItems.some(item => item.prompt.trim())) {
+        toast.error("Please add at least one key phrase question");
+        return;
+      }
+      for (const item of keyPhraseItems) {
+        if (!item.prompt.trim()) continue;
+        if (item.options.filter(o => o.trim()).length < 2) {
+          toast.error("Each question must have at least 2 options");
+          return;
+        }
+        if (!item.correctAnswer.trim()) {
+          toast.error("Please select a correct answer for each question");
+          return;
+        }
+        if (!item.options.includes(item.correctAnswer)) {
+          toast.error("Correct answer must be one of the options");
+          return;
+        }
+      }
     }
 
     if (selectedUsers.size === 0) {
@@ -914,6 +956,15 @@ const DrillBuilder: React.FC = () => {
                 hint: blank.hint?.trim() || undefined,
               })),
             translation: item.translation?.trim() || undefined,
+          }));
+      } else if (drillType === "key_phrases") {
+        drillData.key_phrase_items = keyPhraseItems
+          .filter((item) => item.prompt.trim())
+          .map((item) => ({
+            prompt: item.prompt.trim(),
+            promptTranslation: item.promptTranslation?.trim() || undefined,
+            options: item.options.filter((o) => o.trim()),
+            correctAnswer: item.correctAnswer.trim(),
           }));
       }
 
@@ -2067,6 +2118,135 @@ const DrillBuilder: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Key Phrases Builder */}
+          {drillType === "key_phrases" && (
+            <div className="space-y-4">
+              {keyPhraseItems.map((item, itemIndex) => (
+                <div key={itemIndex} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-gray-700">Question {itemIndex + 1}</h3>
+                    {keyPhraseItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setKeyPhraseItems(keyPhraseItems.filter((_, i) => i !== itemIndex))}
+                        className="text-red-400 hover:text-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt (situation / question)<span className="text-red-500">*</span></label>
+                    <textarea
+                      rows={2}
+                      value={item.prompt}
+                      onChange={(e) => {
+                        const updated = [...keyPhraseItems];
+                        updated[itemIndex].prompt = e.target.value;
+                        setKeyPhraseItems(updated);
+                      }}
+                      placeholder="e.g. A customer asks for the bill."
+                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt Translation (Optional)</label>
+                    <input
+                      type="text"
+                      value={item.promptTranslation || ""}
+                      onChange={(e) => {
+                        const updated = [...keyPhraseItems];
+                        updated[itemIndex].promptTranslation = e.target.value;
+                        setKeyPhraseItems(updated);
+                      }}
+                      placeholder="Translation of the prompt"
+                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Options<span className="text-red-500">*</span> (min 2)</label>
+                    <div className="space-y-2">
+                      {item.options.map((opt, optIndex) => (
+                        <div key={optIndex} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const updated = [...keyPhraseItems];
+                              const wasCorrect = updated[itemIndex].correctAnswer === updated[itemIndex].options[optIndex];
+                              updated[itemIndex].options[optIndex] = e.target.value;
+                              if (wasCorrect) updated[itemIndex].correctAnswer = e.target.value;
+                              setKeyPhraseItems(updated);
+                            }}
+                            placeholder={`Option ${optIndex + 1}`}
+                            className="flex-1 px-4 py-2.5 bg-white border border-gray-100 rounded-xl"
+                          />
+                          {item.options.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...keyPhraseItems];
+                                const removedOpt = updated[itemIndex].options[optIndex];
+                                updated[itemIndex].options = updated[itemIndex].options.filter((_, i) => i !== optIndex);
+                                if (updated[itemIndex].correctAnswer === removedOpt) updated[itemIndex].correctAnswer = "";
+                                setKeyPhraseItems(updated);
+                              }}
+                              className="text-red-400 hover:text-red-600 px-1"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...keyPhraseItems];
+                          updated[itemIndex].options.push("");
+                          setKeyPhraseItems(updated);
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Option
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Correct Answer<span className="text-red-500">*</span></label>
+                    <select
+                      value={item.correctAnswer}
+                      onChange={(e) => {
+                        const updated = [...keyPhraseItems];
+                        updated[itemIndex].correctAnswer = e.target.value;
+                        setKeyPhraseItems(updated);
+                      }}
+                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl appearance-none"
+                    >
+                      <option value="">— select correct answer —</option>
+                      {item.options.filter(o => o.trim()).map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setKeyPhraseItems([...keyPhraseItems, { prompt: "", promptTranslation: "", options: ["", ""], correctAnswer: "" }])}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white text-sm rounded-xl hover:bg-emerald-600"
+              >
+                <Plus className="w-4 h-4" />
+                Add Question
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-8">
@@ -2140,6 +2320,7 @@ const DrillBuilder: React.FC = () => {
                       <option value="summary">Summary</option>
                       <option value="listening">Listening</option>
                       <option value="fill_blank">Fill in the Blank</option>
+                      <option value="key_phrases">Key Phrases</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>

@@ -132,6 +132,7 @@ export const drillAPI = {
     }>('/drills/learner/my-drills', {
       method: 'GET',
       params,
+      cache: false,
     });
   },
 
@@ -150,6 +151,7 @@ export const drillAPI = {
     summaryResults?: any;
     listeningResults?: any;
     fillBlankResults?: any;
+    keyPhrasesResults?: any;
     sentenceResults?: any;
     deviceInfo?: string;
     platform?: 'web' | 'ios' | 'android';

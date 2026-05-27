@@ -22,6 +22,7 @@ import {
   getDrillTypeInfo,
   formatDate,
   getDrillStatus,
+  getDrillTypeLabel,
 } from "@/utils/drill";
 import { getStatusBadge } from "@/utils/drill-ui";
 import { usePrefetchDrill } from "@/hooks/useDrills";
@@ -271,8 +272,8 @@ function DrillCardComponent({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mt-1">
-            <span className="text-xs text-muted-foreground capitalize">
-              {drill.type}
+            <span className="text-xs text-muted-foreground">
+              {getDrillTypeLabel(drill.type)}
             </span>
             <span className="text-xs text-muted-foreground">•</span>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">

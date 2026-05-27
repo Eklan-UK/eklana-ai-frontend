@@ -247,6 +247,41 @@ const SentenceWritingItemSchema = new Schema(
   { _id: false }
 );
 
+const KeyPhraseItemSchema = new Schema(
+  {
+    prompt: {
+      type: String,
+      required: true,
+      description: "Stimulus text shown to the learner (situation / question)",
+    },
+    promptTranslation: {
+      type: String,
+      default: "",
+      description: "Optional translation of the prompt",
+    },
+    options: {
+      type: [String],
+      required: true,
+      validate: {
+        validator: (v: string[]) => v.length >= 2 && v.every((s) => s.trim().length > 0),
+        message: "At least 2 non-empty options are required",
+      },
+      description: "Array of response options (must include correctAnswer)",
+    },
+    correctAnswer: {
+      type: String,
+      required: true,
+      description: "The correct option text (must be one of the options)",
+    },
+    promptAudioUrl: {
+      type: String,
+      default: "",
+      description: "Pre-generated TTS audio URL for the prompt",
+    },
+  },
+  { _id: false }
+);
+
 const FillBlankItemSchema = new Schema(
   {
     sentence: {
@@ -319,7 +354,8 @@ export interface IDrill extends Document {
     | "sentence_writing"
     | "sentence"
     | "listening"
-    | "fill_blank";
+    | "fill_blank"
+    | "key_phrases";
   difficulty: "beginner" | "intermediate" | "advanced";
   date: Date;
   duration_days: number;
@@ -429,6 +465,15 @@ export interface IDrill extends Document {
     audioUrl?: string;
   }>;
 
+  // Key Phrases Drill Fields
+  key_phrase_items: Array<{
+    prompt: string;
+    promptTranslation?: string;
+    options: string[];
+    correctAnswer: string;
+    promptAudioUrl?: string;
+  }>;
+
   // Metadata
   created_by: string; // Email of the teacher/admin (kept for backward compatibility)
   createdById?: Types.ObjectId; // ObjectId reference to creator (preferred)
@@ -472,6 +517,7 @@ const drillSchema = new Schema<IDrill>(
         "sentence",
         "listening",
         "fill_blank",
+        "key_phrases",
         ],
         message: "{VALUE} is not a valid drill type",
       },
@@ -662,6 +708,13 @@ const drillSchema = new Schema<IDrill>(
       type: [FillBlankItemSchema],
       default: [],
       description: "Array of sentences with blanks for fill-in-the-blank drills",
+    },
+
+    // Key Phrases Drill Fields
+    key_phrase_items: {
+      type: [KeyPhraseItemSchema],
+      default: [],
+      description: "Array of prompt-and-options items for key phrases drills",
     },
 
     // Metadata

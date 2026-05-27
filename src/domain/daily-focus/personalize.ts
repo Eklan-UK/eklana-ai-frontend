@@ -69,6 +69,7 @@ export function drillTypeToFocusType(drillType: string): FocusType | null {
       return "pronunciation";
     case "summary":
     case "fill_blank":
+    case "key_phrases":
     default:
       return "general";
   }
