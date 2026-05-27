@@ -92,6 +92,11 @@ export function extractDrillQualityScore(attempt: any): number | null {
     return attempt.fillBlankResults.score ?? attempt.score ?? null;
   }
 
+  // ── Key phrases ───────────────────────────────────────────────
+  if (attempt.keyPhrasesResults) {
+    return attempt.keyPhrasesResults.score ?? attempt.score ?? null;
+  }
+
   // ── Sentence writing (review-based) ─────────────────────────
   if (type === 'sentence' && attempt.sentenceResults) {
     const reviews = attempt.sentenceResults.sentenceReviews ?? [];

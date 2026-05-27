@@ -305,6 +305,14 @@ export function extractTextsForDrillType(drillData: any, drillType: string): Aud
   if (drillType === "fill_blank" && drillData.fill_blank_items) {
     return extractFillBlankTexts(drillData.fill_blank_items);
   }
+  if (drillType === "key_phrases" && drillData.key_phrase_items) {
+    return (drillData.key_phrase_items as Array<{ prompt: string }>)
+      .filter((item) => item.prompt && item.prompt.trim())
+      .map((item, index) => ({
+        id: `key_phrase_${index}_prompt`,
+        text: item.prompt.trim(),
+      }));
+  }
   if (drillType === "summary" && drillData.article_content) {
     return extractContentText(drillData.article_content, "summary");
   }
@@ -424,6 +432,16 @@ export function applyAudioUrls(
       (item: any, index: number) => ({
         ...item,
         audioUrl: urlMap.get(`fill_blank_${index}_sentence`) || item.audioUrl || "",
+      })
+    );
+  }
+
+  // Apply to key phrase items
+  if (updated.key_phrase_items) {
+    updated.key_phrase_items = updated.key_phrase_items.map(
+      (item: any, index: number) => ({
+        ...item,
+        promptAudioUrl: urlMap.get(`key_phrase_${index}_prompt`) || item.promptAudioUrl || "",
       })
     );
   }

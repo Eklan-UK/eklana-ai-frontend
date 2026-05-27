@@ -4,6 +4,10 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '../ui/Button';
 import { ArrowLeftIcon } from 'lucide-react';
+import {
+  drillContentWidthClasses,
+  type DrillContentWidth,
+} from '@/components/drills/shared/drill-content-width';
 
 interface HeaderProps {
   title?: string;
@@ -16,6 +20,8 @@ interface HeaderProps {
   className?: string;
   /** When set with total &gt; 0, shows “current of total” on the title row (with rightAction) and a thin progress bar below. */
   progress?: { current: number; total: number };
+  /** Match drill body width (see DrillLayout maxWidth). */
+  contentWidth?: DrillContentWidth;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   rightAction,
   className = '',
   progress,
+  contentWidth = 'md',
 }) => {
 
   const router = useRouter()
@@ -48,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={`sticky top-0 z-40 bg-background ${className}`}>
-      <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-3">
+      <div className={`${drillContentWidthClasses[contentWidth]} px-4 md:px-8 py-3`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {showBack && (

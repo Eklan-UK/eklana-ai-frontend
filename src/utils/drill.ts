@@ -75,6 +75,30 @@ export function getDrillStatus(drill: any): DrillStatus {
   return "active";
 }
 
+/** Human-readable labels for learner-facing drill lists. */
+export const DRILL_TYPE_LABELS: Record<string, string> = {
+  vocabulary: "Vocabulary",
+  pronunciation: "Pronunciation",
+  roleplay: "Speaking",
+  matching: "Matching",
+  definition: "Vocabulary",
+  summary: "Summarising",
+  grammar: "Grammar",
+  sentence_writing: "Writing",
+  sentence: "Sentence",
+  listening: "Listening",
+  fill_blank: "Fill-in-the-Blank",
+  key_phrases: "Key Phrases",
+};
+
+export function getDrillTypeLabel(type: string | undefined | null): string {
+  if (!type) return "Practice";
+  return (
+    DRILL_TYPE_LABELS[type] ||
+    type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
 /**
  * Get drill type icon
  */
@@ -88,6 +112,8 @@ export function getDrillIcon(type: string): string {
     summary: "📝",
     grammar: "✏️",
     sentence_writing: "✍️",
+    fill_blank: "📋",
+    key_phrases: "🗝️",
   };
   return icons[type] || "📚";
 }
@@ -135,6 +161,16 @@ export function getDrillTypeInfo(type: string): {
       icon: "✍️",
       color: "teal",
       borderColor: "border-l-teal-500",
+    },
+    fill_blank: {
+      icon: "📋",
+      color: "violet",
+      borderColor: "border-l-violet-500",
+    },
+    key_phrases: {
+      icon: "🗝️",
+      color: "amber",
+      borderColor: "border-l-amber-500",
     },
   };
   return (

@@ -25,32 +25,50 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
       }
 
       // Normalize drill data structure (preserve free_talk_scenario rows from API)
-      return drillsData.map((item: any) => {
-        if (item.itemType === "free_talk_scenario") {
+      return drillsData
+        .map((item: any) => {
+          if (item.itemType === "free_talk_scenario") {
+            return item;
+          }
+          if (item.drill && typeof item.drill === "object") {
+            const drill = item.drill;
+            if (drill.title && drill.type) {
+              return {
+                ...item,
+                drill: {
+                  ...drill,
+                  _id: drill._id != null ? String(drill._id) : drill._id,
+                },
+              };
+            }
+          }
+          if (item._id && item.title && item.type) {
+            return {
+              assignmentId: item.assignmentId || item._id,
+              drill: {
+                ...item,
+                _id: String(item._id),
+              },
+              assignedBy: item.assignedBy,
+              assignedAt: item.assignedAt || item.created_date,
+              dueDate:
+                item.dueDate ||
+                new Date(
+                  new Date(item.date).getTime() +
+                    (item.duration_days || 1) * 24 * 60 * 60 * 1000
+                ).toISOString(),
+              status: item.status || "pending",
+              completedAt: item.completedAt,
+              latestAttempt: item.latestAttempt,
+            };
+          }
           return item;
-        }
-        if (item.drill && typeof item.drill === "object") {
-          return item;
-        }
-        if (item._id && item.title) {
-          return {
-            assignmentId: item.assignmentId || item._id,
-            drill: item,
-            assignedBy: item.assignedBy,
-            assignedAt: item.assignedAt || item.created_date,
-            dueDate:
-              item.dueDate ||
-              new Date(
-                new Date(item.date).getTime() +
-                  (item.duration_days || 1) * 24 * 60 * 60 * 1000
-              ).toISOString(),
-            status: item.status || "pending",
-            completedAt: item.completedAt,
-            latestAttempt: item.latestAttempt,
-          };
-        }
-        return item;
-      });
+        })
+        .filter((item: any) => {
+          if (item.itemType === "free_talk_scenario") return true;
+          const drill = item.drill;
+          return drill && typeof drill === "object" && drill.title && drill.type;
+        });
     },
     staleTime: 1000 * 60 * 2, // 2 minutes for learner drills
   });
@@ -183,32 +201,50 @@ export function usePrefetchLearnerDrills() {
         } else if (Array.isArray(response)) {
           drillsData = response;
         }
-        return drillsData.map((item: any) => {
-          if (item.itemType === "free_talk_scenario") {
+        return drillsData
+          .map((item: any) => {
+            if (item.itemType === "free_talk_scenario") {
+              return item;
+            }
+            if (item.drill && typeof item.drill === "object") {
+              const drill = item.drill;
+              if (drill.title && drill.type) {
+                return {
+                  ...item,
+                  drill: {
+                    ...drill,
+                    _id: drill._id != null ? String(drill._id) : drill._id,
+                  },
+                };
+              }
+            }
+            if (item._id && item.title && item.type) {
+              return {
+                assignmentId: item.assignmentId || item._id,
+                drill: {
+                  ...item,
+                  _id: String(item._id),
+                },
+                assignedBy: item.assignedBy,
+                assignedAt: item.assignedAt || item.created_date,
+                dueDate:
+                  item.dueDate ||
+                  new Date(
+                    new Date(item.date).getTime() +
+                      (item.duration_days || 1) * 24 * 60 * 60 * 1000
+                  ).toISOString(),
+                status: item.status || "pending",
+                completedAt: item.completedAt,
+                latestAttempt: item.latestAttempt,
+              };
+            }
             return item;
-          }
-          if (item.drill && typeof item.drill === "object") {
-            return item;
-          }
-          if (item._id && item.title) {
-            return {
-              assignmentId: item.assignmentId || item._id,
-              drill: item,
-              assignedBy: item.assignedBy,
-              assignedAt: item.assignedAt || item.created_date,
-              dueDate:
-                item.dueDate ||
-                new Date(
-                  new Date(item.date).getTime() +
-                    (item.duration_days || 1) * 24 * 60 * 60 * 1000
-                ).toISOString(),
-              status: item.status || "pending",
-              completedAt: item.completedAt,
-              latestAttempt: item.latestAttempt,
-            };
-          }
-          return item;
-        });
+          })
+          .filter((item: any) => {
+            if (item.itemType === "free_talk_scenario") return true;
+            const drill = item.drill;
+            return drill && typeof drill === "object" && drill.title && drill.type;
+          });
       },
       staleTime: 1000 * 60 * 2, // 2 minutes
     });

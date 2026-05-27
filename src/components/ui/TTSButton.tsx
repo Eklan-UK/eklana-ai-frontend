@@ -28,16 +28,38 @@ export function TTSButton({
   audioUrl,
 }: TTSButtonProps) {
   // Use TTS hook for generating audio on-the-fly
-  const { playAudio: playTTSAudio, isGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
+  const { playAudio: playTTSAudio, preloadAudio, isGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
     autoPlay: autoPlay && !audioUrl, // Only auto-play via TTS if no audioUrl
   });
   
   // State for playing pre-generated audio
   const [isPlayingUrl, setIsPlayingUrl] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const preloadedUrlRef = useRef<HTMLAudioElement | null>(null);
   
   // Combined playing state
   const isPlaying = audioUrl ? isPlayingUrl : isTTSPlaying;
+
+  // Pre-warm TTS / pre-generated audio as soon as text or URL is known
+  useEffect(() => {
+    if (!text?.trim() && !audioUrl) return;
+
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
+      audio.setAttribute("playsinline", "true");
+      audio.load();
+      preloadedUrlRef.current = audio;
+      return () => {
+        audio.pause();
+        if (preloadedUrlRef.current === audio) {
+          preloadedUrlRef.current = null;
+        }
+      };
+    }
+
+    void preloadAudio(text, voiceId);
+  }, [text, audioUrl, voiceId, preloadAudio]);
   
   // Auto-play pre-generated audio if specified
   useEffect(() => {
@@ -65,7 +87,10 @@ export function TTSButton({
       audioRef.current.pause();
     }
     
-    const audio = new Audio(audioUrl);
+    const audio =
+      preloadedUrlRef.current?.src === audioUrl
+        ? preloadedUrlRef.current
+        : new Audio(audioUrl);
     audioRef.current = audio;
     
     audio.onplay = () => setIsPlayingUrl(true);
@@ -77,6 +102,7 @@ export function TTSButton({
       playTTSAudio(text, voiceId);
     };
     
+    audio.currentTime = 0;
     audio.play().catch((err) => {
       console.error("Error playing audio:", err);
       setIsPlayingUrl(false);

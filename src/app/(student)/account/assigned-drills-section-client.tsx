@@ -34,7 +34,7 @@ function safeDueIso(item: {
  */
 export function AssignedDrillsSectionClient() {
   const { data: drills = [], isLoading, isError } = useLearnerDrills({
-    limit: 4,
+    limit: 50,
   });
   const { data: me, isLoading: meLoading } = useUserCurrent();
   const subscribed = isUserSubscribed(me?.user);

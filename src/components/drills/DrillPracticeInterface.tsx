@@ -12,6 +12,7 @@ import GrammarDrill from "./GrammarDrill";
 import SentenceDrill from "./SentenceDrill";
 import ListeningDrill from "./ListeningDrill";
 import FillBlankDrill from "./FillBlankDrill";
+import KeyPhrasesDrill from "./KeyPhrasesDrill";
 import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
@@ -101,6 +102,8 @@ export default function DrillPracticeInterface({
         return <ListeningDrill {...commonProps} />;
       case "fill_blank":
         return <FillBlankDrill {...commonProps} />;
+      case "key_phrases":
+        return <KeyPhrasesDrill {...commonProps} />;
       default:
         return (
           <div className="min-h-screen bg-background pb-6">

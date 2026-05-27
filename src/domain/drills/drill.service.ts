@@ -474,6 +474,8 @@ export class DrillService {
       sentenceResults: params.results.sentenceResults,
       summaryResults: params.results.summaryResults,
       listeningResults: params.results.listeningResults,
+      fillBlankResults: params.results.fillBlankResults,
+      keyPhrasesResults: params.results.keyPhrasesResults,
       performanceReviewSnapshot: params.results.performanceReviewSnapshot,
       deviceInfo: params.results.deviceInfo,
       platform: params.results.platform || 'web',
