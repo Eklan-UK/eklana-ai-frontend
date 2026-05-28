@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api";
-import { formatDate, getDrillTypeInfo } from "@/utils/drill";
+import {
+  formatDate,
+  getDrillTypeInfo,
+  getDrillTypeLabel,
+  normalizeDrillType,
+} from "@/utils/drill";
 import { useQuery } from "@tanstack/react-query";
 import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
 
@@ -152,6 +157,19 @@ interface DrillAttempt {
   listeningResults?: {
     completed: boolean;
     timeSpent: number;
+  };
+  keyPhrasesResults?: {
+    items: Array<{
+      prompt: string;
+      selectedAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+      pronunciationScore?: number;
+      attempts: number;
+    }>;
+    totalItems: number;
+    correctItems: number;
+    score: number;
   };
 }
 
@@ -327,6 +345,15 @@ export default function DrillCompletedPage() {
       return { status: reviewStatus, correctCount: 0, totalCount };
     }
 
+    if (attempt.keyPhrasesResults) {
+      const { correctItems, totalItems } = attempt.keyPhrasesResults;
+      return {
+        status: "reviewed" as const,
+        correctCount: correctItems,
+        totalCount: totalItems,
+      };
+    }
+
     // For summary drills
     if (attempt.summaryResults) {
       const { reviewStatus, review } = attempt.summaryResults;
@@ -350,7 +377,12 @@ export default function DrillCompletedPage() {
   const renderResults = () => {
     if (!attempt) return null;
 
-    const drillType = assignment?.drillId?.type || "";
+    const drillType =
+      normalizeDrillType(
+        typeof assignment?.drillId === "object" && assignment?.drillId !== null
+          ? assignment.drillId.type
+          : null
+      ) ?? "";
 
     switch (drillType) {
       case "vocabulary":
@@ -968,6 +1000,64 @@ export default function DrillCompletedPage() {
         }
         break;
 
+      case "key_phrases":
+        if (attempt.keyPhrasesResults) {
+          const { items, totalItems, correctItems, score } = attempt.keyPhrasesResults;
+          return (
+            <div className="space-y-4">
+              <Card className="p-6">
+                <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                  <div>
+                    <p className="text-2xl font-bold text-[#22c55e]">{correctItems}</p>
+                    <p className="text-sm text-muted-foreground">Correct</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+                    <p className="text-sm text-muted-foreground">Questions</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-[#22c55e]">{Math.round(score)}%</p>
+                    <p className="text-sm text-muted-foreground">Score</p>
+                  </div>
+                </div>
+              </Card>
+              {items?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-foreground">Your answers</h4>
+                  {items.map((item, idx) => (
+                    <Card key={idx} className="p-4">
+                      <p className="text-sm text-muted-foreground mb-2">{item.prompt}</p>
+                      <div className="flex items-start gap-2">
+                        {item.isCorrect ? (
+                          <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground break-words">
+                            {item.selectedAnswer || "—"}
+                          </p>
+                          {!item.isCorrect && (
+                            <p className="text-sm text-green-700 mt-1 break-words">
+                              Correct: {item.correctAnswer}
+                            </p>
+                          )}
+                          {item.pronunciationScore != null && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Pronunciation: {Math.round(item.pronunciationScore)}%
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+        break;
+
       default:
         return (
           <Card className="p-6">
@@ -1018,7 +1108,11 @@ export default function DrillCompletedPage() {
     );
   }
 
-  const typeInfo = getDrillTypeInfo(assignment.drillId.type);
+  const assignmentDrillType =
+    typeof assignment.drillId === "object" && assignment.drillId !== null
+      ? normalizeDrillType(assignment.drillId.type) ?? assignment.drillId.type
+      : "";
+  const typeInfo = getDrillTypeInfo(assignmentDrillType);
 
   return (
     <div className="min-h-screen bg-background">
@@ -1040,7 +1134,7 @@ export default function DrillCompletedPage() {
                   {assignment.drillId.title}
                 </h1>
                 <p className="text-sm text-muted-foreground capitalize">
-                  {assignment.drillId.type.replace("_", " ")} •{" "}
+                  {getDrillTypeLabel(assignmentDrillType)} •{" "}
                   {assignment.drillId.difficulty}
                 </p>
               </div>

@@ -16,6 +16,7 @@ import KeyPhrasesDrill from "./KeyPhrasesDrill";
 import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
+import { normalizeDrillType } from "@/utils/drill";
 
 interface DrillPracticeInterfaceProps {
   drill: any;
@@ -79,8 +80,9 @@ export default function DrillPracticeInterface({
   // Render the appropriate drill interface based on type
   const renderDrill = () => {
     const commonProps = { drill, assignmentId: assignmentId || undefined };
+    const drillType = normalizeDrillType(drill?.type) ?? drill?.type;
 
-    switch (drill.type) {
+    switch (drillType) {
       case "vocabulary":
         return <VocabularyDrill {...commonProps} />;
       case "pronunciation":
