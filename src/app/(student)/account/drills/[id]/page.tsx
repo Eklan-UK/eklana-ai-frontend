@@ -4,7 +4,7 @@ import DrillPracticeInterface from "@/components/drills/DrillPracticeInterface";
 import { getServerPublicBaseUrl } from "@/lib/public-base-url.server";
 import { getCurrentUser } from "@/app/(student)/account/get-user";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
-import { normalizeDrillType } from "@/utils/drill";
+import { resolveDrillPracticeType } from "@/utils/drill";
 
 export const dynamic = 'force-dynamic';
 
@@ -129,10 +129,10 @@ export default async function DrillDetailPage({
     }
   }
 
-  const normalizedType = normalizeDrillType(drill.type);
+  const practiceType = resolveDrillPracticeType(drill);
   const drillForPractice =
-    normalizedType && normalizedType !== drill.type
-      ? { ...drill, type: normalizedType }
+    practiceType && practiceType !== drill.type
+      ? { ...drill, type: practiceType }
       : drill;
 
   return (
