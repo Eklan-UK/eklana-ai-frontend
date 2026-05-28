@@ -75,6 +75,55 @@ export function getDrillStatus(drill: any): DrillStatus {
   return "active";
 }
 
+/** Canonical drill type slugs used in the API and learner UI. */
+export const KNOWN_DRILL_TYPES = [
+  "vocabulary",
+  "pronunciation",
+  "roleplay",
+  "matching",
+  "definition",
+  "summary",
+  "grammar",
+  "sentence_writing",
+  "sentence",
+  "listening",
+  "fill_blank",
+  "key_phrases",
+] as const;
+
+export type DrillTypeSlug = (typeof KNOWN_DRILL_TYPES)[number];
+
+const DRILL_TYPE_ALIASES: Record<string, DrillTypeSlug> = {
+  "key-phrases": "key_phrases",
+  "key phrases": "key_phrases",
+  keyphrases: "key_phrases",
+  "fill-in-the-blank": "fill_blank",
+  "fill in the blank": "fill_blank",
+  fillblank: "fill_blank",
+  sentencewriting: "sentence_writing",
+  "sentence writing": "sentence_writing",
+};
+
+/**
+ * Normalize drill.type from API/DB (handles spacing, hyphens, casing).
+ * Returns a known slug when recognized, otherwise a snake_case fallback.
+ */
+export function normalizeDrillType(type: unknown): string | null {
+  if (type == null) return null;
+  const raw = String(type).trim().toLowerCase();
+  if (!raw) return null;
+
+  const fromAlias = DRILL_TYPE_ALIASES[raw];
+  if (fromAlias) return fromAlias;
+
+  const snake = raw.replace(/[\s-]+/g, "_");
+  if ((KNOWN_DRILL_TYPES as readonly string[]).includes(snake)) {
+    return snake;
+  }
+
+  return snake;
+}
+
 /** Human-readable labels for learner-facing drill lists. */
 export const DRILL_TYPE_LABELS: Record<string, string> = {
   vocabulary: "Vocabulary",
