@@ -124,6 +124,27 @@ export function normalizeDrillType(type: unknown): string | null {
   return snake;
 }
 
+/**
+ * Type used by DrillPracticeInterface — normalizes aliases and infers key_phrases
+ * when key_phrase_items are present (guards missing/wrong type in DB).
+ */
+export function resolveDrillPracticeType(drill: {
+  type?: unknown;
+  key_phrase_items?: unknown[] | null;
+} | null | undefined): string | null {
+  if (!drill) return null;
+
+  const normalized = normalizeDrillType(drill.type);
+  if (normalized === "key_phrases") return "key_phrases";
+
+  const items = drill.key_phrase_items;
+  if (Array.isArray(items) && items.length > 0) {
+    return "key_phrases";
+  }
+
+  return normalized ?? (drill.type != null ? String(drill.type) : null);
+}
+
 /** Human-readable labels for learner-facing drill lists. */
 export const DRILL_TYPE_LABELS: Record<string, string> = {
   vocabulary: "Vocabulary",
