@@ -13,7 +13,9 @@ The full flow is:
 2. **Drill Runner** — type-specific interactive drill
 3. **Completion** — success screen with attempt history
 
-Drills support 11 types: `vocabulary`, `pronunciation`, `roleplay`, `matching`, `definition`, `grammar`, `sentence_writing`, `sentence`, `summary`, `listening`, `fill_blank`.
+Drills support 12 types: `vocabulary`, `pronunciation`, `roleplay`, `matching`, `definition`, `grammar`, `sentence_writing`, `sentence`, `summary`, `listening`, `fill_blank`, `key_phrases`.
+
+See [KEY_PHRASES_DRILL.md](./KEY_PHRASES_DRILL.md) for the full Key Phrases runner spec.
 
 ---
 
@@ -70,6 +72,7 @@ interface CompleteDrillBody {
   summaryResults?: SummaryResult[];
   listeningResults?: ListeningResult[];
   fillBlankResults?: FillBlankResult[];
+  keyPhrasesResults?: KeyPhrasesResult;
   performanceReviewSnapshot?: PerformanceSnapshot;
 }
 ```
@@ -95,7 +98,8 @@ export type DrillType =
   | 'sentence'
   | 'summary'
   | 'listening'
-  | 'fill_blank';
+  | 'fill_blank'
+  | 'key_phrases';
 
 // Assignment status
 export type AssignmentStatus = 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
@@ -152,6 +156,7 @@ export interface DrillDetail {
   listening_drill_content?: string;
   listening_drill_audio_url?: string;
   fill_blank_items?: FillBlankItem[];
+  key_phrase_items?: KeyPhraseItem[];
 
   // Legacy
   roleplay_dialogue?: { speaker: string; text: string; translation?: string }[];
@@ -231,6 +236,29 @@ export interface FillBlankItem {
   }[];
 }
 
+export interface KeyPhraseItem {
+  prompt: string;
+  respondentName?: string;
+  options: string[];       // ≥ 2 options
+  correctAnswer: string;   // must match one of options
+  promptAudioUrl?: string;
+}
+
+export interface KeyPhrasesResult {
+  items: Array<{
+    prompt: string;
+    selectedAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+    pronunciationScore?: number;
+    textScore?: Record<string, unknown>;
+    attempts: number;
+  }>;
+  totalItems: number;
+  correctItems: number;
+  score: number;
+}
+
 // DrillAssignment
 export interface DrillAssignment {
   _id: string;
@@ -260,6 +288,7 @@ export interface DrillAttempt {
   summaryResults?: unknown[];
   listeningResults?: unknown[];
   fillBlankResults?: unknown[];
+  keyPhrasesResults?: KeyPhrasesResult;
 }
 ```
 
@@ -359,6 +388,7 @@ function renderDrillComponent(drill: DrillDetail, assignment: DrillAssignment) {
     case 'summary':        return <SummaryDrill drill={drill} assignment={assignment} />;
     case 'listening':      return <ListeningDrill drill={drill} assignment={assignment} />;
     case 'fill_blank':     return <FillBlankDrill drill={drill} assignment={assignment} />;
+    case 'key_phrases':    return <KeyPhrasesDrill drill={drill} assignment={assignment} />;
     default:               return <Text>Unsupported drill type</Text>;
   }
 }
@@ -522,6 +552,39 @@ fillBlankResults: [{
 
 **Known issue**: The backend's `completeDrill` domain service currently does not map `fillBlankResults` into the persisted attempt data, though the API schema accepts it. Track this with backend team for a fix.
 
+### Key Phrases Drill
+
+Multiple-choice situational responses plus spoken production. See **[`KEY_PHRASES_DRILL.md`](./KEY_PHRASES_DRILL.md)** for the full flow, scoring, and API payload.
+
+Summary:
+
+1. For each `key_phrase_item`: show prompt (+ `promptAudioUrl`), learner picks an option, records themselves saying the **selected option**.
+2. Score via `POST /speechace/score` with `text: selectedOption` (not the prompt).
+3. Advance only when choice is correct **and** pronunciation ≥ **65%** (`PASS_THRESHOLD`).
+4. After all questions: performance review → `POST /drills/:id/complete` with `keyPhrasesResults` and `performanceReviewSnapshot`.
+5. **Do not** call `POST /pronunciations/drill-attempt` (unlike vocabulary/pronunciation drills).
+
+```ts
+const score = await apiClient.post('/speechace/score', {
+  text: selectedOption,
+  audioBase64,
+});
+
+completeMutation.mutate({
+  drillAssignmentId: assignmentId,
+  score: avgScore,
+  timeSpent: elapsedSeconds,
+  platform: Platform.OS === 'ios' ? 'ios' : 'android',
+  keyPhrasesResults: {
+    items: resultList,
+    totalItems: items.length,
+    correctItems,
+    score: avgScore,
+  },
+  performanceReviewSnapshot: { /* see KEY_PHRASES_DRILL.md */ },
+});
+```
+
 ---
 
 ## 10. Audio Playback in Drills
@@ -568,6 +631,7 @@ components/drills/
 ├── SummaryDrill.tsx
 ├── ListeningDrill.tsx
 ├── FillBlankDrill.tsx
+├── KeyPhrasesDrill.tsx
 ├── shared/
 │   ├── DrillLayout.tsx             ← Common screen wrapper (header, progress bar, exit)
 │   ├── DrillProgress.tsx           ← Step indicator
@@ -631,9 +695,10 @@ function onDrillVisible(drillId: string) {
 
 - [ ] Drill listing loads with Ongoing / Reviewed / Completed tabs
 - [ ] Drill row navigates to runner with correct `assignmentId` in params
-- [ ] All 11 drill types render in the runner
+- [ ] All 12 drill types render in the runner (including `key_phrases`)
 - [ ] Audio plays correctly for all drill types that have audio URLs
 - [ ] Pronunciation drills record audio, score via SpeechAce, and persist attempt
+- [ ] Key phrases: multiple choice + Speechace on selected option; **no** `POST /pronunciations/drill-attempt`; complete with `keyPhrasesResults` (see [KEY_PHRASES_DRILL.md](./KEY_PHRASES_DRILL.md))
 - [ ] `POST /drills/:id/complete` sent with correct body including `platform`
 - [ ] Completion screen shows score and attempt history
 - [ ] React Query cache invalidated after completion (listing refreshes)
