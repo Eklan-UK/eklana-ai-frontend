@@ -71,7 +71,7 @@ export const getAuth = async () => {
     authInstance = betterAuth({
       database: mongodbAdapter(db as any, {
         usePlural: true,
-        client: mongoose.connection.getClient(),
+        client: mongoose.connection.getClient() as any,
       }),
       secret: config.BETTER_AUTH_SECRET || config.JWT_ACCESS_SECRET,
       baseURL,
