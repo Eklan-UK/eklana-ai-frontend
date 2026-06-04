@@ -19,20 +19,22 @@ The feature has two stages:
 
 ```
 MongoDB
-  ├── DrillAttempt      (completedAt within 7-day window)
-  └── PronunciationAttempt  (createdAt within 7-day window)
+  ├── DrillAttempt         (completedAt within 7-day window)
+  ├── PronunciationAttempt (createdAt within 7-day window)
+  └── FreeTalkAttempt      (createdAt within 7-day window)
           │
           ▼
   aggregateWeaknesses()          [weakness-aggregator.ts]
           │
-          │  groups attempts by drill type
+          │  groups DrillAttempts by drill type
           │  runs per-type signal extractors
-          │  sorts signals by severity desc
+          │  sorts all signals by severity desc
+          │  filters severity > 0 → topWeaknesses
           │
           ▼
   WeaknessProfile
-    ├── weaknesses[]       all signals, sorted by severity
-    └── topWeaknesses[]    top 3 signals
+    ├── weaknesses[]       all signals, sorted by severity (includes 0-severity)
+    └── topWeaknesses[]    top 3 signals with severity > 0
           │
           ▼
   Gemini challenge generation
@@ -50,9 +52,9 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 
 | File | Purpose |
 |------|---------|
-| `src/domain/challenges/types.ts` | TypeScript interfaces: `WeaknessSignal`, `WeaknessProfile`, `ChallengeDrillItem`, `WeeklyChallenge` |
-| `src/domain/challenges/weakness-aggregator.ts` | `aggregateWeaknesses(learnerId, weekStartDate)` — queries MongoDB, extracts per-type signals, returns `WeaknessProfile` |
-| `src/domain/challenges/challenge-generator.ts` | `generateWeeklyChallenge(profile)` — calls Gemini to generate a structured drill sequence from a `WeaknessProfile` |
+| `src/domain/challenges/types.ts` | TypeScript interfaces: `WeaknessSignal`, `WeaknessProfile`, `ChallengeDrillItem`, `WeeklyChallenge`; plus `PronunciationGeneratedContent`, `FillBlankGeneratedContent`, `KeyPhrasesGeneratedContent`, `RoleplayGeneratedContent` — `generatedContent` is a discriminated union of these four |
+| `src/domain/challenges/weakness-aggregator.ts` | `aggregateWeaknesses(learnerId, weekStartDate)` — queries `DrillAttempt`, `PronunciationAttempt`, and `FreeTalkAttempt` in parallel, extracts per-type signals, returns `WeaknessProfile` |
+| `src/domain/challenges/challenge-generator.ts` | `generateWeeklyChallenge(profile)` — calls Gemini with per-type `generatedContent` schemas and hard constraints enforced in the prompt |
 | `src/domain/challenges/test-aggregator.ts` | Dev script for running the aggregator against the live database and inspecting raw output |
 | `src/domain/challenges/test-generator.ts` | Dev script for testing end-to-end: aggregation → Gemini generation |
 
@@ -139,20 +141,24 @@ interface WeeklyChallenge {
 
 ```ts
 interface ChallengeDrillItem {
-  drillType: string;
+  drillType: 'pronunciation' | 'fill_blank' | 'key_phrases' | 'roleplay';
   targetWeakness: WeaknessSignal;
   instructions: string;
-  generatedContent: Record<string, unknown>;
+  generatedContent:
+    | PronunciationGeneratedContent
+    | FillBlankGeneratedContent
+    | KeyPhrasesGeneratedContent
+    | RoleplayGeneratedContent;
   estimatedMinutes: number;
 }
 ```
 
 | Field | Notes |
 |-------|-------|
-| `drillType` | One of the 12 drill types; chosen by Gemini to match `targetWeakness.category` |
+| `drillType` | One of the 4 supported challenge drill types; Gemini picks based on `targetWeakness.category` (see section 9) |
 | `targetWeakness` | The signal this item is designed to address |
 | `instructions` | Gemini-generated description of what the learner should focus on |
-| `generatedContent` | Gemini-generated drill content matching the schema of an existing drill type |
+| `generatedContent` | Discriminated union of 4 typed interfaces — shape depends on `drillType` (see section 9) |
 | `estimatedMinutes` | Gemini estimate of how long this item will take |
 
 ---
@@ -192,7 +198,98 @@ weekEndDate       : <ISO date>
 
 ---
 
-## 6. Known limitations
+## 6. generatedContent schemas and constraints
+
+`ChallengeDrillItem.generatedContent` is a discriminated union typed to the drill type. Gemini is instructed to use these exact shapes; the hard constraints are enforced in the prompt.
+
+### `pronunciation`
+
+```ts
+{
+  pronunciation_items: Array<{
+    word: string;
+    sentence: string;
+    sound?: string;        // IPA phoneme, e.g. "/θ/"
+    wordAudioUrl?: string;
+    sentenceAudioUrl?: string;
+  }>;
+}
+```
+
+### `fill_blank`
+
+```ts
+{
+  fill_blank_items: Array<{
+    sentence: string;      // contains ___ for each blank
+    blanks: Array<{
+      position: number;    // 0-based index
+      correctAnswer: string;
+      options: string[];
+      hint?: string;
+    }>;
+    translation?: string;
+    audioUrl?: string;
+  }>;
+}
+```
+
+### `key_phrases`
+
+```ts
+{
+  key_phrase_items: Array<{
+    prompt: string;
+    options: string[];
+    correctAnswer: string;      // must exactly match one element of options[]
+    respondentName?: string;
+    promptAudioUrl?: string;
+  }>;
+}
+```
+
+### `roleplay`
+
+```ts
+{
+  student_character_name: string;
+  ai_character_names: string[];
+  context?: string;
+  drill_intro?: string;
+  roleplay_scenes: Array<{
+    scene_name?: string;
+    context?: string;
+    dialogue: Array<{
+      speaker: string;    // "student" or "ai_0", "ai_1" — never a character name
+      text: string;
+      translation?: string;
+      audioUrl?: string;
+    }>;
+  }>;
+}
+```
+
+### Hard constraints
+
+| Drill type | Constraint |
+|------------|-----------|
+| `fill_blank` | `sentence` must contain exactly as many `___` as entries in `blanks[]` |
+| `key_phrases` | `correctAnswer` must be a string that exactly matches one element of `options[]` |
+| `roleplay` | `speaker` must be `"student"` or `"ai_<n>"` where `n` is a 0-based index into `ai_character_names[]` — never the character's name |
+| `pronunciation` | `sound` should be an IPA phoneme (e.g. `"/θ/"`) not a plain description |
+
+### Category → drill type mapping
+
+| Weakness category | Chosen drill type |
+|-------------------|------------------|
+| `pronunciation` | `pronunciation` or `key_phrases` |
+| `fluency` | `roleplay` |
+| `vocabulary` | `fill_blank` or `key_phrases` |
+| `grammar` | `fill_blank` |
+
+---
+
+## 7. Known limitations
 
 **Drill types that produce no weakness signal**
 
@@ -206,21 +303,29 @@ The backfill script loops indefinitely on orphaned `DrillAttempt` documents (tho
 
 `PronunciationAttempt` documents do not carry a `drillAttemptId` field in the database. The aggregator queries them by `learnerId` + date window only. This means pronunciation signals reflect all pronunciation activity in the window, not just activity tied to a specific drill attempt. Cross-referencing the two collections is not currently possible without a schema change.
 
+**FreeTalk signals with severity 0 are excluded from topWeaknesses**
+
+A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal with `severity: 0`. These are retained in `weaknesses[]` for auditability but filtered out of `topWeaknesses[]`, so they will not drive challenge generation.
+
+**Only 4 drill types supported for challenge generation**
+
+`generateWeeklyChallenge` only produces content for `pronunciation`, `fill_blank`, `key_phrases`, and `roleplay`. Weaknesses from other drill types (e.g. `grammar`, `vocabulary`, `matching`) will be detected and included in `WeaknessProfile` but Gemini is not yet instructed on how to generate content for them.
+
 ---
 
-## 7. What's coming next
+## 8. What's coming next
 
 Weakness aggregation and Gemini challenge generation are both complete. The remaining steps to make this feature live are:
 
 1. **Mongoose model** — a `WeeklyChallenge` collection to persist generated challenges, keyed by `(learnerId, weekStartDate)`.
-2. **API route** — a learner-facing endpoint (e.g. `GET /api/v1/learner/weekly-challenge`) that runs aggregation + generation on demand (or returns a cached document if one already exists for the current week).
+2. **API route** — a learner-facing endpoint (e.g. `GET /api/v1/learner/weekly-challenge`) with Zod validation on the request and response shape.
 3. **Frontend integration** — a UI surface on the learner dashboard or My Plan screen that displays the weekly challenge drill sequence and tracks completion.
 
 ---
 
-## 8. Sample output
+## 9. Sample output
 
-Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`.
+Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`. Note the `free_talk` signal in `weaknesses[]` with `severity: 0` — it is present but correctly excluded from `topWeaknesses`.
 
 **WeaknessProfile**
 
@@ -247,6 +352,17 @@ Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`.
         "Average fluency score: 66.7"
       ],
       "label": "Fluency"
+    },
+    {
+      "drillType": "free_talk",
+      "category": "fluency",
+      "severity": 0,
+      "evidence": [
+        "Responds naturally in conversation",
+        "Maintains conversational flow",
+        "Uses clear and understandable communication"
+      ],
+      "label": "Clinical communication — small_talk_colleague"
     }
   ],
   "topWeaknesses": [
@@ -270,7 +386,7 @@ Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`.
       "label": "Fluency"
     }
   ],
-  "generatedAt": "2026-06-04T14:38:15.356Z"
+  "generatedAt": "2026-06-04T19:45:48.291Z"
 }
 ```
 
@@ -291,19 +407,34 @@ Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`.
         ],
         "label": "Pronunciation — phonemes: t, r, n, v, er"
       },
-      "instructions": "Practice saying the following medical terms clearly, paying close attention to the 't', 'r', 'n', 'v', and 'er' sounds. Repeat each word after the audio.",
+      "instructions": "Focus on clear pronunciation of the phonemes /t/, /r/, /n/, /v/, and the 'er' sound. Pay attention to tongue and lip placement for each sound.",
       "generatedContent": {
-        "audio_content": [
-          { "text": "patient",      "audio_file": "patient.mp3" },
-          { "text": "transfer",     "audio_file": "transfer.mp3" },
-          { "text": "nutrition",    "audio_file": "nutrition.mp3" },
-          { "text": "vital signs",  "audio_file": "vital_signs.mp3" },
-          { "text": "fever",        "audio_file": "fever.mp3" },
-          { "text": "intravenous",  "audio_file": "intravenous.mp3" },
-          { "text": "respiratory",  "audio_file": "respiratory.mp3" },
-          { "text": "monitoring",   "audio_file": "monitoring.mp3" },
-          { "text": "ventilation",  "audio_file": "ventilation.mp3" },
-          { "text": "temperature",  "audio_file": "temperature.mp3" }
+        "pronunciation_items": [
+          {
+            "word": "Tachycardia",
+            "sentence": "The patient presents with a rapid heart rate, known as tachycardia.",
+            "sound": "/t/"
+          },
+          {
+            "word": "Respiratory",
+            "sentence": "We need to assess the patient's respiratory rate and effort.",
+            "sound": "/r/"
+          },
+          {
+            "word": "Nausea",
+            "sentence": "The patient reports feeling nauseous and has not kept down fluids.",
+            "sound": "/n/"
+          },
+          {
+            "word": "Vital signs",
+            "sentence": "Please take the patient's vital signs, including temperature, pulse, respiration, and blood pressure.",
+            "sound": "/v/"
+          },
+          {
+            "word": "Fever",
+            "sentence": "The patient's temperature is elevated, indicating a fever.",
+            "sound": "/ər/"
+          }
         ]
       },
       "estimatedMinutes": 5
@@ -319,25 +450,32 @@ Real output from 2026-06-04 against learner `6a0716af6a7703bea04ca6c2`.
         ],
         "label": "Fluency"
       },
-      "instructions": "You are a nurse speaking with a patient about their upcoming procedure. Speak clearly and at a natural pace. The patient will ask clarifying questions. Respond calmly and provide reassurance.",
+      "instructions": "Practice speaking at a steady pace, using natural pauses. Focus on connecting your thoughts smoothly and reducing hesitations.",
       "generatedContent": {
-        "scenario": "You are Nurse Sarah. A patient, Mr. Chen, is anxious about an upcoming MRI scan. He has a fear of enclosed spaces.",
-        "dialogue": [
-          { "speaker": "Nurse Sarah", "line": "Good morning, Mr. Chen. I'm Nurse Sarah, and I'll be talking with you today about your upcoming MRI scan." },
-          { "speaker": "Mr. Chen",    "line": "Oh, the MRI... I'm a bit worried about that. I don't like being in small spaces." },
-          { "speaker": "Nurse Sarah", "line": "I understand your concern, Mr. Chen. It's quite common for patients to feel a bit apprehensive. Let me explain what will happen." },
-          { "speaker": "Mr. Chen",    "line": "Will I be completely closed in? It sounds very tight." },
-          { "speaker": "Nurse Sarah", "line": "The MRI machine is a tube, but it's not as narrow as it may seem. We can also offer you some strategies to help you feel more comfortable. We have music you can listen to, and you'll be able to communicate with the technician at all times." },
-          { "speaker": "Mr. Chen",    "line": "So, I can talk to them if I get scared?" },
-          { "speaker": "Nurse Sarah", "line": "Absolutely. There's a microphone, and you'll have a call button. If at any point you feel overwhelmed, you can let the technician know, and we can pause the scan. We want you to feel as safe and comfortable as possible." },
-          { "speaker": "Mr. Chen",    "line": "That's... a little reassuring. Will it take a long time?" },
-          { "speaker": "Nurse Sarah", "line": "The actual scanning time varies depending on what we are looking at, but typically it's between 30 to 60 minutes. We'll make sure you're prepared before we begin." }
+        "student_character_name": "Nurse",
+        "ai_character_names": ["Patient"],
+        "context": "You are a nurse checking in on a patient who has just had surgery. The patient is recovering and you need to assess their pain level and comfort.",
+        "roleplay_scenes": [
+          {
+            "scene_name": "Post-operative Check-in",
+            "dialogue": [
+              { "speaker": "student", "text": "Good morning, Mr. Smith. I'm here to check on you after your procedure. How are you feeling today?" },
+              { "speaker": "ai_0",   "text": "Morning, nurse. I'm a bit sore, but I think the pain medication is starting to work." },
+              { "speaker": "student", "text": "That's good to hear. Can you describe the pain for me? On a scale of 0 to 10, with 10 being the worst pain imaginable, what would you rate it right now?" },
+              { "speaker": "ai_0",   "text": "I'd say it's around a 4 or 5. It's mostly a dull ache." },
+              { "speaker": "student", "text": "Okay, a 4 or 5. And where exactly is the pain located?" },
+              { "speaker": "ai_0",   "text": "It's right here, in my abdomen, where they made the incision." },
+              { "speaker": "student", "text": "Thank you for that information. I'll make a note of it. Are you experiencing any other discomfort, like nausea or dizziness?" },
+              { "speaker": "ai_0",   "text": "No, not really. Just the soreness." },
+              { "speaker": "student", "text": "Alright. I'll let the doctor know your current pain level. We can adjust your medication if needed. Is there anything else I can get for you at this moment?" }
+            ]
+          }
         ]
       },
       "estimatedMinutes": 7
     }
   ],
   "totalEstimatedMinutes": 12,
-  "summaryMessage": "This week, focus on: pronunciation of 't', 'r', 'n', 'v', 'er' sounds and improving overall fluency in patient communication."
+  "summaryMessage": "This week focus on: pronunciation of phonemes t, r, n, v, er, and fluency."
 }
 ```
