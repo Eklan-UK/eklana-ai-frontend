@@ -1,0 +1,20 @@
+// run with:
+// npx tsx src/domain/challenges/test-service.ts
+
+import 'dotenv/config';
+import { Types } from 'mongoose';
+import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
+import { ChallengeRepository } from './challenge.repository';
+import { ChallengeService } from './challenge.service';
+
+async function main() {
+	await connectToDatabase();
+	const service = new ChallengeService(new ChallengeRepository());
+	const learnerId = new Types.ObjectId('6a0716af6a7703bea04ca6c2');
+	const weekStartDate = new Date('2026-05-26T00:00:00.000Z');
+	const result = await service.getOrGenerateChallenge(learnerId, weekStartDate);
+	console.log(JSON.stringify(result, null, 2));
+	await disconnectFromDatabase();
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
