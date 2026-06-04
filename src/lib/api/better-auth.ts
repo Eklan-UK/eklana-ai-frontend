@@ -69,7 +69,7 @@ export const getAuth = async () => {
 
     // Create and cache Better Auth instance
     authInstance = betterAuth({
-      database: mongodbAdapter(db, {
+      database: mongodbAdapter(db as any, {
         usePlural: true,
         client: mongoose.connection.getClient(),
       }),
