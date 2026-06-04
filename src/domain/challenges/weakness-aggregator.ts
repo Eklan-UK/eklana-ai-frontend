@@ -1,8 +1,10 @@
 import { Types } from 'mongoose';
 import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
+import FreeTalkAttempt from '@/models/free-talk-attempt';
 import type { IDrillAttempt } from '@/models/drill-attempt';
 import type { IPronunciationAttempt } from '@/models/pronunciation-attempt';
+import type { IFreeTalkAttempt } from '@/models/free-talk-attempt';
 import type { WeaknessSignal, WeaknessProfile } from './types';
 
 function clamp(value: number): number {
@@ -263,7 +265,7 @@ export async function aggregateWeaknesses(
 
 	const dateFilter = { $gte: weekStartDate, $lt: weekEndDate };
 
-	const [drillAttempts, pronAttempts] = await Promise.all([
+	const [drillAttempts, pronAttempts, freeTalkAttempts] = await Promise.all([
 		DrillAttempt.find({
 			learnerId,
 			completedAt: dateFilter,
@@ -272,6 +274,10 @@ export async function aggregateWeaknesses(
 			learnerId,
 			createdAt: dateFilter,
 		}).lean() as Promise<IPronunciationAttempt[]>,
+		FreeTalkAttempt.find({
+			learnerId,
+			createdAt: dateFilter,
+		}).lean() as Promise<IFreeTalkAttempt[]>,
 	]);
 
 	// Group drill attempts by type
@@ -297,18 +303,63 @@ export async function aggregateWeaknesses(
 		...extractAccuracySignals(byType.get('matching') ?? [], 'matching'),
 		...extractAccuracySignals(byType.get('definition') ?? [], 'definition'),
 		...extractGrammarSignals(byType.get('grammar') ?? []),
+		...extractFreeTalkSignals(freeTalkAttempts),
 		// sentence, summary, listening: skipped — no reliable automated weakness signal
 	];
 
 	signals.sort((a, b) => b.severity - a.severity);
+	const meaningfulSignals = signals.filter((s) => s.severity > 0);
 
 	return {
 		learnerId,
 		weekStartDate,
 		weaknesses: signals,
-		topWeaknesses: signals.slice(0, 3),
+		topWeaknesses: meaningfulSignals.slice(0, 3),
 		generatedAt: new Date(),
 	};
+}
+
+function extractFreeTalkSignals(attempts: IFreeTalkAttempt[]): WeaknessSignal[] {
+	const graded = attempts.filter((a) => a.gradeResult !== null);
+	if (graded.length === 0) return [];
+
+	const weakBehaviourNames: string[] = [];
+	let severitySum = 0;
+
+	for (const attempt of graded) {
+		const { overallScore, maxScore, behaviours } = attempt.gradeResult!;
+		if (maxScore > 0) {
+			severitySum += clamp(1 - overallScore / maxScore);
+		}
+		for (const b of behaviours) {
+			if (b.result === 'none' || b.result === 'partial') {
+				weakBehaviourNames.push(b.name);
+			}
+		}
+	}
+
+	if (weakBehaviourNames.length === 0) return [];
+
+	const severity = clamp(severitySum / graded.length);
+
+	const scenarioTypeFreq = new Map<string, number>();
+	for (const attempt of graded) {
+		const t = attempt.scenarioType;
+		scenarioTypeFreq.set(t, (scenarioTypeFreq.get(t) ?? 0) + 1);
+	}
+	const topScenarioType = [...scenarioTypeFreq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+	const uniqueWeakNames = [...new Set(weakBehaviourNames)].slice(0, 5);
+
+	return [
+		{
+			drillType: 'free_talk',
+			category: 'fluency',
+			severity,
+			evidence: uniqueWeakNames,
+			label: `Clinical communication — ${topScenarioType}`,
+		},
+	];
 }
 
 function inferDrillType(attempt: IDrillAttempt): string | null {

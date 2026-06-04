@@ -8,6 +8,57 @@ export interface WeaknessSignal {
 	label: string;
 }
 
+export interface PronunciationGeneratedContent {
+	pronunciation_items: Array<{
+		word: string;
+		sentence: string;
+		sound?: string;
+		wordAudioUrl?: string;
+		sentenceAudioUrl?: string;
+	}>;
+}
+
+export interface FillBlankGeneratedContent {
+	fill_blank_items: Array<{
+		sentence: string;
+		blanks: Array<{
+			position: number;
+			correctAnswer: string;
+			options: string[];
+			hint?: string;
+		}>;
+		translation?: string;
+		audioUrl?: string;
+	}>;
+}
+
+export interface KeyPhrasesGeneratedContent {
+	key_phrase_items: Array<{
+		prompt: string;
+		options: string[];
+		correctAnswer: string;
+		respondentName?: string;
+		promptAudioUrl?: string;
+	}>;
+}
+
+export interface RoleplayGeneratedContent {
+	student_character_name: string;
+	ai_character_names: string[];
+	context?: string;
+	drill_intro?: string;
+	roleplay_scenes: Array<{
+		scene_name?: string;
+		context?: string;
+		dialogue: Array<{
+			speaker: string;
+			text: string;
+			translation?: string;
+			audioUrl?: string;
+		}>;
+	}>;
+}
+
 export interface WeaknessProfile {
 	learnerId: Types.ObjectId;
 	weekStartDate: Date;
@@ -17,10 +68,14 @@ export interface WeaknessProfile {
 }
 
 export interface ChallengeDrillItem {
-	drillType: string; // one of the 12 drill types
+	drillType: 'pronunciation' | 'fill_blank' | 'key_phrases' | 'roleplay';
 	targetWeakness: WeaknessSignal;
-	instructions: string; // Gemini-generated instruction for this item
-	generatedContent: Record<string, unknown>; // Gemini-generated drill content matching existing drill schemas
+	instructions: string;
+	generatedContent:
+		| PronunciationGeneratedContent
+		| FillBlankGeneratedContent
+		| KeyPhrasesGeneratedContent
+		| RoleplayGeneratedContent;
 	estimatedMinutes: number;
 }
 
