@@ -1,4 +1,5 @@
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
+import { getDrillStatus } from '@/utils/drill';
 
 export function isFreeTalkPlanItem(item: {
   itemType?: string;
@@ -8,6 +9,18 @@ export function isFreeTalkPlanItem(item: {
     item.itemType === FREE_TALK_PLAN_ITEM_TYPE ||
     item.drill?.type === 'eklan_free_talk'
   );
+}
+
+export function isActiveAssignedPlanItem(item: {
+  itemType?: string;
+  drill?: { type?: string };
+  completedAt?: string | Date | null;
+  status?: string;
+}): boolean {
+  if (isFreeTalkPlanItem(item)) {
+    return !item.completedAt && item.status !== 'completed';
+  }
+  return getDrillStatus(item) !== 'completed';
 }
 
 export function freeTalkScenarioTypeLabel(scenarioType: string): string {

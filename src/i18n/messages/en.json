@@ -72,7 +72,25 @@
     "guestName": "User",
     "assignedDrills": "Assigned Drills",
     "seeAll": "See All",
-    "noDrillsYet": "No drills assigned yet"
+    "noDrillsYet": "No drills assigned yet",
+    "weeklyChallenge": {
+      "badge": "Weekly Challenger",
+      "pageTitle": "Weekly Challenger",
+      "start": "Start",
+      "resume": "Resume",
+      "drillCount": "{count, plural, one {# drill} other {# drills}}",
+      "estimatedMinutes": "{minutes} min",
+      "loading": "Loading your weekly challenge…",
+      "generating": "Building your personalized challenge…",
+      "generatingHint": "We're analyzing your practice from this week.",
+      "failed": "We couldn't generate your challenge. Pull to refresh or try again later.",
+      "emptyTitle": "No challenge yet",
+      "emptyDescription": "Complete drills Monday through Saturday to unlock your personalized challenge on Sunday.",
+      "emptySunday": "Keep practicing this week — your personalized challenge will be ready next Sunday.",
+      "summaryFallback": "Your personalized weekly challenge",
+      "completed": "Completed",
+      "backToAccount": "Back to account"
+    }
   },
   "nav": {
     "home": "Home",
