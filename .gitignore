@@ -60,3 +60,6 @@ next-env.d.ts
 # Cursor IDE
 .cursor/
 .agent/
+
+# Sentry Config File
+.env.sentry-build-plugin
