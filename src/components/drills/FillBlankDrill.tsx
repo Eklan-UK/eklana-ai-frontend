@@ -49,22 +49,27 @@ export default function FillBlankDrill({
   };
 
   // Render sentence with blanks
-  const renderSentence = (item: any, showAnswers: boolean = false) => {
+  const renderSentence = (
+    item: any,
+    showAnswers: boolean = false,
+    itemIndex?: number,
+  ) => {
+    const sentenceIdx = itemIndex ?? currentIndex;
     const { parts } = parseSentence(item.sentence);
     let blankIndex = 0;
 
     return (
       <span className="text-lg leading-relaxed">
-        {parts.map((part: string, idx: number) => {
+        {parts.map((part: string, partIdx: number) => {
           if (part === "___") {
             const blank = item.blanks[blankIndex];
-            const currentAnswer = answers[currentIndex]?.[blankIndex] || "";
+            const currentAnswer = answers[sentenceIdx]?.[blankIndex] || "";
             const isCorrect =
               showAnswers && currentAnswer === blank.correctAnswer;
             blankIndex++;
 
             return (
-              <span key={idx} className="inline-block mx-1">
+              <span key={partIdx} className="inline-block mx-1">
                 {showAnswers ? (
                   <span
                     className={`px-3 py-1.5 rounded border-2 font-medium ${
@@ -90,8 +95,8 @@ export default function FillBlankDrill({
                     onChange={(e) => {
                       setAnswers({
                         ...answers,
-                        [currentIndex]: {
-                          ...answers[currentIndex],
+                        [sentenceIdx]: {
+                          ...answers[sentenceIdx],
                           [blankIndex - 1]: e.target.value,
                         },
                       });
@@ -111,7 +116,7 @@ export default function FillBlankDrill({
               </span>
             );
           }
-          return <span key={idx}>{part}</span>;
+          return <span key={partIdx}>{part}</span>;
         })}
       </span>
     );
@@ -262,7 +267,7 @@ export default function FillBlankDrill({
                 return (
                   <div key={itemIdx} className="p-4 bg-muted rounded-lg">
                     <div className="mb-2">
-                      {renderSentence(item, true)}
+                      {renderSentence(item, true, itemIdx)}
                     </div>
                     {item.translation && (
                       <p className="text-sm text-muted-foreground italic mt-2">

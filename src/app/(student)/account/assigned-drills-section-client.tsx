@@ -7,7 +7,11 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { getDrillStatus } from "@/utils/drill";
 import { DrillCard } from "@/components/drills/DrillCard";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
-import { isFreeTalkPlanItem, sortAssignedPlanItems } from "@/lib/learner-assigned-plan";
+import {
+  isActiveAssignedPlanItem,
+  isFreeTalkPlanItem,
+  sortAssignedPlanItems,
+} from "@/lib/learner-assigned-plan";
 import {
   AssignedDrillsTitleRow,
   AssignedDrillsEmptyMessage,
@@ -43,7 +47,8 @@ export function AssignedDrillsSectionClient() {
     return <AssignedDrillsSkeleton />;
   }
 
-  const top = sortAssignedPlanItems(drills).slice(0, 4);
+  const activeDrills = drills.filter(isActiveAssignedPlanItem);
+  const top = sortAssignedPlanItems(activeDrills).slice(0, 4);
 
   return (
     <div className="mb-6 md:mb-8">
