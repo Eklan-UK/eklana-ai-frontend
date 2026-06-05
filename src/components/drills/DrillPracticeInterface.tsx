@@ -17,15 +17,20 @@ import { Card } from "@/components/ui/Card";
 import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 import { resolveDrillPracticeType } from "@/utils/drill";
+import type { WeeklyChallengeMeta } from "@/lib/challenges/challengeDrillAdapter";
+
+export type { WeeklyChallengeMeta };
 
 interface DrillPracticeInterfaceProps {
   drill: any;
   assignmentId?: string;
+  weeklyChallengeMeta?: WeeklyChallengeMeta;
 }
 
 export default function DrillPracticeInterface({
   drill,
   assignmentId: propAssignmentId,
+  weeklyChallengeMeta,
 }: DrillPracticeInterfaceProps) {
   const [assignmentId, setAssignmentId] = useState<string | null>(
     propAssignmentId || null
@@ -36,6 +41,10 @@ export default function DrillPracticeInterface({
   useEffect(() => {
     const fetchAssignment = async () => {
       try {
+        if (weeklyChallengeMeta) {
+          return;
+        }
+
         // If assignmentId is provided as prop, use it
         if (propAssignmentId) {
           setAssignmentId(propAssignmentId);
@@ -75,7 +84,7 @@ export default function DrillPracticeInterface({
       type: drill.type,
       difficulty: drill.difficulty,
     });
-  }, [drill._id, drill.title, drill.type, drill.difficulty, propAssignmentId]);
+  }, [drill._id, drill.title, drill.type, drill.difficulty, propAssignmentId, weeklyChallengeMeta]);
 
   // Render the appropriate drill interface based on type
   const renderDrill = () => {
@@ -85,6 +94,7 @@ export default function DrillPracticeInterface({
     const commonProps = {
       drill: drillForUi,
       assignmentId: assignmentId || undefined,
+      weeklyChallengeMeta,
     };
 
     switch (drillType) {

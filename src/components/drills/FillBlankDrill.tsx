@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { drillAPI } from "@/lib/api";
+import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
+import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
@@ -14,9 +17,15 @@ import { BookmarkButton } from "@/components/common/BookmarkButton";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
+  weeklyChallengeMeta?: WeeklyChallengeMeta;
 }
 
-export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillProps) {
+export default function FillBlankDrill({
+  drill,
+  assignmentId,
+  weeklyChallengeMeta,
+}: FillBlankDrillProps) {
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
   const [showResults, setShowResults] = useState(false);
@@ -136,7 +145,7 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
   };
 
   const handleSubmit = async () => {
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
       return;
     }
@@ -171,18 +180,22 @@ export default function FillBlankDrill({ drill, assignmentId }: FillBlankDrillPr
       );
       const score = totalBlanks > 0 ? Math.round((correctBlanks / totalBlanks) * 100) : 0;
 
-      await drillAPI.complete(drill._id, {
-        drillAssignmentId: assignmentId,
-        score,
-        timeSpent: Math.floor((Date.now() - startTime) / 1000),
-        fillBlankResults: {
-          ...fillBlankResults,
-          totalBlanks,
-          correctBlanks,
+      if (weeklyChallengeMeta) {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, { score });
+      } else {
+        await drillAPI.complete(drill._id, {
+          drillAssignmentId: assignmentId!,
           score,
-        },
-        platform: "web",
-      });
+          timeSpent: Math.floor((Date.now() - startTime) / 1000),
+          fillBlankResults: {
+            ...fillBlankResults,
+            totalBlanks,
+            correctBlanks,
+            score,
+          },
+          platform: "web",
+        });
+      }
 
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");

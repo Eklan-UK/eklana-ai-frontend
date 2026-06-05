@@ -1383,6 +1383,66 @@ export const dailyFocusAPI = {
   },
 };
 
+// Weekly Challenge API
+export const weeklyChallengeAPI = {
+	getCurrent: () => {
+		return apiRequest<{
+			code?: string;
+			data?: {
+				challengeId: string | null;
+				weekStartDate: string;
+				status: 'ready' | 'generating' | 'failed' | 'unavailable';
+				summaryMessage: string;
+				totalEstimatedMinutes: number;
+				drillSequence: Array<{
+					index: number;
+					drillType: string;
+					label: string;
+					instructions: string;
+					estimatedMinutes: number;
+					completed: boolean;
+				}>;
+				isSunday: boolean;
+			};
+		}>('/learner/weekly-challenge', {
+			method: 'GET',
+			cache: false,
+		});
+	},
+
+	getItem: (index: number) => {
+		return apiRequest<{
+			code?: string;
+			data?: {
+				challengeId: string;
+				weekStartDate: string;
+				index: number;
+				item: Record<string, unknown>;
+				completed: boolean;
+			};
+		}>(`/learner/weekly-challenge/items/${index}`, {
+			method: 'GET',
+			cache: false,
+		});
+	},
+
+	completeItem: (index: number, data?: { score?: number }) => {
+		return apiRequest<{
+			code?: string;
+			data?: {
+				challengeId: string;
+				index: number;
+				completed: boolean;
+				completedItemIndexes: number[];
+				totalItems: number;
+			};
+		}>(`/learner/weekly-challenge/items/${index}/complete`, {
+			method: 'POST',
+			data,
+		});
+	},
+};
+
 // Streak API
 export const streakAPI = {
   // Get user's streak data

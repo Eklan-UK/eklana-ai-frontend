@@ -77,6 +77,12 @@ export const queryKeys = {
     recent: (filters?: Record<string, any>) =>
       [...queryKeys.activities.all, "recent", filters] as const,
   },
+  weeklyChallenge: {
+    all: ['weeklyChallenge'] as const,
+    current: () => [...queryKeys.weeklyChallenge.all, 'current'] as const,
+    item: (index: number) =>
+      [...queryKeys.weeklyChallenge.all, 'item', index] as const,
+  },
   classes: {
     all: ["admin", "classes"] as const,
     list: (filters?: { bucket?: string; limit?: number }) =>
