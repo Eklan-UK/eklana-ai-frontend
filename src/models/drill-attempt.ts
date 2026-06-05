@@ -8,6 +8,7 @@ export interface IDrillAttempt extends Document {
 	drillAssignmentId: Types.ObjectId; // Which assignment
 	learnerId: Types.ObjectId;
 	drillId: Types.ObjectId;
+	drillType?: string;
 
 	// Performance Data
 	startedAt: Date;
@@ -218,6 +219,10 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			ref: 'Drill',
 			required: [true, 'Drill ID is required'],
 			// Removed index: true - covered by compound index { drillId: 1, completedAt: -1 }
+		},
+		drillType: {
+			type: String,
+			index: true,
 		},
 		startedAt: {
 			type: Date,
