@@ -1,17 +1,17 @@
 # Weekly Challenge — Weakness Detection and Challenge Generation
 
-This document describes the weekly challenge feature: how the system analyses a learner's recent drill history to detect weaknesses, and how that profile will be used to generate a personalised challenge set for the coming week.
+This document describes the weekly challenge feature: how the system analyses a learner's recent drill history to detect weaknesses, generates a personalised challenge set via Gemini, persists it to MongoDB, and serves it through a REST API.
 
 ---
 
 ## 1. Overview
 
-Once a week the system looks back at everything a learner has practised over the past seven days and asks: *where are they struggling?* It produces a **`WeaknessProfile`** — a ranked list of weakness signals with evidence — and from that profile it will generate a **`WeeklyChallenge`**: a sequenced set of drill items designed to address the top weaknesses.
+Once a week the system looks back at everything a learner has practised over the past seven days and asks: *where are they struggling?* It produces a **`WeaknessProfile`** — a ranked list of weakness signals with evidence — and from that profile generates a **`WeeklyChallenge`**: a sequenced set of drill items designed to address the top weaknesses.
 
-The feature has two stages:
+Both stages are complete and the API is live at `GET /api/v1/learner/weekly-challenge`.
 
-1. **Weakness aggregation** (complete) — reads `DrillAttempt` and `PronunciationAttempt` documents, extracts signals per drill type, and returns a `WeaknessProfile`.
-2. **Challenge generation** (complete) — passes the `WeaknessProfile` to Gemini, which produces structured drill content for each weakness.
+1. **Weakness aggregation** (complete) — reads `DrillAttempt`, `PronunciationAttempt`, and `FreeTalkAttempt` documents, extracts signals per drill type, and returns a `WeaknessProfile`.
+2. **Challenge generation** (complete) — passes the `WeaknessProfile` to Gemini, which produces structured drill content for each weakness, persists the result to MongoDB, and returns a cached document on subsequent requests.
 
 ---
 
@@ -55,8 +55,13 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 | `src/domain/challenges/types.ts` | TypeScript interfaces: `WeaknessSignal`, `WeaknessProfile`, `ChallengeDrillItem`, `WeeklyChallenge`; plus `PronunciationGeneratedContent`, `FillBlankGeneratedContent`, `KeyPhrasesGeneratedContent`, `RoleplayGeneratedContent` — `generatedContent` is a discriminated union of these four |
 | `src/domain/challenges/weakness-aggregator.ts` | `aggregateWeaknesses(learnerId, weekStartDate)` — queries `DrillAttempt`, `PronunciationAttempt`, and `FreeTalkAttempt` in parallel, extracts per-type signals, returns `WeaknessProfile` |
 | `src/domain/challenges/challenge-generator.ts` | `generateWeeklyChallenge(profile)` — calls Gemini with per-type `generatedContent` schemas and hard constraints enforced in the prompt |
+| `src/models/weekly-challenge.ts` | Mongoose schema for `WeeklyChallenge`; compound unique index on `(learnerId, weekStartDate)` — one document per learner per week |
+| `src/domain/challenges/challenge.repository.ts` | `ChallengeRepository` — `findByLearnerAndWeek`, `upsert`, `updateStatus` |
+| `src/domain/challenges/challenge.service.ts` | `ChallengeService.getOrGenerateChallenge` — orchestrates aggregator + generator + repository; returns cached document immediately if `status === 'ready'` |
+| `src/app/api/v1/learner/weekly-challenge/route.ts` | `GET /api/v1/learner/weekly-challenge` — Zod-validated `weekStartDate` query param; defaults to most recent Monday |
 | `src/domain/challenges/test-aggregator.ts` | Dev script for running the aggregator against the live database and inspecting raw output |
 | `src/domain/challenges/test-generator.ts` | Dev script for testing end-to-end: aggregation → Gemini generation |
+| `src/domain/challenges/test-service.ts` | Dev script for testing the full service layer (aggregation → generation → persistence) without HTTP |
 
 ---
 
@@ -315,11 +320,12 @@ A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal w
 
 ## 8. What's coming next
 
-Weakness aggregation and Gemini challenge generation are both complete. The remaining steps to make this feature live are:
+The backend pipeline is complete end-to-end. Remaining work:
 
-1. **Mongoose model** — a `WeeklyChallenge` collection to persist generated challenges, keyed by `(learnerId, weekStartDate)`.
-2. **API route** — a learner-facing endpoint (e.g. `GET /api/v1/learner/weekly-challenge`) with Zod validation on the request and response shape.
-3. **Frontend integration** — a UI surface on the learner dashboard or My Plan screen that displays the weekly challenge drill sequence and tracks completion.
+1. **Frontend integration** — UI surface in the My Practice section that fetches `GET /api/v1/learner/weekly-challenge`, renders the `drillSequence`, and tracks completion per item.
+2. **Full integration testing in staging** — run against real learner data to verify the Gemini prompt produces correctly shaped `generatedContent` across all four drill types.
+3. **Error handling hardening** — surface `status: 'failed'` gracefully in the UI; consider a retry mechanism on the service layer for transient Gemini failures.
+4. **Latency measurement** — instrument `getOrGenerateChallenge` to record aggregation time, Gemini response time, and total wall time; establish a p95 baseline before connecting the frontend.
 
 ---
 
