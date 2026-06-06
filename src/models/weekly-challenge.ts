@@ -10,8 +10,8 @@ export interface IWeeklyChallenge extends Document {
 	challengeType: 'structured_drill_sequence';
 	content: WeeklyChallenge['content'];
 	status: 'pending' | 'generating' | 'ready' | 'failed';
-	completedItemIndexes: number[];
 	generatedAt?: Date;
+	completedItemIndexes: number[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -43,12 +43,12 @@ const weeklyChallengeSchema = new Schema<IWeeklyChallenge>(
 			enum: ['pending', 'generating', 'ready', 'failed'],
 			default: 'pending',
 		},
+		generatedAt: {
+			type: Date,
+		},
 		completedItemIndexes: {
 			type: [Number],
 			default: [],
-		},
-		generatedAt: {
-			type: Date,
 		},
 	},
 	{

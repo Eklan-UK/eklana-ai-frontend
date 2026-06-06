@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/providers/ToastProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { FCMNotificationListener } from "@/components/notifications/FCMNotificationListener";
+import { AmplitudeInit } from "@/components/providers/AmplitudeInit";
 
 export const metadata: Metadata = {
   title: "Eklan - Create Your Future",
@@ -71,6 +72,7 @@ export default function RootLayout({
             <AuthProvider>
               <ToastProvider />
               <FCMNotificationListener />
+              <AmplitudeInit />
               {children}
             </AuthProvider>
           </QueryProvider>
