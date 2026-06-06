@@ -12,6 +12,7 @@ import { HomeHeaderSkeleton } from "@/components/ui/HomeSkeleton";
 import { HomeGreetingHeader } from "./home-sections";
 import { AssignedDrillsSectionClient } from "./assigned-drills-section-client";
 import { AccountHomeContentClient } from "./account-home-content-client";
+import { AmplitudeScreenTracker } from "@/components/analytics/AmplitudeScreenTracker";
 
 // Revalidate every 30 seconds (ISR)
 export const revalidate = 30;
@@ -26,6 +27,7 @@ export const metadata = generateMetadata({
 export default async function HomePage() {
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
+      <AmplitudeScreenTracker screenName="Dashboard" />
       <div className="h-6"></div>
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">

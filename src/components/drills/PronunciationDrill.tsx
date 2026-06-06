@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
+import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import type { TextScore } from "@/services/speechace.service";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService } from "@/services/speechace.service";
@@ -26,6 +29,7 @@ import { BookmarkButton } from "@/components/common/BookmarkButton";
 interface PronunciationDrillProps {
   drill: any;
   assignmentId?: string;
+  weeklyChallengeMeta?: WeeklyChallengeMeta;
 }
 
 type Screen = "word" | "sentence";
@@ -125,7 +129,9 @@ function ScreenIndicator({
 export default function PronunciationDrill({
   drill,
   assignmentId,
+  weeklyChallengeMeta,
 }: PronunciationDrillProps) {
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -469,7 +475,7 @@ export default function PronunciationDrill({
   };
 
   const handleSubmit = async () => {
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
       return;
     }
@@ -506,22 +512,26 @@ export default function PronunciationDrill({
         };
       });
 
-      await drillAPI.complete(drill._id, {
-        drillAssignmentId: assignmentId,
-        score,
-        timeSpent,
-        pronunciationResults: { wordScores },
-        performanceReviewSnapshot: {
-          version: 1,
-          ui: "drillPerformance",
-          avgScore: reviewAvgScore,
-          statsLine: reviewStatsLine,
-          passThreshold: PASS_THRESHOLD,
-          sectionHeading: "Item-by-Item Analysis",
-          groups: JSON.parse(JSON.stringify(reviewGroups)),
-        },
-        platform: "web",
-      });
+      if (weeklyChallengeMeta) {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, { score });
+      } else {
+        await drillAPI.complete(drill._id, {
+          drillAssignmentId: assignmentId!,
+          score,
+          timeSpent,
+          pronunciationResults: { wordScores },
+          performanceReviewSnapshot: {
+            version: 1,
+            ui: "drillPerformance",
+            avgScore: reviewAvgScore,
+            statsLine: reviewStatsLine,
+            passThreshold: PASS_THRESHOLD,
+            sectionHeading: "Item-by-Item Analysis",
+            groups: JSON.parse(JSON.stringify(reviewGroups)),
+          },
+          platform: "web",
+        });
+      }
 
       setShowReview(false);
       setIsCompleted(true);

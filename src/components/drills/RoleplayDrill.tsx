@@ -24,7 +24,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import { useQueryClient } from "@tanstack/react-query";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
+import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
@@ -41,6 +44,7 @@ import { BookmarkButton } from "@/components/common/BookmarkButton";
 interface RoleplayDrillProps {
   drill: any;
   assignmentId?: string;
+  weeklyChallengeMeta?: WeeklyChallengeMeta;
 }
 
 interface DialogueTurn {
@@ -141,7 +145,12 @@ const triggerConfetti = () => {
   });
 };
 
-export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProps) {
+export default function RoleplayDrill({
+  drill,
+  assignmentId,
+  weeklyChallengeMeta,
+}: RoleplayDrillProps) {
+  const queryClient = useQueryClient();
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [completedMessages, setCompletedMessages] = useState<CompletedMessage[]>([]);
@@ -839,7 +848,7 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
   }, [isEntireDrillComplete, showRoleSwitchOption, showReview, isCompleted]);
 
   const handleSubmit = async () => {
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
       return;
     }
@@ -882,24 +891,30 @@ export default function RoleplayDrill({ drill, assignmentId }: RoleplayDrillProp
       );
       const statsLineForSnapshot = `${completedStudentTurns} lines completed · ${totalAttemptsForSnapshot} total attempts`;
 
-      await drillAPI.complete(drill._id, {
-        drillAssignmentId: assignmentId,
-        score: avgScore,
-        timeSpent,
-        roleplayResults: {
-          sceneScores,
-        },
-        performanceReviewSnapshot: {
-          version: 1,
-          ui: "roleplay",
-          avgScore,
-          statsLine: statsLineForSnapshot,
-          passThreshold: PASS_THRESHOLD,
-          sectionHeading: "Scene-by-Scene Analysis",
-          groups: JSON.parse(JSON.stringify(reviewSceneGroups)),
-        },
-        platform: "web",
-      });
+      if (weeklyChallengeMeta) {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
+          score: avgScore,
+        });
+      } else {
+        await drillAPI.complete(drill._id, {
+          drillAssignmentId: assignmentId!,
+          score: avgScore,
+          timeSpent,
+          roleplayResults: {
+            sceneScores,
+          },
+          performanceReviewSnapshot: {
+            version: 1,
+            ui: "roleplay",
+            avgScore,
+            statsLine: statsLineForSnapshot,
+            passThreshold: PASS_THRESHOLD,
+            sectionHeading: "Scene-by-Scene Analysis",
+            groups: JSON.parse(JSON.stringify(reviewSceneGroups)),
+          },
+          platform: "web",
+        });
+      }
 
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
