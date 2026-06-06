@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -12,8 +12,6 @@ import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-c
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
-
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -28,7 +26,9 @@ export default function FillBlankDrill({
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
-  const [showResults, setShowResults] = useState(false);
+  const [submittedResults, setSubmittedResults] = useState<{ score: number } | null>(
+    null,
+  );
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
@@ -137,9 +137,6 @@ export default function FillBlankDrill({
 
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1);
-    } else {
-      // All items completed
-      setShowResults(true);
     }
   };
 
@@ -149,9 +146,20 @@ export default function FillBlankDrill({
     }
   };
 
+  const allItemsComplete = items.every((item: any, itemIdx: number) => {
+    return item.blanks.every((_: any, blankIdx: number) => {
+      return answers[itemIdx]?.[blankIdx];
+    });
+  });
+
   const handleSubmit = async () => {
     if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
+      return;
+    }
+
+    if (!allItemsComplete) {
+      toast.error("Please fill all blanks before submitting");
       return;
     }
 
@@ -202,8 +210,8 @@ export default function FillBlankDrill({
         });
       }
 
-      setIsCompleted(true);
-      toast.success("Drill completed! Great job!");
+      setSubmittedResults({ score });
+      toast.success("Drill submitted!");
 
       trackActivity("drill", drill._id, "completed", {
         title: drill.title,
@@ -221,12 +229,6 @@ export default function FillBlankDrill({
     return <DrillCompletionScreen drillType="fill_blank" />;
   }
 
-  const allItemsComplete = items.every((item: any, itemIdx: number) => {
-    return item.blanks.every((_: any, blankIdx: number) => {
-      return answers[itemIdx]?.[blankIdx];
-    });
-  });
-
   const currentItemComplete = currentItem?.blanks.every(
     (_: any, blankIdx: number) => {
       return answers[currentIndex]?.[blankIdx];
@@ -242,10 +244,12 @@ export default function FillBlankDrill({
           label="sentences"
         />
 
-        {showResults ? (
-          // Results Screen
+        {submittedResults !== null ? (
           <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">Review Your Answers</h2>
+            <h2 className="text-xl font-bold mb-2">Your Results</h2>
+            <p className="text-2xl font-bold text-primary mb-6">
+              Score: {submittedResults.score}%
+            </p>
             <div className="space-y-6 mb-6">
               {items.map((item: any, itemIdx: number) => {
                 const itemAnswers = item.blanks.map(
@@ -291,26 +295,9 @@ export default function FillBlankDrill({
                 );
               })}
             </div>
-            <div className="flex gap-4 mt-6">
-              <Button onClick={() => setShowResults(false)} variant="outline">
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Go Back
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  "Submit Drill"
-                )}
-              </Button>
-            </div>
+            <Button onClick={() => setIsCompleted(true)} className="w-full">
+              Continue
+            </Button>
           </Card>
         ) : (
           // Practice Screen
@@ -361,14 +348,31 @@ export default function FillBlankDrill({
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous
               </Button>
-              <Button
-                onClick={handleNext}
-                disabled={!currentItemComplete}
-                className="flex-1"
-              >
-                {currentIndex === items.length - 1 ? "Review" : "Next"}
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+              {currentIndex === items.length - 1 ? (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!currentItemComplete || !allItemsComplete || isSubmitting}
+                  className="flex-1"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit"
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleNext}
+                  disabled={!currentItemComplete}
+                  className="flex-1"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              )}
             </div>
           </Card>
         )}
