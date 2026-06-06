@@ -11,6 +11,7 @@ export interface IWeeklyChallenge extends Document {
 	content: WeeklyChallenge['content'];
 	status: 'pending' | 'generating' | 'ready' | 'failed';
 	generatedAt?: Date;
+	completedItemIndexes: number[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -44,6 +45,10 @@ const weeklyChallengeSchema = new Schema<IWeeklyChallenge>(
 		},
 		generatedAt: {
 			type: Date,
+		},
+		completedItemIndexes: {
+			type: [Number],
+			default: [],
 		},
 	},
 	{
