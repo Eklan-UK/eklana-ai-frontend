@@ -50,6 +50,21 @@ export class ChallengeRepository {
 		}
 	}
 
+	async findAllByLearner(learnerId: Types.ObjectId): Promise<IWeeklyChallenge[]> {
+		try {
+			return await WeeklyChallengeModel.find({ learnerId })
+				.sort({ weekStartDate: -1 })
+				.lean()
+				.exec();
+		} catch (error: any) {
+			logger.error('Error finding all weekly challenges for learner', {
+				learnerId: learnerId.toString(),
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
 	async updateStatus(
 		id: Types.ObjectId,
 		status: IWeeklyChallenge['status'],

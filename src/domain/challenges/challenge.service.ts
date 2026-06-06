@@ -9,6 +9,10 @@ import type { WeeklyChallenge } from './types';
 export class ChallengeService {
 	constructor(private challengeRepo: ChallengeRepository) {}
 
+	async getAllChallenges(learnerId: Types.ObjectId): Promise<IWeeklyChallenge[]> {
+		return this.challengeRepo.findAllByLearner(learnerId);
+	}
+
 	async getOrGenerateChallenge(
 		learnerId: Types.ObjectId,
 		weekStartDate: Date

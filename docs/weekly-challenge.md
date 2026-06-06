@@ -62,6 +62,51 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 | `src/domain/challenges/test-aggregator.ts` | Dev script for running the aggregator against the live database and inspecting raw output |
 | `src/domain/challenges/test-generator.ts` | Dev script for testing end-to-end: aggregation → Gemini generation |
 | `src/domain/challenges/test-service.ts` | Dev script for testing the full service layer (aggregation → generation → persistence) without HTTP |
+| `src/app/api/v1/learner/weekly-challenge/history/route.ts` | `GET /api/v1/learner/weekly-challenge/history` — returns all challenges for the learner, sorted newest first |
+| `src/hooks/useWeeklyChallengeHistory.ts` | React Query hook for fetching the challenge history list |
+| `docs/weekly-challenge-ui-spec.md` | UI implementation spec for the dev |
+
+---
+
+## API
+
+### `GET /api/v1/learner/weekly-challenge`
+
+Get or generate the current week's challenge. Defaults to the most recent Monday as `weekStartDate`. Accepts an optional `weekStartDate` ISO datetime query param to fetch a specific week.
+
+Upserts the document as `generating`, runs weakness aggregation + Gemini generation, then returns `status: 'ready'`. Returns the cached document immediately if `status === 'ready'` already.
+
+Response shape:
+```json
+{
+  "code": "OK",
+  "data": {
+    "challengeId": "<id>",
+    "weekStartDate": "<ISO date>",
+    "status": "ready",
+    "summaryMessage": "...",
+    "totalEstimatedMinutes": 12,
+    "drillSequence": [ ... ],
+    "isSunday": false
+  }
+}
+```
+
+### `GET /api/v1/learner/weekly-challenge/history`
+
+List all challenges for the authenticated learner, sorted newest first.
+
+Response shape:
+```json
+{
+  "code": "OK",
+  "data": {
+    "challenges": [ ... ]
+  }
+}
+```
+
+Both endpoints require the `user` role (`withRole(['user'])`).
 
 ---
 
@@ -320,12 +365,12 @@ A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal w
 
 ## 8. What's coming next
 
-The backend pipeline is complete end-to-end. Remaining work:
+The backend pipeline and frontend spec are complete. Remaining work:
 
-1. **Frontend integration** — UI surface in the My Practice section that fetches `GET /api/v1/learner/weekly-challenge`, renders the `drillSequence`, and tracks completion per item.
-2. **Full integration testing in staging** — run against real learner data to verify the Gemini prompt produces correctly shaped `generatedContent` across all four drill types.
-3. **Error handling hardening** — surface `status: 'failed'` gracefully in the UI; consider a retry mechanism on the service layer for transient Gemini failures.
-4. **Latency measurement** — instrument `getOrGenerateChallenge` to record aggregation time, Gemini response time, and total wall time; establish a p95 baseline before connecting the frontend.
+1. **Full integration testing in staging** — run against real learner data to verify the Gemini prompt produces correctly shaped `generatedContent` across all four drill types.
+2. **Error handling hardening (Day 9)** — surface `status: 'failed'` gracefully in the UI; consider a retry mechanism on the service layer for transient Gemini failures.
+3. **Latency measurement in staging** — instrument `getOrGenerateChallenge` to record aggregation time, Gemini response time, and total wall time; establish a p95 baseline.
+4. **Handoff documentation (Day 10)** — final review of all docs and sign-off before feature ships.
 
 ---
 

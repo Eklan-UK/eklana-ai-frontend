@@ -1426,6 +1426,16 @@ export const weeklyChallengeAPI = {
 		});
 	},
 
+	getHistory: () => {
+		return apiRequest<{
+			code?: string;
+			data?: { challenges: any[] };
+		}>('/learner/weekly-challenge/history', {
+			method: 'GET',
+			cache: false,
+		});
+	},
+
 	completeItem: (index: number, data?: { score?: number }) => {
 		return apiRequest<{
 			code?: string;
