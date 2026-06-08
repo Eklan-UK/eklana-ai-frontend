@@ -191,6 +191,80 @@ export function getDrillIcon(type: string): string {
 /**
  * Get drill type info (icon, color, border color)
  */
+export interface FillBlankItemInput {
+  sentence: string;
+  blanks: Array<{
+    position: number;
+    correctAnswer: string;
+    options: string[];
+    hint?: string;
+  }>;
+  translation?: string;
+  audioUrl?: string;
+}
+
+/**
+ * Normalize fill-in-the-blank items before API submit.
+ * Trims whitespace on options/answers so server validation stays consistent across browsers/OSes.
+ */
+export function normalizeFillBlankItems(items: FillBlankItemInput[]) {
+  return items
+    .filter((item) => item.sentence.trim())
+    .map((item) => ({
+      sentence: item.sentence.trim(),
+      blanks: item.blanks
+        .map((blank) => {
+          const correctAnswer = blank.correctAnswer.trim();
+          const options = blank.options
+            .map((opt) => opt.trim())
+            .filter((opt) => opt.length > 0);
+          return {
+            position: blank.position,
+            correctAnswer,
+            options,
+            hint: blank.hint?.trim() || undefined,
+          };
+        })
+        .filter((blank) => blank.correctAnswer && blank.options.length >= 2)
+        .map((blank, idx) => ({ ...blank, position: idx })),
+      translation: item.translation?.trim() || undefined,
+      ...(item.audioUrl ? { audioUrl: item.audioUrl } : {}),
+    }))
+    .filter((item) => item.blanks.length > 0);
+}
+
+/** Client-side validation; returns an error message or null if valid. */
+export function validateFillBlankItems(items: FillBlankItemInput[]): string | null {
+  const withSentences = items.filter((item) => item.sentence.trim());
+  if (withSentences.length === 0) {
+    return "Please add at least one sentence with blanks";
+  }
+
+  for (const item of withSentences) {
+    const preview = item.sentence.trim().substring(0, 30);
+    const activeBlanks = item.blanks.filter((b) => b.correctAnswer.trim());
+    if (activeBlanks.length === 0) {
+      return `Sentence "${preview}..." must have at least one blank with a correct answer`;
+    }
+
+    for (const blank of item.blanks) {
+      if (!blank.correctAnswer.trim()) continue;
+
+      const correctAnswer = blank.correctAnswer.trim();
+      const options = blank.options.map((o) => o.trim()).filter(Boolean);
+
+      if (options.length < 2) {
+        return "Each blank must have at least 2 options";
+      }
+      if (!options.includes(correctAnswer)) {
+        return "Options must include the correct answer";
+      }
+    }
+  }
+
+  return null;
+}
+
 export function getDrillTypeInfo(type: string): {
   icon: string;
   color: string;

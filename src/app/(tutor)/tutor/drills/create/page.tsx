@@ -37,6 +37,10 @@ import {
   extractTextsForDrillType,
   generateDrillAudio,
 } from "@/services/drill-audio.service";
+import {
+  normalizeFillBlankItems,
+  validateFillBlankItems,
+} from "@/utils/drill";
 
 const DRAFT_KEY = "drill_draft";
 
@@ -457,6 +461,14 @@ function CreateDrillPageContent() {
       }
     }
 
+    if (formData.type === "fill_blank") {
+      const fillBlankError = validateFillBlankItems(formData.fill_blank_items || []);
+      if (fillBlankError) {
+        alert(fillBlankError);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const submitData: any = { ...formData };
@@ -635,6 +647,12 @@ function CreateDrillPageContent() {
 
       // Convert date to ISO string
       submitData.date = new Date(submitData.date).toISOString();
+
+      if (formData.type === "fill_blank") {
+        submitData.fill_blank_items = normalizeFillBlankItems(
+          submitData.fill_blank_items || []
+        );
+      }
 
       if (isEditMode) {
         await drillAPI.update(drillId!, submitData);
@@ -1739,21 +1757,8 @@ function CreateDrillPageContent() {
                           </p>
                         </div>
 
-                        <div>
-                          <Label>Translation (Optional)</Label>
-                          <Input
-                            value={item.translation || ""}
-                            onChange={(e) => {
-                              const items = [...(formData.fill_blank_items || [])];
-                              items[itemIndex].translation = e.target.value;
-                              setFormData({ ...formData, fill_blank_items: items });
-                            }}
-                            placeholder="e.g., I went to the store to buy milk."
-                          />
-                        </div>
-
                         {/* Blanks Section */}
-                        <div className="border-t pt-4">
+                        <div className="pt-2">
                           <div className="flex items-center justify-between mb-3">
                             <Label>Blanks in this Sentence *</Label>
                             <Button
