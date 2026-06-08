@@ -103,12 +103,20 @@ const updateDrillSchema = z.object({
 	article_content: z.string().optional(),
 	article_audio_url: z.string().optional(),
 	fill_blank_items: z.array(z.object({
-		sentence: z.string().min(1),
+		sentence: z.string().trim().min(1),
 		blanks: z.array(z.object({
 			position: z.number().int().min(0),
-			correctAnswer: z.string().min(1),
-			options: z.array(z.string().min(1)).min(2),
+			correctAnswer: z.string().trim().min(1),
+			options: z.array(z.string().trim().min(1)).min(2),
 			hint: z.string().optional(),
+		}).superRefine((data, ctx) => {
+			if (!data.options.includes(data.correctAnswer)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: "Options must include the correct answer",
+					path: ["options"],
+				});
+			}
 		})).min(1),
 		translation: z.string().optional(),
 		audioUrl: z.string().optional(),

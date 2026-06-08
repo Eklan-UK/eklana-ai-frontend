@@ -23,22 +23,37 @@ function messageFromResponseData(data: unknown): string | undefined {
 	}
 	if (typeof data === 'object' && !Array.isArray(data)) {
 		const o = data as Record<string, unknown>;
-		if (typeof o.message === 'string' && o.message.trim()) return o.message.trim();
-		if (typeof o.error === 'string' && o.error.trim()) return o.error.trim();
-		if (typeof o.detail === 'string' && o.detail.trim()) return o.detail.trim();
+		const baseMessage =
+			(typeof o.message === 'string' && o.message.trim()) ||
+			(typeof o.error === 'string' && o.error.trim()) ||
+			(typeof o.detail === 'string' && o.detail.trim()) ||
+			'';
+
 		if (Array.isArray(o.errors) && o.errors.length > 0) {
-			const first = o.errors[0];
-			if (typeof first === 'string' && first.trim()) return first.trim();
-			if (
-				first &&
-				typeof first === 'object' &&
-				'message' in first &&
-				typeof (first as { message: unknown }).message === 'string'
-			) {
-				const m = (first as { message: string }).message;
-				if (m.trim()) return m.trim();
+			const detailMessages = o.errors
+				.map((issue) => {
+					if (typeof issue === 'string' && issue.trim()) return issue.trim();
+					if (issue && typeof issue === 'object' && 'message' in issue) {
+						const message = (issue as { message?: unknown }).message;
+						if (typeof message === 'string' && message.trim()) {
+							const path = (issue as { path?: unknown }).path;
+							if (Array.isArray(path) && path.length > 0) {
+								return `${path.join('.')}: ${message.trim()}`;
+							}
+							return message.trim();
+						}
+					}
+					return null;
+				})
+				.filter((msg): msg is string => Boolean(msg));
+
+			if (detailMessages.length > 0) {
+				const prefix = baseMessage || 'Validation failed';
+				return `${prefix}: ${detailMessages.join('; ')}`;
 			}
 		}
+
+		if (baseMessage) return baseMessage;
 	}
 	return undefined;
 }

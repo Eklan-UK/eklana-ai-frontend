@@ -27,6 +27,10 @@ import {
   extractTextsForDrillType,
   applyAudioUrls,
 } from "@/services/drill-audio.service";
+import {
+  normalizeFillBlankItems,
+  validateFillBlankItems,
+} from "@/utils/drill";
 
 interface Sentence {
   english: string;
@@ -802,31 +806,10 @@ const DrillBuilder: React.FC = () => {
         return;
       }
     } else if (drillType === "fill_blank") {
-      if (fillBlankItems.length === 0 || !fillBlankItems.some(item => item.sentence.trim())) {
-        toast.error("Please add at least one sentence with blanks");
+      const fillBlankError = validateFillBlankItems(fillBlankItems);
+      if (fillBlankError) {
+        toast.error(fillBlankError);
         return;
-      }
-      // Validate each item has at least one blank with correct answer and options
-      for (const item of fillBlankItems) {
-        if (!item.sentence.trim()) continue;
-        if (item.blanks.length === 0) {
-          toast.error(`Sentence "${item.sentence.substring(0, 30)}..." must have at least one blank`);
-          return;
-        }
-        for (const blank of item.blanks) {
-          if (!blank.correctAnswer.trim()) {
-            toast.error("All blanks must have a correct answer");
-            return;
-          }
-          if (blank.options.length < 2 || !blank.options.some(opt => opt.trim())) {
-            toast.error("Each blank must have at least 2 options");
-            return;
-          }
-          if (!blank.options.includes(blank.correctAnswer)) {
-            toast.error("Options must include the correct answer");
-            return;
-          }
-        }
       }
     } else if (drillType === "key_phrases") {
       if (keyPhraseItems.length === 0 || !keyPhraseItems.some(item => item.prompt.trim())) {
@@ -943,20 +926,7 @@ const DrillBuilder: React.FC = () => {
         drillData.listening_drill_title = listeningTitle.trim();
         drillData.listening_drill_content = listeningContent.trim();
       } else if (drillType === "fill_blank") {
-        drillData.fill_blank_items = fillBlankItems
-          .filter((item) => item.sentence.trim())
-          .map((item) => ({
-            sentence: item.sentence.trim(),
-            blanks: item.blanks
-              .filter((blank) => blank.correctAnswer.trim() && blank.options.length >= 2)
-              .map((blank, idx) => ({
-                position: idx,
-                correctAnswer: blank.correctAnswer.trim(),
-                options: blank.options.filter((opt) => opt.trim()),
-                hint: blank.hint?.trim() || undefined,
-              })),
-            translation: item.translation?.trim() || undefined,
-          }));
+        drillData.fill_blank_items = normalizeFillBlankItems(fillBlankItems);
       } else if (drillType === "key_phrases") {
         drillData.key_phrase_items = keyPhraseItems
           .filter((item) => item.prompt.trim())
@@ -1938,25 +1908,8 @@ const DrillBuilder: React.FC = () => {
                         </p>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                          Translation (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={item.translation || ""}
-                          onChange={(e) => {
-                            const updated = [...fillBlankItems];
-                            updated[itemIndex].translation = e.target.value;
-                            setFillBlankItems(updated);
-                          }}
-                          placeholder="e.g., I went to the store to buy milk."
-                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
-                        />
-                      </div>
-
                       {/* Blanks Section */}
-                      <div className="border-t pt-4">
+                      <div className="pt-2">
                         <div className="flex items-center justify-between mb-3">
                           <label className="block text-xs font-bold text-gray-600">
                             Blanks in this Sentence<span className="text-red-500">*</span>
