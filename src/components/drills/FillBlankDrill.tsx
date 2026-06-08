@@ -4,7 +4,13 @@ import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  CheckCircle,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { drillAPI } from "@/lib/api";
@@ -18,6 +24,8 @@ interface FillBlankDrillProps {
   weeklyChallengeMeta?: WeeklyChallengeMeta;
 }
 
+const PASS_THRESHOLD = 70;
+
 export default function FillBlankDrill({
   drill,
   assignmentId,
@@ -26,9 +34,10 @@ export default function FillBlankDrill({
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
-  const [submittedResults, setSubmittedResults] = useState<{ score: number } | null>(
-    null,
-  );
+  const [submittedResults, setSubmittedResults] = useState<{
+    score: number;
+    passed: boolean;
+  } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
@@ -152,6 +161,44 @@ export default function FillBlankDrill({
     });
   });
 
+  const buildFillBlankResults = () => {
+    const fillBlankResults = {
+      items: items.map((item: any, itemIdx: number) => ({
+        sentence: item.sentence,
+        blanks: item.blanks.map((blank: any, blankIdx: number) => {
+          const selectedAnswer = answers[itemIdx]?.[blankIdx] || "";
+          const isCorrect = selectedAnswer === blank.correctAnswer;
+          return {
+            position: blank.position,
+            selectedAnswer,
+            correctAnswer: blank.correctAnswer,
+            isCorrect,
+          };
+        }),
+      })),
+    };
+
+    const totalBlanks = fillBlankResults.items.reduce(
+      (sum: number, item: any) => sum + item.blanks.length,
+      0,
+    );
+    const correctBlanks = fillBlankResults.items.reduce(
+      (sum: number, item: any) =>
+        sum + item.blanks.filter((b: any) => b.isCorrect).length,
+      0,
+    );
+    const score =
+      totalBlanks > 0 ? Math.round((correctBlanks / totalBlanks) * 100) : 0;
+
+    return { fillBlankResults, totalBlanks, correctBlanks, score };
+  };
+
+  const handleRetry = () => {
+    setSubmittedResults(null);
+    setAnswers({});
+    setCurrentIndex(0);
+  };
+
   const handleSubmit = async () => {
     if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
@@ -165,59 +212,45 @@ export default function FillBlankDrill({
 
     setIsSubmitting(true);
     try {
-      // Calculate results
-      const fillBlankResults = {
-        items: items.map((item: any, itemIdx: number) => ({
-          sentence: item.sentence,
-          blanks: item.blanks.map((blank: any, blankIdx: number) => {
-            const selectedAnswer = answers[itemIdx]?.[blankIdx] || "";
-            const isCorrect = selectedAnswer === blank.correctAnswer;
-            return {
-              position: blank.position,
-              selectedAnswer,
-              correctAnswer: blank.correctAnswer,
-              isCorrect,
-            };
-          }),
-        })),
-      };
+      const { fillBlankResults, totalBlanks, correctBlanks, score } =
+        buildFillBlankResults();
+      const passed = score >= PASS_THRESHOLD;
 
-      const totalBlanks = fillBlankResults.items.reduce(
-        (sum: number, item: any) => sum + item.blanks.length,
-        0
-      );
-      const correctBlanks = fillBlankResults.items.reduce(
-        (sum: number, item: any) =>
-          sum + item.blanks.filter((b: any) => b.isCorrect).length,
-        0
-      );
-      const score = totalBlanks > 0 ? Math.round((correctBlanks / totalBlanks) * 100) : 0;
-
-      if (weeklyChallengeMeta) {
-        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, { score });
-      } else {
-        await drillAPI.complete(drill._id, {
-          drillAssignmentId: assignmentId!,
-          score,
-          timeSpent: Math.floor((Date.now() - startTime) / 1000),
-          fillBlankResults: {
-            ...fillBlankResults,
-            totalBlanks,
-            correctBlanks,
+      if (passed) {
+        if (weeklyChallengeMeta) {
+          await completeWeeklyChallengeItem(
+            queryClient,
+            weeklyChallengeMeta.itemIndex,
+            { score },
+          );
+        } else {
+          await drillAPI.complete(drill._id, {
+            drillAssignmentId: assignmentId!,
             score,
-          },
-          platform: "web",
+            timeSpent: Math.floor((Date.now() - startTime) / 1000),
+            fillBlankResults: {
+              ...fillBlankResults,
+              totalBlanks,
+              correctBlanks,
+              score,
+            },
+            platform: "web",
+          });
+        }
+
+        trackActivity("drill", drill._id, "completed", {
+          title: drill.title,
+          type: drill.type,
+          score,
         });
+        toast.success("Drill passed! Great job!");
+      } else {
+        toast.error(
+          `Score: ${score}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`,
+        );
       }
 
-      setSubmittedResults({ score });
-      toast.success("Drill submitted!");
-
-      trackActivity("drill", drill._id, "completed", {
-        title: drill.title,
-        type: drill.type,
-        score,
-      });
+      setSubmittedResults({ score, passed });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -247,8 +280,17 @@ export default function FillBlankDrill({
         {submittedResults !== null ? (
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-2">Your Results</h2>
-            <p className="text-2xl font-bold text-primary mb-6">
+            <p
+              className={`text-2xl font-bold mb-2 ${
+                submittedResults.passed ? "text-emerald-600" : "text-red-600"
+              }`}
+            >
               Score: {submittedResults.score}%
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              {submittedResults.passed
+                ? "You passed this drill!"
+                : `You need at least ${PASS_THRESHOLD}% to complete this drill.`}
             </p>
             <div className="space-y-6 mb-6">
               {items.map((item: any, itemIdx: number) => {
@@ -273,11 +315,6 @@ export default function FillBlankDrill({
                     <div className="mb-2">
                       {renderSentence(item, true, itemIdx)}
                     </div>
-                    {item.translation && (
-                      <p className="text-sm text-muted-foreground italic mt-2">
-                        {item.translation}
-                      </p>
-                    )}
                     <div className="mt-3 text-sm">
                       <span
                         className={`font-semibold ${
@@ -295,9 +332,16 @@ export default function FillBlankDrill({
                 );
               })}
             </div>
-            <Button onClick={() => setIsCompleted(true)} className="w-full">
-              Continue
-            </Button>
+            {submittedResults.passed ? (
+              <Button onClick={() => setIsCompleted(true)} className="w-full">
+                Continue
+              </Button>
+            ) : (
+              <Button onClick={handleRetry} className="w-full">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Try Again
+              </Button>
+            )}
           </Card>
         ) : (
           // Practice Screen
@@ -315,12 +359,7 @@ export default function FillBlankDrill({
             </div>
 
             <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="mb-2">{renderSentence(currentItem, false)}</div>
-              {currentItem.translation && (
-                <p className="text-sm text-muted-foreground italic mt-3 border-t pt-3">
-                  Translation: {currentItem.translation}
-                </p>
-              )}
+              {renderSentence(currentItem, false)}
             </div>
 
             {/* Hints */}
