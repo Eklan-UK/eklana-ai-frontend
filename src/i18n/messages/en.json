@@ -78,7 +78,7 @@
       "pageTitle": "Weekly Challenge",
       "practiceCardTitle": "Weekly Challenge",
       "practiceCardSubtitle": "Personalized drills from your practice",
-      "weekLabel": "Week {number}",
+      "weekLabel": "Challenge {number}",
       "start": "Start",
       "resume": "Resume",
       "drillCount": "{count, plural, one {# drill} other {# drills}}",
