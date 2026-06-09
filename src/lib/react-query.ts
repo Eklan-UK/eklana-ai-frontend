@@ -79,9 +79,12 @@ export const queryKeys = {
   },
   weeklyChallenge: {
     all: ['weeklyChallenge'] as const,
+    history: () => [...queryKeys.weeklyChallenge.all, 'history'] as const,
     current: () => [...queryKeys.weeklyChallenge.all, 'current'] as const,
-    item: (index: number) =>
-      [...queryKeys.weeklyChallenge.all, 'item', index] as const,
+    week: (weekStartDate: string) =>
+      [...queryKeys.weeklyChallenge.all, 'week', weekStartDate] as const,
+    item: (weekStartDate: string, index: number) =>
+      [...queryKeys.weeklyChallenge.all, 'item', weekStartDate, index] as const,
   },
   classes: {
     all: ["admin", "classes"] as const,

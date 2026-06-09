@@ -13,6 +13,14 @@ export class ChallengeService {
 		return this.challengeRepo.findAllByLearner(learnerId);
 	}
 
+	async completeItem(
+		learnerId: Types.ObjectId,
+		weekStartDate: Date,
+		itemIndex: number
+	): Promise<IWeeklyChallenge | null> {
+		return this.challengeRepo.completeItem(learnerId, weekStartDate, itemIndex);
+	}
+
 	async getOrGenerateChallenge(
 		learnerId: Types.ObjectId,
 		weekStartDate: Date
@@ -83,7 +91,14 @@ export class ChallengeService {
 				weekStartDate,
 				error: error.message,
 			});
-			await this.challengeRepo.updateStatus(doc._id as Types.ObjectId, 'failed');
+			try {
+				await this.challengeRepo.updateStatus(doc._id as Types.ObjectId, 'failed');
+			} catch (statusErr: any) {
+				logger.error('Failed to mark challenge as failed', {
+					id: (doc._id as Types.ObjectId).toString(),
+					error: statusErr.message,
+				});
+			}
 			throw error;
 		}
 	}

@@ -1,5 +1,26 @@
+import { z } from 'zod';
 import { generateConversationResponse } from '@/services/gemini.service';
 import type { WeaknessProfile, WeeklyChallenge, ChallengeDrillItem } from './types';
+
+const drillItemSchema = z.object({
+	drillType: z.string(),
+	targetWeakness: z.object({
+		drillType: z.string(),
+		category: z.string(),
+		severity: z.number(),
+		evidence: z.array(z.string()),
+		label: z.string(),
+	}),
+	instructions: z.string(),
+	generatedContent: z.unknown(),
+	estimatedMinutes: z.number(),
+});
+
+const contentSchema = z.object({
+	drillSequence: z.array(drillItemSchema),
+	totalEstimatedMinutes: z.number(),
+	summaryMessage: z.string(),
+});
 
 const SYSTEM_INSTRUCTION =
 	'You are Eklan, a clinical English fluency coach specialising in helping ' +
@@ -116,11 +137,20 @@ export async function generateWeeklyChallenge(
 		throw new Error('Gemini response did not contain a JSON object');
 	}
 
-	const content = JSON.parse(match[0]) as {
-		drillSequence: ChallengeDrillItem[];
-		totalEstimatedMinutes: number;
-		summaryMessage: string;
-	};
+	let raw: unknown;
+	try {
+		raw = JSON.parse(match[0]);
+	} catch (e: any) {
+		throw new Error('Gemini returned malformed JSON: ' + e.message);
+	}
 
-	return content;
+	const validation = contentSchema.safeParse(raw);
+	if (!validation.success) {
+		throw new Error(
+			'Gemini returned invalid content shape: ' +
+				(validation.error.issues[0]?.message ?? 'unknown')
+		);
+	}
+
+	return validation.data as WeeklyChallenge['content'];
 }

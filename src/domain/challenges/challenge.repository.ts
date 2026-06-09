@@ -15,6 +15,28 @@ type UpsertData = {
 };
 
 export class ChallengeRepository {
+	async findByLearner(
+		learnerId: Types.ObjectId,
+		options?: { statuses?: IWeeklyChallenge['status'][] },
+	): Promise<IWeeklyChallenge[]> {
+		try {
+			const filter: Record<string, unknown> = { learnerId };
+			if (options?.statuses?.length) {
+				filter.status = { $in: options.statuses };
+			}
+			return (await WeeklyChallengeModel.find(filter)
+				.sort({ weekStartDate: -1 })
+				.lean()
+				.exec()) as IWeeklyChallenge[];
+		} catch (error: any) {
+			logger.error('Error listing weekly challenges', {
+				learnerId: learnerId.toString(),
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
 	async findByLearnerAndWeek(
 		learnerId: Types.ObjectId,
 		weekStartDate: Date
@@ -59,6 +81,28 @@ export class ChallengeRepository {
 		} catch (error: any) {
 			logger.error('Error finding all weekly challenges for learner', {
 				learnerId: learnerId.toString(),
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
+	async completeItem(
+		learnerId: Types.ObjectId,
+		weekStartDate: Date,
+		itemIndex: number
+	): Promise<IWeeklyChallenge | null> {
+		try {
+			return await WeeklyChallengeModel.findOneAndUpdate(
+				{ learnerId, weekStartDate },
+				{ $addToSet: { completedItemIndexes: itemIndex } },
+				{ returnDocument: 'after', lean: true }
+			).exec();
+		} catch (error: any) {
+			logger.error('Error completing weekly challenge item', {
+				learnerId: learnerId.toString(),
+				weekStartDate,
+				itemIndex,
 				error: error.message,
 			});
 			throw error;

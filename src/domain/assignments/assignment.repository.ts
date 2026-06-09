@@ -209,8 +209,7 @@ export class AssignmentRepository {
         .populate({
           path: 'drillId',
           model: Drill,
-          // `roleplay_scenes` is needed so the pressure-test list can show drills with roleplay
-          // content even when `type` is mis-set or missing.
+          // Include roleplay fields for assignment drill previews.
           select:
             'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names',
         })

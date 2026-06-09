@@ -55,7 +55,6 @@ export interface IUser extends Document {
   appleOriginalTransactionId?: string;
   appleLatestTransactionId?: string;
   appleSubscriptionStatus?: string;
-  pressureTestLevel?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -252,12 +251,6 @@ const userSchema = new Schema<IUser>(
     },
     appleSubscriptionStatus: {
       type: String,
-    },
-    pressureTestLevel: {
-      type: Number,
-      default: 1,
-      min: 1,
-      max: 20,
     },
   },
   {

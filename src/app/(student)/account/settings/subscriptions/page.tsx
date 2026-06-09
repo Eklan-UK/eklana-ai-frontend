@@ -21,7 +21,6 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Eklan Free Talk — unlimited AI conversation practice sessions",
-  "Eklan Pressure Test — timed, high-pressure AI speaking drills",
   "Full access to all current and future AI-powered features",
   "AI-driven feedback and scoring on every session",
   "Personalised difficulty that adapts as you improve",

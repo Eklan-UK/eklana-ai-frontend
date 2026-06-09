@@ -1385,12 +1385,41 @@ export const dailyFocusAPI = {
 
 // Weekly Challenge API
 export const weeklyChallengeAPI = {
-	getCurrent: () => {
+	getHistory: () => {
+		return apiRequest<{
+			code?: string;
+			data?: {
+				challenges: Array<{
+					challengeId: string | null;
+					weekStartDate: string;
+					weekNumber?: number;
+					status: 'ready' | 'generating' | 'failed' | 'unavailable';
+					summaryMessage: string;
+					totalEstimatedMinutes: number;
+					drillSequence: Array<{
+						index: number;
+						drillType: string;
+						label: string;
+						instructions: string;
+						estimatedMinutes: number;
+						completed: boolean;
+					}>;
+					isSunday: boolean;
+				}>;
+			};
+		}>('/learner/weekly-challenge/history', {
+			method: 'GET',
+			cache: false,
+		});
+	},
+
+	getCurrent: (weekStartDate?: string) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
 				challengeId: string | null;
 				weekStartDate: string;
+				weekNumber?: number;
 				status: 'ready' | 'generating' | 'failed' | 'unavailable';
 				summaryMessage: string;
 				totalEstimatedMinutes: number;
@@ -1406,11 +1435,12 @@ export const weeklyChallengeAPI = {
 			};
 		}>('/learner/weekly-challenge', {
 			method: 'GET',
+			params: weekStartDate ? { weekStartDate } : undefined,
 			cache: false,
 		});
 	},
 
-	getItem: (index: number) => {
+	getItem: (index: number, weekStartDate?: string) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
@@ -1422,21 +1452,16 @@ export const weeklyChallengeAPI = {
 			};
 		}>(`/learner/weekly-challenge/items/${index}`, {
 			method: 'GET',
+			params: weekStartDate ? { weekStartDate } : undefined,
 			cache: false,
 		});
 	},
 
-	getHistory: () => {
-		return apiRequest<{
-			code?: string;
-			data?: { challenges: any[] };
-		}>('/learner/weekly-challenge/history', {
-			method: 'GET',
-			cache: false,
-		});
-	},
-
-	completeItem: (index: number, data?: { score?: number }) => {
+	completeItem: (
+		index: number,
+		data?: { score?: number },
+		weekStartDate?: string,
+	) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
@@ -1449,6 +1474,7 @@ export const weeklyChallengeAPI = {
 		}>(`/learner/weekly-challenge/items/${index}/complete`, {
 			method: 'POST',
 			data,
+			params: weekStartDate ? { weekStartDate } : undefined,
 		});
 	},
 };

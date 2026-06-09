@@ -52,8 +52,10 @@ async function main() {
 		}
 
 		// Build bulkWrite ops — set drillType to the resolved type, or null if the drill no longer exists
+		let resolvedCount = 0;
 		const ops = batch.map((attempt) => {
 			const type = drillTypeMap.get(attempt.drillId.toString()) ?? null;
+			if (type !== null) resolvedCount++;
 			return {
 				updateOne: {
 					filter: { _id: attempt._id },
@@ -69,6 +71,13 @@ async function main() {
 		updated += ops.length;
 		const remaining = total - updated;
 		console.log(`updated: ${updated} / ${total}  (remaining: ${remaining > 0 ? remaining : 0})`);
+
+		// Every document in this batch was an orphan (no matching Drill) — writing null
+		// again on the next iteration would loop forever. Stop here.
+		if (resolvedCount === 0) {
+			console.log(`Stopping — ${ops.length} orphaned documents have no matching Drill and cannot be resolved.`);
+			break;
+		}
 	}
 
 	console.log(`Done. ${updated} documents backfilled.`);

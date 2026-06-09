@@ -64,6 +64,9 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 | `src/domain/challenges/test-service.ts` | Dev script for testing the full service layer (aggregation → generation → persistence) without HTTP |
 | `src/app/api/v1/learner/weekly-challenge/history/route.ts` | `GET /api/v1/learner/weekly-challenge/history` — returns all challenges for the learner, sorted newest first |
 | `src/hooks/useWeeklyChallengeHistory.ts` | React Query hook for fetching the challenge history list |
+| `src/app/api/v1/learner/weekly-challenge/items/[index]/route.ts` | `GET /api/v1/learner/weekly-challenge/items/[index]` — fetch a single drill item by index, including its `generatedContent` |
+| `src/app/api/v1/learner/weekly-challenge/items/[index]/complete/route.ts` | `POST /api/v1/learner/weekly-challenge/items/[index]/complete` — mark item complete via `$addToSet` on `completedItemIndexes` |
+| `src/scripts/seed-test-challenge.ts` | Dev script to seed fake drill data for a test learner |
 | `docs/weekly-challenge-ui-spec.md` | UI implementation spec for the dev |
 
 ---
@@ -106,7 +109,41 @@ Response shape:
 }
 ```
 
-Both endpoints require the `user` role (`withRole(['user'])`).
+### `GET /api/v1/learner/weekly-challenge/items/[index]`
+
+Fetch a single drill item by its 0-based index within the current week's challenge. Returns the full `ChallengeDrillItem` including `generatedContent`.
+
+Response shape:
+```json
+{
+  "code": "OK",
+  "data": {
+    "item": {
+      "drillType": "pronunciation",
+      "targetWeakness": { ... },
+      "instructions": "...",
+      "generatedContent": { ... },
+      "estimatedMinutes": 5
+    }
+  }
+}
+```
+
+### `POST /api/v1/learner/weekly-challenge/items/[index]/complete`
+
+Mark a drill item as complete. Uses `$addToSet` on `completedItemIndexes` — safe to call multiple times for the same index.
+
+Response shape:
+```json
+{
+  "code": "OK",
+  "data": {
+    "completedItemIndexes": [0, 1]
+  }
+}
+```
+
+All four endpoints require the `user` role (`withRole(['user'])`).
 
 ---
 
@@ -361,16 +398,18 @@ A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal w
 
 `generateWeeklyChallenge` only produces content for `pronunciation`, `fill_blank`, `key_phrases`, and `roleplay`. Weaknesses from other drill types (e.g. `grammar`, `vocabulary`, `matching`) will be detected and included in `WeaknessProfile` but Gemini is not yet instructed on how to generate content for them.
 
+**`weekStartDate` window uses UTC**
+
+The window calculation uses `setUTCDate` — fixed in error hardening pass.
+
 ---
 
 ## 8. What's coming next
 
-The backend pipeline and frontend spec are complete. Remaining work:
+Remaining work:
 
-1. **Full integration testing in staging** — run against real learner data to verify the Gemini prompt produces correctly shaped `generatedContent` across all four drill types.
-2. **Error handling hardening (Day 9)** — surface `status: 'failed'` gracefully in the UI; consider a retry mechanism on the service layer for transient Gemini failures.
-3. **Latency measurement in staging** — instrument `getOrGenerateChallenge` to record aggregation time, Gemini response time, and total wall time; establish a p95 baseline.
-4. **Handoff documentation (Day 10)** — final review of all docs and sign-off before feature ships.
+1. **Production deployment** — ship the feature to production.
+2. **AA sign-off** — final review and sign-off before release.
 
 ---
 
