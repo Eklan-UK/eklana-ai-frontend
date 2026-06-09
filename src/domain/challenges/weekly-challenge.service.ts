@@ -267,8 +267,14 @@ function assignWeekNumbers(
 		(a, b) => a.weekStartDate.getTime() - b.weekStartDate.getTime(),
 	);
 	const weekNumbers = new Map<string, number>();
-	sorted.forEach((doc, index) => {
-		weekNumbers.set(doc.weekStartDate.toISOString(), index + 1);
+	let counter = 0;
+	sorted.forEach((doc) => {
+		const hasDrills = (doc.content?.drillSequence?.length ?? 0) > 0;
+		if (hasDrills) {
+			weekNumbers.set(doc.weekStartDate.toISOString(), ++counter);
+		} else {
+			weekNumbers.set(doc.weekStartDate.toISOString(), 0);
+		}
 	});
 	return weekNumbers;
 }

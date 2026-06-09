@@ -65,7 +65,7 @@ export function WeeklyChallengeCard({
 				</div>
 				<h3 className="text-white text-xl font-bold font-nunito mb-2">
 					{challenge.summaryMessage?.startsWith("This week focus on:")
-						? "Tackle your weaknesses from last week"
+						? "Personalized to address your weakest areas"
 						: (challenge.summaryMessage || t("summaryFallback"))}
 				</h3>
 				<div className="flex items-center gap-4 mb-4">

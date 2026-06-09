@@ -548,6 +548,8 @@ export default function RoleplayDrill({
   const startRecording = async () => {
     if (!isStudentTurn) return;
 
+    stopTTSAudio();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const chosenMime = pickRoleplayRecorderMimeType();

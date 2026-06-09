@@ -35,18 +35,18 @@ export default function WeeklyChallengeHistoryPage() {
 		);
 	}
 
+	const visibleChallenges = challenges.filter((c) => (c.drillSequence?.length ?? 0) > 0);
+
 	return (
 		<div className="min-h-screen bg-background pb-24">
 			<Header title={t("pageTitle")} showBack backHref="/account/practice" />
 			<div className="max-w-md mx-auto px-4 py-4 md:max-w-2xl">
-				{challenges.filter((c) => (c.drillSequence?.length ?? 0) > 0).length > 0 ? (
+				{visibleChallenges.length > 0 ? (
 					<div className="space-y-3">
-						{challenges
-							.filter((c) => (c.drillSequence?.length ?? 0) > 0)
-							.map((challenge) => (
+						{visibleChallenges.map((challenge, i) => (
 							<WeeklyChallengeWeekCard
 								key={challenge.weekStartDate}
-								challenge={challenge}
+								challenge={{ ...challenge, weekNumber: i + 1 }}
 							/>
 						))}
 					</div>
