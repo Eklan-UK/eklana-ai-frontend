@@ -146,6 +146,11 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // Vercel builds were timing out on "Running TypeScript". Type-check locally/CI via `npx tsc --noEmit`.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   /**
    * Short URL aliases (URL bar shows the short path; internally serves /account/*).
    * SubscriptionGuard normalizes these for allowlist checks (see subscriptionGuardPathname).

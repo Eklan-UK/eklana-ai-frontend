@@ -261,7 +261,7 @@ export async function aggregateWeaknesses(
 	weekStartDate: Date
 ): Promise<WeaknessProfile> {
 	const weekEndDate = new Date(weekStartDate);
-	weekEndDate.setDate(weekEndDate.getDate() + 7);
+	weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
 
 	const dateFilter = { $gte: weekStartDate, $lt: weekEndDate };
 
@@ -344,6 +344,7 @@ function extractFreeTalkSignals(attempts: IFreeTalkAttempt[]): WeaknessSignal[] 
 
 	const scenarioTypeFreq = new Map<string, number>();
 	for (const attempt of graded) {
+		if (!attempt.scenarioType) continue;
 		const t = attempt.scenarioType;
 		scenarioTypeFreq.set(t, (scenarioTypeFreq.get(t) ?? 0) + 1);
 	}

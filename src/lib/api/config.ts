@@ -129,7 +129,7 @@ export const config = {
 		process.env.GEMINI_SUMMARY_FALLBACK_MODEL?.trim() ||
 		'gemini-2.5-flash-lite',
 	/**
-	 * Native Gemini TTS (pressure-test, etc.). Prefer a lighter / preview model first
+	 * Native Gemini TTS (free-talk, etc.). Prefer a lighter / preview model first
 	 * to keep latency and quota lower; 3.1 TTS is often a separate, tighter daily cap.
 	 */
 	GEMINI_TTS_MODEL_PRIMARY:

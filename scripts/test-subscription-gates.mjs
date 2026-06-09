@@ -70,9 +70,6 @@ const GATED_ROUTES = [
   { label: 'Free Talk — greeting',     method: 'GET',  path: '/api/v1/ai/free-talk/greeting' },
   { label: 'Free Talk — scenario list', method: 'GET', path: '/api/v1/ai/free-talk/scenarios' },
   { label: 'Free Talk — conversation', method: 'POST', path: '/api/v1/ai/conversation',       body: { message: 'hello', conversationHistory: [] } },
-  { label: 'Pressure Test — chat',     method: 'POST', path: '/api/v1/pressure-test/chat',    body: { message: 'test' } },
-  { label: 'Pressure Test — analyze',  method: 'POST', path: '/api/v1/pressure-test/analyze', body: { conversationHistory: [] } },
-  { label: 'Pressure Test — TTS',      method: 'POST', path: '/api/v1/pressure-test/tts',     body: { text: 'hello' } },
 ];
 
 // ── Console helpers ───────────────────────────────────────────────────────────

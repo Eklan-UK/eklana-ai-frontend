@@ -216,33 +216,41 @@ export default function FillBlankDrill({
         buildFillBlankResults();
       const passed = score >= PASS_THRESHOLD;
 
-      if (passed) {
-        if (weeklyChallengeMeta) {
-          await completeWeeklyChallengeItem(
-            queryClient,
-            weeklyChallengeMeta.itemIndex,
-            { score },
-          );
-        } else {
-          await drillAPI.complete(drill._id, {
-            drillAssignmentId: assignmentId!,
+      if (weeklyChallengeMeta) {
+        await completeWeeklyChallengeItem(
+          queryClient,
+          weeklyChallengeMeta.itemIndex,
+          {
             score,
-            timeSpent: Math.floor((Date.now() - startTime) / 1000),
-            fillBlankResults: {
-              ...fillBlankResults,
-              totalBlanks,
-              correctBlanks,
-              score,
-            },
-            platform: "web",
-          });
-        }
-
+            weekStartDate: weeklyChallengeMeta.weekStartDate,
+          },
+        );
         trackActivity("drill", drill._id, "completed", {
           title: drill.title,
           type: drill.type,
           score,
         });
+      } else if (passed) {
+        await drillAPI.complete(drill._id, {
+          drillAssignmentId: assignmentId!,
+          score,
+          timeSpent: Math.floor((Date.now() - startTime) / 1000),
+          fillBlankResults: {
+            ...fillBlankResults,
+            totalBlanks,
+            correctBlanks,
+            score,
+          },
+          platform: "web",
+        });
+        trackActivity("drill", drill._id, "completed", {
+          title: drill.title,
+          type: drill.type,
+          score,
+        });
+      }
+
+      if (passed) {
         toast.success("Drill passed! Great job!");
       } else {
         toast.error(

@@ -10,30 +10,54 @@ function unwrapWeeklyChallenge(response: {
 	return response?.data ?? null;
 }
 
-export function useWeeklyChallenge(options?: { enabled?: boolean }) {
+const generatingPollInterval = (data: WeeklyChallengeListResponse | null | undefined) =>
+	data?.status === 'generating' ? 3000 : false;
+
+export function useWeeklyChallengeHistory(options?: { enabled?: boolean }) {
 	return useQuery({
-		queryKey: queryKeys.weeklyChallenge.current(),
+		queryKey: queryKeys.weeklyChallenge.history(),
 		queryFn: async () => {
-			const response = await weeklyChallengeAPI.getCurrent();
-			return unwrapWeeklyChallenge(response);
+			const response = await weeklyChallengeAPI.getHistory();
+			return response?.data?.challenges ?? [];
 		},
 		enabled: options?.enabled ?? true,
 		staleTime: 1000 * 60 * 2,
 		refetchInterval: (query) => {
-			const data = query.state.data;
-			if (data?.status === 'generating') {
-				return 3000;
-			}
-			return false;
+			const challenges = query.state.data ?? [];
+			const isGenerating = challenges.some((c) => c.status === 'generating');
+			return isGenerating ? 3000 : false;
 		},
 	});
 }
 
-export function useWeeklyChallengeItem(index: number, options?: { enabled?: boolean }) {
+export function useWeeklyChallenge(
+	weekStartDate?: string,
+	options?: { enabled?: boolean },
+) {
 	return useQuery({
-		queryKey: queryKeys.weeklyChallenge.item(index),
+		queryKey: weekStartDate
+			? queryKeys.weeklyChallenge.week(weekStartDate)
+			: queryKeys.weeklyChallenge.current(),
 		queryFn: async () => {
-			const response = await weeklyChallengeAPI.getItem(index);
+			const response = await weeklyChallengeAPI.getCurrent(weekStartDate);
+			return unwrapWeeklyChallenge(response);
+		},
+		enabled: options?.enabled ?? true,
+		staleTime: 1000 * 60 * 2,
+		refetchInterval: (query) => generatingPollInterval(query.state.data),
+	});
+}
+
+export function useWeeklyChallengeItem(
+	index: number,
+	weekStartDate?: string,
+	options?: { enabled?: boolean },
+) {
+	const resolvedWeek = weekStartDate ?? '';
+	return useQuery({
+		queryKey: queryKeys.weeklyChallenge.item(resolvedWeek, index),
+		queryFn: async () => {
+			const response = await weeklyChallengeAPI.getItem(index, weekStartDate);
 			return response?.data ?? null;
 		},
 		enabled: (options?.enabled ?? true) && index >= 0,

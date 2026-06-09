@@ -513,7 +513,10 @@ export default function PronunciationDrill({
       });
 
       if (weeklyChallengeMeta) {
-        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, { score });
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
+          score,
+          weekStartDate: weeklyChallengeMeta.weekStartDate,
+        });
       } else {
         await drillAPI.complete(drill._id, {
           drillAssignmentId: assignmentId!,
