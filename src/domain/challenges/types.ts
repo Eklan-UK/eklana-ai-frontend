@@ -87,7 +87,7 @@ export interface WeeklyChallenge {
 	content: {
 		drillSequence: ChallengeDrillItem[];
 		totalEstimatedMinutes: number;
-		summaryMessage: string; // e.g. "This week focus on: fluency, phoneme /θ/, vocabulary"
+		summaryMessage: string; // e.g. "Tackle Your Weaknesses from Last Week"
 	};
 	status: 'pending' | 'generating' | 'ready' | 'failed';
 	generatedAt?: Date; // only set when status === 'ready'

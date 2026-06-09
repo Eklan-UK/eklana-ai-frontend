@@ -39,9 +39,11 @@ export default function WeeklyChallengeHistoryPage() {
 		<div className="min-h-screen bg-background pb-24">
 			<Header title={t("pageTitle")} showBack backHref="/account/practice" />
 			<div className="max-w-md mx-auto px-4 py-4 md:max-w-2xl">
-				{challenges.length > 0 ? (
+				{challenges.filter((c) => (c.drillSequence?.length ?? 0) > 0).length > 0 ? (
 					<div className="space-y-3">
-						{challenges.map((challenge) => (
+						{challenges
+							.filter((c) => (c.drillSequence?.length ?? 0) > 0)
+							.map((challenge) => (
 							<WeeklyChallengeWeekCard
 								key={challenge.weekStartDate}
 								challenge={challenge}
