@@ -368,14 +368,17 @@ export default function RoleplayDrill({
 
   const drillIdStr = drill._id != null ? String(drill._id) : "";
 
+  // Stop prestart intro voice the moment the session begins — runs once on that transition.
+  useEffect(() => {
+    if (!sessionStarted) return;
+    stopTTSAudio();
+    if (drillIdStr) clearPrestartTtsDebounce(drillIdStr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stopTTSAudio is stable; only needs sessionStarted + drillIdStr
+  }, [sessionStarted, drillIdStr]);
+
   // Auto-read intro + roles when the learner lands on the pre-start screen (browser may block until a tap).
   useEffect(() => {
-    if (sessionStarted) {
-      stopTTSAudio();
-      if (drillIdStr) clearPrestartTtsDebounce(drillIdStr);
-      return;
-    }
-    if (isCompleted || showReview) return;
+    if (sessionStarted || isCompleted || showReview) return;
 
     const d = scenes[currentSceneIndex]?.dialogue;
     const turn = d?.[currentTurnIndex];
@@ -384,8 +387,7 @@ export default function RoleplayDrill({
     if (!consumePrestartTtsDebounceSlot(drillIdStr)) return;
 
     void playTTSAudio(prestartTtsText);
-    // playTTSAudio / stopTTSAudio are stable from useTTS; omit to avoid effect churn double-firing TTS.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playTTSAudio is stable from useTTS
   }, [
     sessionStarted,
     isCompleted,
@@ -947,8 +949,8 @@ export default function RoleplayDrill({
       }
       stopTTSAudio();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopTTSAudio]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only cleanup; all captured refs are stable
+  }, []);
 
   const awaitingSubmit =
     !!pendingSubmitBlob &&
