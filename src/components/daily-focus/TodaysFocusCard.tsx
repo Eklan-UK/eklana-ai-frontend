@@ -38,7 +38,8 @@ const focusTypeLabels: Record<string, string> = {
 };
 
 export function TodaysFocusCard() {
-  const isSunday = isSundayUtc();
+  // TEMP: force Sunday for demo — revert to: const isSunday = isSundayUtc();
+  const isSunday = true;
   const { data: weeklyChallenge } = useWeeklyChallenge(undefined, { enabled: isSunday });
   const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
 

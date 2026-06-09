@@ -72,6 +72,43 @@ export class ChallengeRepository {
 		}
 	}
 
+	async findAllByLearner(learnerId: Types.ObjectId): Promise<IWeeklyChallenge[]> {
+		try {
+			return await WeeklyChallengeModel.find({ learnerId })
+				.sort({ weekStartDate: -1 })
+				.lean()
+				.exec();
+		} catch (error: any) {
+			logger.error('Error finding all weekly challenges for learner', {
+				learnerId: learnerId.toString(),
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
+	async completeItem(
+		learnerId: Types.ObjectId,
+		weekStartDate: Date,
+		itemIndex: number
+	): Promise<IWeeklyChallenge | null> {
+		try {
+			return await WeeklyChallengeModel.findOneAndUpdate(
+				{ learnerId, weekStartDate },
+				{ $addToSet: { completedItemIndexes: itemIndex } },
+				{ returnDocument: 'after', lean: true }
+			).exec();
+		} catch (error: any) {
+			logger.error('Error completing weekly challenge item', {
+				learnerId: learnerId.toString(),
+				weekStartDate,
+				itemIndex,
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
 	async updateStatus(
 		id: Types.ObjectId,
 		status: IWeeklyChallenge['status'],
