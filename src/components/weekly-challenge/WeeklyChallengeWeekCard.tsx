@@ -50,7 +50,9 @@ export function WeeklyChallengeWeekCard({
 					) : null}
 				</div>
 				<p className="text-xs text-muted-foreground line-clamp-2">
-					{challenge.summaryMessage || t("summaryFallback")}
+					{challenge.summaryMessage?.startsWith("This week focus on:")
+						? "Tackle your weaknesses from last week"
+						: (challenge.summaryMessage || t("summaryFallback"))}
 				</p>
 				<div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
 					<span>{t("drillCount", { count: drillSequence.length })}</span>

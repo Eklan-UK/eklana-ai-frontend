@@ -80,7 +80,9 @@ export default function WeeklyChallengeWeekPage() {
 								</span>
 							</div>
 							<h2 className="text-xl font-bold font-nunito mb-2">
-								{challenge.summaryMessage || t("summaryFallback")}
+								{challenge.summaryMessage?.startsWith("This week focus on:")
+									? "Tackle your weaknesses from last week"
+									: (challenge.summaryMessage || t("summaryFallback"))}
 							</h2>
 							<p className="text-white/80 text-sm">
 								{t("estimatedMinutes", { minutes: challenge.totalEstimatedMinutes })}

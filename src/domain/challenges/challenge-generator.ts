@@ -68,7 +68,7 @@ Return a JSON object with this exact shape:
     }
   ],
   "totalEstimatedMinutes": <sum of estimatedMinutes>,
-  "summaryMessage": "Tackle Your Weaknesses from Last Week"
+  "summaryMessage": "Tackle your weaknesses from last week"
 }
 
 Per-type generatedContent schemas:
