@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { ChevronRight, Lock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
@@ -97,6 +98,7 @@ function PracticeCard({
 }
 
 export default function PracticePage() {
+  const tWeekly = useTranslations("account.weeklyChallenge");
   const { data: me, isLoading } = useUserCurrent();
   // Default locked while loading to prevent flash of unlocked state.
   const isSubscribed = !isLoading && learnerHasProAccess(me?.user);
@@ -123,15 +125,12 @@ export default function PracticePage() {
           />
 
           <PracticeCard
-            href="/account/practice/comment-screen"
-            iconBg="bg-[#2A602C]"
-            iconSrc="/Pressure_test_logo.svg"
-            title="Eklan Pressure Test"
-            subtitle="Coming soon"
+            href="/account/practice/weekly-challenge"
+            iconBg="bg-emerald-700"
+            iconSrc="/icons/logo-yellow.svg"
+            title={tWeekly("practiceCardTitle")}
+            subtitle={tWeekly("practiceCardSubtitle")}
             meta={[]}
-            iconWidth={40}
-            iconHeight={38}
-            iconImageClassName=""
             locked={!isSubscribed}
           />
         </div>

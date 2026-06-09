@@ -3,6 +3,7 @@ import type { ChallengeDrillItem } from '@/domain/challenges/types';
 export interface WeeklyChallengeMeta {
 	challengeId: string;
 	itemIndex: number;
+	weekStartDate: string;
 }
 
 export function toDrillShape(

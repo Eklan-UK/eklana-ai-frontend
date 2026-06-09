@@ -381,6 +381,7 @@ export default function KeyPhrasesDrill({
       if (weeklyChallengeMeta) {
         await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
           score: avgScore,
+          weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
       } else {
         await drillAPI.complete(drill._id, {

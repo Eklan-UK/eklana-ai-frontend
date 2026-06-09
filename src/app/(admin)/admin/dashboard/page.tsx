@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Plus,
   Clock,
@@ -14,12 +14,9 @@ import {
   CalendarDays,
   Target,
   Flame,
-  Download,
-  Database,
 } from "lucide-react";
 import Link from "next/link";
 import { adminService } from "@/services/admin.service";
-import { toast } from "sonner";
 import { useDashboardStats, useRecentLearners } from "@/hooks/useAdmin";
 import { useOverallPronunciationAnalytics } from "@/hooks/usePronunciations";
 import { BarChart, Mic, AlertCircle, Volume2 } from "lucide-react";
@@ -39,50 +36,6 @@ const Dashboard: React.FC = () => {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: learners = [], isLoading: learnersLoading } = useRecentLearners(10);
   const { data: pronunciationAnalytics, isLoading: pronunciationLoading } = useOverallPronunciationAnalytics();
-
-  // Pressure test export state
-  const [exportFrom, setExportFrom] = useState("");
-  const [exportTo, setExportTo] = useState("");
-  const [exportLevel, setExportLevel] = useState("");
-  const [exportMinAccuracy, setExportMinAccuracy] = useState("");
-  const [exportLimit, setExportLimit] = useState("1000");
-  const [exporting, setExporting] = useState(false);
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const params = new URLSearchParams();
-      if (exportFrom) params.set("from", exportFrom);
-      if (exportTo) params.set("to", exportTo);
-      if (exportLevel) params.set("level", exportLevel);
-      if (exportMinAccuracy) params.set("minAccuracy", exportMinAccuracy);
-      if (exportLimit) params.set("limit", exportLimit);
-
-      const res = await fetch(`/api/v1/admin/pressure-test/export?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || `Export failed (${res.status})`);
-      }
-
-      const totalLines = res.headers.get("X-Total-Lines") ?? "?";
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `pressure-test-export-${new Date().toISOString().slice(0, 10)}.jsonl`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast.success(`Downloaded ${totalLines} training examples.`);
-    } catch (err: any) {
-      toast.error(err?.message || "Export failed.");
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const loading = statsLoading || learnersLoading || pronunciationLoading;
 
@@ -550,93 +503,6 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         )}
-      </section>
-
-      {/* Pressure Test — AI Training Data Export */}
-      <section className="mt-8">
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50">
-            <Database className="w-4 h-4 text-violet-600" />
-            <h2 className="text-sm font-semibold text-gray-800">Pressure Test — AI Training Data Export</h2>
-          </div>
-          <div className="p-5 space-y-4">
-            <p className="text-xs text-gray-500">
-              Export raw pressure test sessions as JSONL for Gemini / Vertex AI fine-tuning.
-              Each line is a training example containing the system prompt, student response, and metadata.
-            </p>
-
-            {/* Filters */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">From date</label>
-                <input
-                  type="date"
-                  value={exportFrom}
-                  onChange={(e) => setExportFrom(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">To date</label>
-                <input
-                  type="date"
-                  value={exportTo}
-                  onChange={(e) => setExportTo(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Level (1–20)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  placeholder="All levels"
-                  value={exportLevel}
-                  onChange={(e) => setExportLevel(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Min accuracy %</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0"
-                  value={exportMinAccuracy}
-                  onChange={(e) => setExportMinAccuracy(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Limit rows</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={10000}
-                  value={exportLimit}
-                  onChange={(e) => setExportLimit(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {exporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {exporting ? "Exporting…" : "Download JSONL"}
-            </button>
-          </div>
-        </div>
       </section>
     </div>
   );

@@ -5,14 +5,33 @@ import { queryKeys } from '@/lib/react-query';
 export async function completeWeeklyChallengeItem(
 	queryClient: QueryClient,
 	itemIndex: number,
-	data?: { score?: number },
+	data?: { score?: number; weekStartDate?: string },
 ) {
-	const response = await weeklyChallengeAPI.completeItem(itemIndex, data);
+	const response = await weeklyChallengeAPI.completeItem(
+		itemIndex,
+		data?.score != null ? { score: data.score } : undefined,
+		data?.weekStartDate,
+	);
+
 	await queryClient.invalidateQueries({
-		queryKey: queryKeys.weeklyChallenge.current(),
+		queryKey: queryKeys.weeklyChallenge.history(),
 	});
-	await queryClient.invalidateQueries({
-		queryKey: queryKeys.weeklyChallenge.item(itemIndex),
-	});
+
+	if (data?.weekStartDate) {
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.week(data.weekStartDate),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.item(data.weekStartDate, itemIndex),
+		});
+	} else {
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.current(),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.item('', itemIndex),
+		});
+	}
+
 	return response;
 }

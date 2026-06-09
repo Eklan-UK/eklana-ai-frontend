@@ -1,7 +1,7 @@
 ` /**
  * Eklan AI — Conversation Latency Benchmark
  * ==========================================
- * Measures end-to-end response times for Free Talk (text + voice) and Pressure Test
+ * Measures end-to-end response times for Free Talk (text + voice)
  * by hitting the real Next.js API routes over HTTP and parsing the SSE stream.
  *
  * REQUIREMENTS
@@ -17,16 +17,13 @@
  *   LATENCY_RUNS           Number of timed runs per scenario (after warmup). Default: 3
  *   LATENCY_WARMUP         Warmup runs discarded before recording. Default: 1
  *   LATENCY_ONLY           Comma-separated list to restrict scenarios:
- *                            freetalk-text, freetalk-voice, pressure
- *                          Default: all three.
- *   PRESSURE_LEVEL         Student level 1-20 for Pressure Test payload. Default: 3
- *   PRESSURE_DRILL_ID      Optional drillId to include in Pressure Test request for
- *                          a realistic system prompt. Leave blank for generic prompt.
+ *                            freetalk-text, freetalk-voice
+ *                          Default: both.
  *
  * EXAMPLE
  *   npm run latency:conversation
  *   LATENCY_BASE_URL=http://localhost:3000 LATENCY_COOKIE='better-auth.session_token=abc...' npm run latency:conversation
- *   LATENCY_ONLY=freetalk-text,pressure LATENCY_RUNS=5 npm run latency:conversation
+ *   LATENCY_ONLY=freetalk-text LATENCY_RUNS=5 npm run latency:conversation
  *
  * REGENERATE VOICE FIXTURE
  *   ./node_modules/ffmpeg-static/ffmpeg -f lavfi -i anullsrc=r=16000:cl=mono -t 1 \
@@ -36,8 +33,6 @@
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { randomUUID } from "crypto";
-
 // ── Load .env ─────────────────────────────────────────────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -57,9 +52,6 @@ const RUNS        = parseInt(process.env.LATENCY_RUNS   || "3",  10);
 const WARMUP      = parseInt(process.env.LATENCY_WARMUP || "1",  10);
 const ONLY_RAW    = (process.env.LATENCY_ONLY || "").trim();
 const ONLY        = ONLY_RAW ? ONLY_RAW.split(",").map((s) => s.trim()) : null;
-
-const PRESSURE_LEVEL    = parseInt(process.env.PRESSURE_LEVEL || "3", 10);
-const PRESSURE_DRILL_ID = process.env.PRESSURE_DRILL_ID || "";
 
 const VOICE_FIXTURE = join(__dirname, "fixtures", "minimal-voice.webm");
 
@@ -241,43 +233,6 @@ async function runFreeTalkVoice() {
   }));
 }
 
-// ── Scenario: Pressure Test chat (POST /api/v1/pressure-test/chat) ────────────
-async function runPressureTest() {
-  const sessionId = randomUUID();
-
-  const body = {
-    messages: [{ role: "user", content: "begin" }],
-    level: PRESSURE_LEVEL,
-    turnNumber: 1,
-    sessionId,
-    isNewSession: true,
-    reset: true,
-    ...(PRESSURE_DRILL_ID ? { drillId: PRESSURE_DRILL_ID } : {}),
-  };
-
-  const t0 = performance.now();
-  const response = await fetch(`${BASE_URL}/api/v1/pressure-test/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
-  }
-
-  const headersMs = performance.now() - t0;
-
-  return consumeSSE(response, ["text"], ["done", "error"]).then((r) => ({
-    ...r,
-    headersMs,
-  }));
-}
-
 // ── Runner: execute one scenario N+warmup times ───────────────────────────────
 async function runScenario(name, fn, { runs, warmup }) {
   const firstTimes = [];
@@ -339,11 +294,6 @@ const scenarios = [
     name: "Free Talk — voice (POST /api/v1/ai/voice/conversation)",
     fn: runFreeTalkVoice,
   },
-  {
-    id: "pressure",
-    name: "Pressure Test — chat (POST /api/v1/pressure-test/chat)",
-    fn: runPressureTest,
-  },
 ];
 
 const selected = ONLY
@@ -351,7 +301,7 @@ const selected = ONLY
   : scenarios;
 
 if (selected.length === 0) {
-  console.error(`No matching scenarios for LATENCY_ONLY="${ONLY_RAW}". Valid: freetalk-text, freetalk-voice, pressure`);
+  console.error(`No matching scenarios for LATENCY_ONLY="${ONLY_RAW}". Valid: freetalk-text, freetalk-voice`);
   process.exit(1);
 }
 
