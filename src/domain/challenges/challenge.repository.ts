@@ -15,6 +15,28 @@ type UpsertData = {
 };
 
 export class ChallengeRepository {
+	async findByLearner(
+		learnerId: Types.ObjectId,
+		options?: { statuses?: IWeeklyChallenge['status'][] },
+	): Promise<IWeeklyChallenge[]> {
+		try {
+			const filter: Record<string, unknown> = { learnerId };
+			if (options?.statuses?.length) {
+				filter.status = { $in: options.statuses };
+			}
+			return (await WeeklyChallengeModel.find(filter)
+				.sort({ weekStartDate: -1 })
+				.lean()
+				.exec()) as IWeeklyChallenge[];
+		} catch (error: any) {
+			logger.error('Error listing weekly challenges', {
+				learnerId: learnerId.toString(),
+				error: error.message,
+			});
+			throw error;
+		}
+	}
+
 	async findByLearnerAndWeek(
 		learnerId: Types.ObjectId,
 		weekStartDate: Date

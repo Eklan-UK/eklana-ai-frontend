@@ -39,7 +39,7 @@ const focusTypeLabels: Record<string, string> = {
 
 export function TodaysFocusCard() {
   const isSunday = isSundayUtc();
-  const { data: weeklyChallenge } = useWeeklyChallenge({ enabled: isSunday });
+  const { data: weeklyChallenge } = useWeeklyChallenge(undefined, { enabled: isSunday });
   const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
 
   const activeDrills = (drillsData ?? []).filter(
@@ -90,7 +90,7 @@ export function TodaysFocusCard() {
   if (
     isSunday &&
     weeklyChallenge?.status === "ready" &&
-    weeklyChallenge.drillSequence.length > 0
+    (weeklyChallenge.drillSequence?.length ?? 0) > 0
   ) {
     return <WeeklyChallengeCard challenge={weeklyChallenge} />;
   }

@@ -1,15 +1,31 @@
 // GET /api/v1/learner/weekly-challenge/items/[index] — full drill item for practice
 import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
+import { z } from 'zod';
 import { withRole } from '@/lib/api/middleware';
 import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
 import { apiResponse, NotFoundError, ValidationError } from '@/lib/api/response';
 import { getWeeklyChallengeItem } from '@/domain/challenges/weekly-challenge.service';
+import { currentWeekStartUtc } from '@/lib/challenges/utc-week-challenge';
 import '@/models/weekly-challenge';
 
+const weekStartDateSchema = z.string().datetime();
+
+function parseWeekStartDate(req: NextRequest): Date {
+	const weekStartDateParam = new URL(req.url).searchParams.get('weekStartDate');
+	if (!weekStartDateParam) {
+		return currentWeekStartUtc();
+	}
+	const parsed = weekStartDateSchema.safeParse(weekStartDateParam);
+	if (!parsed.success) {
+		throw new ValidationError('weekStartDate must be an ISO datetime string');
+	}
+	return new Date(parsed.data);
+}
+
 async function getHandler(
-	_req: NextRequest,
+	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string },
 	params: { index: string },
 ) {
@@ -19,7 +35,12 @@ async function getHandler(
 		throw new ValidationError('Invalid item index');
 	}
 
-	const item = await getWeeklyChallengeItem(context.userId, index);
+	const weekStartDate = parseWeekStartDate(req);
+	const item = await getWeeklyChallengeItem(
+		context.userId,
+		index,
+		weekStartDate,
+	);
 	if (!item) {
 		throw new NotFoundError('Weekly challenge item');
 	}

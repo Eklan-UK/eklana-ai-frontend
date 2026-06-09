@@ -49,8 +49,9 @@ export function WeeklyChallengeCard({
 		);
 	}
 
-	const drillCount = challenge.drillSequence.length;
-	const completedCount = challenge.drillSequence.filter((d) => d.completed).length;
+	const drillSequence = challenge.drillSequence ?? [];
+	const drillCount = drillSequence.length;
+	const completedCount = drillSequence.filter((d) => d.completed).length;
 	const hasProgress = completedCount > 0 && completedCount < drillCount;
 
 	return (
@@ -75,7 +76,7 @@ export function WeeklyChallengeCard({
 				</div>
 				<button
 					type="button"
-					onClick={() => router.push("/account/weekly-challenge")}
+					onClick={() => router.push("/account/practice/weekly-challenge")}
 					className="w-full bg-yellow-400 hover:bg-yellow-300 text-emerald-900 font-semibold text-base py-3.5 rounded-2xl transition-colors"
 				>
 					{hasProgress ? t("resume") : t("start")}

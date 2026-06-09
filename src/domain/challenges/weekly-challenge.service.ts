@@ -2,8 +2,12 @@ import { Types } from 'mongoose';
 import WeeklyChallengeModel, { type IWeeklyChallenge } from '@/models/weekly-challenge';
 import { aggregateWeaknesses } from './weakness-aggregator';
 import { generateWeeklyChallenge } from './challenge-generator';
+import { ChallengeRepository } from './challenge.repository';
+import { ChallengeService } from './challenge.service';
 import { currentWeekStartUtc, isSundayUtc } from '@/lib/challenges/utc-week-challenge';
 import type { ChallengeDrillItem } from './types';
+
+const challengeService = new ChallengeService(new ChallengeRepository());
 
 const EMPTY_SUMMARY =
 	'Complete drills Monday through Saturday to unlock your personalized challenge on Sunday.';
@@ -20,11 +24,16 @@ export interface WeeklyChallengeListItem {
 export interface WeeklyChallengeListResponse {
 	challengeId: string | null;
 	weekStartDate: string;
+	weekNumber?: number;
 	status: 'ready' | 'generating' | 'failed' | 'unavailable';
 	summaryMessage: string;
 	totalEstimatedMinutes: number;
 	drillSequence: WeeklyChallengeListItem[];
 	isSunday: boolean;
+}
+
+export interface WeeklyChallengeHistoryResponse {
+	challenges: WeeklyChallengeListResponse[];
 }
 
 export interface WeeklyChallengeItemResponse {
@@ -43,17 +52,19 @@ export interface WeeklyChallengeCompleteResponse {
 	totalItems: number;
 }
 
-function toListResponse(
+export function toListResponse(
 	doc: IWeeklyChallenge | null,
 	now: Date,
+	options?: { weekStartDate?: Date; weekNumber?: number },
 ): WeeklyChallengeListResponse {
 	const isSunday = isSundayUtc(now);
-	const weekStartDate = currentWeekStartUtc(now);
+	const fallbackWeekStart = options?.weekStartDate ?? currentWeekStartUtc(now);
 
 	if (!doc) {
 		return {
 			challengeId: null,
-			weekStartDate: weekStartDate.toISOString(),
+			weekStartDate: fallbackWeekStart.toISOString(),
+			weekNumber: options?.weekNumber,
 			status: 'unavailable',
 			summaryMessage: EMPTY_SUMMARY,
 			totalEstimatedMinutes: 0,
@@ -75,6 +86,7 @@ function toListResponse(
 	return {
 		challengeId: doc._id.toString(),
 		weekStartDate: doc.weekStartDate.toISOString(),
+		weekNumber: options?.weekNumber,
 		status:
 			doc.status === 'ready' || doc.status === 'generating' || doc.status === 'failed'
 				? doc.status
@@ -242,13 +254,108 @@ export async function getOrCreateWeeklyChallenge(
 	return toListResponse(doc, now);
 }
 
+function normalizeWeekStartDate(weekStartDate: Date): Date {
+	const normalized = new Date(weekStartDate);
+	normalized.setUTCHours(0, 0, 0, 0);
+	return normalized;
+}
+
+function assignWeekNumbers(
+	docs: IWeeklyChallenge[],
+): Map<string, number> {
+	const sorted = [...docs].sort(
+		(a, b) => a.weekStartDate.getTime() - b.weekStartDate.getTime(),
+	);
+	const weekNumbers = new Map<string, number>();
+	sorted.forEach((doc, index) => {
+		weekNumbers.set(doc.weekStartDate.toISOString(), index + 1);
+	});
+	return weekNumbers;
+}
+
+async function ensureCurrentWeekChallenge(
+	learnerId: Types.ObjectId,
+	now: Date = new Date(),
+): Promise<void> {
+	const currentWeek = currentWeekStartUtc(now);
+	try {
+		await challengeService.getOrGenerateChallenge(learnerId, currentWeek);
+	} catch {
+		// Generation may fail; history should still return existing weeks
+	}
+	if (isSundayUtc(now)) {
+		await getOrCreateWeeklyChallenge(learnerId, now);
+	}
+}
+
+export async function getWeeklyChallengeHistory(
+	learnerId: Types.ObjectId,
+	now: Date = new Date(),
+): Promise<WeeklyChallengeHistoryResponse> {
+	await ensureCurrentWeekChallenge(learnerId, now);
+
+	const docs = await WeeklyChallengeModel.find({
+		learnerId,
+		status: { $in: ['ready', 'generating', 'failed'] },
+	})
+		.sort({ weekStartDate: -1 })
+		.exec();
+
+	const weekNumbers = assignWeekNumbers(docs);
+
+	const challenges = docs.map((doc) =>
+		toListResponse(doc, now, {
+			weekNumber: weekNumbers.get(doc.weekStartDate.toISOString()),
+		}),
+	);
+
+	return { challenges };
+}
+
+export async function getWeeklyChallengeForWeek(
+	learnerId: Types.ObjectId,
+	weekStartDate: Date,
+	now: Date = new Date(),
+): Promise<WeeklyChallengeListResponse> {
+	const normalizedWeek = normalizeWeekStartDate(weekStartDate);
+	const currentWeek = currentWeekStartUtc(now);
+
+	if (normalizedWeek.getTime() === currentWeek.getTime()) {
+		await ensureCurrentWeekChallenge(learnerId, now);
+	}
+
+	const doc = await WeeklyChallengeModel.findOne({
+		learnerId,
+		weekStartDate: normalizedWeek,
+	});
+
+	const allDocs = await WeeklyChallengeModel.find({
+		learnerId,
+		status: { $in: ['ready', 'generating', 'failed'] },
+	}).exec();
+	const weekNumbers = assignWeekNumbers(allDocs);
+
+	return toListResponse(doc, now, {
+		weekStartDate: normalizedWeek,
+		weekNumber: doc
+			? weekNumbers.get(doc.weekStartDate.toISOString())
+			: undefined,
+	});
+}
+
 export async function getWeeklyChallengeItem(
 	learnerId: Types.ObjectId,
 	index: number,
+	weekStartDate?: Date,
 	now: Date = new Date(),
 ): Promise<WeeklyChallengeItemResponse | null> {
-	const weekStartDate = currentWeekStartUtc(now);
-	const doc = await WeeklyChallengeModel.findOne({ learnerId, weekStartDate });
+	const resolvedWeekStart = normalizeWeekStartDate(
+		weekStartDate ?? currentWeekStartUtc(now),
+	);
+	const doc = await WeeklyChallengeModel.findOne({
+		learnerId,
+		weekStartDate: resolvedWeekStart,
+	});
 
 	if (!doc || doc.status !== 'ready') {
 		return null;
@@ -274,10 +381,16 @@ export async function markWeeklyChallengeItemComplete(
 	learnerId: Types.ObjectId,
 	index: number,
 	_score?: number,
+	weekStartDate?: Date,
 	now: Date = new Date(),
 ): Promise<WeeklyChallengeCompleteResponse | null> {
-	const weekStartDate = currentWeekStartUtc(now);
-	const doc = await WeeklyChallengeModel.findOne({ learnerId, weekStartDate });
+	const resolvedWeekStart = normalizeWeekStartDate(
+		weekStartDate ?? currentWeekStartUtc(now),
+	);
+	const doc = await WeeklyChallengeModel.findOne({
+		learnerId,
+		weekStartDate: resolvedWeekStart,
+	});
 
 	if (!doc || doc.status !== 'ready') {
 		return null;
@@ -289,7 +402,7 @@ export async function markWeeklyChallengeItemComplete(
 	}
 
 	const updated = await WeeklyChallengeModel.findOneAndUpdate(
-		{ learnerId, weekStartDate, status: 'ready' },
+		{ learnerId, weekStartDate: resolvedWeekStart, status: 'ready' },
 		{ $addToSet: { completedItemIndexes: index } },
 		{ new: true },
 	);

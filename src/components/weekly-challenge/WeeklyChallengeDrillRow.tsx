@@ -8,6 +8,7 @@ import {
 	getDrillTypeLabel,
 } from "@/utils/drill";
 import type { WeeklyChallengeListItem } from "@/domain/challenges/weekly-challenge.service";
+import { encodeWeekStartDate } from "@/lib/challenges/weekly-challenge-url";
 
 const CATEGORY_TEXT: Record<string, string> = {
 	green: "text-violet-600",
@@ -39,9 +40,11 @@ const THUMB_GRADIENT: Record<string, string> = {
 
 export function WeeklyChallengeDrillRow({
 	item,
+	weekStartDate,
 	completedLabel,
 }: {
 	item: WeeklyChallengeListItem;
+	weekStartDate: string;
 	completedLabel: string;
 }) {
 	const typeInfo = getDrillTypeInfo(item.drillType);
@@ -50,7 +53,7 @@ export function WeeklyChallengeDrillRow({
 
 	return (
 		<Link
-			href={`/account/weekly-challenge/${item.index}`}
+			href={`/account/practice/weekly-challenge/${encodeWeekStartDate(weekStartDate)}/${item.index}`}
 			className="flex items-center gap-3 rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow"
 		>
 			<div

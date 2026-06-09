@@ -221,7 +221,10 @@ export default function FillBlankDrill({
           await completeWeeklyChallengeItem(
             queryClient,
             weeklyChallengeMeta.itemIndex,
-            { score },
+            {
+              score,
+              weekStartDate: weeklyChallengeMeta.weekStartDate,
+            },
           );
         } else {
           await drillAPI.complete(drill._id, {
