@@ -68,7 +68,7 @@ Return a JSON object with this exact shape:
     }
   ],
   "totalEstimatedMinutes": <sum of estimatedMinutes>,
-  "summaryMessage": "<short plain-English summary, e.g. 'This week focus on: fluency, phoneme /θ/, vocabulary'>"
+  "summaryMessage": "Tackle Your Weaknesses from Last Week"
 }
 
 Per-type generatedContent schemas:

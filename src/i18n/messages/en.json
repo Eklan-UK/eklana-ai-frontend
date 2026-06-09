@@ -74,8 +74,8 @@
     "seeAll": "See All",
     "noDrillsYet": "No drills assigned yet",
     "weeklyChallenge": {
-      "badge": "Weekly Challenger",
-      "pageTitle": "Weekly Challenger",
+      "badge": "Weekly Challenge",
+      "pageTitle": "Weekly Challenge",
       "practiceCardTitle": "Weekly Challenge",
       "practiceCardSubtitle": "Personalized drills from your practice",
       "weekLabel": "Week {number}",
