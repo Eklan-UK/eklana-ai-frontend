@@ -1763,7 +1763,7 @@ function CreateDrillPageContent() {
                             <Label>Blanks in this Sentence *</Label>
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="primary"
                               size="sm"
                               onClick={() => {
                                 const items = [...(formData.fill_blank_items || [])];

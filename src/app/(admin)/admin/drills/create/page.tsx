@@ -1926,7 +1926,7 @@ const DrillBuilder: React.FC = () => {
                               });
                               setFillBlankItems(updated);
                             }}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 text-white text-xs rounded-lg hover:bg-emerald-600"
                           >
                             <Plus className="w-3 h-3" />
                             Add Blank
@@ -2038,7 +2038,7 @@ const DrillBuilder: React.FC = () => {
                                     updated[itemIndex].blanks[blankIndex].options.push("");
                                     setFillBlankItems(updated);
                                   }}
-                                  className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                                  className="mt-2 flex items-center gap-1 px-3 py-1.5 bg-emerald-500 text-white text-xs rounded-lg hover:bg-emerald-600"
                                 >
                                   <Plus className="w-3 h-3" />
                                   Add Option
