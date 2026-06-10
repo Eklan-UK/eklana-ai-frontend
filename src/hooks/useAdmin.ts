@@ -12,6 +12,7 @@ export function useAllDrills(filters?: {
   limit?: number;
   type?: string;
   difficulty?: string;
+  assignmentStatus?: 'saved' | 'assigned';
 }) {
   return useQuery({
     queryKey: [...queryKeys.drills.all, "admin", "list", filters],
@@ -20,6 +21,7 @@ export function useAllDrills(filters?: {
         limit: filters?.limit || 100,
         type: filters?.type,
         difficulty: filters?.difficulty,
+        assignmentStatus: filters?.assignmentStatus,
       });
       console.log(response)
       return response.data?.drills || [];

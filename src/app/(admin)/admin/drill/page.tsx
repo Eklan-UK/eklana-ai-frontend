@@ -35,6 +35,7 @@ interface Drill {
   assigned_to: string[];
   created_by: string;
   is_active: boolean;
+  totalAssignments?: number;
   context?: string;
 }
 
@@ -43,7 +44,7 @@ const AdminDrillPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
-  const [filterActive, setFilterActive] = useState<string>("all");
+  const [filterAssignmentStatus, setFilterAssignmentStatus] = useState<string>("all");
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -51,6 +52,10 @@ const AdminDrillPage: React.FC = () => {
   // Use React Query instead of useEffect + useState
   const { data: drills = [], isLoading: loading } = useAllDrills({
     limit: 100,
+    assignmentStatus:
+      filterAssignmentStatus === "saved" || filterAssignmentStatus === "assigned"
+        ? filterAssignmentStatus
+        : undefined,
   });
   const deleteMutation = useDeleteDrill();
   const queryClient = useQueryClient();
@@ -105,16 +110,9 @@ const AdminDrillPage: React.FC = () => {
         const matchesType = filterType === "all" || drill.type === filterType;
         const matchesDifficulty =
           filterDifficulty === "all" || drill.difficulty === filterDifficulty;
-        const matchesActive =
-          filterActive === "all" ||
-          (filterActive === "active" && drill.is_active) ||
-          (filterActive === "inactive" && !drill.is_active);
-
-        return (
-          matchesSearch && matchesType && matchesDifficulty && matchesActive
-        );
+        return matchesSearch && matchesType && matchesDifficulty;
       }),
-    [drills, searchTerm, filterType, filterDifficulty, filterActive]
+    [drills, searchTerm, filterType, filterDifficulty]
   );
 
   return (
@@ -190,15 +188,15 @@ const AdminDrillPage: React.FC = () => {
             <option value="advanced">Advanced</option>
           </select>
 
-          {/* Active Filter */}
+          {/* Assignment Status Filter */}
           <select
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value)}
+            value={filterAssignmentStatus}
+            onChange={(e) => setFilterAssignmentStatus(e.target.value)}
             className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#418b43] focus:border-transparent"
           >
             <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="saved">Saved</option>
+            <option value="assigned">Assigned</option>
           </select>
         </div>
       </div>
@@ -285,8 +283,11 @@ const AdminDrillPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-gray-400" />
                         <span className="text-sm text-gray-600">
-                          {drill.assigned_to?.length || 0} student
-                          {drill.assigned_to?.length !== 1 ? "s" : ""}
+                          {(drill.totalAssignments ?? 0) === 0
+                            ? "Not assigned"
+                            : `${drill.totalAssignments} student${
+                                drill.totalAssignments !== 1 ? "s" : ""
+                              }`}
                         </span>
                       </div>
                     </td>
@@ -298,12 +299,13 @@ const AdminDrillPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${drill.is_active
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          (drill.totalAssignments ?? 0) > 0
                             ? "bg-emerald-100 text-emerald-700"
-                            : "bg-gray-100 text-gray-700"
-                          }`}
+                            : "bg-amber-100 text-amber-700"
+                        }`}
                       >
-                        {drill.is_active ? "Active" : "Inactive"}
+                        {(drill.totalAssignments ?? 0) > 0 ? "Assigned" : "Saved"}
                       </span>
                     </td>
                     <td className="px-6 py-4">

@@ -66,6 +66,7 @@ export const drillAPI = {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ 
       code?: string;

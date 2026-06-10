@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -79,6 +79,116 @@ interface RoleplayScene {
   }>;
 }
 
+interface FillBlankItem {
+  sentence: string;
+  blanks: Array<{
+    position: number;
+    correctAnswer: string;
+    options: string[];
+    hint?: string;
+  }>;
+  translation?: string;
+}
+
+interface KeyPhraseItem {
+  prompt: string;
+  respondentName?: string;
+  options: string[];
+  correctAnswer: string;
+}
+
+const ADMIN_DRAFT_KEY = "admin_drill_draft";
+
+interface AdminDrillDraft {
+  vocabularyItems: VocabularyItem[];
+  pronunciationItems: PronunciationItem[];
+  studentCharacterName: string;
+  aiCharacterNames: string[];
+  drillIntro: string;
+  roleplayScenes: RoleplayScene[];
+  matchingPairs: MatchingPair[];
+  grammarItems: GrammarItem[];
+  sentenceWritingItems: SentenceWritingItem[];
+  articleTitle: string;
+  articleContent: string;
+  listeningTitle: string;
+  listeningContent: string;
+  fillBlankItems: FillBlankItem[];
+  keyPhraseItems: KeyPhraseItem[];
+  drillTitle: string;
+  drillType: string;
+  difficulty: string;
+  completionDate: string;
+  durationDays: number;
+  context: string;
+  audioExampleUrl: string;
+  selectedUsers: string[];
+  generateTTSAudio: boolean;
+}
+
+function getDefaultCompletionDate(): string {
+  const defaultDate = new Date();
+  defaultDate.setDate(defaultDate.getDate() + 7);
+  return defaultDate.toISOString().split("T")[0];
+}
+
+function getDefaultAdminDrillDraft(): AdminDrillDraft {
+  return {
+    vocabularyItems: [
+      { word: "", wordTranslation: "", text: "", translation: "" },
+    ],
+    pronunciationItems: [{ sound: "", word: "", sentence: "" }],
+    studentCharacterName: "",
+    aiCharacterNames: [""],
+    drillIntro: "",
+    roleplayScenes: [
+      {
+        scene_name: "Scene 1",
+        context: "",
+        dialogue: [
+          { speaker: "ai_0", text: "", translation: "" },
+          { speaker: "student", text: "", translation: "" },
+        ],
+      },
+    ],
+    matchingPairs: [
+      { left: "", right: "", leftTranslation: "", rightTranslation: "" },
+    ],
+    grammarItems: [{ pattern: "", hint: "", example: "" }],
+    sentenceWritingItems: [{ word: "", hint: "" }],
+    articleTitle: "",
+    articleContent: "",
+    listeningTitle: "",
+    listeningContent: "",
+    fillBlankItems: [
+      {
+        sentence: "",
+        blanks: [
+          {
+            position: 0,
+            correctAnswer: "",
+            options: ["", ""],
+            hint: "",
+          },
+        ],
+        translation: "",
+      },
+    ],
+    keyPhraseItems: [
+      { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
+    ],
+    drillTitle: "",
+    drillType: "vocabulary",
+    difficulty: "intermediate",
+    completionDate: getDefaultCompletionDate(),
+    durationDays: 7,
+    context: "",
+    audioExampleUrl: "",
+    selectedUsers: [],
+    generateTTSAudio: true,
+  };
+}
+
 const DrillBuilder: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -133,16 +243,6 @@ const DrillBuilder: React.FC = () => {
   const [listeningContent, setListeningContent] = useState("");
 
   // Fill Blank
-  interface FillBlankItem {
-    sentence: string;
-    blanks: Array<{
-      position: number;
-      correctAnswer: string;
-      options: string[];
-      hint?: string;
-    }>;
-    translation?: string;
-  }
   const [fillBlankItems, setFillBlankItems] = useState<FillBlankItem[]>([
     {
       sentence: "",
@@ -159,12 +259,6 @@ const DrillBuilder: React.FC = () => {
   ]);
 
   // Key Phrases
-  interface KeyPhraseItem {
-    prompt: string;
-    respondentName?: string;
-    options: string[];
-    correctAnswer: string;
-  }
   const [keyPhraseItems, setKeyPhraseItems] = useState<KeyPhraseItem[]>([
     { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
   ]);
@@ -180,6 +274,7 @@ const DrillBuilder: React.FC = () => {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(
     null
@@ -192,18 +287,136 @@ const DrillBuilder: React.FC = () => {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState("");
 
+  const applyDraft = useCallback((draft: AdminDrillDraft) => {
+    setVocabularyItems(draft.vocabularyItems);
+    setPronunciationItems(draft.pronunciationItems);
+    setStudentCharacterName(draft.studentCharacterName);
+    setAiCharacterNames(draft.aiCharacterNames);
+    setDrillIntro(draft.drillIntro);
+    setRoleplayScenes(draft.roleplayScenes);
+    setMatchingPairs(draft.matchingPairs);
+    setGrammarItems(draft.grammarItems);
+    setSentenceWritingItems(draft.sentenceWritingItems);
+    setArticleTitle(draft.articleTitle);
+    setArticleContent(draft.articleContent);
+    setListeningTitle(draft.listeningTitle);
+    setListeningContent(draft.listeningContent);
+    setFillBlankItems(draft.fillBlankItems);
+    setKeyPhraseItems(draft.keyPhraseItems);
+    setDrillTitle(draft.drillTitle);
+    setDrillType(draft.drillType);
+    setDifficulty(draft.difficulty);
+    setCompletionDate(draft.completionDate);
+    setDurationDays(draft.durationDays);
+    setContext(draft.context);
+    setAudioExampleUrl(draft.audioExampleUrl);
+    setSelectedUsers(new Set(draft.selectedUsers));
+    setGenerateTTSAudio(draft.generateTTSAudio);
+  }, []);
+
+  const buildDraft = useCallback((): AdminDrillDraft => {
+    return {
+      vocabularyItems,
+      pronunciationItems,
+      studentCharacterName,
+      aiCharacterNames,
+      drillIntro,
+      roleplayScenes,
+      matchingPairs,
+      grammarItems,
+      sentenceWritingItems,
+      articleTitle,
+      articleContent,
+      listeningTitle,
+      listeningContent,
+      fillBlankItems,
+      keyPhraseItems,
+      drillTitle,
+      drillType,
+      difficulty,
+      completionDate,
+      durationDays,
+      context,
+      audioExampleUrl,
+      selectedUsers: Array.from(selectedUsers),
+      generateTTSAudio,
+    };
+  }, [
+    vocabularyItems,
+    pronunciationItems,
+    studentCharacterName,
+    aiCharacterNames,
+    drillIntro,
+    roleplayScenes,
+    matchingPairs,
+    grammarItems,
+    sentenceWritingItems,
+    articleTitle,
+    articleContent,
+    listeningTitle,
+    listeningContent,
+    fillBlankItems,
+    keyPhraseItems,
+    drillTitle,
+    drillType,
+    difficulty,
+    completionDate,
+    durationDays,
+    context,
+    audioExampleUrl,
+    selectedUsers,
+    generateTTSAudio,
+  ]);
+
+  const saveDraft = useCallback(() => {
+    if (isEditMode) return;
+    try {
+      localStorage.setItem(ADMIN_DRAFT_KEY, JSON.stringify(buildDraft()));
+    } catch (e) {
+      console.warn("Failed to save admin drill draft:", e);
+    }
+  }, [isEditMode, buildDraft]);
+
+  const clearDraft = useCallback(() => {
+    localStorage.removeItem(ADMIN_DRAFT_KEY);
+  }, []);
+
   // Load drill data in edit mode
   const { data: drillData, isLoading: loadingDrill } = useDrillById(
     drillId || ""
   );
+  const totalAssignments = drillData?.totalAssignments ?? 0;
+  const isAssignedDrill = isEditMode && totalAssignments > 0;
 
   useEffect(() => {
-    // Set default completion date to 7 days from now
-    const defaultDate = new Date();
-    defaultDate.setDate(defaultDate.getDate() + 7);
-    setCompletionDate(defaultDate.toISOString().split("T")[0]);
+    if (!isEditMode) {
+      const savedDraft = localStorage.getItem(ADMIN_DRAFT_KEY);
+      if (savedDraft) {
+        try {
+          const parsedDraft = JSON.parse(savedDraft) as AdminDrillDraft;
+          if (parsedDraft && typeof parsedDraft === "object") {
+            applyDraft(parsedDraft);
+            toast.success("Draft restored", {
+              action: {
+                label: "Discard",
+                onClick: () => {
+                  clearDraft();
+                  applyDraft(getDefaultAdminDrillDraft());
+                  toast.info("Draft discarded");
+                },
+              },
+            });
+          }
+        } catch (e) {
+          console.warn("Failed to parse saved admin drill draft:", e);
+          clearDraft();
+          setCompletionDate(getDefaultCompletionDate());
+        }
+      } else {
+        setCompletionDate(getDefaultCompletionDate());
+      }
+    }
 
-    // Fetch users with role 'user'
     const fetchUsers = async () => {
       try {
         setLoadingUsers(true);
@@ -219,7 +432,22 @@ const DrillBuilder: React.FC = () => {
       }
     };
     fetchUsers();
-  }, []);
+  }, [isEditMode, applyDraft, clearDraft]);
+
+  // Auto-save draft (create mode only)
+  useEffect(() => {
+    if (isEditMode) return;
+    const timeoutId = setTimeout(saveDraft, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [isEditMode, saveDraft]);
+
+  // Save draft before page unload (create mode only)
+  useEffect(() => {
+    if (isEditMode) return;
+    const handleBeforeUnload = () => saveDraft();
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isEditMode, saveDraft]);
 
   // Load drill data when in edit mode
   useEffect(() => {
@@ -237,13 +465,17 @@ const DrillBuilder: React.FC = () => {
       setContext(drill.context || "");
       setAudioExampleUrl(drill.audio_example_url || "");
 
-      // Set assigned users
+      // Set assigned users (IDs or legacy emails)
       if (drill.assigned_to && Array.isArray(drill.assigned_to)) {
-        const assignedEmails = new Set(drill.assigned_to);
+        const assignedRefs = new Set(drill.assigned_to);
         const assignedUserIds = new Set<string>();
         users.forEach((user: any) => {
-          if (user.email && assignedEmails.has(user.email)) {
-            assignedUserIds.add(user._id);
+          const userId = user._id.toString();
+          if (
+            assignedRefs.has(userId) ||
+            (user.email && assignedRefs.has(user.email))
+          ) {
+            assignedUserIds.add(userId);
           }
         });
         setSelectedUsers(assignedUserIds);
@@ -550,11 +782,12 @@ const DrillBuilder: React.FC = () => {
   };
 
   const toggleUser = (userId: string) => {
+    const id = userId.toString();
     const updated = new Set(selectedUsers);
-    if (updated.has(userId)) {
-      updated.delete(userId);
+    if (updated.has(id)) {
+      updated.delete(id);
     } else {
-      updated.add(userId);
+      updated.add(id);
     }
     setSelectedUsers(updated);
   };
@@ -563,7 +796,7 @@ const DrillBuilder: React.FC = () => {
     if (selectedUsers.size === users.length) {
       setSelectedUsers(new Set());
     } else {
-      setSelectedUsers(new Set(users.map((u) => u._id)));
+      setSelectedUsers(new Set(users.map((u) => u._id.toString())));
     }
   };
 
@@ -715,50 +948,48 @@ const DrillBuilder: React.FC = () => {
     toast.success("Form populated with parsed data");
   };
 
-  const handleSubmit = async () => {
-    // Validation
+  const validateDrillContent = (): boolean => {
     if (!drillTitle.trim()) {
       toast.error("Please enter a drill title");
-      return;
+      return false;
     }
 
     if (!completionDate) {
       toast.error("Please select a completion date");
-      return;
+      return false;
     }
 
-    // Validate based on drill type
     if (drillType === "vocabulary") {
       if (
         vocabularyItems.length === 0 ||
         vocabularyItems.some((v) => !v.text.trim())
       ) {
         toast.error("Please add at least one vocabulary item with a sentence");
-        return;
+        return false;
       }
     } else if (drillType === "pronunciation") {
       if (pronunciationItems.length === 0) {
         toast.error("Add at least one pronunciation item");
-        return;
+        return false;
       }
       for (const p of pronunciationItems) {
         if (!p.sound.trim() || !p.word.trim() || !p.sentence.trim()) {
           toast.error("Each pronunciation item needs Sound, Word, and Sentence");
-          return;
+          return false;
         }
       }
     } else if (drillType === "roleplay") {
       if (!context.trim()) {
         toast.error("Please provide a context/scenario for the roleplay");
-        return;
+        return false;
       }
       if (!studentCharacterName.trim()) {
         toast.error("Please provide a student character name");
-        return;
+        return false;
       }
       if (aiCharacterNames.some((name) => !name.trim())) {
         toast.error("Please provide all AI character names");
-        return;
+        return false;
       }
       if (
         roleplayScenes.length === 0 ||
@@ -767,7 +998,7 @@ const DrillBuilder: React.FC = () => {
         )
       ) {
         toast.error("Please add at least one scene with complete dialogue");
-        return;
+        return false;
       }
     } else if (drillType === "matching") {
       if (
@@ -777,7 +1008,7 @@ const DrillBuilder: React.FC = () => {
         toast.error(
           "Please add at least one matching pair with both sides filled"
         );
-        return;
+        return false;
       }
     } else if (drillType === "grammar") {
       if (
@@ -785,7 +1016,7 @@ const DrillBuilder: React.FC = () => {
         grammarItems.some((g) => !g.pattern.trim() || !g.example.trim())
       ) {
         toast.error("Please add at least one grammar pattern with an example sentence");
-        return;
+        return false;
       }
     } else if (drillType === "sentence_writing") {
       if (
@@ -793,45 +1024,193 @@ const DrillBuilder: React.FC = () => {
         sentenceWritingItems.some((s) => !s.word.trim())
       ) {
         toast.error("Please add at least one word for sentence writing");
-        return;
+        return false;
       }
     } else if (drillType === "summary") {
       if (!articleTitle.trim() || !articleContent.trim()) {
         toast.error("Please provide both article title and content");
-        return;
+        return false;
       }
     } else if (drillType === "listening") {
       if (!listeningTitle.trim() || !listeningContent.trim()) {
         toast.error("Please provide both listening title and content");
-        return;
+        return false;
       }
     } else if (drillType === "fill_blank") {
       const fillBlankError = validateFillBlankItems(fillBlankItems);
       if (fillBlankError) {
         toast.error(fillBlankError);
-        return;
+        return false;
       }
     } else if (drillType === "key_phrases") {
       if (keyPhraseItems.length === 0 || !keyPhraseItems.some(item => item.prompt.trim())) {
         toast.error("Please add at least one key phrase question");
-        return;
+        return false;
       }
       for (const item of keyPhraseItems) {
         if (!item.prompt.trim()) continue;
         if (item.options.filter(o => o.trim()).length < 2) {
           toast.error("Each question must have at least 2 options");
-          return;
+          return false;
         }
         if (!item.correctAnswer.trim()) {
           toast.error("Please select a correct answer for each question");
-          return;
+          return false;
         }
         if (!item.options.includes(item.correctAnswer)) {
           toast.error("Correct answer must be one of the options");
-          return;
+          return false;
         }
       }
     }
+
+    return true;
+  };
+
+  const buildDrillPayload = (options?: {
+    assignedTo?: string[];
+    isActive?: boolean;
+    omitAssignment?: boolean;
+  }): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      title: drillTitle,
+      type: drillType,
+      difficulty: difficulty.toLowerCase(),
+      date: new Date(completionDate).toISOString(),
+      duration_days: durationDays,
+      context: context || undefined,
+      audio_example_url: audioExampleUrl || undefined,
+    };
+
+    if (!options?.omitAssignment) {
+      if (options?.assignedTo !== undefined) {
+        payload.assigned_to = options.assignedTo;
+      }
+      if (options?.isActive !== undefined) {
+        payload.is_active = options.isActive;
+      }
+    }
+
+    if (drillType === "vocabulary") {
+      payload.target_sentences = vocabularyItems
+        .filter((v) => v.text.trim())
+        .map((v) => ({
+          word: v.word?.trim() || undefined,
+          wordTranslation: v.wordTranslation?.trim() || undefined,
+          text: v.text.trim(),
+          translation: v.translation?.trim() || undefined,
+        }));
+      payload.pronunciation_items = [];
+    } else if (drillType === "pronunciation") {
+      payload.target_sentences = [];
+      payload.pronunciation_items = pronunciationItems
+        .filter((p) => p.sound.trim() && p.word.trim() && p.sentence.trim())
+        .map((p) => ({
+          sound: p.sound.trim(),
+          word: p.word.trim(),
+          sentence: p.sentence.trim(),
+        }));
+    } else if (drillType === "roleplay") {
+      payload.student_character_name = studentCharacterName.trim();
+      payload.ai_character_names = aiCharacterNames.filter((name) => name.trim());
+      payload.drill_intro = drillIntro.trim();
+      payload.roleplay_scenes = roleplayScenes.map((scene) => ({
+        scene_name: scene.scene_name.trim(),
+        context: scene.context?.trim() || undefined,
+        dialogue: scene.dialogue
+          .filter((d) => d.text.trim())
+          .map((d) => ({
+            speaker: d.speaker,
+            text: d.text.trim(),
+            translation: d.translation?.trim() || undefined,
+          })),
+      }));
+    } else if (drillType === "matching") {
+      payload.matching_pairs = matchingPairs
+        .filter((p) => p.left.trim() && p.right.trim())
+        .map((p) => ({
+          left: p.left.trim(),
+          right: p.right.trim(),
+          leftTranslation: p.leftTranslation?.trim() || undefined,
+          rightTranslation: p.rightTranslation?.trim() || undefined,
+        }));
+    } else if (drillType === "grammar") {
+      payload.grammar_items = grammarItems
+        .filter((g) => g.pattern.trim())
+        .map((g) => ({
+          pattern: g.pattern.trim(),
+          hint: g.hint?.trim() || undefined,
+          example: g.example?.trim() || undefined,
+        }));
+    } else if (drillType === "sentence_writing") {
+      payload.sentence_writing_items = sentenceWritingItems
+        .filter((s) => s.word.trim())
+        .map((s) => ({
+          word: s.word.trim(),
+          hint: s.hint?.trim() || undefined,
+        }));
+    } else if (drillType === "summary") {
+      payload.article_title = articleTitle.trim();
+      payload.article_content = articleContent.trim();
+    } else if (drillType === "listening") {
+      payload.listening_drill_title = listeningTitle.trim();
+      payload.listening_drill_content = listeningContent.trim();
+    } else if (drillType === "fill_blank") {
+      payload.fill_blank_items = normalizeFillBlankItems(fillBlankItems);
+    } else if (drillType === "key_phrases") {
+      payload.key_phrase_items = keyPhraseItems
+        .filter((item) => item.prompt.trim())
+        .map((item) => ({
+          prompt: item.prompt.trim(),
+          respondentName: item.respondentName?.trim() || undefined,
+          options: item.options.filter((o) => o.trim()),
+          correctAnswer: item.correctAnswer.trim(),
+        }));
+    }
+
+    return payload;
+  };
+
+  const handleSaveDrill = async () => {
+    if (!validateDrillContent()) return;
+
+    try {
+      setSaving(true);
+
+      const payload = buildDrillPayload(
+        isAssignedDrill
+          ? { omitAssignment: true }
+          : { assignedTo: [], isActive: false }
+      );
+
+      if (isEditMode && drillId) {
+        await drillAPI.update(drillId, payload);
+        clearDraft();
+        toast.success("Drill saved successfully!");
+      } else {
+        await drillAPI.create(payload);
+        clearDraft();
+        if (selectedUsers.size > 0) {
+          toast.success(
+            "Drill saved as draft. Use \"Create Drill\" to assign it to selected students."
+          );
+        } else {
+          toast.success("Drill saved successfully!");
+        }
+      }
+
+      router.push("/admin/drill");
+    } catch (error: any) {
+      toast.error(
+        "Failed to save drill: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateDrillContent()) return;
 
     if (selectedUsers.size === 0) {
       toast.error("Please select at least one user");
@@ -841,102 +1220,14 @@ const DrillBuilder: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get user IDs for assignment (not emails)
       const assignedTo = Array.from(selectedUsers)
         .map((id) => id.toString())
         .filter(Boolean) as string[];
 
-      // Build drill data based on type
-      let drillData: any = {
-        title: drillTitle,
-        type: drillType,
-        difficulty: difficulty.toLowerCase(),
-        date: new Date(completionDate).toISOString(),
-        duration_days: durationDays,
-        assigned_to: assignedTo, // Now contains user IDs, not emails
-        context: context || undefined,
-        audio_example_url: audioExampleUrl || undefined,
-      };
-
-      // Add type-specific data BEFORE updating
-      if (drillType === "vocabulary") {
-        drillData.target_sentences = vocabularyItems
-          .filter((v) => v.text.trim())
-          .map((v) => ({
-            word: v.word?.trim() || undefined,
-            wordTranslation: v.wordTranslation?.trim() || undefined,
-            text: v.text.trim(),
-            translation: v.translation?.trim() || undefined,
-          }));
-        drillData.pronunciation_items = [];
-      } else if (drillType === "pronunciation") {
-        drillData.target_sentences = [];
-        drillData.pronunciation_items = pronunciationItems
-          .filter((p) => p.sound.trim() && p.word.trim() && p.sentence.trim())
-          .map((p) => ({
-            sound: p.sound.trim(),
-            word: p.word.trim(),
-            sentence: p.sentence.trim(),
-          }));
-      } else if (drillType === "roleplay") {
-        drillData.student_character_name = studentCharacterName.trim();
-        drillData.ai_character_names = aiCharacterNames.filter((name) =>
-          name.trim()
-        );
-        drillData.drill_intro = drillIntro.trim();
-        drillData.roleplay_scenes = roleplayScenes.map((scene) => ({
-          scene_name: scene.scene_name.trim(),
-          context: scene.context?.trim() || undefined,
-          dialogue: scene.dialogue
-            .filter((d) => d.text.trim())
-            .map((d) => ({
-              speaker: d.speaker,
-              text: d.text.trim(),
-              translation: d.translation?.trim() || undefined,
-            })),
-        }));
-      } else if (drillType === "matching") {
-        drillData.matching_pairs = matchingPairs
-          .filter((p) => p.left.trim() && p.right.trim())
-          .map((p) => ({
-            left: p.left.trim(),
-            right: p.right.trim(),
-            leftTranslation: p.leftTranslation?.trim() || undefined,
-            rightTranslation: p.rightTranslation?.trim() || undefined,
-          }));
-      } else if (drillType === "grammar") {
-        drillData.grammar_items = grammarItems
-          .filter((g) => g.pattern.trim())
-          .map((g) => ({
-            pattern: g.pattern.trim(),
-            hint: g.hint?.trim() || undefined,
-            example: g.example?.trim() || undefined,
-          }));
-      } else if (drillType === "sentence_writing") {
-        drillData.sentence_writing_items = sentenceWritingItems
-          .filter((s) => s.word.trim())
-          .map((s) => ({
-            word: s.word.trim(),
-            hint: s.hint?.trim() || undefined,
-          }));
-      } else if (drillType === "summary") {
-        drillData.article_title = articleTitle.trim();
-        drillData.article_content = articleContent.trim();
-      } else if (drillType === "listening") {
-        drillData.listening_drill_title = listeningTitle.trim();
-        drillData.listening_drill_content = listeningContent.trim();
-      } else if (drillType === "fill_blank") {
-        drillData.fill_blank_items = normalizeFillBlankItems(fillBlankItems);
-      } else if (drillType === "key_phrases") {
-        drillData.key_phrase_items = keyPhraseItems
-          .filter((item) => item.prompt.trim())
-          .map((item) => ({
-            prompt: item.prompt.trim(),
-            respondentName: item.respondentName?.trim() || undefined,
-            options: item.options.filter((o) => o.trim()),
-            correctAnswer: item.correctAnswer.trim(),
-          }));
-      }
+      let drillData: any = buildDrillPayload({
+        assignedTo,
+        isActive: true,
+      });
 
       // Pre-generate TTS audio if enabled
       if (generateTTSAudio) {
@@ -982,10 +1273,12 @@ const DrillBuilder: React.FC = () => {
       // If editing, use update API
       if (isEditMode && drillId) {
         await drillAPI.update(drillId, drillData);
+        clearDraft();
         toast.success("Drill updated successfully!");
         router.push("/admin/drill");
       } else {
         await drillAPI.create(drillData);
+        clearDraft();
         toast.success("Drill created successfully!");
         router.push("/admin/drills/assignment");
       }
@@ -2403,7 +2696,7 @@ const DrillBuilder: React.FC = () => {
                     const name =
                       `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
                       user.name || "Unknown";
-                    const isSelected = selectedUsers.has(user._id);
+                    const isSelected = selectedUsers.has(user._id.toString());
                     return (
                       <div
                         key={user._id}
@@ -2413,7 +2706,7 @@ const DrillBuilder: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleUser(user._id)}
+                          onChange={() => toggleUser(user._id.toString())}
                           className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
                         />
                         <div>
@@ -2434,8 +2727,24 @@ const DrillBuilder: React.FC = () => {
 
       <div className="fixed bottom-0 left-64 right-0 bg-white border-t border-gray-100 p-6 flex gap-4 z-10">
         <button
+          onClick={handleSaveDrill}
+          disabled={loading || saving}
+          className="px-8 py-3.5 bg-amber-400 text-amber-950 font-bold rounded-full hover:bg-amber-500 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : isEditMode ? (
+            isAssignedDrill ? "Save Changes" : "Save Drill"
+          ) : (
+            "Save Drill"
+          )}
+        </button>
+        <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || saving}
           className="px-8 py-3.5 bg-[#418b43] text-white font-bold rounded-full hover:bg-[#3a7c3b] transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {loading ? (
@@ -2443,17 +2752,17 @@ const DrillBuilder: React.FC = () => {
               <Loader2 className="w-4 h-4 animate-spin" />
               {isEditMode ? "Updating..." : "Creating..."}
             </>
+          ) : isEditMode && !isAssignedDrill ? (
+            `Assign to ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""}`
           ) : isEditMode ? (
-            `Update Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""
-            }`
+            `Update Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""}`
           ) : (
-            `Create Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""
-            }`
+            `Create Drill for ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""}`
           )}
         </button>
         <button
           onClick={() => router.back()}
-          disabled={loading}
+          disabled={loading || saving}
           className="px-8 py-3.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-full hover:bg-gray-50 transition-all disabled:opacity-50"
         >
           Cancel Drill

@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +11,6 @@ import {
   Hammer,
   BarChart2,
   Settings,
-  LogOut,
   Sun,
   Moon,
   Layout,
@@ -25,12 +24,9 @@ import {
   Video,
   MessageSquare,
 } from "lucide-react";
-import { useAuthStore } from "@/store/auth-store";
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
-  const router = useRouter();
-  const logout = useAuthStore((s) => s.logout);
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -49,16 +45,6 @@ const Sidebar: React.FC = () => {
     { name: "Analytics", icon: BarChart2, path: "/admin/analytics" },
     { name: "Settings", icon: Settings, path: "/admin/settings" },
   ];
-
-  const handleLogout = async () => {
-    const loginPath = "/auth/admin/login";
-    try {
-      await logout();
-      router.push(loginPath);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
 
   return (
     <aside className="flex h-full min-h-0 w-64 min-w-64 flex-col border-r border-gray-200 bg-white">
@@ -116,7 +102,7 @@ const Sidebar: React.FC = () => {
       </nav>
 
       <div className="shrink-0 border-t border-gray-100 p-4">
-        <div className="bg-gray-50 p-1 rounded-xl flex items-center justify-around mb-4">
+        <div className="bg-gray-50 p-1 rounded-xl flex items-center justify-around">
           <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white shadow-sm rounded-lg text-gray-700">
             <Sun className="w-4 h-4" />
             Light
@@ -126,13 +112,6 @@ const Sidebar: React.FC = () => {
             Dark
           </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          Log out
-        </button>
       </div>
     </aside>
   );
