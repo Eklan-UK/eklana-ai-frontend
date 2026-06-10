@@ -7,6 +7,7 @@ import { Flame, Clock, Target, Loader2, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useLearnerDrills } from "@/hooks/useDrills";
 import { useWeeklyChallenge } from "@/hooks/useWeeklyChallenge";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ContinuePracticeCard } from "@/components/practice/ContinuePracticeCard";
 import { WeeklyChallengeCard } from "@/components/weekly-challenge/WeeklyChallengeCard";
 import { isSundayUtc } from "@/lib/challenges/utc-week-challenge";
@@ -38,8 +39,11 @@ const focusTypeLabels: Record<string, string> = {
 };
 
 export function TodaysFocusCard() {
-  // TEMP: force Sunday for demo — revert to: const isSunday = isSundayUtc();
-  const isSunday = true;
+  const { data: me } = useUserCurrent();
+  const subscriptionActivatedAt = me?.user?.subscriptionActivatedAt
+    ? new Date(me.user.subscriptionActivatedAt)
+    : undefined;
+  const isSunday = isSundayUtc(new Date(), subscriptionActivatedAt);
   const { data: weeklyChallenge } = useWeeklyChallenge(undefined, { enabled: isSunday });
   const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
 
@@ -90,6 +94,8 @@ export function TodaysFocusCard() {
 
   if (
     isSunday &&
+    !drillsLoading &&
+    activeDrills.length === 0 &&
     weeklyChallenge?.status === "ready" &&
     (weeklyChallenge.drillSequence?.length ?? 0) > 0
   ) {
@@ -98,6 +104,8 @@ export function TodaysFocusCard() {
 
   if (
     isSunday &&
+    !drillsLoading &&
+    activeDrills.length === 0 &&
     (weeklyChallenge?.status === "generating" || weeklyChallenge?.status === "failed")
   ) {
     return <WeeklyChallengeCard challenge={weeklyChallenge} />;

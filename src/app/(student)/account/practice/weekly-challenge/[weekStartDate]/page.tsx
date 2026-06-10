@@ -81,7 +81,7 @@ export default function WeeklyChallengeWeekPage() {
 							</div>
 							<h2 className="text-xl font-bold font-nunito mb-2">
 								{challenge.summaryMessage?.startsWith("This week focus on:")
-									? "Tackle your weaknesses from last week"
+									? "Personalized to address your weakest areas"
 									: (challenge.summaryMessage || t("summaryFallback"))}
 							</h2>
 							<p className="text-white/80 text-sm">

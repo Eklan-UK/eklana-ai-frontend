@@ -51,7 +51,7 @@ export function WeeklyChallengeWeekCard({
 				</div>
 				<p className="text-xs text-muted-foreground line-clamp-2">
 					{challenge.summaryMessage?.startsWith("This week focus on:")
-						? "Tackle your weaknesses from last week"
+						? "Personalized to address your weakest areas"
 						: (challenge.summaryMessage || t("summaryFallback"))}
 				</p>
 				<div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 flex-wrap">
