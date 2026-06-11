@@ -20,6 +20,7 @@ import {
   extendSubscriptionExpiresAt,
   shouldSkipStripeDowngrade,
 } from '@/lib/api/subscription-reconciliation';
+import { billingPeriodFromStripePriceId } from '@/lib/api/stripe-billing-period';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -49,6 +50,17 @@ function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date | nul
 /** Find user by stripeCustomerId. */
 async function findUserByCustomer(customerId: string) {
   return User.findOne({ stripeCustomerId: customerId }).exec();
+}
+
+function applyBillingPeriodFromSubscription(
+  user: InstanceType<typeof User>,
+  subscription: Stripe.Subscription
+): void {
+  const priceId = subscription.items?.data?.[0]?.price?.id;
+  const period = billingPeriodFromStripePriceId(priceId);
+  if (period) {
+    user.subscriptionBillingPeriod = period;
+  }
 }
 
 // ── Event handlers ────────────────────────────────────────────────────────────
@@ -118,6 +130,7 @@ async function handleCheckoutSessionCompleted(
   user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? new Date();
   user.subscriptionExpiresAt = periodEnd;
   user.subscriptionPaymentMethod = 'stripe';
+  applyBillingPeriodFromSubscription(user, subscription);
   await user.save();
 
   logger.info('[Stripe Webhook] checkout.session.completed — subscription activated', {
@@ -155,6 +168,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
     if (!shouldSkipStripeDowngrade(user)) {
       user.subscriptionPlan = 'premium';
       user.subscriptionPaymentMethod = 'stripe';
+      applyBillingPeriodFromSubscription(user, expandedSub);
     }
   } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
     if (shouldSkipStripeDowngrade(user)) {
@@ -164,6 +178,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
       );
     } else {
       user.subscriptionPlan = 'free';
+      user.subscriptionBillingPeriod = null;
       user.subscriptionExpiresAt = null;
     }
   }
@@ -200,6 +215,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
   }
 
   user.subscriptionPlan = 'free';
+  user.subscriptionBillingPeriod = null;
   user.subscriptionExpiresAt = null;
   user.subscriptionActivatedAt = null;
   if (user.subscriptionPaymentMethod === 'stripe') {

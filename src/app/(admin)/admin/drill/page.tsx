@@ -49,17 +49,22 @@ const AdminDrillPage: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Use React Query instead of useEffect + useState
-  const { data: drills = [], isLoading: loading } = useAllDrills({
-    limit: 100,
-    assignmentStatus:
-      filterAssignmentStatus === "saved" || filterAssignmentStatus === "assigned"
-        ? filterAssignmentStatus
-        : undefined,
-  });
+  const drillQueryFilters = useMemo(
+    () => ({
+      limit: 100,
+      type: filterType !== "all" ? filterType : undefined,
+      difficulty: filterDifficulty !== "all" ? filterDifficulty : undefined,
+      assignmentStatus:
+        filterAssignmentStatus === "saved" || filterAssignmentStatus === "assigned"
+          ? (filterAssignmentStatus as "saved" | "assigned")
+          : undefined,
+    }),
+    [filterType, filterDifficulty, filterAssignmentStatus]
+  );
+
+  const { data: drills = [], isLoading: loading } = useAllDrills(drillQueryFilters);
   const deleteMutation = useDeleteDrill();
   const queryClient = useQueryClient();
-  console.log(drills)
 
   const handleDelete = async (drillId: string) => {
     if (
@@ -101,30 +106,31 @@ const AdminDrillPage: React.FC = () => {
     });
   };
 
-  const filteredDrills = React.useMemo(
-    () =>
-      drills.filter((drill) => {
-        const matchesSearch =
-          drill.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          drill.context?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = filterType === "all" || drill.type === filterType;
-        const matchesDifficulty =
-          filterDifficulty === "all" || drill.difficulty === filterDifficulty;
-        return matchesSearch && matchesType && matchesDifficulty;
-      }),
-    [drills, searchTerm, filterType, filterDifficulty]
-  );
+  const filteredDrills = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return drills;
+
+    return drills.filter((drill) => {
+      const title = drill.title?.toLowerCase() ?? "";
+      const type = drill.type?.toLowerCase() ?? "";
+      const difficulty = drill.difficulty?.toLowerCase() ?? "";
+      const context = drill.context?.toLowerCase() ?? "";
+
+      return (
+        title.includes(query) ||
+        type.includes(query) ||
+        difficulty.includes(query) ||
+        context.includes(query)
+      );
+    });
+  }, [drills, searchTerm]);
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Drill Management</h1>
-          <p className="text-gray-500 text-sm">
-            Manage all drills, assign to students, edit, and delete
-          </p>
-        </div>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-gray-500">
+          Manage all drills, assign to students, edit, and delete
+        </p>
         <div className="flex items-center gap-3">
           <Link
             href="/admin/drills/sentence-reviews"
@@ -148,7 +154,7 @@ const AdminDrillPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search drills..."
@@ -174,6 +180,9 @@ const AdminDrillPage: React.FC = () => {
             <option value="sentence_writing">Sentence Writing</option>
             <option value="sentence">Sentence</option>
             <option value="listening">Listening</option>
+            <option value="pronunciation">Pronunciation</option>
+            <option value="fill_blank">Fill in the Blank</option>
+            <option value="key_phrases">Key Phrases</option>
           </select>
 
           {/* Difficulty Filter */}

@@ -8,6 +8,13 @@ import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
+import { z } from 'zod';
+import type { BillingPeriod } from '@/domain/subscriptions/subscription.types';
+import { stripePriceIdForBillingPeriod } from '@/lib/api/stripe-billing-period';
+
+const checkoutBodySchema = z.object({
+  billingPeriod: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+});
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -37,9 +44,24 @@ async function handler(
         { status: 500 }
       );
     }
-    if (!config.STRIPE_PREMIUM_MONTHLY_PRICE_ID) {
+    let billingPeriod: BillingPeriod = 'monthly';
+    try {
+      const body = await req.json().catch(() => ({}));
+      const parsed = checkoutBodySchema.safeParse(body);
+      if (parsed.success && parsed.data.billingPeriod) {
+        billingPeriod = parsed.data.billingPeriod;
+      }
+    } catch {
+      // Empty body is fine — default to monthly.
+    }
+
+    const priceId = stripePriceIdForBillingPeriod(billingPeriod);
+    if (!priceId) {
       return NextResponse.json(
-        { code: 'ConfigError', message: 'Subscription price is not configured.' },
+        {
+          code: 'ConfigError',
+          message: `Subscription price for ${billingPeriod} billing is not configured.`,
+        },
         { status: 500 }
       );
     }
@@ -77,10 +99,13 @@ async function handler(
       mode: 'subscription',
       line_items: [
         {
-          price: config.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],
+      metadata: {
+        billingPeriod,
+      },
       success_url: `${appUrl}/account/settings/subscriptions?checkout=success`,
       cancel_url: `${appUrl}/account/settings/subscriptions`,
       allow_promotion_codes: true,
@@ -89,6 +114,7 @@ async function handler(
     logger.info('Stripe Checkout Session created', {
       userId: String(user._id),
       sessionId: session.id,
+      billingPeriod,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });

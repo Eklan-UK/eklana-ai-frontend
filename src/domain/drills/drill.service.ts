@@ -131,8 +131,23 @@ export class DrillService {
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
     if (filters.studentEmail) query.assigned_to = filters.studentEmail;
-    if (filters.assignmentStatus === 'saved') query.totalAssignments = 0;
-    if (filters.assignmentStatus === 'assigned') query.totalAssignments = { $gt: 0 };
+    if (filters.assignmentStatus === 'saved') {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (filters.assignmentStatus === 'assigned') {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
 
     const total = await this.drillRepo.count(query);
 

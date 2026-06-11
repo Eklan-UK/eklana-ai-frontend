@@ -23,8 +23,11 @@ export function useAllDrills(filters?: {
         difficulty: filters?.difficulty,
         assignmentStatus: filters?.assignmentStatus,
       });
-      console.log(response)
-      return response.data?.drills || [];
+      const drills =
+        response.data?.drills ??
+        response.drills ??
+        [];
+      return Array.isArray(drills) ? drills : [];
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
@@ -36,6 +39,9 @@ export function useAllLearners(filters?: {
   offset?: number;
   role?: string;
   search?: string;
+  signupDateFrom?: string;
+  signupDateTo?: string;
+  status?: 'active' | 'inactive';
 }) {
   return useQuery({
     queryKey: [...queryKeys.students.all, "admin", "list", filters],
@@ -269,14 +275,40 @@ export function useUpdateUserSubscription() {
     mutationFn: async (data: {
       userId: string;
       plan: "free" | "premium";
-      months: number;
+      months?: number;
+      billingPeriod?: "monthly" | "quarterly" | "annual";
+      zeroPauseProducts?: ("challenge" | "mastery")[];
       amount?: number;
       paymentMethod?: string;
       note?: string;
     }) => {
       return adminAPI.updateUserSubscription(data);
     },
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      const updated = response?.data;
+      if (updated?.userId) {
+        queryClient.setQueriesData(
+          { queryKey: [...queryKeys.students.all, "admin", "list"] },
+          (old: { learners: Array<Record<string, unknown>>; total: number } | undefined) => {
+            if (!old?.learners) return old;
+            return {
+              ...old,
+              learners: old.learners.map((learner) =>
+                String(learner._id) === String(variables.userId)
+                  ? {
+                      ...learner,
+                      subscriptionPlan: updated.subscriptionPlan,
+                      subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
+                      zeroPauseProducts: updated.zeroPauseProducts,
+                      subscriptionActivatedAt: updated.subscriptionActivatedAt,
+                      subscriptionExpiresAt: updated.subscriptionExpiresAt,
+                    }
+                  : learner
+              ),
+            };
+          }
+        );
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard", "stats"] });
       toast.success("Subscription updated");

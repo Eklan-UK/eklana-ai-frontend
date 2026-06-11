@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Loader2,
   Volume2,
+  Search,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
@@ -272,6 +273,7 @@ const DrillBuilder: React.FC = () => {
   const [context, setContext] = useState("");
   const [audioExampleUrl, setAudioExampleUrl] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [studentSearch, setStudentSearch] = useState("");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -421,7 +423,7 @@ const DrillBuilder: React.FC = () => {
       try {
         setLoadingUsers(true);
         const response = await adminService.getLearners({
-          limit: 100,
+          limit: 1000,
           role: "user",
         });
         setUsers(response.users);
@@ -792,12 +794,36 @@ const DrillBuilder: React.FC = () => {
     setSelectedUsers(updated);
   };
 
+  const filteredUsers = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return users;
+
+    return users.filter((user) => {
+      const name = `${user.firstName || ""} ${user.lastName || ""} ${user.name || ""}`
+        .trim()
+        .toLowerCase();
+      const email = (user.email || "").toLowerCase();
+      return name.includes(query) || email.includes(query);
+    });
+  }, [users, studentSearch]);
+
+  const allFilteredSelected =
+    filteredUsers.length > 0 &&
+    filteredUsers.every((user) => selectedUsers.has(user._id.toString()));
+
   const toggleAllUsers = () => {
-    if (selectedUsers.size === users.length) {
-      setSelectedUsers(new Set());
-    } else {
-      setSelectedUsers(new Set(users.map((u) => u._id.toString())));
+    const targetIds = filteredUsers.map((u) => u._id.toString());
+
+    if (allFilteredSelected) {
+      const updated = new Set(selectedUsers);
+      targetIds.forEach((id) => updated.delete(id));
+      setSelectedUsers(updated);
+      return;
     }
+
+    const updated = new Set(selectedUsers);
+    targetIds.forEach((id) => updated.add(id));
+    setSelectedUsers(updated);
   };
 
   // Handle file upload
@@ -2661,10 +2687,19 @@ const DrillBuilder: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 text-gray-600 text-xs font-bold rounded-lg border border-gray-100 hover:bg-gray-100"
               >
                 <Plus className="w-3 h-3" />{" "}
-                {selectedUsers.size === users.length
-                  ? "Deselect all"
-                  : "Select all"}
+                {allFilteredSelected ? "Deselect all" : "Select all"}
               </button>
+            </div>
+
+            <div className="relative mb-6">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                placeholder="Search students by name or email…"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="w-full rounded-xl border border-gray-100 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#418b43]/40 focus:outline-none focus:ring-2 focus:ring-[#418b43]/20"
+              />
             </div>
 
             {loadingUsers ? (
@@ -2675,24 +2710,28 @@ const DrillBuilder: React.FC = () => {
               <p className="text-sm text-gray-500 text-center py-8">
                 No users found
               </p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                No students match your search.
+              </p>
             ) : (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 <div className="flex items-center gap-3 p-2">
                   <input
                     type="checkbox"
-                    checked={
-                      selectedUsers.size === users.length && users.length > 0
-                    }
+                    checked={allFilteredSelected}
                     onChange={toggleAllUsers}
                     className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
                   />
                   <span className="text-sm font-medium text-gray-700">
-                    Select all Users
+                    {studentSearch.trim()
+                      ? `Select all shown (${filteredUsers.length})`
+                      : "Select all Users"}
                   </span>
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-2xl space-y-4">
-                  {users.map((user) => {
+                  {filteredUsers.map((user) => {
                     const name =
                       `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
                       user.name || "Unknown";

@@ -201,6 +201,9 @@ export class ClassRepository {
     const mongoSession = await m.startSession();
     mongoSession.startTransaction();
     try {
+      // Weekly series: persist meetingUrl on ClassSeries so future sessions/reschedules reuse it.
+      // When auto-creating sessions 2+ for a weekly series, copy series.meetingUrl and use
+      // createGoogleCalendarEventWithExistingMeetLink — do not mint a new Meet link.
       const createdSeries = await ClassSeries.create(
         [
           {
@@ -213,6 +216,7 @@ export class ClassRepository {
             scheduleStartTime: body.scheduleStartTime ?? '',
             scheduleEndTime: body.scheduleEndTime ?? '',
             recurrenceRule: recurrence === 'weekly' ? 'weekly' : 'none',
+            ...(recurrence === 'weekly' && meetingUrl ? { meetingUrl } : {}),
             createdBy,
             isActive: true,
           },
@@ -497,7 +501,7 @@ export class ClassRepository {
         learnerUsers,
         tutor,
       );
-      const item = applyTutorJoinPolicy(raw, next);
+      const item = applyTutorJoinPolicy(raw, next, new Date(), raw.meetingUrl);
       if (params.bucket && item.bucket !== params.bucket) {
         continue;
       }
@@ -611,7 +615,7 @@ export class ClassRepository {
         learnerUsers,
         tutor,
       );
-      const item = applyTutorJoinPolicy(raw, next);
+      const item = applyTutorJoinPolicy(raw, next, new Date(), raw.meetingUrl);
       if (params.bucket && item.bucket !== params.bucket) {
         continue;
       }
@@ -745,6 +749,7 @@ export class ClassRepository {
     learnerId: Types.ObjectId,
   ): Promise<{
     session: IClassSession;
+    series: IClassSeries;
     seriesTitle: string;
     tutorName: string;
     tutorId: Types.ObjectId;
@@ -775,6 +780,7 @@ export class ClassRepository {
 
     return {
       session: session as unknown as IClassSession,
+      series: series as unknown as IClassSeries,
       seriesTitle: series.title || 'Class',
       tutorName,
       tutorId: series.tutorId as Types.ObjectId,

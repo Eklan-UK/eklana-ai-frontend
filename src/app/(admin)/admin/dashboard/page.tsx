@@ -8,7 +8,6 @@ import {
   UserPlus,
   Video,
   ArrowUpRight,
-  Filter,
   Eye,
   Loader2,
   CalendarDays,
@@ -35,9 +34,14 @@ const Dashboard: React.FC = () => {
   // Use React Query instead of useEffect + useState
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: learners = [], isLoading: learnersLoading } = useRecentLearners(10);
-  const { data: pronunciationAnalytics, isLoading: pronunciationLoading } = useOverallPronunciationAnalytics();
+  const {
+    data: pronunciationAnalytics,
+    isLoading: pronunciationLoading,
+    isError: pronunciationError,
+  } = useOverallPronunciationAnalytics(30);
 
-  const loading = statsLoading || learnersLoading || pronunciationLoading;
+  // Stat cards and learner table should resolve independently of the (slow) pronunciation analytics fetch.
+  const loading = statsLoading || learnersLoading;
 
   // Default stats with all optional properties
   const statsWithDefaults: DashboardStats = stats
@@ -65,19 +69,19 @@ const Dashboard: React.FC = () => {
       title: "Total Users",
       value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
-      color: "border-emerald-200 bg-emerald-50/30",
+      color: "border-emerald-200 bg-emerald-50/30 dark:border-border dark:bg-emerald-950/30",
     },
     {
       title: "Subscribed Users",
       value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
-      color: "border-blue-200 bg-blue-50/30",
+      color: "border-blue-200 bg-blue-50/30 dark:border-border dark:bg-blue-950/30",
     },
     {
       title: "Total Active Learners",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
-      color: "border-primary-200 bg-primary-50/30",
+      color: "border-primary-200 bg-primary-50/30 dark:border-border dark:bg-primary-950/30",
     },
     {
       title: "Total Drills",
@@ -85,7 +89,7 @@ const Dashboard: React.FC = () => {
         ? "..."
         : statsWithDefaults.totalDrills.toString(),
       change: "",
-      color: "border-amber-200 bg-amber-50/30",
+      color: "border-amber-200 bg-amber-50/30 dark:border-border dark:bg-amber-950/30",
     },
   ];
 
@@ -153,7 +157,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Daily Focus Quick Access */}
-      <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-6">
+      <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-6 dark:from-orange-950/40 dark:to-amber-950/40 dark:border-orange-900/50">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl">
@@ -283,21 +287,17 @@ const Dashboard: React.FC = () => {
 
       {/* Learners Requiring Action */}
       <section className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+        <div className="p-6 border-b border-gray-50">
           <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
             <span className="p-1.5 bg-amber-50 rounded-lg">
               <span className="text-amber-600 text-lg">!</span>
             </span>
             Learners Requiring Action
           </h2>
-          <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 bg-gray-50 rounded-lg hover:bg-gray-100">
-            <Filter className="w-4 h-4" />
-            Filters
-          </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[340px]">
           <table className="w-full text-left">
-            <thead className="bg-gray-50/50">
+            <thead className="sticky top-0 z-10 bg-gray-50/50">
               <tr>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Learner
@@ -333,7 +333,7 @@ const Dashboard: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                learners.slice(0, 4).map((learner, idx) => {
+                learners.slice(0, 5).map((learner) => {
                   const name =
                     `${learner.firstName || ""} ${learner.lastName || ""
                       }`.trim() || "Unknown";
@@ -404,6 +404,10 @@ const Dashboard: React.FC = () => {
           <div className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           </div>
+        ) : pronunciationError ? (
+          <div className="text-center py-8 text-red-500">
+            Failed to load pronunciation analytics.
+          </div>
         ) : !pronunciationAnalytics ? (
           <div className="text-center py-8 text-gray-500">
             No pronunciation data available.
@@ -435,18 +439,35 @@ const Dashboard: React.FC = () => {
                 <AlertCircle className="w-4 h-4" />
                 Most Difficult Letters
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {pronunciationAnalytics.problemAreas?.topIncorrectLetters?.length > 0 ? (
-                  pronunciationAnalytics.problemAreas.topIncorrectLetters.map((item: any, i: number) => (
-                    <div key={i} className="px-3 py-1.5 bg-white border border-red-100 rounded-lg shadow-sm flex items-center gap-2">
-                      <span className="font-mono font-bold text-red-600">{item.letter}</span>
-                      <span className="text-xs text-gray-500">×{item.count}</span>
+              {pronunciationAnalytics.problemAreas?.topIncorrectLetters?.length > 0 ? (
+                <div className="space-y-2">
+                  {pronunciationAnalytics.problemAreas.topIncorrectLetters.map((item: any, i: number) => (
+                    <div key={i} className="p-3 bg-white border border-red-100 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-mono font-bold text-red-700">{item.letter}</span>
+                        <span className="text-xs text-red-600 font-bold ml-auto">×{item.count}</span>
+                      </div>
+                      {item.words?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.words.map((w: { word: string; count: number }, wi: number) => (
+                            <span
+                              key={wi}
+                              className="px-2 py-0.5 bg-red-50 border border-red-200 rounded text-xs text-gray-800"
+                            >
+                              {w.word}
+                              <span className="text-red-500 ml-1">×{w.count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No word data yet</p>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-gray-500 italic">No data available</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No data available</p>
+              )}
             </div>
 
             {/* Problem Areas - Phonemes */}
@@ -455,18 +476,36 @@ const Dashboard: React.FC = () => {
                 <Volume2 className="w-4 h-4" />
                 Most Difficult Sounds
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {pronunciationAnalytics.problemAreas?.topIncorrectPhonemes?.length > 0 ? (
-                  pronunciationAnalytics.problemAreas.topIncorrectPhonemes.map((item: any, i: number) => (
-                    <div key={i} className="px-3 py-1.5 bg-white border border-orange-100 rounded-lg shadow-sm flex items-center gap-2">
-                      <span className="font-medium text-orange-600">{item.phoneme}</span>
-                      <span className="text-xs text-gray-500">×{item.count}</span>
+              {pronunciationAnalytics.problemAreas?.topIncorrectPhonemes?.length > 0 ? (
+                <div className="space-y-2">
+                  {pronunciationAnalytics.problemAreas.topIncorrectPhonemes.map((item: any, i: number) => (
+                    <div key={i} className="p-3 bg-white border border-orange-100 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Volume2 className="w-3.5 h-3.5 text-orange-500" />
+                        <span className="text-sm font-semibold text-orange-700">/{item.phoneme}/</span>
+                        <span className="text-xs text-orange-600 font-bold ml-auto">×{item.count}</span>
+                      </div>
+                      {item.words?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.words.map((w: { word: string; count: number }, wi: number) => (
+                            <span
+                              key={wi}
+                              className="px-2 py-0.5 bg-orange-50 border border-orange-200 rounded text-xs text-gray-800"
+                            >
+                              {w.word}
+                              <span className="text-orange-500 ml-1">×{w.count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No word data yet</p>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-gray-500 italic">No data available</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No data available</p>
+              )}
             </div>
 
             {/* Difficult Words Table */}

@@ -17,6 +17,8 @@ export interface ClassSeries {
   timezone: string;
   /** Optional cap for group classes. */
   maxLearners?: number;
+  /** Shared Google Meet link for weekly recurring programs. */
+  meetingUrl?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

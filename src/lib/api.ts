@@ -710,6 +710,10 @@ export const adminAPI = {
   getAllLearners: (params?: {
     limit?: number;
     offset?: number;
+    search?: string;
+    signupDateFrom?: string;
+    signupDateTo?: string;
+    status?: 'active' | 'inactive';
   }) => {
     return apiRequest<{
       code?: string;
@@ -721,6 +725,7 @@ export const adminAPI = {
     }>('/admin/learners', {
       method: 'GET',
       params,
+      cache: false,
     });
   },
 
@@ -728,7 +733,9 @@ export const adminAPI = {
   updateUserSubscription: (data: {
     userId: string;
     plan: "free" | "premium";
-    months: number;
+    months?: number;
+    billingPeriod?: "monthly" | "quarterly" | "annual";
+    zeroPauseProducts?: ("challenge" | "mastery")[];
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -739,12 +746,18 @@ export const adminAPI = {
       data: {
         userId: string;
         subscriptionPlan: "free" | "premium";
+        subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
+        zeroPauseProducts: ("challenge" | "mastery")[];
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
     }>('/admin/users/subscription', {
       method: 'POST',
       data,
+    }).then((response) => {
+      // Subscription changes must be visible on the learners list immediately.
+      apiCache.clearPattern('^/admin/learners');
+      return response;
     });
   },
 
