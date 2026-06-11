@@ -10,6 +10,7 @@ import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { getProblemAreasWithWords } from '@/domain/pronunciations/pronunciation-analytics.service';
 import { Types } from 'mongoose';
+import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -21,19 +22,23 @@ async function handler(
 
 		const { learnerId } = params;
 
-		// Check permissions: Admin/Tutor or the learner themselves
-		if (
-			context.userRole !== 'admin' &&
-			context.userRole !== 'tutor' &&
-			context.userId.toString() !== learnerId
-		) {
-			return NextResponse.json(
-				{
-					code: 'Forbidden',
-					message: "You don't have permission to access these analytics",
-				},
-				{ status: 403 }
-			);
+		// Check permissions: Admin/assigned Tutor or the learner themselves
+		if (context.userId.toString() !== learnerId) {
+			if (context.userRole !== 'admin' && context.userRole !== 'tutor') {
+				return NextResponse.json(
+					{ code: 'Forbidden', message: "You don't have permission to access these analytics" },
+					{ status: 403 }
+				);
+			}
+			if (context.userRole === 'tutor' && Types.ObjectId.isValid(learnerId)) {
+				const access = await assertStaffCanReadLearner(context, learnerId);
+				if (access === 'forbidden') {
+					return NextResponse.json(
+						{ code: 'Forbidden', message: "You don't have permission to access these analytics" },
+						{ status: 403 }
+					);
+				}
+			}
 		}
 
 		// Find user (learnerId is now userId)

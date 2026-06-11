@@ -8,6 +8,7 @@ import Profile from '@/models/profile';
 import Tutor from '@/models/tutor';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -39,6 +40,17 @@ async function handler(
 				},
 				{ status: 404 }
 			);
+		}
+
+		// Tutors may only read learners assigned to them
+		if (user.role === 'user' && context.userRole === 'tutor') {
+			const access = await assertStaffCanReadLearner(context, userId);
+			if (access === 'forbidden') {
+				return NextResponse.json(
+					{ code: 'NotFoundError', message: 'User not found' },
+					{ status: 404 }
+				);
+			}
 		}
 
 		const response: any = { user };

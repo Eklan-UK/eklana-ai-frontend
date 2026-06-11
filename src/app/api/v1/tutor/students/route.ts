@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
-import Profile from "@/models/profile";
+import TutorAssignment from "@/models/tutor-assignment";
 import DrillAssignment from "@/models/drill-assignment";
 import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
@@ -21,26 +21,27 @@ async function handler(
 		const limit = parseInt(searchParams.get("limit") || String(config.defaultResLimit));
 		const offset = parseInt(searchParams.get("offset") || String(config.defaultResOffset));
 
-		const total = await Profile.countDocuments({ tutorId: context.userId }).exec();
+		const total = await TutorAssignment.countDocuments({
+			tutorId: context.userId,
+			status: "active",
+		}).exec();
 
-		const profiles = await Profile.find({ tutorId: context.userId })
-			.select("userId")
-			.sort({ createdAt: -1 })
+		const assignments = await TutorAssignment.find({
+			tutorId: context.userId,
+			status: "active",
+		})
+			.select("learnerId assignedAt")
+			.sort({ assignedAt: -1 })
 			.limit(limit)
 			.skip(offset)
 			.lean()
 			.exec();
 
-		const userIds = profiles.map((p) => p.userId);
+		const userIds = assignments.map((a) => a.learnerId);
 
 		if (userIds.length === 0) {
 			return NextResponse.json(
-				{
-					limit,
-					offset,
-					total,
-					students: [],
-				},
+				{ limit, offset, total, students: [] },
 				{ status: 200 },
 			);
 		}
@@ -58,7 +59,7 @@ async function handler(
 		const drillCounts = await DrillAssignment.aggregate([
 			{
 				$match: {
-					learnerId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+					learnerId: { $in: userIds.map((id) => new Types.ObjectId(id.toString())) },
 					assignedBy: context.userId,
 				},
 			},
@@ -104,7 +105,6 @@ async function handler(
 
 			return {
 				...user,
-				userId: user,
 				drillsTotal: counts.drillsTotal,
 				drillsCompleted: counts.drillsCompleted,
 				drillsActive: counts.drillsActive,
@@ -115,26 +115,13 @@ async function handler(
 		logger.info("Students fetched successfully for tutor", {
 			tutorId: context.userId,
 			returned: students.length,
-			totalProfiles: total,
 		});
 
-		return NextResponse.json(
-			{
-				limit,
-				offset,
-				total,
-				students,
-			},
-			{ status: 200 },
-		);
+		return NextResponse.json({ limit, offset, total, students }, { status: 200 });
 	} catch (error: any) {
 		logger.error("Error fetching students for tutor", error);
 		return NextResponse.json(
-			{
-				code: "ServerError",
-				message: "Internal Server Error",
-				error: error.message,
-			},
+			{ code: "ServerError", message: "Internal Server Error", error: error.message },
 			{ status: 500 },
 		);
 	}

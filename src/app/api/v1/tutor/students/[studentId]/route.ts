@@ -4,12 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
-import Profile from '@/models/profile';
 import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { isTutorAssignedToLearner } from '@/domain/tutor-assignments/tutor-assignment.service';
 
 const updateStudentNameSchema = z.object({
 	firstName: z.string().min(1).max(50),
@@ -40,14 +40,8 @@ async function handler(
 		const studentObjectId = new Types.ObjectId(studentId);
 
 		// Verify the student is assigned to this tutor
-		const profile = await Profile.findOne({
-			userId: studentObjectId,
-			tutorId: context.userId,
-		})
-			.lean()
-			.exec();
-
-		if (!profile) {
+		const isAssigned = await isTutorAssignedToLearner(context.userId, studentObjectId);
+		if (!isAssigned) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
@@ -264,12 +258,8 @@ async function patchHandler(
 
 		const studentObjectId = new Types.ObjectId(studentId);
 
-		const profile = await Profile.findOne({
-			userId: studentObjectId,
-			tutorId: context.userId,
-		}).exec();
-
-		if (!profile) {
+		const isAssigned = await isTutorAssignedToLearner(context.userId, studentObjectId);
+		if (!isAssigned) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
