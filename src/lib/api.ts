@@ -694,16 +694,45 @@ export const adminAPI = {
     });
   },
 
-  // Assign tutor to student
+  // Assign tutor to student (creates TutorAssignment, multiple tutors per student supported)
   assignTutorToStudent: (studentId: string, tutorId: string) => {
     return apiRequest<{
       code: string;
       message: string;
-      data: { learner: any };
+      data: { assignmentId: string };
     }>('/admin/assign-tutor', {
       method: 'POST',
       data: { studentId, tutorId },
     });
+  },
+
+  // Remove tutor–student assignment
+  unassignTutorFromStudent: (studentId: string, tutorId: string) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+    }>('/admin/unassign-tutor', {
+      method: 'DELETE',
+      data: { studentId, tutorId },
+    });
+  },
+
+  // List learners assigned to a specific tutor
+  getTutorAssignedStudents: (tutorId: string, params?: { search?: string }) => {
+    const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+    return apiRequest<{
+      students: Array<{
+        assignmentId: string;
+        id: string;
+        firstName?: string;
+        lastName?: string;
+        name: string;
+        email: string;
+        assignedAt: string;
+        assignedBy: any;
+      }>;
+      total: number;
+    }>(`/admin/tutors/${tutorId}/students${qs}`);
   },
 
   // Get all learners (admin only)

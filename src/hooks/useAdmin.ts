@@ -318,3 +318,45 @@ export function useUpdateUserSubscription() {
     },
   });
 }
+
+// Get learners assigned to a specific tutor
+export function useTutorAssignedStudents(tutorId: string, search?: string) {
+  return useQuery({
+    queryKey: ["admin", "tutor-assignments", tutorId, search],
+    queryFn: () => adminAPI.getTutorAssignedStudents(tutorId, search ? { search } : undefined),
+    enabled: !!tutorId,
+    staleTime: 30_000,
+  });
+}
+
+// Assign a learner to a tutor
+export function useAssignTutorToStudent(tutorId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) =>
+      adminAPI.assignTutorToStudent(studentId, tutorId),
+    onSuccess: () => {
+      toast.success("Student assigned");
+      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to assign student");
+    },
+  });
+}
+
+// Remove a learner from a tutor
+export function useUnassignTutorFromStudent(tutorId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) =>
+      adminAPI.unassignTutorFromStudent(studentId, tutorId),
+    onSuccess: () => {
+      toast.success("Student removed");
+      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to remove student");
+    },
+  });
+}

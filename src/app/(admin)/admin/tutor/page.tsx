@@ -2,10 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search, UserPlus, UserRound } from "lucide-react";
+import { Loader2, Search, UserPlus, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { adminAPI } from "@/lib/api";
 import { queryKeys } from "@/lib/react-query";
+import Link from "next/link";
 
 type RoleFilter = "all" | "user" | "tutor";
 
@@ -228,6 +229,15 @@ export default function AdminTutorPromotePage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
+                          {isTutor && (
+                            <Link
+                              href={`/admin/tutor/${id}/students`}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 shadow-sm transition-colors hover:bg-blue-100"
+                            >
+                              <Users className="h-3.5 w-3.5" strokeWidth={2.5} />
+                              Manage Students
+                            </Link>
+                          )}
                           <button
                             type="button"
                             disabled={isTutor || tutorBusy || learnerBusy}
