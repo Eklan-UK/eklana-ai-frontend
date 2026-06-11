@@ -34,6 +34,7 @@ Each card shows:
 
 `weekNumber` comes from `assignWeekNumbers()` in the service — empty challenges are excluded so numbering is always sequential.
 
+
 Clicking a card navigates to `/account/practice/weekly-challenge/[weekStartDate]` where `weekStartDate` is the ISO date string from the document. This is the week view page — already built by dev, no changes needed.
 
 Sort: newest first (the API already returns them sorted).

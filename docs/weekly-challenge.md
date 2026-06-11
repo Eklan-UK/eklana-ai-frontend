@@ -407,6 +407,7 @@ The window calculation uses `setUTCDate` — fixed in error hardening pass.
 
 Challenge numbers in the week view are assigned server-side by `assignWeekNumbers()` — empty challenges are excluded from numbering so numbers are always sequential.
 
+
 ---
 
 ## 8. What's coming next
