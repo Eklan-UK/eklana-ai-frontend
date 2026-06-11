@@ -69,19 +69,19 @@ const Dashboard: React.FC = () => {
       title: "Total Users",
       value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
-      color: "border-emerald-200 bg-emerald-50/30 dark:border-border dark:bg-emerald-950/30",
+      color: "bg-white border border-emerald-200 dark:border-border dark:bg-emerald-950/30",
     },
     {
       title: "Subscribed Users",
       value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
-      color: "border-blue-200 bg-blue-50/30 dark:border-border dark:bg-blue-950/30",
+      color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",
     },
     {
       title: "Total Active Learners",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
-      color: "border-primary-200 bg-primary-50/30 dark:border-border dark:bg-primary-950/30",
+      color: "bg-white border border-primary-200 dark:border-border dark:bg-primary-950/30",
     },
     {
       title: "Total Drills",
@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
         ? "..."
         : statsWithDefaults.totalDrills.toString(),
       change: "",
-      color: "border-amber-200 bg-amber-50/30 dark:border-border dark:bg-amber-950/30",
+      color: "bg-white border border-amber-200 dark:border-border dark:bg-amber-950/30",
     },
   ];
 
@@ -137,7 +137,7 @@ const Dashboard: React.FC = () => {
           ) => (
             <div
               key={idx}
-              className={`p-6 rounded-2xl border ${stat.color} relative overflow-hidden`}
+              className={`p-6 rounded-2xl ${stat.color} relative overflow-hidden`}
             >
               <div className="flex justify-between items-start mb-4">
                 <p className="text-sm font-medium text-gray-600 max-w-[120px]">
@@ -157,7 +157,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Daily Focus Quick Access */}
-      <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-6 dark:from-orange-950/40 dark:to-amber-950/40 dark:border-orange-900/50">
+      <div className="bg-[#fff7ed] rounded-2xl border border-orange-200 p-6 dark:bg-gradient-to-br dark:from-orange-950/40 dark:to-amber-950/40 dark:border-orange-900/50">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl">
