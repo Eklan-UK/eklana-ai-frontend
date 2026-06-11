@@ -12,6 +12,10 @@ export interface CreateGoogleMeetEventInput {
   attendees?: string[];
 }
 
+export interface CreateGoogleMeetEventWithExistingLinkInput extends CreateGoogleMeetEventInput {
+  meetingUrl: string;
+}
+
 export async function createGoogleCalendarEventWithMeetLink(
   input: CreateGoogleMeetEventInput,
 ): Promise<{ meetingUrl: string; eventId: string }> {
@@ -73,6 +77,82 @@ export async function createGoogleCalendarEventWithMeetLink(
   }
   if (!meetingUrl) {
     throw new Error("Google Calendar event created without Meet link");
+  }
+
+  return {
+    meetingUrl,
+    eventId: event.id,
+  };
+}
+
+/**
+ * Create a calendar event that reuses an existing Google Meet link (no new conference room).
+ * Used for weekly recurring series where all sessions share one Meet URL.
+ */
+export async function createGoogleCalendarEventWithExistingMeetLink(
+  input: CreateGoogleMeetEventWithExistingLinkInput,
+): Promise<{ meetingUrl: string; eventId: string }> {
+  const clientId = config.GOOGLE_CALENDAR_CLIENT_ID?.trim();
+  const clientSecret = config.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Google Calendar OAuth client is not configured (GOOGLE_CALENDAR_CLIENT_ID/SECRET)",
+    );
+  }
+
+  const refreshToken = input.refreshToken.trim();
+  if (!refreshToken) {
+    throw new Error("Google Calendar refresh token is missing for this tutor");
+  }
+
+  const meetingUrl = input.meetingUrl.trim();
+  if (!meetingUrl) {
+    throw new Error("Existing Meet link URL is required");
+  }
+
+  const oauth2Client = new googleApis.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  const calendar = googleApis.calendar({ version: "v3", auth: oauth2Client });
+  const attendees =
+    input.attendees?.filter((email) => !!email && email.includes("@")).map((email) => ({ email })) ??
+    [];
+
+  const response = await calendar.events.insert({
+    calendarId: "primary",
+    conferenceDataVersion: 1,
+    requestBody: {
+      summary: input.summary,
+      description: input.description,
+      start: {
+        dateTime: input.startIsoUtc,
+        timeZone: input.timezone,
+      },
+      end: {
+        dateTime: input.endIsoUtc,
+        timeZone: input.timezone,
+      },
+      attendees,
+      hangoutLink: meetingUrl,
+      conferenceData: {
+        entryPoints: [
+          {
+            entryPointType: "video",
+            uri: meetingUrl,
+            label: "meet.google.com",
+          },
+        ],
+        conferenceSolution: {
+          key: { type: "hangoutsMeet" },
+          name: "Google Meet",
+        },
+      },
+    },
+  });
+
+  const event = response.data;
+  if (!event.id) {
+    throw new Error("Google Calendar event created without event id");
   }
 
   return {

@@ -12,6 +12,8 @@ export interface IClassSeries extends Document {
   scheduleStartTime: string;
   scheduleEndTime: string;
   recurrenceRule: 'weekly' | 'none';
+  /** Shared Google Meet link for weekly recurring programs (one link per series). */
+  meetingUrl?: string;
   createdBy: Types.ObjectId;
   isActive: boolean;
   createdAt: Date;
@@ -42,6 +44,7 @@ const classSeriesSchema = new Schema<IClassSeries>(
       enum: ['weekly', 'none'],
       default: 'none',
     },
+    meetingUrl: { type: String, trim: true },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',

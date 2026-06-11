@@ -119,6 +119,7 @@ export class DrillService {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
     limit?: number;
     offset?: number;
   }): Promise<{ drills: DrillType[]; total: number; limit: number; offset: number }> {
@@ -130,6 +131,23 @@ export class DrillService {
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
     if (filters.studentEmail) query.assigned_to = filters.studentEmail;
+    if (filters.assignmentStatus === 'saved') {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (filters.assignmentStatus === 'assigned') {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
 
     const total = await this.drillRepo.count(query);
 
@@ -155,12 +173,15 @@ export class DrillService {
       'email role firstName lastName name'
     );
 
-    // 2. Validate assigned users
-    const assignedUsers = await userService.findMultipleWithRole(
-      params.assignedUserIds,
-      'user',
-      'email firstName lastName'
-    );
+    // 2. Validate assigned users (skip when saving without assignment)
+    const assignedUsers =
+      params.assignedUserIds.length > 0
+        ? await userService.findMultipleWithRole(
+            params.assignedUserIds,
+            'user',
+            'email firstName lastName'
+          )
+        : [];
 
     // 3. Create drill
     const drill = await this.drillRepo.create({
@@ -365,6 +386,13 @@ export class DrillService {
         newAssignmentsCount = created.length;
 
         await this.drillRepo.incrementAssignments(drillId, newAssignmentsCount);
+
+        if (newAssignmentsCount > 0) {
+          await this.drillRepo.update(drillId, { is_active: true });
+          if (updatedDrill) {
+            updatedDrill.is_active = true;
+          }
+        }
       }
     }
 

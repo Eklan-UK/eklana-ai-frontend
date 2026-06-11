@@ -6,6 +6,50 @@ import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 
+function startOfDay(dateString: string): Date {
+	const date = new Date(dateString);
+	date.setHours(0, 0, 0, 0);
+	return date;
+}
+
+function endOfDay(dateString: string): Date {
+	const date = new Date(dateString);
+	date.setHours(23, 59, 59, 999);
+	return date;
+}
+
+function buildLearnerQuery(searchParams: URLSearchParams): Record<string, unknown> {
+	const query: Record<string, unknown> = { role: 'user' };
+
+	const search = searchParams.get('search')?.trim();
+	const signupDateFrom = searchParams.get('signupDateFrom');
+	const signupDateTo = searchParams.get('signupDateTo');
+	const status = searchParams.get('status');
+
+	if (search) {
+		query.$or = [
+			{ firstName: { $regex: search, $options: 'i' } },
+			{ lastName: { $regex: search, $options: 'i' } },
+			{ name: { $regex: search, $options: 'i' } },
+		];
+	}
+
+	if (signupDateFrom || signupDateTo) {
+		const createdAt: Record<string, Date> = {};
+		if (signupDateFrom) createdAt.$gte = startOfDay(signupDateFrom);
+		if (signupDateTo) createdAt.$lte = endOfDay(signupDateTo);
+		query.createdAt = createdAt;
+	}
+
+	if (status === 'active') {
+		query.isActive = { $ne: false };
+	} else if (status === 'inactive') {
+		query.isActive = false;
+	}
+
+	return query;
+}
+
 async function getHandler(
 	req: NextRequest,
 	context: { userId: Types.ObjectId; userRole: string }
@@ -16,12 +60,11 @@ async function getHandler(
 		const { searchParams } = new URL(req.url);
 		const limit = parseInt(searchParams.get('limit') || '100');
 		const offset = parseInt(searchParams.get('offset') || '0');
+		const query = buildLearnerQuery(searchParams);
 
-		// Get total count of users with role 'user'
-		const total = await User.countDocuments({ role: 'user' }).exec();
+		const total = await User.countDocuments(query).exec();
 
-		// Find all users with role 'user'
-		const users = await User.find({ role: 'user' })
+		const users = await User.find(query)
 			.select('-password -__v')
 			.sort({ createdAt: -1 })
 			.limit(limit)
