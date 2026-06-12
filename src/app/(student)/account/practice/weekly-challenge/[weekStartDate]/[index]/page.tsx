@@ -56,6 +56,7 @@ export default function WeeklyChallengePracticePage() {
 			weeklyChallengeMeta={{
 				challengeId: itemData.challengeId,
 				itemIndex: itemData.index,
+				itemId: itemData.itemId,
 				weekStartDate: itemData.weekStartDate,
 			}}
 		/>
