@@ -127,7 +127,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 Edit
               </Button>
             </Link>
-            <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+            <Link href={`/admin/drills/create?drillId=${drillId}`}>
               <Button variant="outline" size="sm">
                 <Users className="w-4 h-4 mr-2" />
                 Assign
@@ -522,7 +522,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                   {assignedCount} total
                 </p>
               </div>
-              <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+              <Link href={`/admin/drills/create?drillId=${drillId}`}>
                 <Button variant="outline" size="sm">
                   <Users className="w-4 h-4 mr-2" />
                   Manage Assignments
@@ -688,7 +688,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 <p className="text-gray-500">
                   No students assigned to this drill yet
                 </p>
-                <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+                <Link href={`/admin/drills/create?drillId=${drillId}`}>
                   <Button variant="primary" size="sm" className="mt-4">
                     Assign Students
                   </Button>

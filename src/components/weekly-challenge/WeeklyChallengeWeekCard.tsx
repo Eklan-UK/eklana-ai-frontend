@@ -14,14 +14,8 @@ export function WeeklyChallengeWeekCard({
 	const t = useTranslations("account.weeklyChallenge");
 	const drillSequence = challenge.drillSequence ?? [];
 	const completedCount = drillSequence.filter((d) => d.completed).length;
-	const totalDrills = drillSequence.length;
-	const isCompleted = completedCount > 0 && completedCount === totalDrills;
-	const isOngoing = completedCount > 0 && completedCount < totalDrills;
 	const weekNumber = challenge.weekNumber ?? 0;
 	const href = `/account/practice/weekly-challenge/${encodeWeekStartDate(challenge.weekStartDate)}`;
-	const weekDateLabel = challenge.generatedAt
-		? `Generated ${new Date(challenge.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-		: null;
 
 	return (
 		<Link
@@ -49,25 +43,12 @@ export function WeeklyChallengeWeekCard({
 							{t("statusFailed")}
 						</span>
 					) : null}
-					{challenge.status === "ready" && isCompleted ? (
-						<span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-							{t("statusCompleted")}
-						</span>
-					) : null}
-					{challenge.status === "ready" && isOngoing ? (
-						<span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-							{t("statusOngoing")}
-						</span>
-					) : null}
-					{challenge.status === "ready" && !isOngoing && !isCompleted ? (
+					{challenge.status === "ready" ? (
 						<span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
 							{t("statusReady")}
 						</span>
 					) : null}
 				</div>
-				{weekDateLabel ? (
-					<p className="text-xs text-muted-foreground/70 mb-0.5">{weekDateLabel}</p>
-				) : null}
 				<p className="text-xs text-muted-foreground line-clamp-2">
 					{challenge.summaryMessage?.startsWith("This week focus on:")
 						? "Personalized to address your weakest areas"

@@ -28,12 +28,9 @@ Each card shows:
 
 | Field | Example |
 |-------|---------|
-| Challenge label | "Challenge 1", "Challenge 2"… — sequential number from API `weekNumber` field |
+| Week label | "Week of Jun 2, 2026" — format `weekStartDate` |
 | Status badge | Ready / Generating / Failed |
 | Drill summary | "2 drills · 12 min" — count of `drillSequence` items + `totalEstimatedMinutes` |
-
-`weekNumber` comes from `assignWeekNumbers()` in the service — empty challenges are excluded so numbering is always sequential.
-
 
 Clicking a card navigates to `/account/practice/weekly-challenge/[weekStartDate]` where `weekStartDate` is the ISO date string from the document. This is the week view page — already built by dev, no changes needed.
 

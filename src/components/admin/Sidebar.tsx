@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -12,10 +11,10 @@ import {
   Hammer,
   BarChart2,
   Settings,
+  LogOut,
   Sun,
   Moon,
-  PanelLeftClose,
-  PanelLeft,
+  Layout,
   Mic,
   FileCheck,
   FileText,
@@ -23,38 +22,14 @@ import {
   CreditCard,
   UserPlus,
   Video,
+  MessageSquare,
 } from "lucide-react";
-
-const STORAGE_KEY = "admin-sidebar-collapsed";
+import { useAuthStore } from "@/store/auth-store";
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    try {
-      setCollapsed(localStorage.getItem(STORAGE_KEY) === "true");
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
-
-  const isDark = mounted && theme === "dark";
-
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        // ignore storage errors
-      }
-      return next;
-    });
-  };
+  const router = useRouter();
+  const logout = useAuthStore((s) => s.logout);
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -62,6 +37,7 @@ const Sidebar: React.FC = () => {
     { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
     { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/free-talk" },
     { name: "Classes", icon: Video, path: "/admin/classes" },
     { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
     { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
@@ -72,52 +48,32 @@ const Sidebar: React.FC = () => {
     { name: "Settings", icon: Settings, path: "/admin/settings" },
   ];
 
+  const handleLogout = async () => {
+    const loginPath = "/auth/admin/login";
+    try {
+      await logout();
+      router.push(loginPath);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   return (
-    <aside
-      className={`flex h-full min-h-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ease-in-out dark:border-border dark:bg-card ${
-        collapsed ? "w-[72px] min-w-[72px]" : "w-64 min-w-64"
-      }`}
-    >
-      <div
-        className={`shrink-0 flex ${
-          collapsed
-            ? "flex-col items-center gap-2 px-2 py-4"
-            : "items-center gap-2 p-6"
-        }`}
-      >
+    <aside className="flex h-full min-h-0 w-64 min-w-64 flex-col border-r border-gray-200 bg-white">
+      <div className="shrink-0 p-6 flex items-center gap-2">
         <Image
           src="/logo2.png"
           alt="eklan Logo"
           width={32}
           height={32}
-          className="shrink-0 rounded-lg"
+          className="rounded-lg"
         />
-        {!collapsed && (
-          <span className="min-w-0 flex-1 truncate text-xl font-bold text-gray-800 dark:text-foreground">
-            eklan
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!collapsed}
-          className={`shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground ${
-            collapsed ? "" : "ml-auto"
-          }`}
-        >
-          {collapsed ? (
-            <PanelLeft className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </button>
+        <span className="text-xl font-bold text-gray-800">eklan</span>
+        <Layout className="ml-auto w-4 h-4 text-gray-400" />
       </div>
 
       <nav
-        className={`min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain ${
-          collapsed ? "px-2" : "px-4"
-        }`}
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain px-4"
         aria-label="Admin"
       >
         {navItems.map((item) => {
@@ -127,13 +83,10 @@ const Sidebar: React.FC = () => {
             <Link
               key={item.path}
               href={item.path}
-              title={collapsed ? item.name : undefined}
-              className={`group flex items-center rounded-lg text-sm transition-colors ${
-                collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-3"
-              } ${
+              className={`group flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
                 isActive
-                  ? "bg-primary-100 font-semibold text-primary-700 dark:bg-primary-900/40 dark:font-semibold dark:text-primary-300"
-                  : "font-normal text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                  ? "bg-emerald-50 font-bold text-[#3d8c40]"
+                  : "font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800"
               }`}
             >
               {item.name === "Classes" && isActive ? (
@@ -149,49 +102,36 @@ const Sidebar: React.FC = () => {
                 <item.icon
                   className={`h-5 w-5 shrink-0 ${
                     isActive
-                      ? "text-primary-700 dark:text-primary-300"
-                      : "text-gray-500 group-hover:text-gray-700 dark:text-muted-foreground dark:group-hover:text-foreground"
+                      ? "text-[#3d8c40]"
+                      : "text-gray-500 group-hover:text-gray-800"
                   }`}
                 />
               )}
-              {!collapsed && <span className="truncate">{item.name}</span>}
+              {item.name}
             </Link>
           );
         })}
       </nav>
 
-      {!collapsed && (
-        <div className="shrink-0 border-t border-gray-100 p-4 dark:border-border">
-          <div className="flex items-center justify-around rounded-xl bg-gray-50 p-1 dark:bg-muted">
-            <button
-              type="button"
-              onClick={() => setTheme("light")}
-              aria-pressed={!isDark}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium transition-colors ${
-                !isDark
-                  ? "bg-white text-gray-700 shadow-sm dark:bg-card dark:text-foreground"
-                  : "text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              <Sun className="h-4 w-4" />
-              Light
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme("dark")}
-              aria-pressed={isDark}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium transition-colors ${
-                isDark
-                  ? "bg-white text-gray-700 shadow-sm dark:bg-card dark:text-foreground"
-                  : "text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              <Moon className="h-4 w-4" />
-              Dark
-            </button>
-          </div>
+      <div className="shrink-0 border-t border-gray-100 p-4">
+        <div className="bg-gray-50 p-1 rounded-xl flex items-center justify-around mb-4">
+          <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-white shadow-sm rounded-lg text-gray-700">
+            <Sun className="w-4 h-4" />
+            Light
+          </button>
+          <button className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-medium text-gray-500">
+            <Moon className="w-4 h-4" />
+            Dark
+          </button>
         </div>
-      )}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 };

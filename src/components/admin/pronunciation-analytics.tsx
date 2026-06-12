@@ -142,36 +142,62 @@ export function PronunciationAnalyticsComponent({
       </div>
 
       {/* Problem Areas Section */}
-      {problemAreas.topIncorrectPhonemes?.length > 0 && (
+      {(problemAreas.topIncorrectPhonemes?.length ||
+        problemAreas.topIncorrectLetters?.length) > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-orange-500" />
             Problem Areas
           </h3>
-          <div>
-            <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
-              Difficult Sounds
-            </p>
-            <div className="space-y-2">
-              {problemAreas.topIncorrectPhonemes.map(
-                (item: PhonemeProblemArea, idx: number) => (
-                  <div
-                    key={idx}
-                    className="p-3 bg-orange-50 border border-orange-100 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="w-3.5 h-3.5 text-orange-500" />
-                      <span className="text-sm font-semibold text-orange-700">
-                        /{item.phoneme}/
-                      </span>
-                      <span className="text-xs text-orange-600 font-bold ml-auto">
-                        ×{item.count}
-                      </span>
-                    </div>
-                  </div>
-                ),
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {problemAreas.topIncorrectPhonemes?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
+                  Difficult Sounds
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {problemAreas.topIncorrectPhonemes.map(
+                    (item: PhonemeProblemArea, idx: number) => (
+                      <div
+                        key={idx}
+                        className="px-3 py-1.5 bg-orange-100 border border-orange-200 rounded-full text-xs font-medium text-orange-700 flex items-center gap-2"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                        {item.phoneme}
+                        <span className="text-orange-600 font-bold">
+                          ×{item.count}
+                        </span>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+            {problemAreas.topIncorrectLetters?.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
+                  Difficult Letters
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {problemAreas.topIncorrectLetters.map(
+                    (item: { letter: string; count: number }, idx: number) => (
+                      <div
+                        key={idx}
+                        className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-full text-xs font-medium text-red-700 flex items-center gap-2"
+                      >
+                        <span className="font-mono font-bold text-base">
+                          {item.letter}
+                        </span>
+                        <span className="text-red-600 font-bold">
+                          ×{item.count}
+                        </span>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

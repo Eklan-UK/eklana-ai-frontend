@@ -106,16 +106,7 @@ When admin schedules a class, `ClassRepository.create()`:
 5. Receives:
    - `eventId`
    - `meetingUrl` (Meet link)
-6. Persists class series/session in Mongo:
-   - **Weekly recurring** (`recurrenceRule === 'weekly'`): `meetingUrl` on both `class_series` and `class_sessions` (shared link for the program).
-   - **One-time / non-weekly**: `meetingUrl` on the session only (unchanged).
-
-### Two calendar paths
-
-| Flow | Function | Meet link |
-|------|----------|-----------|
-| First session of a weekly series, one-time class, or weekly backfill | `createGoogleCalendarEventWithMeetLink()` | **New** link via `conferenceData.createRequest` |
-| Reschedule / future session for weekly series with existing link | `createGoogleCalendarEventWithExistingMeetLink()` | **Reuses** series `meetingUrl` (no `createRequest`) |
+6. Persists class series/session in Mongo (session `meetingUrl` is stored in class session doc).
 
 `createGoogleCalendarEventWithMeetLink()` uses:
 
@@ -125,18 +116,6 @@ When admin schedules a class, `ClassRepository.create()`:
 - robust extraction of meeting URL from either:
   - `hangoutLink`, or
   - `conferenceData.entryPoints` video URI.
-
-`createGoogleCalendarEventWithExistingMeetLink()` inserts a new calendar event (new `eventId` for reminders) but attaches the **existing** Meet URI via `hangoutLink` and `conferenceData.entryPoints` — no new conference room.
-
-### Reschedule behavior
-
-`RescheduleService.applyRescheduleToCalendarAndDb()`:
-
-- **Weekly series with `class_series.meetingUrl`:** reuses the shared link; old per-session calendar event is deleted, new event created with same Meet URL.
-- **Weekly series without series link** (legacy / calendar failed on create): mints a new link, then **backfills** `class_series.meetingUrl` for future reschedules.
-- **Non-weekly:** new Meet link on every reschedule (unchanged).
-
-Read paths (`class.mapper.resolveSessionMeetingUrl`, learner/tutor session APIs) prefer `class_series.meetingUrl` for weekly programs so UIs stay consistent even if a session row has a stale link.
 
 ## 6) Validation and failure handling
 

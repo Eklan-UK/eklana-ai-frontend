@@ -12,7 +12,6 @@ export function useAllDrills(filters?: {
   limit?: number;
   type?: string;
   difficulty?: string;
-  assignmentStatus?: 'saved' | 'assigned';
 }) {
   return useQuery({
     queryKey: [...queryKeys.drills.all, "admin", "list", filters],
@@ -21,13 +20,9 @@ export function useAllDrills(filters?: {
         limit: filters?.limit || 100,
         type: filters?.type,
         difficulty: filters?.difficulty,
-        assignmentStatus: filters?.assignmentStatus,
       });
-      const drills =
-        response.data?.drills ??
-        response.drills ??
-        [];
-      return Array.isArray(drills) ? drills : [];
+      console.log(response)
+      return response.data?.drills || [];
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
@@ -95,9 +90,6 @@ export function useAllLearners(filters?: {
   offset?: number;
   role?: string;
   search?: string;
-  signupDateFrom?: string;
-  signupDateTo?: string;
-  status?: 'active' | 'inactive';
 }) {
   return useQuery({
     queryKey: [...queryKeys.students.all, "admin", "list", filters],
@@ -406,88 +398,20 @@ export function useUpdateUserSubscription() {
     mutationFn: async (data: {
       userId: string;
       plan: "free" | "premium";
-      months?: number;
-      billingPeriod?: "monthly" | "quarterly" | "annual";
-      zeroPauseProducts?: ("challenge" | "mastery")[];
+      months: number;
       amount?: number;
       paymentMethod?: string;
       note?: string;
     }) => {
       return adminAPI.updateUserSubscription(data);
     },
-    onSuccess: (response, variables) => {
-      const updated = response?.data;
-      if (updated?.userId) {
-        queryClient.setQueriesData(
-          { queryKey: [...queryKeys.students.all, "admin", "list"] },
-          (old: { learners: Array<Record<string, unknown>>; total: number } | undefined) => {
-            if (!old?.learners) return old;
-            return {
-              ...old,
-              learners: old.learners.map((learner) =>
-                String(learner._id) === String(variables.userId)
-                  ? {
-                      ...learner,
-                      subscriptionPlan: updated.subscriptionPlan,
-                      subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
-                      zeroPauseProducts: updated.zeroPauseProducts,
-                      subscriptionActivatedAt: updated.subscriptionActivatedAt,
-                      subscriptionExpiresAt: updated.subscriptionExpiresAt,
-                    }
-                  : learner
-              ),
-            };
-          }
-        );
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard", "stats"] });
       toast.success("Subscription updated");
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to update subscription");
-    },
-  });
-}
-
-// Get learners assigned to a specific tutor
-export function useTutorAssignedStudents(tutorId: string, search?: string) {
-  return useQuery({
-    queryKey: ["admin", "tutor-assignments", tutorId, search],
-    queryFn: () => adminAPI.getTutorAssignedStudents(tutorId, search ? { search } : undefined),
-    enabled: !!tutorId,
-    staleTime: 30_000,
-  });
-}
-
-// Assign a learner to a tutor
-export function useAssignTutorToStudent(tutorId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (studentId: string) =>
-      adminAPI.assignTutorToStudent(studentId, tutorId),
-    onSuccess: () => {
-      toast.success("Student assigned");
-      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || "Failed to assign student");
-    },
-  });
-}
-
-// Remove a learner from a tutor
-export function useUnassignTutorFromStudent(tutorId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (studentId: string) =>
-      adminAPI.unassignTutorFromStudent(studentId, tutorId),
-    onSuccess: () => {
-      toast.success("Student removed");
-      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || "Failed to remove student");
     },
   });
 }

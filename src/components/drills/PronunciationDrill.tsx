@@ -79,9 +79,9 @@ function ScreenIndicator({
           <span
             className={`text-sm font-medium ${
               currentScreen === "word"
-                ? "text-emerald-900 dark:text-emerald-800"
+                ? "text-sky-800 dark:text-sky-200"
                 : isWordPassed
-                ? "text-emerald-700 dark:text-emerald-800"
+                ? "text-emerald-700 dark:text-emerald-300"
                 : "text-muted-foreground"
             }`}
           >
@@ -110,9 +110,9 @@ function ScreenIndicator({
           <span
             className={`text-sm font-medium ${
               currentScreen === "sentence"
-                ? "text-emerald-900 dark:text-emerald-800"
+                ? "text-sky-800 dark:text-sky-200"
                 : isSentencePassed
-                ? "text-emerald-700 dark:text-emerald-800"
+                ? "text-emerald-700 dark:text-emerald-300"
                 : !isWordPassed
                 ? "text-muted-foreground"
                 : "text-muted-foreground"
@@ -158,15 +158,12 @@ export default function PronunciationDrill({
     PronunciationTranscriptEntry[]
   >([]);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
-  const [showMic, setShowMic] = useState(true);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const ttsStopRef = useRef<(() => void) | null>(null);
 
   const revokeRecordingPreview = useCallback(() => {
     setRecordingPreviewUrl((prev) => {
@@ -392,13 +389,6 @@ export default function PronunciationDrill({
               currentScreen === "word" ? "Word" : "Sentence"
             } passed!`
           );
-          setShowMic(false);
-          setTimeout(() => {
-            scrollContainerRef.current?.scrollTo({
-              top: scrollContainerRef.current!.scrollHeight,
-              behavior: "smooth",
-            });
-          }, 50);
         } else {
           toast.warning(
             `Score: ${score.toFixed(
@@ -423,20 +413,19 @@ export default function PronunciationDrill({
           ];
         });
 
-        // Record pronunciation attempt (skip for weekly challenges — drill._id is not a valid ObjectId)
-        if (!weeklyChallengeMeta) {
-          try {
-            const audioBase64 = await blobToBase64(audioBlob);
-            await pronunciationAPI.createDrillAttempt({
-              text: textToAnalyze,
-              audioBase64,
-              drillId: drill._id,
-              drillType: 'pronunciation',
-              passingThreshold: PASS_THRESHOLD,
-            });
-          } catch (error) {
-            console.error('Failed to record pronunciation attempt:', error);
-          }
+        // Record pronunciation attempt
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          await pronunciationAPI.createDrillAttempt({
+            text: textToAnalyze,
+            audioBase64,
+            drillId: drill._id,
+            drillType: 'pronunciation',
+            passingThreshold: PASS_THRESHOLD,
+          });
+        } catch (error) {
+          // Log but don't fail the drill if pronunciation recording fails
+          console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce - missing textScore");
@@ -451,8 +440,6 @@ export default function PronunciationDrill({
   const handleTryAgain = () => {
     setPronunciationScore(null);
     discardPendingRecording();
-    setShowMic(true);
-    scrollContainerRef.current?.scrollTo({ top: 0 });
   };
 
   const handleContinueToSentence = () => {
@@ -460,8 +447,6 @@ export default function PronunciationDrill({
       discardPendingRecording();
       setCurrentScreen("sentence");
       setPronunciationScore(null);
-      setShowMic(true);
-      scrollContainerRef.current?.scrollTo({ top: 0 });
     } else {
       toast.error(
         "You must pass the word pronunciation (65%+) before proceeding to the sentence"
@@ -482,8 +467,6 @@ export default function PronunciationDrill({
       setCurrentScreen("word");
       setPronunciationScore(null);
       discardPendingRecording();
-      setShowMic(true);
-      scrollContainerRef.current?.scrollTo({ top: 0 });
     } else {
       discardPendingRecording();
       setPronunciationScore(null);
@@ -530,7 +513,7 @@ export default function PronunciationDrill({
       });
 
       if (weeklyChallengeMeta) {
-        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemId, {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
           score,
           weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
@@ -691,14 +674,11 @@ export default function PronunciationDrill({
 
   // Completed state
   if (isCompleted) {
-    const returnPath = weeklyChallengeMeta
-      ? `/account/practice/weekly-challenge/${encodeURIComponent(weeklyChallengeMeta.weekStartDate)}`
-      : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Pronunciation" : "pronunciation"}
-        returnPath={returnPath}
-        returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        drillType="pronunciation"
+        returnPath="/account/drills"
+        returnLabel="Back to My Plan"
         extraContent={
           sessionTranscripts.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">
@@ -766,20 +746,15 @@ export default function PronunciationDrill({
       void submitPendingForAnalysis();
       return;
     }
-    ttsStopRef.current?.();
     void startRecording();
   };
-
-  const passedCount = Object.values(wordProgress).filter(
-    (p) => p.wordPassed && p.sentencePassed
-  ).length;
 
   return (
     <DrillLayout title={drill.title}>
       <div className="relative flex min-h-0 flex-1 flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)]">
         <div className="shrink-0 space-y-4">
           <DrillProgress
-            current={passedCount}
+            current={currentIndex + 1}
             total={items.length}
           />
 
@@ -791,9 +766,8 @@ export default function PronunciationDrill({
         </div>
 
         <div
-          ref={scrollContainerRef}
           className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-4 ${
-            !showMic ? "pb-6" : awaitingSubmit ? "pb-48 sm:pb-52" : "pb-28 sm:pb-32"
+            awaitingSubmit ? "pb-48 sm:pb-52" : "pb-28 sm:pb-32"
           }`}
         >
           <Card className="mb-0">
@@ -856,14 +830,12 @@ export default function PronunciationDrill({
               text={currentText}
               size="lg"
               variant="button"
-              autoPlay={autoPlayAudio}
+              autoPlay={false}
               audioUrl={
                 currentScreen === "word"
                   ? currentItem.wordAudioUrl
                   : currentItem.sentenceAudioUrl
               }
-              onPlayStart={stopRecording}
-              stopRef={ttsStopRef}
             />
           </div>
 
@@ -1010,7 +982,6 @@ export default function PronunciationDrill({
                   setCurrentScreen("word");
                   setPronunciationScore(null);
                   discardPendingRecording();
-                  scrollContainerRef.current?.scrollTo({ top: 0 });
                 }}
                 disabled={isRecording || isAnalyzing}
               >
@@ -1020,8 +991,7 @@ export default function PronunciationDrill({
           </div>
         </div>
 
-        {/* Floating recording dock */}
-        {showMic && (
+        {/* Floating recording dock (centered): no full-width sheet */}
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] md:bottom-5 md:px-8">
           <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
             {awaitingSubmit && recordingPreviewUrl ? (
@@ -1096,7 +1066,6 @@ export default function PronunciationDrill({
             </div>
           </div>
         </div>
-        )}
       </div>
     </DrillLayout>
   );

@@ -67,7 +67,6 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 | `src/app/api/v1/learner/weekly-challenge/items/[index]/route.ts` | `GET /api/v1/learner/weekly-challenge/items/[index]` — fetch a single drill item by index, including its `generatedContent` |
 | `src/app/api/v1/learner/weekly-challenge/items/[index]/complete/route.ts` | `POST /api/v1/learner/weekly-challenge/items/[index]/complete` — mark item complete via `$addToSet` on `completedItemIndexes` |
 | `src/scripts/seed-test-challenge.ts` | Dev script to seed fake drill data for a test learner |
-| `src/domain/challenges/weekly-challenge.service.ts` | `assignWeekNumbers()` maps challenges to sequential numbers, excluding empty `drillSequence` documents |
 | `docs/weekly-challenge-ui-spec.md` | UI implementation spec for the dev |
 
 ---
@@ -403,16 +402,14 @@ A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal w
 
 The window calculation uses `setUTCDate` — fixed in error hardening pass.
 
-**Challenge numbering in the week view**
-
-Challenge numbers in the week view are assigned server-side by `assignWeekNumbers()` — empty challenges are excluded from numbering so numbers are always sequential.
-
-
 ---
 
 ## 8. What's coming next
 
-Production deployment pending AA sign-off on staging.
+Remaining work:
+
+1. **Production deployment** — ship the feature to production.
+2. **AA sign-off** — final review and sign-off before release.
 
 ---
 

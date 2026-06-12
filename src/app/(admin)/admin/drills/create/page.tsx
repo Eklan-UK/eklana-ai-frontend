@@ -1439,7 +1439,7 @@ const DrillBuilder: React.FC = () => {
         await drillAPI.create(drillData);
         clearDraft();
         toast.success("Drill created successfully!");
-        router.push("/admin/drills/assignment");
+        router.push("/admin/drill");
       }
     } catch (error: any) {
       toast.error(

@@ -56,7 +56,6 @@ export const profileService = {
       authStore.setUser({
         ...authStore.user,
         avatar: response.data.avatarUrl,
-        image: response.data.avatarUrl,
       });
     }
     
@@ -71,11 +70,7 @@ export const profileService = {
 
     const authStore = useAuthStore.getState();
     if (authStore.user) {
-      authStore.setUser({
-        ...authStore.user,
-        avatar: avatarUrl,
-        image: avatarUrl,
-      });
+      authStore.setUser({ ...authStore.user, avatar: avatarUrl });
     }
 
     return response.data;

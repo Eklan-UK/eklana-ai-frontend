@@ -1,14 +1,14 @@
 // POST /api/v1/admin/assign-tutor
-// Assign a tutor to a student (learner) — supports multiple tutors per student
+// Assign a tutor to a student (learner)
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
+import Profile from '@/models/profile';
 import Tutor from '@/models/tutor';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { assignLearnerToTutor } from '@/domain/tutor-assignments/tutor-assignment.service';
 
 const assignTutorSchema = z.object({
 	studentId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -29,67 +29,111 @@ async function handler(
 		const body = await req.json();
 		const validated = assignTutorSchema.parse(body);
 
+		// Verify student exists and is a learner
 		const studentUser = await User.findById(validated.studentId).exec();
 		if (!studentUser) {
 			return NextResponse.json(
-				{ code: 'NotFoundError', message: 'Student not found' },
+				{
+					code: 'NotFoundError',
+					message: 'Student not found',
+				},
 				{ status: 404 }
 			);
 		}
+
 		if (studentUser.role !== 'user') {
 			return NextResponse.json(
-				{ code: 'ValidationError', message: 'The provided studentId does not belong to a learner' },
+				{
+					code: 'ValidationError',
+					message: 'The provided studentId does not belong to a learner',
+				},
 				{ status: 400 }
 			);
 		}
 
+		// Verify tutor exists and is a tutor
 		const tutorUser = await User.findById(validated.tutorId).exec();
 		if (!tutorUser) {
 			return NextResponse.json(
-				{ code: 'NotFoundError', message: 'Tutor not found' },
+				{
+					code: 'NotFoundError',
+					message: 'Tutor not found',
+				},
 				{ status: 404 }
 			);
 		}
+
 		if (tutorUser.role !== 'tutor') {
 			return NextResponse.json(
-				{ code: 'ValidationError', message: 'The provided tutorId does not belong to a tutor' },
+				{
+					code: 'ValidationError',
+					message: 'The provided tutorId does not belong to a tutor',
+				},
 				{ status: 400 }
 			);
 		}
 
+		// Verify tutor profile exists
 		const tutorProfile = await Tutor.findOne({ userId: validated.tutorId }).exec();
 		if (!tutorProfile) {
 			return NextResponse.json(
-				{ code: 'NotFoundError', message: 'Tutor profile not found' },
+				{
+					code: 'NotFoundError',
+					message: 'Tutor profile not found',
+				},
 				{ status: 404 }
 			);
 		}
 
-		const assignment = await assignLearnerToTutor({
-			learnerId: new Types.ObjectId(validated.studentId),
-			tutorId: new Types.ObjectId(validated.tutorId),
-			assignedBy: context.userId,
-		});
+		// Find user profile
+		const userProfile = await Profile.findOne({ userId: validated.studentId }).exec();
+		if (!userProfile) {
+			return NextResponse.json(
+				{
+					code: 'NotFoundError',
+					message: 'User profile not found',
+				},
+				{ status: 404 }
+			);
+		}
+
+		// Update profile's tutorId (if Profile model has tutorId field)
+		// Note: Profile model may need tutorId field added if not present
+		if (userProfile.tutorId !== undefined) {
+			(userProfile as any).tutorId = new Types.ObjectId(validated.tutorId);
+			await userProfile.save();
+		}
+
+		// Get updated user with profile
+		const updatedUser = await User.findById(validated.studentId)
+			.select('-password -__v')
+			.lean()
+			.exec();
 
 		logger.info('Tutor assigned to student successfully', {
 			studentId: validated.studentId,
 			tutorId: validated.tutorId,
 			assignedBy: context.userId,
-			assignmentId: assignment._id.toString(),
 		});
 
 		return NextResponse.json(
 			{
 				code: 'Success',
 				message: 'Tutor assigned to student successfully',
-				data: { assignmentId: assignment._id.toString() },
+				data: {
+					learner: updatedUser, // Keep 'learner' key for backward compatibility
+				},
 			},
 			{ status: 200 }
 		);
 	} catch (error: any) {
 		if (error instanceof z.ZodError) {
 			return NextResponse.json(
-				{ code: 'ValidationError', message: 'Validation failed', errors: error.issues },
+				{
+					code: 'ValidationError',
+					message: 'Validation failed',
+					errors: error.issues,
+				},
 				{ status: 400 }
 			);
 		}
@@ -100,10 +144,15 @@ async function handler(
 		});
 
 		return NextResponse.json(
-			{ code: 'ServerError', message: 'Internal Server Error', error: error.message },
+			{
+				code: 'ServerError',
+				message: 'Internal Server Error',
+				error: error.message,
+			},
 			{ status: 500 }
 		);
 	}
 }
 
 export const POST = withRole(['admin'], handler);
+
