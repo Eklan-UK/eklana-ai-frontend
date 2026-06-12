@@ -5,9 +5,12 @@ import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
+import LearnerPronunciationProgress from '@/models/learner-pronunciation-progress';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
+import { getProblemAreasWithWords } from '@/domain/pronunciations/pronunciation-analytics.service';
 import { Types } from 'mongoose';
+import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -19,19 +22,23 @@ async function handler(
 
 		const { learnerId } = params;
 
-		// Check permissions: Admin/Tutor or the learner themselves
-		if (
-			context.userRole !== 'admin' &&
-			context.userRole !== 'tutor' &&
-			context.userId.toString() !== learnerId
-		) {
-			return NextResponse.json(
-				{
-					code: 'Forbidden',
-					message: "You don't have permission to access these analytics",
-				},
-				{ status: 403 }
-			);
+		// Check permissions: Admin/assigned Tutor or the learner themselves
+		if (context.userId.toString() !== learnerId) {
+			if (context.userRole !== 'admin' && context.userRole !== 'tutor') {
+				return NextResponse.json(
+					{ code: 'Forbidden', message: "You don't have permission to access these analytics" },
+					{ status: 403 }
+				);
+			}
+			if (context.userRole === 'tutor' && Types.ObjectId.isValid(learnerId)) {
+				const access = await assertStaffCanReadLearner(context, learnerId);
+				if (access === 'forbidden') {
+					return NextResponse.json(
+						{ code: 'Forbidden', message: "You don't have permission to access these analytics" },
+						{ status: 403 }
+					);
+				}
+			}
 		}
 
 		// Find user (learnerId is now userId)
@@ -128,48 +135,10 @@ async function handler(
 			? (stats.passedCount / stats.totalAttempts) * 100
 			: 0;
 
-		// Get most problematic letters/phonemes using aggregation (much faster)
-		const topIncorrectLettersAgg = await PronunciationAttempt.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
-			{ $unwind: { path: '$incorrectLetters', preserveNullAndEmptyArrays: true } },
-			{ $match: { incorrectLetters: { $ne: null } } },
-			{
-				$group: {
-					_id: '$incorrectLetters',
-					count: { $sum: 1 },
-				},
-			},
-			{ $sort: { count: -1 } },
-			{ $limit: 10 },
-			{
-				$project: {
-					_id: 0,
-					letter: '$_id',
-					count: 1,
-				},
-			},
-		]);
-
-		const topIncorrectPhonemesAgg = await PronunciationAttempt.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
-			{ $unwind: { path: '$incorrectPhonemes', preserveNullAndEmptyArrays: true } },
-			{ $match: { incorrectPhonemes: { $ne: null } } },
-			{
-				$group: {
-					_id: '$incorrectPhonemes',
-					count: { $sum: 1 },
-				},
-			},
-			{ $sort: { count: -1 } },
-			{ $limit: 10 },
-			{
-				$project: {
-					_id: 0,
-					phoneme: '$_id',
-					count: 1,
-				},
-			},
-		]);
+		// Get problematic sounds/letters with the specific words the learner struggles on
+		const problemAreasWithWords = await getProblemAreasWithWords(
+			new Types.ObjectId(learnerId)
+		);
 
 		// Calculate progress over time (last 30 days) using aggregation
 		const thirtyDaysAgo = new Date();
@@ -252,9 +221,45 @@ async function handler(
 			lastAttemptAt: a.lastAttemptAt,
 		}));
 
-		const wordStats = wordStatsAgg;
-		const topIncorrectLetters = topIncorrectLettersAgg;
-		const topIncorrectPhonemes = topIncorrectPhonemesAgg;
+		// Problem-based word progress (new pronunciation system)
+		const progressWordStats = await LearnerPronunciationProgress.aggregate([
+			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{
+				$lookup: {
+					from: 'pronunciation_words',
+					localField: 'wordId',
+					foreignField: '_id',
+					as: 'word',
+				},
+			},
+			{ $unwind: { path: '$word', preserveNullAndEmptyArrays: true } },
+			{
+				$project: {
+					_id: 1,
+					wordId: 1,
+					title: '$word.word',
+					word: '$word.word',
+					text: '$word.ipa',
+					difficulty: '$word.difficulty',
+					attempts: 1,
+					bestScore: { $ifNull: ['$bestScore', 0] },
+					averageScore: { $ifNull: ['$averageScore', 0] },
+					status: { $cond: ['$passed', 'completed', 'in-progress'] },
+					isChallenging: { $ifNull: ['$isChallenging', false] },
+					challengeLevel: 1,
+					weakPhonemes: { $ifNull: ['$weakPhonemes', []] },
+					incorrectLetters: { $ifNull: ['$incorrectLetters', []] },
+					lastAttemptAt: 1,
+					passedAt: 1,
+				},
+			},
+			{ $sort: { lastAttemptAt: -1 } },
+			{ $limit: limit },
+		]);
+
+		const wordStats =
+			progressWordStats.length > 0 ? progressWordStats : wordStatsAgg;
+		const { topIncorrectLetters, topIncorrectPhonemes } = problemAreasWithWords;
 		const accuracyTrend = accuracyTrendAgg;
 
 		return NextResponse.json(

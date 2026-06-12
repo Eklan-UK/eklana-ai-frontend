@@ -39,6 +39,7 @@ async function handler(
       ...user,
       role: effectiveRole,
       subscriptionPlan: user.subscriptionPlan || "free",
+      subscriptionBillingPeriod: user.subscriptionBillingPeriod || null,
       subscriptionActivatedAt: user.subscriptionActivatedAt || null,
       subscriptionExpiresAt: user.subscriptionExpiresAt || null,
       stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,

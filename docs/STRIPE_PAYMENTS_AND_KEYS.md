@@ -115,12 +115,11 @@ STRIPE_SECRET_KEY=sk_test_...
 # One secret per registered endpoint and per mode (test/live).
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Price ID for the premium subscription (from Stripe Dashboard → Products).
-# Use a test-mode Price ID while in development.
+# Price IDs for Pro subscriptions by billing period (Stripe Dashboard → Products).
+# Use test-mode Price IDs while in development.
 STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
-
-# Optional: annual Price ID if you offer it
-# STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_...
+STRIPE_PREMIUM_QUARTERLY_PRICE_ID=price_...
+STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_...
 
 
 # ── Client-safe (safe to expose in browser / mobile bundle) ──────────────────
@@ -136,7 +135,9 @@ STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
 |---|---|---|---|
 | `STRIPE_SECRET_KEY` | `sk_test_` / `sk_live_` | Server env only | Backend API routes |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_` | Server env only | Webhook route |
-| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout Session creation |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout Session creation (monthly) |
+| `STRIPE_PREMIUM_QUARTERLY_PRICE_ID` | `price_` | Server env only | Checkout Session creation (quarterly) |
+| `STRIPE_PREMIUM_ANNUAL_PRICE_ID` | `price_` | Server env only | Checkout Session creation (annual) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_` / `pk_live_` | Client bundle | Only if using Stripe.js |
 
 ---

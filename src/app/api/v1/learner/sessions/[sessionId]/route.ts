@@ -6,7 +6,10 @@ import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
 import { apiResponse, NotFoundError, ValidationError } from '@/lib/api/response';
 import { ClassRepository } from '@/domain/classes/class.repository';
-import { tutorMeetingUrlAllowed } from '@/domain/classes/class.mapper';
+import {
+  resolveSessionMeetingUrl,
+  tutorMeetingUrlAllowed,
+} from '@/domain/classes/class.mapper';
 import '@/models/class-series';
 import '@/models/class-enrollment';
 import '@/models/class-session';
@@ -28,10 +31,10 @@ async function getHandler(
     throw new NotFoundError('Session');
   }
 
-  const { session, seriesTitle, tutorName, tutorId } = row;
-  const allowUrl = tutorMeetingUrlAllowed(session, new Date());
-  const meetingUrl =
-    allowUrl && session.meetingUrl ? session.meetingUrl : undefined;
+  const { session, series, seriesTitle, tutorName, tutorId } = row;
+  const resolvedMeetingUrl = resolveSessionMeetingUrl(series, session);
+  const allowUrl = tutorMeetingUrlAllowed(session, new Date(), resolvedMeetingUrl);
+  const meetingUrl = allowUrl && resolvedMeetingUrl ? resolvedMeetingUrl : undefined;
 
   return apiResponse.success({
     session: {
