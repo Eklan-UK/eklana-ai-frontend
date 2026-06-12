@@ -51,13 +51,16 @@ export function useWeeklyChallenge(
 export function useWeeklyChallengeItem(
 	index: number,
 	weekStartDate?: string,
-	options?: { enabled?: boolean },
+	options?: { enabled?: boolean; itemId?: string },
 ) {
 	const resolvedWeek = weekStartDate ?? '';
+	const queryKey = queryKeys.weeklyChallenge.item(resolvedWeek, index);
+
 	return useQuery({
-		queryKey: queryKeys.weeklyChallenge.item(resolvedWeek, index),
+		queryKey,
 		queryFn: async () => {
-			const response = await weeklyChallengeAPI.getItem(index, weekStartDate);
+			const itemId = options?.itemId ?? index;
+			const response = await weeklyChallengeAPI.getItem(itemId, weekStartDate);
 			return response?.data ?? null;
 		},
 		enabled: (options?.enabled ?? true) && index >= 0,

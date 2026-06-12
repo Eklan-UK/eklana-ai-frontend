@@ -57,11 +57,18 @@ export function WeeklyChallengeCard({
 	return (
 		<div className="mb-6">
 			<div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-3xl p-5 shadow-lg">
-				<div className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-full px-3 py-1 mb-3">
-					<Trophy className="w-3 h-3 text-emerald-200" />
-					<span className="text-emerald-200 text-xs font-semibold uppercase tracking-wide">
-						{t("badge")}
-					</span>
+				<div className="flex items-center gap-2 mb-3 flex-wrap">
+					<div className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-full px-3 py-1">
+						<Trophy className="w-3 h-3 text-emerald-200" />
+						<span className="text-emerald-200 text-xs font-semibold uppercase tracking-wide">
+							{t("badge")}
+						</span>
+					</div>
+					{hasProgress ? (
+						<span className="text-xs font-medium text-blue-100 bg-blue-500/40 px-2 py-0.5 rounded-full">
+							{t("statusOngoing")}
+						</span>
+					) : null}
 				</div>
 				<h3 className="text-white text-xl font-bold font-nunito mb-2">
 					{challenge.summaryMessage?.startsWith("This week focus on:")

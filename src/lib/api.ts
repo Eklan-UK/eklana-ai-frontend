@@ -1441,6 +1441,7 @@ export const weeklyChallengeAPI = {
 					totalEstimatedMinutes: number;
 					drillSequence: Array<{
 						index: number;
+						itemId: string;
 						drillType: string;
 						label: string;
 						instructions: string;
@@ -1468,6 +1469,7 @@ export const weeklyChallengeAPI = {
 				totalEstimatedMinutes: number;
 				drillSequence: Array<{
 					index: number;
+					itemId: string;
 					drillType: string;
 					label: string;
 					instructions: string;
@@ -1483,17 +1485,18 @@ export const weeklyChallengeAPI = {
 		});
 	},
 
-	getItem: (index: number, weekStartDate?: string) => {
+	getItem: (itemId: string | number, weekStartDate?: string) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
 				challengeId: string;
+				itemId: string;
 				weekStartDate: string;
 				index: number;
 				item: Record<string, unknown>;
 				completed: boolean;
 			};
-		}>(`/learner/weekly-challenge/items/${index}`, {
+		}>(`/learner/weekly-challenge/items/${itemId}`, {
 			method: 'GET',
 			params: weekStartDate ? { weekStartDate } : undefined,
 			cache: false,
@@ -1501,7 +1504,7 @@ export const weeklyChallengeAPI = {
 	},
 
 	completeItem: (
-		index: number,
+		itemId: string | number,
 		data?: { score?: number },
 		weekStartDate?: string,
 	) => {
@@ -1509,12 +1512,13 @@ export const weeklyChallengeAPI = {
 			code?: string;
 			data?: {
 				challengeId: string;
+				itemId: string;
 				index: number;
 				completed: boolean;
 				completedItemIndexes: number[];
 				totalItems: number;
 			};
-		}>(`/learner/weekly-challenge/items/${index}/complete`, {
+		}>(`/learner/weekly-challenge/items/${itemId}/complete`, {
 			method: 'POST',
 			data,
 			params: weekStartDate ? { weekStartDate } : undefined,

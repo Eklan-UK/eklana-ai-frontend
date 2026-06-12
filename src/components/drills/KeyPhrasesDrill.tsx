@@ -379,7 +379,7 @@ export default function KeyPhrasesDrill({
           : 0;
 
       if (weeklyChallengeMeta) {
-        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemId, {
           score: avgScore,
           weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
@@ -450,11 +450,14 @@ export default function KeyPhrasesDrill({
   }, [pronunciationScore, selectedOption, currentIndex, sessionReviewAnalytics, attempts]);
 
   if (isCompleted) {
+    const returnPath = weeklyChallengeMeta
+      ? `/account/practice/weekly-challenge/${encodeURIComponent(weeklyChallengeMeta.weekStartDate)}`
+      : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType="key phrases"
-        returnPath="/account/drills"
-        returnLabel="Back to My Plan"
+        drillType={weeklyChallengeMeta ? "Key Phrases" : "key phrases"}
+        returnPath={returnPath}
+        returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
       />
     );
   }
@@ -492,6 +495,10 @@ export default function KeyPhrasesDrill({
 
   const awaitingSubmit = !!pendingSubmitBlob && !isAnalyzing && !pronunciationScore;
 
+  const answeredCount = Object.values(itemResults).filter(
+    (r) => r.isCorrect && (r.pronunciationScore ?? 0) >= PASS_THRESHOLD
+  ).length;
+
   return (
     <DrillLayout
       title={drill.title}
@@ -506,13 +513,13 @@ export default function KeyPhrasesDrill({
     >
       <div className="w-full space-y-6 pb-10">
         <DrillProgress
-          current={currentIndex + 1}
+          current={answeredCount}
           total={items.length}
           label="Question"
           embedded
         />
 
-        <Card padding="none" className={`${KP_GHOST_CARD} space-y-2`}>
+        <Card padding="sm" className={`${KP_GHOST_CARD} space-y-2`}>
           <p className="text-sm font-semibold text-foreground">
             {currentItem.respondentName?.trim()
               ? `${currentItem.respondentName.trim()} says`
@@ -542,12 +549,12 @@ export default function KeyPhrasesDrill({
                 "box-border w-full min-h-[3.75rem] rounded-2xl border-2 px-4 py-3.5 text-sm font-medium flex items-center gap-3 text-left transition-colors ";
               if (hasResult) {
                 cardStyle += isCorrectOption
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
                   : isSelected
-                    ? "border-red-400 bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200"
+                    ? "border-red-400 bg-red-50 text-red-900 dark:bg-red-950/30 dark:text-red-100"
                     : "border-border/80 bg-muted/50 text-muted-foreground";
               } else if (isSelected) {
-                cardStyle += "border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-200";
+                cardStyle += "border-sky-500 bg-sky-50 text-emerald-900 dark:bg-sky-950/30 dark:text-emerald-800";
               } else {
                 cardStyle +=
                   "border-border bg-card text-foreground hover:border-sky-300 hover:bg-sky-50/50 dark:hover:bg-sky-950/20";
