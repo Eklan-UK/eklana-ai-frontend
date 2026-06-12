@@ -279,57 +279,6 @@ export function DrillSubmissionsComponent({
         </div>
       ) : null}
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
-            Total Drills
-          </p>
-          <p className="text-2xl font-bold text-blue-600">{drills.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Assigned</p>
-        </div>
-
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
-            Pending
-          </p>
-          <p className="text-2xl font-bold text-gray-600">
-            {categorizedDrills.pending.length}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">To start</p>
-        </div>
-
-        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
-            In Progress
-          </p>
-          <p className="text-2xl font-bold text-indigo-600">
-            {categorizedDrills.inProgress.length}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Active</p>
-        </div>
-
-        <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
-            Completed
-          </p>
-          <p className="text-2xl font-bold text-green-600">
-            {categorizedDrills.completed.length}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">{completionRate}%</p>
-        </div>
-
-        <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
-            Pending Review
-          </p>
-          <p className="text-2xl font-bold text-orange-600">
-            {pendingReviewCount}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Submissions</p>
-        </div>
-      </div>
-
       {/* Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         <button

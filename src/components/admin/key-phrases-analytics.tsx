@@ -1,21 +1,19 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import { Calendar, Loader2, BookOpen } from "lucide-react";
-import { useAnalyticsDashboard, useLearnerSentenceAnalytics } from "@/hooks/useAdmin";
+import { Calendar, Loader2, MessageSquareQuote } from "lucide-react";
+import { useAnalyticsDashboard, useLearnerKeyPhrasesAnalytics } from "@/hooks/useAdmin";
 
-export interface SentenceAnalyticsComponentProps {
+export interface KeyPhrasesAnalyticsComponentProps {
   learnerId?: string;
   learnerName?: string;
-  hideProblemAreas?: boolean;
   learnerIds?: string[];
 }
 
-export function SentenceAnalyticsComponent({
+export function KeyPhrasesAnalyticsComponent({
   learnerId,
-  hideProblemAreas = false,
   learnerIds,
-}: SentenceAnalyticsComponentProps) {
+}: KeyPhrasesAnalyticsComponentProps) {
   const useAggregated =
     learnerIds !== undefined ? learnerIds.length !== 1 : false;
   const effectiveLearnerId =
@@ -32,7 +30,7 @@ export function SentenceAnalyticsComponent({
   }, [appliedRange]);
 
   const { data: learnerData, isLoading: learnerLoading, error: learnerError } =
-    useLearnerSentenceAnalytics(effectiveLearnerId, rangeForQuery);
+    useLearnerKeyPhrasesAnalytics(effectiveLearnerId, rangeForQuery);
 
   const {
     data: dashboardData,
@@ -40,17 +38,7 @@ export function SentenceAnalyticsComponent({
     error: dashboardError,
   } = useAnalyticsDashboard(learnerIds, 30, useAggregated);
 
-  const data = useAggregated
-    ? dashboardData?.sentence
-      ? {
-          ...dashboardData.sentence,
-          problemRows: [],
-          feedbackRows: [],
-          hasReviewedData: false,
-          attemptsConsidered: dashboardData.sentence.attemptsConsidered ?? 0,
-        }
-      : null
-    : learnerData;
+  const data = useAggregated ? dashboardData?.keyPhrases ?? null : learnerData;
 
   const isLoading = useAggregated ? dashboardLoading : learnerLoading;
   const error = useAggregated ? dashboardError : learnerError;
@@ -71,7 +59,7 @@ export function SentenceAnalyticsComponent({
 
   const headerRow = (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-lg font-bold text-foreground">Sentence Analytics</h2>
+      <h2 className="text-lg font-bold text-foreground">Key Phrase Analytics</h2>
       {!useAggregated && (
         <button
           type="button"
@@ -90,7 +78,7 @@ export function SentenceAnalyticsComponent({
     </div>
   );
 
-  const dateFilterPanel = !useAggregated && filterOpen ? (
+  const filterPanel = !useAggregated && filterOpen ? (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:flex-wrap sm:items-end">
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         From
@@ -145,114 +133,75 @@ export function SentenceAnalyticsComponent({
       <div>
         {headerRow}
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-800">Failed to load sentence analytics</p>
+          <p className="text-sm text-red-800">Failed to load key phrase analytics</p>
         </div>
       </div>
     );
   }
 
-  if (!data || (data.attemptsConsidered === 0 && data.totalAssignedTargets === 0)) {
+  if (!data || data.totalAttempts === 0) {
     return (
       <div className="space-y-4">
         {headerRow}
-        {dateFilterPanel}
+        {filterPanel}
         <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-muted/30 py-12 text-center">
-          <BookOpen className="mb-2 h-8 w-8 text-muted-foreground opacity-60" aria-hidden />
-          <p className="text-sm text-muted-foreground">No sentence drill data for this learner yet.</p>
+          <MessageSquareQuote className="mb-2 h-8 w-8 text-muted-foreground opacity-60" aria-hidden />
+          <p className="text-sm text-muted-foreground">No key phrase drill data for this learner yet.</p>
         </div>
       </div>
     );
   }
 
   const {
-    totalAssignedTargets,
-    correctSentence,
-    incorrectSentence,
-    problemRows,
-    feedbackRows,
-    hasReviewedData,
+    totalAssignedItems,
+    correctItems,
+    accuracyRatePct,
+    totalAttempts,
+    averageScore,
+    averagePronunciationScore,
   } = data;
 
   return (
     <div className="space-y-6">
       {headerRow}
+      {filterPanel}
 
-      {dateFilterPanel}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-blue-500 bg-blue-900/9 p-5 shadow-sm">
           <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
-            {totalAssignedTargets}
+            {totalAssignedItems}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">Total Assigned Target</p>
+          <p className="mt-1 text-sm text-muted-foreground">Total Items</p>
         </div>
         <div className="rounded-2xl border border-green-500 bg-green-500/5 p-5 shadow-sm">
-          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">{correctSentence}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Correct sentence</p>
+          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
+            {correctItems}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Correct Items</p>
         </div>
         <div className="rounded-2xl border border-yellow-500 bg-yellow-500/5 p-5 shadow-sm">
-          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">{incorrectSentence}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Incorrect sentence</p>
-        </div>
-      </div>
-
-      {!hideProblemAreas && (
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6">
-        <h4 className="mb-5 text-base font-bold text-foreground">Problem Areas breakdown</h4>
-
-        {!hasReviewedData && (
-          <p className="mb-4 text-sm text-muted-foreground">
-            Breakdown appears once sentence submissions are reviewed. Totals above include all
-            sentence-writing attempts with targets assigned.
+          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
+            {accuracyRatePct}%
           </p>
-        )}
-
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-          <div>
-            <p className="mb-4 text-sm font-semibold tracking-wide text-muted-foreground">
-              Problem Area(s)
-            </p>
-            <ul className="space-y-6">
-              {problemRows.length === 0 ? (
-                <li className="text-sm text-muted-foreground">No incorrect sentences in reviewed data.</li>
-              ) : (
-                problemRows.map((row) => (
-                  <li key={row.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{row.areaLabel}</span>
-                      <span className="inline-flex min-h-7 min-w-7 items-center justify-center rounded-full bg-red-500/15 px-2 text-xs font-bold text-red-600">
-                        {row.count}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium leading-relaxed text-foreground">{row.sentence}</p>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-          <div>
-            <p className="mb-4 text-sm font-semibold tracking-wide text-muted-foreground">Your feedback</p>
-            <ul className="space-y-6">
-              {feedbackRows.length === 0 ? (
-                <li className="text-sm text-muted-foreground">No feedback rows yet.</li>
-              ) : (
-                feedbackRows.map((row) => (
-                  <li key={row.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{row.label}</span>
-                      <span className="inline-flex min-h-7 min-w-7 items-center justify-center rounded-full bg-primary/15 px-2 text-xs font-bold text-primary">
-                        {row.count}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium leading-relaxed text-foreground">{row.sentence}</p>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Accuracy Rate</p>
+        </div>
+        <div className="rounded-2xl border border-purple-500 bg-purple-500/5 p-5 shadow-sm">
+          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
+            {averageScore}%
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Avg Score</p>
+        </div>
+        <div className="rounded-2xl border border-cyan-500 bg-cyan-500/5 p-5 shadow-sm">
+          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
+            {averagePronunciationScore > 0 ? `${averagePronunciationScore}%` : "—"}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Avg Pronunciation</p>
         </div>
       </div>
-      )}
+
+      <p className="text-xs text-muted-foreground">
+        Based on {totalAttempts} completed key phrase drill{totalAttempts === 1 ? "" : "s"}.
+      </p>
     </div>
   );
 }

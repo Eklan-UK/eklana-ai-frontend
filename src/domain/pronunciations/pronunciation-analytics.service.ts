@@ -101,6 +101,26 @@ function buildDateMatch(days?: number): Record<string, unknown> {
 	return { createdAt: { $gte: startDate } };
 }
 
+function buildLearnerIdsMatch(learnerIds?: string[]): Record<string, unknown> {
+	if (!learnerIds?.length) {
+		return {};
+	}
+	const validIds = learnerIds
+		.filter((id) => Types.ObjectId.isValid(id))
+		.map((id) => new Types.ObjectId(id));
+	if (validIds.length === 0) {
+		return { learnerId: { $in: [] } };
+	}
+	return { learnerId: { $in: validIds } };
+}
+
+function buildOverallMatch(days?: number, learnerIds?: string[]): Record<string, unknown> {
+	return {
+		...buildDateMatch(days),
+		...buildLearnerIdsMatch(learnerIds),
+	};
+}
+
 async function aggregateSoundProblems(
 	match: Record<string, unknown>,
 	field: 'incorrectPhonemes' | 'incorrectLetters',
@@ -183,11 +203,14 @@ export async function getProblemAreasWithWords(learnerId: Types.ObjectId): Promi
 	return { topIncorrectPhonemes, topIncorrectLetters };
 }
 
-export async function getOverallProblemAreasWithWords(days = 30): Promise<{
+export async function getOverallProblemAreasWithWords(
+	days = 30,
+	learnerIds?: string[]
+): Promise<{
 	topIncorrectPhonemes: PhonemeProblemArea[];
 	topIncorrectLetters: LetterProblemArea[];
 }> {
-	const match = buildDateMatch(days);
+	const match = buildOverallMatch(days, learnerIds);
 	const [topIncorrectPhonemes, topIncorrectLetters] = await Promise.all([
 		aggregateSoundProblems(match, 'incorrectPhonemes', 'phoneme') as Promise<PhonemeProblemArea[]>,
 		aggregateSoundProblems(match, 'incorrectLetters', 'letter') as Promise<LetterProblemArea[]>,
@@ -196,8 +219,11 @@ export async function getOverallProblemAreasWithWords(days = 30): Promise<{
 	return { topIncorrectPhonemes, topIncorrectLetters };
 }
 
-export async function getOverallStats(days = 30): Promise<OverallPronunciationStats> {
-	const match = buildDateMatch(days);
+export async function getOverallStats(
+	days = 30,
+	learnerIds?: string[]
+): Promise<OverallPronunciationStats> {
+	const match = buildOverallMatch(days, learnerIds);
 	const overallStats = await PronunciationAttempt.aggregate([
 		{ $match: match },
 		{
@@ -244,8 +270,11 @@ export async function getOverallStats(days = 30): Promise<OverallPronunciationSt
 	};
 }
 
-export async function getOverallDifficultWords(days = 30): Promise<DifficultWord[]> {
-	const match = buildDateMatch(days);
+export async function getOverallDifficultWords(
+	days = 30,
+	learnerIds?: string[]
+): Promise<DifficultWord[]> {
+	const match = buildOverallMatch(days, learnerIds);
 	const results = await PronunciationAttempt.aggregate([
 		{ $match: match },
 		...wordLookupStages,

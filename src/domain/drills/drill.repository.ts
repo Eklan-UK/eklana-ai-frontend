@@ -187,6 +187,20 @@ export class DrillRepository {
   }
 
   /**
+   * Set assignment count directly
+   */
+  async setTotalAssignments(drillId: string, count: number): Promise<void> {
+    try {
+      await Drill.findByIdAndUpdate(drillId, {
+        totalAssignments: count,
+      }).exec();
+    } catch (error: any) {
+      logger.error('Error setting total assignments', { drillId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * Count drills
    */
   async count(filter?: any): Promise<number> {

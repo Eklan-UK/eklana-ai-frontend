@@ -138,6 +138,7 @@ function CreateDrillPageContent() {
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [showReassignConfirm, setShowReassignConfirm] = useState(false);
 
   const [formData, setFormData] = useState<DrillFormData>(() => {
     if (isEditMode) {
@@ -440,35 +441,10 @@ function CreateDrillPageContent() {
     toast.success('Form populated with parsed data');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.assigned_to.length === 0) {
-      alert("Please select at least one student");
-      return;
-    }
+  const totalAssignments = existingDrill?.totalAssignments ?? 0;
+  const isAssignedDrill = isEditMode && totalAssignments > 0;
 
-    if (formData.type === "pronunciation") {
-      const pItems = formData.pronunciation_items || [];
-      if (
-        pItems.length === 0 ||
-        pItems.some(
-          (p) =>
-            !p.sound?.trim() || !p.word?.trim() || !p.sentence?.trim()
-        )
-      ) {
-        alert("Pronunciation drills need at least one item with Sound, Word, and Sentence.");
-        return;
-      }
-    }
-
-    if (formData.type === "fill_blank") {
-      const fillBlankError = validateFillBlankItems(formData.fill_blank_items || []);
-      if (fillBlankError) {
-        alert(fillBlankError);
-        return;
-      }
-    }
-
+  const executeSubmit = async () => {
     setSaving(true);
     try {
       const submitData: any = { ...formData };
@@ -656,7 +632,15 @@ function CreateDrillPageContent() {
 
       if (isEditMode) {
         await drillAPI.update(drillId!, submitData);
-        alert("Drill updated successfully!");
+        if (isAssignedDrill) {
+          toast.success(
+            `Drill updated and reassigned to ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}. All previous progress has been reset.`
+          );
+        } else {
+          toast.success(
+            `Drill assigned to ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}!`
+          );
+        }
       } else {
         await drillAPI.create(submitData);
         localStorage.removeItem(DRAFT_KEY);
@@ -672,6 +656,43 @@ function CreateDrillPageContent() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.assigned_to.length === 0) {
+      alert("Please select at least one student");
+      return;
+    }
+
+    if (formData.type === "pronunciation") {
+      const pItems = formData.pronunciation_items || [];
+      if (
+        pItems.length === 0 ||
+        pItems.some(
+          (p) =>
+            !p.sound?.trim() || !p.word?.trim() || !p.sentence?.trim()
+        )
+      ) {
+        alert("Pronunciation drills need at least one item with Sound, Word, and Sentence.");
+        return;
+      }
+    }
+
+    if (formData.type === "fill_blank") {
+      const fillBlankError = validateFillBlankItems(formData.fill_blank_items || []);
+      if (fillBlankError) {
+        alert(fillBlankError);
+        return;
+      }
+    }
+
+    if (isEditMode && isAssignedDrill) {
+      setShowReassignConfirm(true);
+      return;
+    }
+
+    await executeSubmit();
   };
 
   if (loading || (isEditMode && !formData)) {
@@ -2362,6 +2383,43 @@ function CreateDrillPageContent() {
             </Button>
           </div>
         </form>
+
+        {/* Reassignment confirmation */}
+        {showReassignConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Update and reassign drill?
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                This will reset all student progress for this drill — including
+                assignments, attempts, and bookmarks — and create fresh assignments
+                for the {formData.assigned_to.length} selected student
+                {formData.assigned_to.length !== 1 ? "s" : ""}. This cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowReassignConfirm(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    setShowReassignConfirm(false);
+                    await executeSubmit();
+                  }}
+                  disabled={saving}
+                >
+                  Update Drill
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Preview Modal */}
         {showPreview && parsedContent && (

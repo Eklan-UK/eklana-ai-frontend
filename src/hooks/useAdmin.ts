@@ -33,6 +33,62 @@ export function useAllDrills(filters?: {
   });
 }
 
+/** Aggregated analytics dashboard (platform-wide or selected learners). */
+export function useAnalyticsDashboard(
+  learnerIds?: string[],
+  days = 30,
+  enabled = true
+) {
+  const sortedIds = learnerIds?.length ? [...learnerIds].sort().join(',') : '';
+  return useQuery({
+    queryKey: ['admin', 'analytics', 'dashboard', sortedIds, days],
+    queryFn: async () => {
+      const response = await adminAPI.getAnalyticsDashboard({
+        learnerIds: learnerIds?.length ? learnerIds : undefined,
+        days,
+      });
+      return response.data ?? null;
+    },
+    enabled,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+// Platform-wide drill analytics overview (admin)
+export function usePlatformAnalyticsOverview() {
+  return useQuery({
+    queryKey: ["admin", "analytics", "overview"],
+    queryFn: async () => {
+      const response = await adminAPI.getPlatformAnalyticsOverview();
+      return response.data ?? null;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+// Learners with analytics summary for admin analytics page
+export function useAnalyticsLearners(filters?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  signupDateFrom?: string;
+  signupDateTo?: string;
+  status?: 'active' | 'inactive';
+}) {
+  return useQuery({
+    queryKey: ["admin", "analytics", "learners", filters],
+    queryFn: async () => {
+      const response = await adminAPI.getAnalyticsLearners(filters || {});
+      return {
+        learners: response.data?.learners || [],
+        total: response.data?.pagination?.total || 0,
+        pagination: response.data?.pagination,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
 // Get all learners (admin)
 export function useAllLearners(filters?: {
   limit?: number;
@@ -103,7 +159,8 @@ export function useDashboardStats() {
     queryFn: async () => {
       return await adminService.getDashboardStats();
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 30, // 30 seconds
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -225,6 +282,80 @@ export function useLearnerMatchingAnalytics(
       return response.data ?? null;
     },
     enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Fill-in-the-blank analytics for admin learner profile (optional date range). */
+export function useLearnerFillBlankAnalytics(
+  learnerId: string,
+  range?: { from?: string; to?: string }
+) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "fill-blank-analytics", range?.from, range?.to],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerFillBlankAnalytics(learnerId, range);
+      return response.data ?? null;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Key phrase analytics for admin learner profile (optional date range). */
+export function useLearnerKeyPhrasesAnalytics(
+  learnerId: string,
+  range?: { from?: string; to?: string }
+) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "key-phrases-analytics", range?.from, range?.to],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerKeyPhrasesAnalytics(learnerId, range);
+      return response.data ?? null;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Platform-wide fill-in-the-blank analytics (admin). */
+export function usePlatformFillBlankAnalytics(
+  days = 30,
+  learnerIds?: string[],
+  enabled = true
+) {
+  const sortedIds = learnerIds?.length ? [...learnerIds].sort().join(',') : '';
+  return useQuery({
+    queryKey: ['admin', 'analytics', 'fill-blank', days, sortedIds],
+    queryFn: async () => {
+      const response = await adminAPI.getPlatformFillBlankAnalytics({
+        days,
+        learnerIds: learnerIds?.length ? learnerIds : undefined,
+      });
+      return response.data ?? null;
+    },
+    enabled,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+/** Platform-wide key phrase analytics (admin). */
+export function usePlatformKeyPhrasesAnalytics(
+  days = 30,
+  learnerIds?: string[],
+  enabled = true
+) {
+  const sortedIds = learnerIds?.length ? [...learnerIds].sort().join(',') : '';
+  return useQuery({
+    queryKey: ['admin', 'analytics', 'key-phrases', days, sortedIds],
+    queryFn: async () => {
+      const response = await adminAPI.getPlatformKeyPhrasesAnalytics({
+        days,
+        learnerIds: learnerIds?.length ? learnerIds : undefined,
+      });
+      return response.data ?? null;
+    },
+    enabled,
     staleTime: 1000 * 60 * 2,
   });
 }

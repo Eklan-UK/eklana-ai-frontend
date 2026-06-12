@@ -20,7 +20,6 @@ import {
   FileCheck,
   FileText,
   BookOpen,
-  CalendarDays,
   CreditCard,
   UserPlus,
   Video,
@@ -59,7 +58,6 @@ const Sidebar: React.FC = () => {
 
   const navItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-    { name: "Daily Focus", icon: CalendarDays, path: "/admin/daily-focus" },
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },

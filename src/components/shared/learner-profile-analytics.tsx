@@ -5,15 +5,15 @@ import {
   Mic,
   MessageSquare,
   BarChart3,
-  AlertCircle,
 } from "lucide-react";
 import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciation-analytics";
 import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics";
 import { SentenceAnalyticsComponent } from "@/components/admin/sentence-analytics";
 import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytics";
+import { FillBlankAnalyticsComponent } from "@/components/admin/fill-blank-analytics";
+import { KeyPhrasesAnalyticsComponent } from "@/components/admin/key-phrases-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
 import { LearnerFreeTalkAttemptsSection } from "@/components/admin/learner-free-talk-attempts";
-import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
 
 interface LearnerProfileAnalyticsProps {
@@ -78,12 +78,14 @@ export function LearnerProfileAnalytics({
         <MatchingAnalyticsComponent learnerId={learnerId} learnerName={learnerName} />
       </div>
 
-      {/* Challenging Words */}
+      {/* Fill in the Blank Analytics */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-orange-500" /> Words with Challenges
-        </h2>
-        <ChallengingWordsComponent learnerId={learnerId} learnerName={learnerName} />
+        <FillBlankAnalyticsComponent learnerId={learnerId} learnerName={learnerName} />
+      </div>
+
+      {/* Key Phrase Analytics */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <KeyPhrasesAnalyticsComponent learnerId={learnerId} learnerName={learnerName} />
       </div>
     </div>
   );

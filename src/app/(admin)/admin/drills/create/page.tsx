@@ -133,6 +133,136 @@ function getDefaultCompletionDate(): string {
   return defaultDate.toISOString().split("T")[0];
 }
 
+function copyMediaFields<T extends Record<string, unknown>>(
+  target: T,
+  source: Record<string, unknown> | undefined,
+  fields: string[]
+): T {
+  if (!source) return target;
+  const result = { ...target };
+  for (const field of fields) {
+    const value = source[field];
+    if (value) {
+      (result as Record<string, unknown>)[field] = value;
+    }
+  }
+  return result;
+}
+
+function mergeArrayMedia<T extends Record<string, unknown>>(
+  items: T[] | undefined,
+  sourceItems: Array<Record<string, unknown>> | undefined,
+  fields: string[]
+): T[] | undefined {
+  if (!items || !sourceItems) return items;
+  return items.map((item, index) =>
+    copyMediaFields(item, sourceItems[index], fields)
+  );
+}
+
+function mergeMediaFieldsFromSource(
+  payload: Record<string, unknown>,
+  source: Record<string, unknown>
+): Record<string, unknown> {
+  const merged = { ...payload };
+  const drillType = (payload.type as string) || (source.type as string);
+
+  for (const field of [
+    "audio_example_url",
+    "sentence_drill_audio_url",
+    "listening_drill_audio_url",
+    "article_audio_url",
+  ]) {
+    if (source[field]) {
+      merged[field] = source[field];
+    }
+  }
+
+  switch (drillType) {
+    case "vocabulary":
+      merged.target_sentences = mergeArrayMedia(
+        merged.target_sentences as Array<Record<string, unknown>>,
+        source.target_sentences as Array<Record<string, unknown>>,
+        ["wordAudioUrl", "sentenceAudioUrl"]
+      );
+      break;
+    case "pronunciation":
+      merged.pronunciation_items = mergeArrayMedia(
+        merged.pronunciation_items as Array<Record<string, unknown>>,
+        source.pronunciation_items as Array<Record<string, unknown>>,
+        ["soundAudioUrl", "wordAudioUrl", "sentenceAudioUrl"]
+      );
+      break;
+    case "roleplay": {
+      const scenes = merged.roleplay_scenes as Array<{
+        scene_name: string;
+        context?: string;
+        dialogue: Array<Record<string, unknown>>;
+      }>;
+      const sourceScenes = source.roleplay_scenes as Array<{
+        dialogue?: Array<Record<string, unknown>>;
+      }>;
+      if (scenes && sourceScenes) {
+        merged.roleplay_scenes = scenes.map((scene, sceneIndex) => ({
+          ...scene,
+          dialogue: scene.dialogue.map((turn, turnIndex) =>
+            copyMediaFields(
+              turn,
+              sourceScenes[sceneIndex]?.dialogue?.[turnIndex],
+              ["audioUrl"]
+            )
+          ),
+        }));
+      }
+      break;
+    }
+    case "matching":
+      merged.matching_pairs = mergeArrayMedia(
+        merged.matching_pairs as Array<Record<string, unknown>>,
+        source.matching_pairs as Array<Record<string, unknown>>,
+        ["leftAudioUrl", "rightAudioUrl"]
+      );
+      break;
+    case "grammar":
+      merged.grammar_items = mergeArrayMedia(
+        merged.grammar_items as Array<Record<string, unknown>>,
+        source.grammar_items as Array<Record<string, unknown>>,
+        ["patternAudioUrl", "exampleAudioUrl"]
+      );
+      break;
+    case "sentence_writing":
+      merged.sentence_writing_items = mergeArrayMedia(
+        merged.sentence_writing_items as Array<Record<string, unknown>>,
+        source.sentence_writing_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+    case "fill_blank":
+      merged.fill_blank_items = mergeArrayMedia(
+        merged.fill_blank_items as Array<Record<string, unknown>>,
+        source.fill_blank_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+    case "key_phrases":
+      merged.key_phrase_items = mergeArrayMedia(
+        merged.key_phrase_items as Array<Record<string, unknown>>,
+        source.key_phrase_items as Array<Record<string, unknown>>,
+        ["promptAudioUrl"]
+      );
+      break;
+    case "definition":
+      merged.definition_items = mergeArrayMedia(
+        merged.definition_items as Array<Record<string, unknown>>,
+        source.definition_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+  }
+
+  return merged;
+}
+
 function getDefaultAdminDrillDraft(): AdminDrillDraft {
   return {
     vocabularyItems: [
@@ -277,6 +407,7 @@ const DrillBuilder: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(
     null
@@ -288,6 +419,7 @@ const DrillBuilder: React.FC = () => {
   const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState("");
+  const [showReassignConfirm, setShowReassignConfirm] = useState(false);
 
   const applyDraft = useCallback((draft: AdminDrillDraft) => {
     setVocabularyItems(draft.vocabularyItems);
@@ -1235,14 +1367,7 @@ const DrillBuilder: React.FC = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!validateDrillContent()) return;
-
-    if (selectedUsers.size === 0) {
-      toast.error("Please select at least one user");
-      return;
-    }
-
+  const executeSubmit = async () => {
     try {
       setLoading(true);
 
@@ -1300,7 +1425,15 @@ const DrillBuilder: React.FC = () => {
       if (isEditMode && drillId) {
         await drillAPI.update(drillId, drillData);
         clearDraft();
-        toast.success("Drill updated successfully!");
+        if (isAssignedDrill) {
+          toast.success(
+            `Drill updated and reassigned to ${selectedUsers.size} student${selectedUsers.size !== 1 ? "s" : ""}. All previous progress has been reset.`
+          );
+        } else {
+          toast.success(
+            `Drill assigned to ${selectedUsers.size} student${selectedUsers.size !== 1 ? "s" : ""}!`
+          );
+        }
         router.push("/admin/drill");
       } else {
         await drillAPI.create(drillData);
@@ -1316,6 +1449,56 @@ const DrillBuilder: React.FC = () => {
       setLoading(false);
       setIsGeneratingAudio(false);
       setAudioProgress("");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateDrillContent()) return;
+
+    if (selectedUsers.size === 0) {
+      toast.error("Please select at least one user");
+      return;
+    }
+
+    if (isEditMode && isAssignedDrill) {
+      setShowReassignConfirm(true);
+      return;
+    }
+
+    await executeSubmit();
+  };
+
+  const handleCopyDrill = async () => {
+    if (!validateDrillContent()) return;
+
+    setCopying(true);
+    try {
+      let payload = buildDrillPayload({ assignedTo: [], isActive: false });
+      if (isEditMode && drillData) {
+        payload = mergeMediaFieldsFromSource(
+          payload,
+          drillData as Record<string, unknown>
+        );
+      }
+      const response: any = await drillAPI.create(payload);
+      const newDrillId =
+        response?.data?.drill?._id ?? response?.drill?._id;
+      if (!newDrillId) {
+        throw new Error("New drill ID not returned");
+      }
+      clearDraft();
+      setSelectedUsers(new Set());
+      setCompletionDate(getDefaultCompletionDate());
+      toast.success(
+        "Drill copied. Select students and a completion date, then assign."
+      );
+      router.push(`/admin/drills/create?drillId=${newDrillId}`);
+    } catch (error: any) {
+      toast.error(
+        "Failed to copy drill: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setCopying(false);
     }
   };
 
@@ -2767,7 +2950,7 @@ const DrillBuilder: React.FC = () => {
       <div className="fixed bottom-0 left-64 right-0 bg-white border-t border-gray-100 p-6 flex gap-4 z-10">
         <button
           onClick={handleSaveDrill}
-          disabled={loading || saving}
+          disabled={loading || saving || copying}
           className="px-8 py-3.5 bg-amber-400 text-amber-950 font-bold rounded-full hover:bg-amber-500 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {saving ? (
@@ -2783,7 +2966,7 @@ const DrillBuilder: React.FC = () => {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading || saving}
+          disabled={loading || saving || copying}
           className="px-8 py-3.5 bg-[#418b43] text-white font-bold rounded-full hover:bg-[#3a7c3b] transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {loading ? (
@@ -2800,13 +2983,65 @@ const DrillBuilder: React.FC = () => {
           )}
         </button>
         <button
+          onClick={handleCopyDrill}
+          disabled={loading || saving || copying}
+          className="px-8 py-3.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-full hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {copying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Copying...
+            </>
+          ) : (
+            "Copy Drill"
+          )}
+        </button>
+        <button
           onClick={() => router.back()}
-          disabled={loading || saving}
+          disabled={loading || saving || copying}
           className="px-8 py-3.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-full hover:bg-gray-50 transition-all disabled:opacity-50"
         >
           Cancel Drill
         </button>
       </div>
+
+      {/* Reassignment confirmation */}
+      {showReassignConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Update and reassign drill?
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              This will reset all student progress for this drill — including
+              assignments, attempts, and bookmarks — and create fresh assignments
+              for the {selectedUsers.size} selected student
+              {selectedUsers.size !== 1 ? "s" : ""}. This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReassignConfirm(false)}
+                disabled={loading}
+                className="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 font-semibold rounded-full hover:bg-gray-50 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowReassignConfirm(false);
+                  await executeSubmit();
+                }}
+                disabled={loading}
+                className="px-5 py-2.5 bg-[#418b43] text-white font-semibold rounded-full hover:bg-[#3a7c3b] transition-all disabled:opacity-50"
+              >
+                Update Drill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content Preview Modal */}
       {showPreview && parsedContent && (

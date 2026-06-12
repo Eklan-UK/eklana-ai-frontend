@@ -46,7 +46,6 @@ const AdminDrillPage: React.FC = () => {
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
   const [filterAssignmentStatus, setFilterAssignmentStatus] = useState<string>("all");
   const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const drillQueryFilters = useMemo(
@@ -336,16 +335,6 @@ const AdminDrillPage: React.FC = () => {
                         <button
                           onClick={() => {
                             setSelectedDrill(drill);
-                            setShowAssignModal(true);
-                          }}
-                          className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                          title="Assign to Students"
-                        >
-                          <Users className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedDrill(drill);
                             setShowDeleteModal(true);
                           }}
                           className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -390,41 +379,6 @@ const AdminDrillPage: React.FC = () => {
               >
                 Delete
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Assign Modal */}
-      {showAssignModal && selectedDrill && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Assign Drill to Students
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Assign &quot;{selectedDrill.title}&quot; to students
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowAssignModal(false);
-                  setSelectedDrill(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <Link
-                href={`/admin/drills/assignment?drillId=${selectedDrill._id}`}
-                className="flex-1 px-4 py-2 bg-[#418b43] text-white rounded-lg hover:bg-[#3a7c3b] transition-colors text-center"
-                onClick={() => {
-                  setShowAssignModal(false);
-                  setSelectedDrill(null);
-                }}
-              >
-                Go to Assignment
-              </Link>
             </div>
           </div>
         </div>
