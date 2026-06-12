@@ -76,7 +76,7 @@ drillType must be one of: pronunciation, vocabulary, key_phrases, roleplay. Ever
 
 Use these exact instructions per drill type:
 - pronunciation: "Practice these words and phrases focusing on clear pronunciation."
-- vocabulary: "Focus on using these vocabularies correctly, paying attention to the meaning and appropriate usage."
+- vocabulary: "Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage."
 - roleplay: "Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift."
 - key_phrases: "Practice responding in these clinical situations using the correct key phrases."
 
