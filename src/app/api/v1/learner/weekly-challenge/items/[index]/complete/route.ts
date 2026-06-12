@@ -30,19 +30,7 @@ async function postHandler(
 	params: { index: string },
 ) {
 	await connectToDatabase();
-	
-	const itemId = params.index;
-	let index: number;
-	let challengeId: string | undefined;
-
-	if (itemId.includes('-')) {
-		const parts = itemId.split('-');
-		challengeId = parts[0];
-		index = parseInt(parts[1] ?? '', 10);
-	} else {
-		index = parseInt(itemId, 10);
-	}
-
+	const index = parseInt(params.index, 10);
 	if (Number.isNaN(index) || index < 0) {
 		throw new ValidationError('Invalid item index');
 	}
@@ -63,16 +51,8 @@ async function postHandler(
 		index,
 		score,
 		weekStartDate,
-		new Date(),
-		challengeId,
 	);
 	if (!result) {
-		console.warn('[WeeklyChallenge] Item complete failed - not found or not ready', {
-			userId: context.userId.toString(),
-			index,
-			challengeId,
-			weekStartDate: weekStartDate.toISOString(),
-		});
 		throw new NotFoundError('Weekly challenge item');
 	}
 

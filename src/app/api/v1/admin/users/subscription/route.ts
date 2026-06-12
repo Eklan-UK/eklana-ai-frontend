@@ -12,20 +12,13 @@ import {
   subscriptionExpiresAtMs,
 } from "@/lib/api/subscription-reconciliation";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
-import {
-  billingPeriodToMonths,
-  type BillingPeriod,
-  type ZeroPauseProduct,
-} from "@/domain/subscriptions/subscription.types";
 
 const updateSubscriptionSchema = z.object({
   userId: z.string().refine((id) => Types.ObjectId.isValid(id), {
     message: "Invalid user ID format",
   }),
   plan: z.enum(["free", "premium"]),
-  months: z.number().int().min(0).optional(),
-  billingPeriod: z.enum(["monthly", "quarterly", "annual"]).optional(),
-  zeroPauseProducts: z.array(z.enum(["challenge", "mastery"])).optional(),
+  months: z.number().int().min(0),
   amount: z.number().nonnegative().optional(),
   paymentMethod: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
@@ -55,13 +48,8 @@ async function handler(
       );
     }
 
-    if (input.zeroPauseProducts !== undefined) {
-      user.zeroPauseProducts = input.zeroPauseProducts as ZeroPauseProduct[];
-    }
-
     if (input.plan === "free") {
       user.subscriptionPlan = "free";
-      user.subscriptionBillingPeriod = null;
       user.subscriptionActivatedAt = null;
       user.subscriptionExpiresAt = null;
       user.subscriptionMonthsPaidFor = 0;
@@ -70,28 +58,15 @@ async function handler(
       user.subscriptionAdminNote = input.note || undefined;
       user.subscriptionUpdatedBy = context.userId;
     } else {
-      const billingPeriod: BillingPeriod =
-        input.billingPeriod ??
-        (input.months === 3
-          ? "quarterly"
-          : input.months === 12
-            ? "annual"
-            : "monthly");
-      const months =
-        input.months && input.months > 0
-          ? input.months
-          : billingPeriodToMonths(billingPeriod);
-
       const activation = new Date();
-      const expiry = addMonths(activation, months);
+      const expiry = addMonths(activation, input.months);
       const prevExpiryMs = subscriptionExpiresAtMs(user);
 
       extendSubscriptionExpiresAt(user, expiry);
 
       if (expiry.getTime() > prevExpiryMs) {
         user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? activation;
-        user.subscriptionBillingPeriod = billingPeriod;
-        user.subscriptionMonthsPaidFor = months;
+        user.subscriptionMonthsPaidFor = input.months;
         user.subscriptionAmountPaid = input.amount ?? 0;
         user.subscriptionPaymentMethod = input.paymentMethod || "manual";
         user.subscriptionProvider = "manual";
@@ -120,8 +95,6 @@ async function handler(
         data: {
           userId: user._id,
           subscriptionPlan: user.subscriptionPlan,
-          subscriptionBillingPeriod: user.subscriptionBillingPeriod,
-          zeroPauseProducts: user.zeroPauseProducts ?? [],
           subscriptionActivatedAt: user.subscriptionActivatedAt,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
         },

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -23,38 +23,12 @@ import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
 
-function formatHeaderDate(date?: Date) {
-  const value = date ?? new Date();
-  return value.toLocaleDateString("en-US", {
+function formatHeaderDate() {
+  return new Date().toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
-}
-
-function toLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getScheduledDateKey(session: TeachingClass): string | null {
-  if (session.nextSessionStartUtc) {
-    const start = new Date(session.nextSessionStartUtc);
-    if (!Number.isNaN(start.getTime())) {
-      return toLocalDateKey(start);
-    }
-  }
-
-  if (session.nextSessionLabel && session.nextSessionLabel !== "—") {
-    const parsed = new Date(session.nextSessionLabel);
-    if (!Number.isNaN(parsed.getTime())) {
-      return toLocalDateKey(parsed);
-    }
-  }
-
-  return null;
 }
 
 function StatusBadge({ status }: { status: ClassStatus }) {
@@ -107,9 +81,6 @@ export default function AdminClassesPage() {
   const [detailSession, setDetailSession] = useState<TeachingClass | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleTypeChoiceOpen, setScheduleTypeChoiceOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filterDate, setFilterDate] = useState("");
-  const filtersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (
@@ -120,22 +91,6 @@ export default function AdminClassesPage() {
       setTab(tabFromUrl);
     }
   }, [tabFromUrl]);
-
-  useEffect(() => {
-    if (!filtersOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (
-        filtersRef.current &&
-        !filtersRef.current.contains(event.target as Node)
-      ) {
-        setFiltersOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [filtersOpen]);
 
   const { data, isLoading, error } = useAdminClasses({ limit: 100 });
   const deleteClass = useDeleteAdminClass();
@@ -183,18 +138,11 @@ export default function AdminClassesPage() {
   );
 
   const visibleClasses = useMemo(() => {
-    const filtered = classes.filter((c) => {
-      if (c.bucket !== tab) return false;
-      if (!filterDate) return true;
-      return getScheduledDateKey(c) === filterDate;
-    });
+    const filtered = classes.filter((c) => c.bucket === tab);
     return sortTeachingClassesByTab(tab, filtered);
-  }, [classes, tab, filterDate]);
+  }, [classes, tab]);
 
-  const headerDate = formatHeaderDate(
-    filterDate ? new Date(`${filterDate}T12:00:00`) : undefined,
-  );
-  const hasDateFilter = Boolean(filterDate);
+  const headerDate = formatHeaderDate();
 
   return (
     <div className="relative space-y-6 pb-12">
@@ -387,87 +335,16 @@ export default function AdminClassesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div
-            className={`rounded-xl border px-4 py-2 text-sm font-medium ${
-              hasDateFilter
-                ? "border-[#3d8c40]/30 bg-emerald-50 text-[#2d6a32]"
-                : "border-gray-100 bg-gray-50 text-gray-600"
-            }`}
+          <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-600">
+            {headerDate}
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
           >
-            {hasDateFilter ? `Filtered: ${headerDate}` : headerDate}
-          </div>
-          <div className="relative" ref={filtersRef}>
-            <button
-              type="button"
-              aria-expanded={filtersOpen}
-              aria-haspopup="dialog"
-              onClick={() => setFiltersOpen((open) => !open)}
-              className={`inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 ${
-                hasDateFilter
-                  ? "border-[#3d8c40]/40 text-[#2d6a32]"
-                  : "border-gray-200 text-gray-600"
-              }`}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-              {hasDateFilter ? (
-                <span className="rounded-full bg-[#3d8c40] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                  1
-                </span>
-              ) : null}
-            </button>
-
-            {filtersOpen ? (
-              <div
-                role="dialog"
-                aria-label="Filter classes by scheduled date"
-                className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
-              >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    Filter by date
-                  </h3>
-                  <button
-                    type="button"
-                    aria-label="Close filters"
-                    onClick={() => setFiltersOpen(false)}
-                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">
-                  Scheduled class date
-                </label>
-                <input
-                  type="date"
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-[#3d8c40]/40 focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/20"
-                />
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilterDate("");
-                      setFiltersOpen(false);
-                    }}
-                    disabled={!hasDateFilter}
-                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Clear filter
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFiltersOpen(false)}
-                    className="rounded-lg bg-[#3d8c40] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#327035]"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
+            <Filter className="h-4 w-4" />
+            Filters
+          </button>
         </div>
       </div>
 
@@ -486,9 +363,7 @@ export default function AdminClassesPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {!isLoading && visibleClasses.length === 0 ? (
           <div className="col-span-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-12 text-center text-sm text-gray-600">
-            {hasDateFilter
-              ? `No classes scheduled for ${headerDate} in this tab.`
-              : "No classes yet. Schedule a class to get started."}
+            No classes yet. Schedule a class to get started.
           </div>
         ) : null}
         {!isLoading &&

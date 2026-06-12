@@ -10,13 +10,9 @@ import {
   NotFoundError,
   ValidationError,
 } from '@/lib/api/response';
-import ClassSession, { type IClassSession } from '@/models/class-session';
-import ClassSeries, { type IClassSeries } from '@/models/class-series';
+import ClassSession from '@/models/class-session';
+import ClassSeries from '@/models/class-series';
 import User from '@/models/user';
-import {
-  resolveSessionMeetingUrl,
-  tutorMeetingUrlAllowed,
-} from '@/domain/classes/class.mapper';
 
 function formatTutorName(t: {
   firstName?: string;
@@ -54,12 +50,6 @@ async function getHandler(
     throw new NotFoundError('Tutor');
   }
 
-  const sessionRow = session as unknown as IClassSession;
-  const seriesRow = series as unknown as IClassSeries;
-  const resolvedMeetingUrl = resolveSessionMeetingUrl(seriesRow, sessionRow);
-  const allowUrl = tutorMeetingUrlAllowed(sessionRow, new Date(), resolvedMeetingUrl);
-  const meetingUrl = allowUrl && resolvedMeetingUrl ? resolvedMeetingUrl : undefined;
-
   return apiResponse.success({
     session: {
       id: session._id.toString(),
@@ -68,7 +58,6 @@ async function getHandler(
       endUtc: new Date(session.endUtc).toISOString(),
       status: session.status,
       isReschedule: Boolean((session as { isReschedule?: boolean }).isReschedule),
-      meetingUrl,
     },
     classTitle: series.title?.trim() || 'Class',
     tutorName: formatTutorName(tutor as { firstName?: string; lastName?: string; email?: string }),

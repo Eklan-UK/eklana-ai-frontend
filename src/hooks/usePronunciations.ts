@@ -173,7 +173,7 @@ export function useOverallPronunciationAnalytics(days?: number) {
     queryKey: ["pronunciations", "analytics", "overall", days],
     queryFn: async () => {
       const response = await pronunciationAPI.getOverallAnalytics(days);
-      return response.data ?? null;
+      return response.data;
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });

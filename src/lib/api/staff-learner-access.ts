@@ -1,7 +1,6 @@
 import { Types } from 'mongoose';
 import Profile from '@/models/profile';
 import User from '@/models/user';
-import { isTutorAssignedToLearner } from '@/domain/tutor-assignments/tutor-assignment.service';
 
 type StaffContext = { userId: Types.ObjectId; userRole: string };
 
@@ -21,8 +20,8 @@ export async function resolveLearnerIdToUserIdString(learnerId: string): Promise
 }
 
 /**
- * Admin may read any learner. Tutor may read only if they have an active
- * TutorAssignment for the learner (falls back to legacy Profile.tutorId).
+ * Admin may read any learner. Tutor may read only if Profile links learner to that tutor
+ * (same pattern as /api/v1/tutor/students/[studentId]).
  */
 export async function assertStaffCanReadLearner(
 	context: StaffContext,
@@ -30,11 +29,14 @@ export async function assertStaffCanReadLearner(
 ): Promise<'ok' | 'forbidden'> {
 	if (context.userRole === 'admin') return 'ok';
 	if (context.userRole === 'tutor') {
-		const assigned = await isTutorAssignedToLearner(
-			context.userId,
-			new Types.ObjectId(learnerId)
-		);
-		return assigned ? 'ok' : 'forbidden';
+		const link = await Profile.findOne({
+			userId: new Types.ObjectId(learnerId),
+			tutorId: context.userId,
+		})
+			.select('_id')
+			.lean()
+			.exec();
+		return link ? 'ok' : 'forbidden';
 	}
 	return 'forbidden';
 }

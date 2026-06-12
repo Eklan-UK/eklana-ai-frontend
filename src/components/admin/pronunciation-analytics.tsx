@@ -12,23 +12,6 @@ import {
 } from "lucide-react";
 import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
 
-interface StrugglingWord {
-  word: string;
-  count: number;
-}
-
-interface PhonemeProblemArea {
-  phoneme: string;
-  count: number;
-  words?: StrugglingWord[];
-}
-
-interface LetterProblemArea {
-  letter: string;
-  count: number;
-  words?: StrugglingWord[];
-}
-
 interface PronunciationAnalyticsComponentProps {
   learnerId: string;
   learnerName?: string;
@@ -193,48 +176,24 @@ export function PronunciationAnalyticsComponent({
               Problem Areas
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Top Incorrect Phonemes with struggling words */}
+              {/* Top Incorrect Phonemes */}
               {problemAreas.topIncorrectPhonemes?.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
                     Difficult Sounds
                   </p>
-                  <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
                     {problemAreas.topIncorrectPhonemes.map(
-                      (item: PhonemeProblemArea, idx: number) => (
+                      (item: any, idx: number) => (
                         <div
                           key={idx}
-                          className="p-3 bg-orange-50 border border-orange-100 rounded-lg"
+                          className="px-3 py-1.5 bg-orange-100 border border-orange-200 rounded-full text-xs font-medium text-orange-700 flex items-center gap-2"
                         >
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Volume2 className="w-3.5 h-3.5 text-orange-500" />
-                            <span className="text-sm font-semibold text-orange-700">
-                              /{item.phoneme}/
-                            </span>
-                            <span className="text-xs text-orange-600 font-bold ml-auto">
-                              ×{item.count}
-                            </span>
-                          </div>
-                          {item.words && item.words.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {item.words.map((w, wi) => (
-                                <span
-                                  key={wi}
-                                  className="px-2 py-0.5 bg-white border border-orange-200 rounded text-xs text-gray-800"
-                                  title={`${w.count} attempt${w.count !== 1 ? "s" : ""} with this sound`}
-                                >
-                                  {w.word}
-                                  <span className="text-orange-500 ml-1">
-                                    ×{w.count}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-500 italic">
-                              No word data yet
-                            </p>
-                          )}
+                          <Volume2 className="w-3 h-3" />
+                          {item.phoneme}
+                          <span className="text-orange-600 font-bold">
+                            ×{item.count}
+                          </span>
                         </div>
                       ),
                     )}
@@ -242,47 +201,25 @@ export function PronunciationAnalyticsComponent({
                 </div>
               )}
 
-              {/* Top Incorrect Letters with struggling words */}
+              {/* Top Incorrect Letters */}
               {problemAreas.topIncorrectLetters?.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-700 mb-3 uppercase">
                     Difficult Letters
                   </p>
-                  <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
                     {problemAreas.topIncorrectLetters.map(
-                      (item: LetterProblemArea, idx: number) => (
+                      (item: any, idx: number) => (
                         <div
                           key={idx}
-                          className="p-3 bg-red-50 border border-red-100 rounded-lg"
+                          className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-full text-xs font-medium text-red-700 flex items-center gap-2"
                         >
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="font-mono font-bold text-base text-red-700">
-                              {item.letter}
-                            </span>
-                            <span className="text-xs text-red-600 font-bold ml-auto">
-                              ×{item.count}
-                            </span>
-                          </div>
-                          {item.words && item.words.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {item.words.map((w, wi) => (
-                                <span
-                                  key={wi}
-                                  className="px-2 py-0.5 bg-white border border-red-200 rounded text-xs text-gray-800"
-                                  title={`${w.count} attempt${w.count !== 1 ? "s" : ""} with this letter`}
-                                >
-                                  {w.word}
-                                  <span className="text-red-500 ml-1">
-                                    ×{w.count}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-500 italic">
-                              No word data yet
-                            </p>
-                          )}
+                          <span className="font-mono font-bold text-base">
+                            {item.letter}
+                          </span>
+                          <span className="text-red-600 font-bold">
+                            ×{item.count}
+                          </span>
                         </div>
                       ),
                     )}

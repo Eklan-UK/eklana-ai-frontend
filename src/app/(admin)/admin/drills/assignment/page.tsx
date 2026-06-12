@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   BookOpen,
   Plus,
@@ -31,33 +31,18 @@ export default function DrillAssignmentPage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDifficulty, setFilterDifficulty] = useState<string>("all");
 
-  const drillQueryFilters = useMemo(
-    () => ({
-      limit: 100,
-      type: filterType !== "all" ? filterType : undefined,
-      difficulty: filterDifficulty !== "all" ? filterDifficulty : undefined,
-    }),
-    [filterType, filterDifficulty]
-  );
+  // Use React Query instead of useEffect + useState
+  const { data: drills = [], isLoading: loading } = useAllDrills({ limit: 100 });
 
-  const { data: drills = [], isLoading: loading } = useAllDrills(drillQueryFilters);
-
-  const filteredDrills = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return drills;
-
-    return drills.filter((drill) => {
-      const title = drill.title?.toLowerCase() ?? "";
-      const type = drill.type?.toLowerCase() ?? "";
-      const difficulty = drill.difficulty?.toLowerCase() ?? "";
-
-      return (
-        title.includes(query) ||
-        type.includes(query) ||
-        difficulty.includes(query)
-      );
-    });
-  }, [drills, searchTerm]);
+  const filteredDrills = React.useMemo(() => drills.filter((drill) => {
+    const matchesSearch =
+      drill.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      drill.type.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === "all" || drill.type === filterType;
+    const matchesDifficulty =
+      filterDifficulty === "all" || drill.difficulty === filterDifficulty;
+    return matchesSearch && matchesType && matchesDifficulty;
+  }), [drills, searchTerm, filterType, filterDifficulty]);
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -103,7 +88,7 @@ export default function DrillAssignmentPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search drills..."

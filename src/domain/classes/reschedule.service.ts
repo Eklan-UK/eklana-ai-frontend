@@ -9,7 +9,6 @@ import { ValidationError, ForbiddenError } from '@/lib/api/response';
 import { getGoogleCalendarRefreshTokenForUser } from '@/lib/api/google-calendar-connection';
 import {
   createGoogleCalendarEventWithMeetLink,
-  createGoogleCalendarEventWithExistingMeetLink,
   deleteGoogleCalendarEvent,
 } from '@/lib/api/google-calendar-events';
 import { validationMessageForGoogleCalendarEventFailure } from '@/domain/classes/class.repository';
@@ -562,45 +561,22 @@ export class RescheduleService {
       learnersOrdered,
     );
 
-    const attendeeEmails = [
-      typeof tutor.email === 'string' ? tutor.email : '',
-      ...learnersOrdered.map((u) => (typeof u.email === 'string' ? u.email : '')),
-    ].filter(Boolean);
-
-    const isWeekly = seriesDoc.recurrenceRule === 'weekly';
-    const seriesMeetingUrl = (seriesDoc as { meetingUrl?: string }).meetingUrl?.trim();
-
     let meetingUrl: string;
     let googleEventId: string;
-    let backfillSeriesMeetingUrl = false;
     try {
-      if (isWeekly && seriesMeetingUrl) {
-        const created = await createGoogleCalendarEventWithExistingMeetLink({
-          refreshToken,
-          summary,
-          meetingUrl: seriesMeetingUrl,
-          startIsoUtc: newStartUtc.toISOString(),
-          endIsoUtc: newEndUtc.toISOString(),
-          timezone,
-          attendees: attendeeEmails,
-        });
-        meetingUrl = created.meetingUrl;
-        googleEventId = created.eventId;
-      } else {
-        const created = await createGoogleCalendarEventWithMeetLink({
-          refreshToken,
-          summary,
-          startIsoUtc: newStartUtc.toISOString(),
-          endIsoUtc: newEndUtc.toISOString(),
-          timezone,
-          attendees: attendeeEmails,
-        });
-        meetingUrl = created.meetingUrl;
-        googleEventId = created.eventId;
-        if (isWeekly) {
-          backfillSeriesMeetingUrl = true;
-        }
-      }
+      const created = await createGoogleCalendarEventWithMeetLink({
+        refreshToken,
+        summary,
+        startIsoUtc: newStartUtc.toISOString(),
+        endIsoUtc: newEndUtc.toISOString(),
+        timezone,
+        attendees: [
+          typeof tutor.email === 'string' ? tutor.email : '',
+          ...learnersOrdered.map((u) => (typeof u.email === 'string' ? u.email : '')),
+        ].filter(Boolean),
+      });
+      meetingUrl = created.meetingUrl;
+      googleEventId = created.eventId;
     } catch (error: unknown) {
       const err = error as Error;
       logger.error('RescheduleService.createGoogleCalendarEvent', {
@@ -609,13 +585,6 @@ export class RescheduleService {
       });
       throw new ValidationError(
         validationMessageForGoogleCalendarEventFailure(err.message ?? ''),
-      );
-    }
-
-    if (backfillSeriesMeetingUrl) {
-      await ClassSeries.updateOne(
-        { _id: seriesDoc._id },
-        { $set: { meetingUrl } },
       );
     }
 

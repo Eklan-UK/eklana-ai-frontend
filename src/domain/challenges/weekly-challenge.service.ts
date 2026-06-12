@@ -14,7 +14,6 @@ const EMPTY_SUMMARY =
 
 export interface WeeklyChallengeListItem {
 	index: number;
-	itemId: string;
 	drillType: string;
 	label: string;
 	instructions: string;
@@ -25,7 +24,6 @@ export interface WeeklyChallengeListItem {
 export interface WeeklyChallengeListResponse {
 	challengeId: string | null;
 	weekStartDate: string;
-	generatedAt?: string | null;
 	weekNumber?: number;
 	status: 'ready' | 'generating' | 'failed' | 'unavailable';
 	summaryMessage: string;
@@ -40,7 +38,6 @@ export interface WeeklyChallengeHistoryResponse {
 
 export interface WeeklyChallengeItemResponse {
 	challengeId: string;
-	itemId: string;
 	weekStartDate: string;
 	index: number;
 	item: ChallengeDrillItem;
@@ -49,7 +46,6 @@ export interface WeeklyChallengeItemResponse {
 
 export interface WeeklyChallengeCompleteResponse {
 	challengeId: string;
-	itemId: string;
 	index: number;
 	completed: boolean;
 	completedItemIndexes: number[];
@@ -68,7 +64,6 @@ export function toListResponse(
 		return {
 			challengeId: null,
 			weekStartDate: fallbackWeekStart.toISOString(),
-			generatedAt: null,
 			weekNumber: options?.weekNumber,
 			status: 'unavailable',
 			summaryMessage: EMPTY_SUMMARY,
@@ -78,11 +73,9 @@ export function toListResponse(
 		};
 	}
 
-	const challengeId = doc._id.toString();
 	const completedSet = new Set(doc.completedItemIndexes ?? []);
 	const drillSequence = (doc.content?.drillSequence ?? []).map((item, index) => ({
 		index,
-		itemId: `${challengeId}-${index}`,
 		drillType: item.drillType,
 		label: item.targetWeakness.label,
 		instructions: item.instructions,
@@ -91,9 +84,8 @@ export function toListResponse(
 	}));
 
 	return {
-		challengeId,
+		challengeId: doc._id.toString(),
 		weekStartDate: doc.weekStartDate.toISOString(),
-		generatedAt: doc.generatedAt ? doc.generatedAt.toISOString() : null,
 		weekNumber: options?.weekNumber,
 		status:
 			doc.status === 'ready' || doc.status === 'generating' || doc.status === 'failed'
@@ -104,13 +96,6 @@ export function toListResponse(
 		drillSequence,
 		isSunday,
 	};
-}
-
-function checkCasualOptions(content: WeeklyChallengeListResponse['drillSequence']): void {
-	const casualPhrases = ["what's up", "see you", "how's it going", "hey,"];
-	
-	// Access drillSequence from generated content via the provided list response mapping
-	// In the actual service doc, we need to check doc.content.drillSequence
 }
 
 async function runGeneration(
@@ -144,27 +129,6 @@ async function runGeneration(
 
 	try {
 		const generatedContent = await generateWeeklyChallenge(profile);
-		
-		// ─── Post-processing: Check for casual options ──────────────────────────
-		const casualPhrases = ["what's up", "see you", "how's it going", "hey,"];
-		generatedContent.drillSequence.forEach((drill: any, drillIdx: number) => {
-			if (drill.drillType === 'key_phrases' && drill.generatedContent?.key_phrase_items) {
-				drill.generatedContent.key_phrase_items.forEach((item: any, itemIdx: number) => {
-					const hasCasual = (item.options || []).some((opt: string) => 
-						casualPhrases.some(phrase => opt.toLowerCase().includes(phrase.toLowerCase()))
-					);
-					if (hasCasual) {
-						console.warn(`[WeeklyChallenge] Casual phrase detected in key_phrase_item`, {
-							drillIdx,
-							itemIdx,
-							prompt: item.prompt,
-						});
-					}
-				});
-			}
-		});
-		// ────────────────────────────────────────────────────────────────────────
-
 		const readyDoc = await WeeklyChallengeModel.findOneAndUpdate(
 			{ learnerId, weekStartDate, status: 'generating' },
 			{
@@ -390,24 +354,14 @@ export async function getWeeklyChallengeItem(
 	index: number,
 	weekStartDate?: Date,
 	now: Date = new Date(),
-	challengeId?: string,
 ): Promise<WeeklyChallengeItemResponse | null> {
-	let doc: IWeeklyChallenge | null = null;
-
-	if (challengeId && Types.ObjectId.isValid(challengeId)) {
-		doc = await WeeklyChallengeModel.findOne({
-			_id: new Types.ObjectId(challengeId),
-			learnerId,
-		});
-	} else {
-		const resolvedWeekStart = normalizeWeekStartDate(
-			weekStartDate ?? currentWeekStartUtc(now),
-		);
-		doc = await WeeklyChallengeModel.findOne({
-			learnerId,
-			weekStartDate: resolvedWeekStart,
-		});
-	}
+	const resolvedWeekStart = normalizeWeekStartDate(
+		weekStartDate ?? currentWeekStartUtc(now),
+	);
+	const doc = await WeeklyChallengeModel.findOne({
+		learnerId,
+		weekStartDate: resolvedWeekStart,
+	});
 
 	if (!doc || doc.status !== 'ready') {
 		return null;
@@ -422,7 +376,6 @@ export async function getWeeklyChallengeItem(
 
 	return {
 		challengeId: doc._id.toString(),
-		itemId: `${doc._id.toString()}-${index}`,
 		weekStartDate: doc.weekStartDate.toISOString(),
 		index,
 		item: item as ChallengeDrillItem,
@@ -436,24 +389,14 @@ export async function markWeeklyChallengeItemComplete(
 	_score?: number,
 	weekStartDate?: Date,
 	now: Date = new Date(),
-	challengeId?: string,
 ): Promise<WeeklyChallengeCompleteResponse | null> {
-	let doc: IWeeklyChallenge | null = null;
-
-	if (challengeId && Types.ObjectId.isValid(challengeId)) {
-		doc = await WeeklyChallengeModel.findOne({
-			_id: new Types.ObjectId(challengeId),
-			learnerId,
-		});
-	} else {
-		const resolvedWeekStart = normalizeWeekStartDate(
-			weekStartDate ?? currentWeekStartUtc(now),
-		);
-		doc = await WeeklyChallengeModel.findOne({
-			learnerId,
-			weekStartDate: resolvedWeekStart,
-		});
-	}
+	const resolvedWeekStart = normalizeWeekStartDate(
+		weekStartDate ?? currentWeekStartUtc(now),
+	);
+	const doc = await WeeklyChallengeModel.findOne({
+		learnerId,
+		weekStartDate: resolvedWeekStart,
+	});
 
 	if (!doc || doc.status !== 'ready') {
 		return null;
@@ -465,7 +408,7 @@ export async function markWeeklyChallengeItemComplete(
 	}
 
 	const updated = await WeeklyChallengeModel.findOneAndUpdate(
-		{ _id: doc._id, status: 'ready' },
+		{ learnerId, weekStartDate: resolvedWeekStart, status: 'ready' },
 		{ $addToSet: { completedItemIndexes: index } },
 		{ new: true },
 	);
@@ -476,7 +419,6 @@ export async function markWeeklyChallengeItemComplete(
 
 	return {
 		challengeId: updated._id.toString(),
-		itemId: `${updated._id.toString()}-${index}`,
 		index,
 		completed: true,
 		completedItemIndexes: updated.completedItemIndexes ?? [],

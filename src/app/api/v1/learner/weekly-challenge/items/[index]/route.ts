@@ -30,19 +30,7 @@ async function getHandler(
 	params: { index: string },
 ) {
 	await connectToDatabase();
-	
-	const itemId = params.index;
-	let index: number;
-	let challengeId: string | undefined;
-
-	if (itemId.includes('-')) {
-		const parts = itemId.split('-');
-		challengeId = parts[0];
-		index = parseInt(parts[1] ?? '', 10);
-	} else {
-		index = parseInt(itemId, 10);
-	}
-
+	const index = parseInt(params.index, 10);
 	if (Number.isNaN(index) || index < 0) {
 		throw new ValidationError('Invalid item index');
 	}
@@ -52,8 +40,6 @@ async function getHandler(
 		context.userId,
 		index,
 		weekStartDate,
-		new Date(),
-		challengeId,
 	);
 	if (!item) {
 		throw new NotFoundError('Weekly challenge item');

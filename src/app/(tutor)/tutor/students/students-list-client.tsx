@@ -55,9 +55,7 @@ export function StudentsListClient({ initialStudents }: StudentsListClientProps)
         {filteredStudents.length === 0 ? (
           <Card className="p-12 text-center">
             <p className="text-gray-500">
-              {searchQuery
-                ? "No students match your search"
-                : "No students assigned yet — your admin will assign learners to you"}
+              {searchQuery ? "No students match your search" : "No students assigned yet"}
             </p>
           </Card>
         ) : (

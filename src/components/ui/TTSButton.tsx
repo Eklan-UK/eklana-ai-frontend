@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type MutableRefObject } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { Button } from "./Button";
@@ -15,10 +15,6 @@ interface TTSButtonProps {
   disabled?: boolean;
   /** Pre-generated audio URL (Cloudinary). If provided, plays directly from URL without TTS generation */
   audioUrl?: string;
-  /** Called when audio starts playing — use to stop mic recording if active. */
-  onPlayStart?: () => void;
-  /** Write a stop function here so the parent can stop this button's audio externally. */
-  stopRef?: MutableRefObject<(() => void) | null>;
 }
 
 export function TTSButton({
@@ -30,13 +26,10 @@ export function TTSButton({
   autoPlay = false,
   disabled = false,
   audioUrl,
-  onPlayStart,
-  stopRef,
 }: TTSButtonProps) {
   // Use TTS hook for generating audio on-the-fly
   const { playAudio: playTTSAudio, preloadAudio, isGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
-    autoPlay: autoPlay && !audioUrl,
-    onPlayStart: audioUrl ? undefined : onPlayStart,
+    autoPlay: autoPlay && !audioUrl, // Only auto-play via TTS if no audioUrl
   });
   
   // State for playing pre-generated audio
@@ -86,22 +79,6 @@ export function TTSButton({
     };
   }, []);
 
-  // Expose a stop function to the parent via stopRef
-  useEffect(() => {
-    if (!stopRef) return;
-    stopRef.current = () => {
-      if (audioUrl) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-          setIsPlayingUrl(false);
-        }
-      } else {
-        stopTTSAudio();
-      }
-    };
-  }, [audioUrl, stopRef, stopTTSAudio]);
-
   const playFromUrl = () => {
     if (!audioUrl) return;
     
@@ -116,10 +93,7 @@ export function TTSButton({
         : new Audio(audioUrl);
     audioRef.current = audio;
     
-    audio.onplay = () => {
-      setIsPlayingUrl(true);
-      onPlayStart?.();
-    };
+    audio.onplay = () => setIsPlayingUrl(true);
     audio.onended = () => setIsPlayingUrl(false);
     audio.onerror = () => {
       setIsPlayingUrl(false);
