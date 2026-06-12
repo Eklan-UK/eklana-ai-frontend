@@ -149,6 +149,21 @@ export class AssignmentRepository {
   }
 
   /**
+   * Delete all assignments for a drill
+   */
+  async deleteByDrillId(drillId: string): Promise<number> {
+    try {
+      const result = await DrillAssignment.deleteMany({
+        drillId: new Types.ObjectId(drillId),
+      }).exec();
+      return result.deletedCount;
+    } catch (error: any) {
+      logger.error('Error deleting assignments by drill ID', { drillId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * Count assignments
    */
   async count(filter?: any): Promise<number> {

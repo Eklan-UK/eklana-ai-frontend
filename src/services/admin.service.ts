@@ -133,17 +133,19 @@ export const adminService = {
     subscribedUsers: number;
     totalActiveLearners: number;
     totalDrills: number;
+    zeroPauseChallengeUsers: number;
+    zeroPauseMasteryUsers: number;
     newSignupsThisWeek: number;
     discoveryCallsToday: number;
     videosAwaitingReview: number;
   }> => {
     // For now, we'll fetch data and calculate stats on the frontend
     const [usersResponse, drills] = await Promise.all([
-      adminAPI.getAllUsers({ limit: 1000 }),
+      adminAPI.getAllLearners({ limit: 1000 }),
       adminService.getDrills({ limit: 1 }),
     ]);
 
-    const users = usersResponse.users || [];
+    const users = usersResponse.data?.learners || [];
     const now = new Date();
 
     const totalUsers = users.length;
@@ -156,11 +158,25 @@ export const adminService = {
 
     const activeCount = users.filter((u: any) => u.isActive !== false).length;
 
+    const zeroPauseChallengeUsers = users.filter(
+      (u: any) =>
+        Array.isArray(u.zeroPauseProducts) &&
+        u.zeroPauseProducts.includes("challenge"),
+    ).length;
+
+    const zeroPauseMasteryUsers = users.filter(
+      (u: any) =>
+        Array.isArray(u.zeroPauseProducts) &&
+        u.zeroPauseProducts.includes("mastery"),
+    ).length;
+
     return {
       totalUsers,
       subscribedUsers,
       totalActiveLearners: activeCount,
       totalDrills: drills.total,
+      zeroPauseChallengeUsers,
+      zeroPauseMasteryUsers,
       newSignupsThisWeek: 0, // TODO: Calculate from user creation dates
       discoveryCallsToday: 0, // TODO: Implement discovery calls tracking
       videosAwaitingReview: 0, // TODO: Implement video review tracking

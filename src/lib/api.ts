@@ -735,6 +735,94 @@ export const adminAPI = {
     }>(`/admin/tutors/${tutorId}/students${qs}`);
   },
 
+  // Platform analytics overview (admin only)
+  getPlatformAnalyticsOverview: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learners: {
+          totalActive: number;
+          totalWithAssignments: number;
+        };
+        drills: {
+          totalAssignments: number;
+          completed: number;
+          inProgress: number;
+          pending: number;
+          overdue: number;
+          averageScore: number;
+          completionRatePct: number;
+        };
+      };
+    }>('/admin/analytics/overview', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  // Aggregated analytics dashboard (platform-wide or filtered learners)
+  getAnalyticsDashboard: (params?: { learnerIds?: string[]; days?: number }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.learnerIds && params.learnerIds.length > 0) {
+      query.learnerIds = params.learnerIds.join(',');
+    }
+    if (params?.days != null) {
+      query.days = params.days;
+    }
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: import('@/types/admin-analytics-dashboard').AnalyticsDashboardData;
+    }>('/admin/analytics/dashboard', {
+      method: 'GET',
+      params: query,
+      cache: false,
+    });
+  },
+
+  // Learners with analytics summaries (admin only)
+  getAnalyticsLearners: (params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    signupDateFrom?: string;
+    signupDateTo?: string;
+    status?: 'active' | 'inactive';
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learners: Array<{
+          _id: string;
+          firstName?: string;
+          lastName?: string;
+          name?: string;
+          email: string;
+          isActive?: boolean;
+          createdAt: string;
+          summary: {
+            drillCompletionRatePct: number;
+            drillAverageScore: number;
+            pronunciationAverageScore: number;
+            overallProgressPct: number;
+          };
+        }>;
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
+      };
+    }>('/admin/analytics/learners', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
   // Get all learners (admin only)
   getAllLearners: (params?: {
     limit?: number;
@@ -786,6 +874,7 @@ export const adminAPI = {
     }).then((response) => {
       // Subscription changes must be visible on the learners list immediately.
       apiCache.clearPattern('^/admin/learners');
+      apiCache.clearPattern('^/users');
       return response;
     });
   },
@@ -887,6 +976,134 @@ export const adminAPI = {
     }>(`/admin/learners/${learnerId}/sentence-analytics`, {
       method: 'GET',
       params,
+      cache: false,
+    });
+  },
+
+  /** Fill-in-the-blank drill analytics for a learner. Admin/tutor. */
+  getLearnerFillBlankAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssignedBlanks: number;
+        correctBlanks: number;
+        incorrectBlanks: number;
+        accuracyRatePct: number;
+        totalAttempts: number;
+        averageScore: number;
+        problemRows: Array<{
+          id: string;
+          sentence: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/fill-blank-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Key phrase drill analytics for a learner. Admin/tutor. */
+  getLearnerKeyPhrasesAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssignedItems: number;
+        correctItems: number;
+        incorrectItems: number;
+        accuracyRatePct: number;
+        totalAttempts: number;
+        averageScore: number;
+        averagePronunciationScore: number;
+        problemRows: Array<{
+          id: string;
+          prompt: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/key-phrases-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Platform fill-in-the-blank analytics (admin). */
+  getPlatformFillBlankAnalytics: (params?: { days?: number; learnerIds?: string[] }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.days != null) query.days = params.days;
+    if (params?.learnerIds?.length) query.learnerIds = params.learnerIds.join(',');
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        stats: {
+          totalAssignedBlanks: number;
+          correctBlanks: number;
+          incorrectBlanks: number;
+          accuracyRatePct: number;
+          totalAttempts: number;
+          averageScore: number;
+        };
+        problemRows: Array<{
+          id: string;
+          sentence: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+      };
+    }>('/admin/analytics/fill-blank', {
+      method: 'GET',
+      params: query,
+      cache: false,
+    });
+  },
+
+  /** Platform key phrase analytics (admin). */
+  getPlatformKeyPhrasesAnalytics: (params?: { days?: number; learnerIds?: string[] }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.days != null) query.days = params.days;
+    if (params?.learnerIds?.length) query.learnerIds = params.learnerIds.join(',');
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        stats: {
+          totalAssignedItems: number;
+          correctItems: number;
+          incorrectItems: number;
+          accuracyRatePct: number;
+          totalAttempts: number;
+          averageScore: number;
+          averagePronunciationScore: number;
+        };
+        problemRows: Array<{
+          id: string;
+          prompt: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+      };
+    }>('/admin/analytics/key-phrases', {
+      method: 'GET',
+      params: query,
       cache: false,
     });
   },

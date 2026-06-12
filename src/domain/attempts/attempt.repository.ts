@@ -48,6 +48,21 @@ export class AttemptRepository {
   }
 
   /**
+   * Delete all attempts for a drill
+   */
+  async deleteByDrillId(drillId: string): Promise<number> {
+    try {
+      const result = await DrillAttempt.deleteMany({
+        drillId: new Types.ObjectId(drillId),
+      }).exec();
+      return result.deletedCount;
+    } catch (error: any) {
+      logger.error('Error deleting attempts by drill ID', { drillId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * Find attempts by assignment ID
    */
   async findByAssignmentId(assignmentId: string): Promise<any[]> {
