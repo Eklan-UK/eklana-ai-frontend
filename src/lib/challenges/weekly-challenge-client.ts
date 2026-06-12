@@ -4,25 +4,34 @@ import { queryKeys } from '@/lib/react-query';
 
 export async function completeWeeklyChallengeItem(
 	queryClient: QueryClient,
-	itemId: string | number,
+	itemIndex: number,
 	data?: { score?: number; weekStartDate?: string },
 ) {
-	const numericIndex = typeof itemId === 'string' 
-		? parseInt(itemId.split('-').pop() ?? '0', 10) 
-		: itemId;
-
 	const response = await weeklyChallengeAPI.completeItem(
-		numericIndex,
+		itemIndex,
 		data?.score != null ? { score: data.score } : undefined,
 		data?.weekStartDate,
 	);
 
-	// Refetch the entire weeklyChallenge namespace so history, current,
-	// week, and item queries all update immediately regardless of 
-	// which key variant each consumer registered with.
-	await queryClient.refetchQueries({
-		queryKey: queryKeys.weeklyChallenge.all,
+	await queryClient.invalidateQueries({
+		queryKey: queryKeys.weeklyChallenge.history(),
 	});
+
+	if (data?.weekStartDate) {
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.week(data.weekStartDate),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.item(data.weekStartDate, itemIndex),
+		});
+	} else {
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.current(),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.weeklyChallenge.item('', itemIndex),
+		});
+	}
 
 	return response;
 }

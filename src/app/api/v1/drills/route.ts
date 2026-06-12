@@ -123,7 +123,7 @@ const createDrillSchema = z.object({
 	duration_days: z.number().int().min(1).optional(),
 	assigned_to: z.array(z.string().refine((id) => Types.ObjectId.isValid(id), {
 		message: 'Each user ID must be a valid MongoDB ObjectId',
-	})).min(0),
+	})).min(1),
 	context: z.string().optional(),
 	audio_example_url: z.string().url().optional(),
 	target_sentences: z.array(targetSentenceSchema).optional(),
@@ -186,18 +186,12 @@ async function getHandler(
 	const drillService = new DrillService(drillRepo, assignmentRepo, attemptRepo);
 
 	// List drills
-	const assignmentStatus =
-		queryParams.assignmentStatus === 'saved' || queryParams.assignmentStatus === 'assigned'
-			? queryParams.assignmentStatus
-			: undefined;
-
 	const result = await drillService.listDrills({
 		type: queryParams.type,
 		difficulty: queryParams.difficulty,
 		studentEmail: queryParams.search, // Using search param for studentEmail
 		createdBy: queryParams.role === 'creator' ? context.userId.toString() : undefined,
 		isActive: queryParams.isActive,
-		assignmentStatus,
 		limit: queryParams.limit,
 		offset: queryParams.offset,
 	});
@@ -226,8 +220,6 @@ async function postHandler(
 	const attemptRepo = new AttemptRepository();
 	const drillService = new DrillService(drillRepo, assignmentRepo, attemptRepo);
 
-	const isSavedDrill = validated.assigned_to.length === 0;
-
 	// Prepare drill data
 	const drillData: any = {
 		title: validated.title,
@@ -236,11 +228,7 @@ async function postHandler(
 		date: new Date(validated.date),
 		duration_days: validated.duration_days || 1,
 		assigned_to: validated.assigned_to.map(id => id.toString()),
-		is_active: isSavedDrill
-			? false
-			: validated.is_active !== undefined
-				? validated.is_active
-				: true,
+		is_active: validated.is_active !== undefined ? validated.is_active : true,
 		totalAssignments: 0,
 		totalCompletions: 0,
 		averageScore: 0,

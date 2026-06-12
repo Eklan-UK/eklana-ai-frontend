@@ -143,20 +143,10 @@ export default function VocabularyDrill({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const targetSentences = useMemo(() => {
-    if (drill.vocabulary_items?.length) {
-      return drill.vocabulary_items.map((item: any) => {
-        const correctAnswer = item.blanks?.[0]?.correctAnswer ?? '';
-        return {
-          word: correctAnswer,
-          text: (item.sentence ?? '').replace(/___/g, correctAnswer),
-          translation: undefined,
-          wordTranslation: undefined,
-        };
-      });
-    }
-    return drill.target_sentences || [];
-  }, [drill.vocabulary_items, drill.target_sentences]);
+  const targetSentences = useMemo(
+    () => drill.target_sentences || [],
+    [drill.target_sentences]
+  );
   const currentSentence = targetSentences[currentIndex];
   const currentProgress = wordProgress[currentIndex] || {
     wordPassed: false,

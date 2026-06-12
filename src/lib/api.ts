@@ -66,7 +66,6 @@ export const drillAPI = {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
-    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -694,55 +693,22 @@ export const adminAPI = {
     });
   },
 
-  // Assign tutor to student (creates TutorAssignment, multiple tutors per student supported)
+  // Assign tutor to student
   assignTutorToStudent: (studentId: string, tutorId: string) => {
     return apiRequest<{
       code: string;
       message: string;
-      data: { assignmentId: string };
+      data: { learner: any };
     }>('/admin/assign-tutor', {
       method: 'POST',
       data: { studentId, tutorId },
     });
   },
 
-  // Remove tutor–student assignment
-  unassignTutorFromStudent: (studentId: string, tutorId: string) => {
-    return apiRequest<{
-      code: string;
-      message: string;
-    }>('/admin/unassign-tutor', {
-      method: 'DELETE',
-      data: { studentId, tutorId },
-    });
-  },
-
-  // List learners assigned to a specific tutor
-  getTutorAssignedStudents: (tutorId: string, params?: { search?: string }) => {
-    const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
-    return apiRequest<{
-      students: Array<{
-        assignmentId: string;
-        id: string;
-        firstName?: string;
-        lastName?: string;
-        name: string;
-        email: string;
-        assignedAt: string;
-        assignedBy: any;
-      }>;
-      total: number;
-    }>(`/admin/tutors/${tutorId}/students${qs}`);
-  },
-
   // Get all learners (admin only)
   getAllLearners: (params?: {
     limit?: number;
     offset?: number;
-    search?: string;
-    signupDateFrom?: string;
-    signupDateTo?: string;
-    status?: 'active' | 'inactive';
   }) => {
     return apiRequest<{
       code?: string;
@@ -754,7 +720,6 @@ export const adminAPI = {
     }>('/admin/learners', {
       method: 'GET',
       params,
-      cache: false,
     });
   },
 
@@ -762,9 +727,7 @@ export const adminAPI = {
   updateUserSubscription: (data: {
     userId: string;
     plan: "free" | "premium";
-    months?: number;
-    billingPeriod?: "monthly" | "quarterly" | "annual";
-    zeroPauseProducts?: ("challenge" | "mastery")[];
+    months: number;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -775,18 +738,12 @@ export const adminAPI = {
       data: {
         userId: string;
         subscriptionPlan: "free" | "premium";
-        subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
-        zeroPauseProducts: ("challenge" | "mastery")[];
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
     }>('/admin/users/subscription', {
       method: 'POST',
       data,
-    }).then((response) => {
-      // Subscription changes must be visible on the learners list immediately.
-      apiCache.clearPattern('^/admin/learners');
-      return response;
     });
   },
 
@@ -1441,7 +1398,6 @@ export const weeklyChallengeAPI = {
 					totalEstimatedMinutes: number;
 					drillSequence: Array<{
 						index: number;
-						itemId: string;
 						drillType: string;
 						label: string;
 						instructions: string;
@@ -1469,7 +1425,6 @@ export const weeklyChallengeAPI = {
 				totalEstimatedMinutes: number;
 				drillSequence: Array<{
 					index: number;
-					itemId: string;
 					drillType: string;
 					label: string;
 					instructions: string;
@@ -1485,18 +1440,17 @@ export const weeklyChallengeAPI = {
 		});
 	},
 
-	getItem: (itemId: string | number, weekStartDate?: string) => {
+	getItem: (index: number, weekStartDate?: string) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
 				challengeId: string;
-				itemId: string;
 				weekStartDate: string;
 				index: number;
 				item: Record<string, unknown>;
 				completed: boolean;
 			};
-		}>(`/learner/weekly-challenge/items/${itemId}`, {
+		}>(`/learner/weekly-challenge/items/${index}`, {
 			method: 'GET',
 			params: weekStartDate ? { weekStartDate } : undefined,
 			cache: false,
@@ -1504,7 +1458,7 @@ export const weeklyChallengeAPI = {
 	},
 
 	completeItem: (
-		itemId: string | number,
+		index: number,
 		data?: { score?: number },
 		weekStartDate?: string,
 	) => {
@@ -1512,13 +1466,12 @@ export const weeklyChallengeAPI = {
 			code?: string;
 			data?: {
 				challengeId: string;
-				itemId: string;
 				index: number;
 				completed: boolean;
 				completedItemIndexes: number[];
 				totalItems: number;
 			};
-		}>(`/learner/weekly-challenge/items/${itemId}/complete`, {
+		}>(`/learner/weekly-challenge/items/${index}/complete`, {
 			method: 'POST',
 			data,
 			params: weekStartDate ? { weekStartDate } : undefined,

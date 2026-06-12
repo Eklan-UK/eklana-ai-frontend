@@ -51,17 +51,6 @@ function formatNextSessionLabel(d: Date, timeZone: string): string {
 /** Minutes before session start when join URL may be revealed (Phase 2). */
 export const TUTOR_JOIN_EARLY_MINUTES = 15;
 
-/** Weekly series use the shared series link; other sessions use their own row. */
-export function resolveSessionMeetingUrl(
-  series: Pick<IClassSeries, 'recurrenceRule' | 'meetingUrl'>,
-  session: Pick<IClassSession, 'meetingUrl'>,
-): string | undefined {
-  if (series.recurrenceRule === 'weekly' && series.meetingUrl?.trim()) {
-    return series.meetingUrl.trim();
-  }
-  return session.meetingUrl?.trim() || undefined;
-}
-
 export function getNextSessionForList(sessions: IClassSession[]): IClassSession | null {
   const sorted = [...sessions].sort(
     (a, b) => new Date(a.startUtc).getTime() - new Date(b.startUtc).getTime(),
@@ -80,10 +69,8 @@ export function getNextSessionForList(sessions: IClassSession[]): IClassSession 
 export function tutorMeetingUrlAllowed(
   next: IClassSession | null,
   now: Date = new Date(),
-  meetingUrlOverride?: string,
 ): boolean {
-  const url = meetingUrlOverride ?? next?.meetingUrl;
-  if (!url || !next) return false;
+  if (!next?.meetingUrl) return false;
   if (next.status === 'in_progress') return true;
   const start = new Date(next.startUtc).getTime();
   const end = new Date(next.endUtc).getTime();
@@ -97,9 +84,8 @@ export function applyTutorJoinPolicy(
   item: AdminClassListItemDTO,
   nextSession: IClassSession | null,
   now: Date = new Date(),
-  resolvedMeetingUrl?: string,
 ): AdminClassListItemDTO {
-  const allow = tutorMeetingUrlAllowed(nextSession, now, resolvedMeetingUrl ?? item.meetingUrl);
+  const allow = tutorMeetingUrlAllowed(nextSession, now);
   if (allow) return item;
   return {
     ...item,
@@ -212,8 +198,6 @@ export function mapSeriesToListItem(
         ? computeBucket(new Date(next.startUtc), tz)
         : 'upcoming';
 
-  const resolvedMeetingUrl = next ? resolveSessionMeetingUrl(series, next) : undefined;
-
   return {
     id: series._id.toString(),
     title: series.title?.trim() || undefined,
@@ -234,7 +218,7 @@ export function mapSeriesToListItem(
     nextSessionIsReschedule: Boolean(next?.isReschedule),
     status,
     bucket,
-    meetingUrl: resolvedMeetingUrl,
+    meetingUrl: next?.meetingUrl,
     drawer: {
       recurring: series.recurrenceRule === 'weekly',
       sessionTimeRange:
@@ -243,7 +227,7 @@ export function mapSeriesToListItem(
       sessionTotal: totalSessions,
       blockCompleted: programPosition,
       blockTotal: totalSessions,
-      meetingUrl: resolvedMeetingUrl,
+      meetingUrl: next?.meetingUrl,
     },
   };
 }
@@ -267,7 +251,7 @@ export function mapToAdminDetail(
       startUtc: new Date(s.startUtc).toISOString(),
       endUtc: new Date(s.endUtc).toISOString(),
       status: s.status,
-      meetingUrl: resolveSessionMeetingUrl(series, s),
+      meetingUrl: s.meetingUrl,
     }));
 
   return {

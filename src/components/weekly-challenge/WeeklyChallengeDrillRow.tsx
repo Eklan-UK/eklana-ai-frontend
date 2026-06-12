@@ -10,20 +10,6 @@ import {
 import type { WeeklyChallengeListItem } from "@/domain/challenges/weekly-challenge.service";
 import { encodeWeekStartDate } from "@/lib/challenges/weekly-challenge-url";
 
-const DRILL_TYPE_TITLE: Record<string, string> = {
-	pronunciation: "Pronunciation",
-	vocabulary: "Vocabulary",
-	roleplay: "Role-play",
-	key_phrases: "Key Phrases",
-};
-
-const DRILL_TYPE_BADGE: Record<string, string> = {
-	pronunciation: "Pronunciation",
-	vocabulary: "Fill-in-the-Blank",
-	roleplay: "Role-play",
-	key_phrases: "Key Phrases",
-};
-
 const CATEGORY_TEXT: Record<string, string> = {
 	green: "text-violet-600",
 	blue: "text-sky-600",
@@ -77,10 +63,10 @@ export function WeeklyChallengeDrillRow({
 			</div>
 			<div className="flex-1 min-w-0">
 				<h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
-					{DRILL_TYPE_TITLE[item.drillType] ?? item.label}
+					{item.label}
 				</h3>
 				<p className={`text-xs mt-0.5 font-medium ${catClass}`}>
-					• {DRILL_TYPE_BADGE[item.drillType] ?? getDrillTypeLabel(item.drillType)}
+					• {getDrillTypeLabel(item.drillType)}
 				</p>
 				{item.instructions ? (
 					<p className="text-xs text-muted-foreground mt-1 line-clamp-2">

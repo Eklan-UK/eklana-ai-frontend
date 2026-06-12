@@ -8,17 +8,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Check, Crown, Zap, Calendar, Loader2 } from "lucide-react";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import {
-  planTitleFromUser,
-  getPlanCardMessage,
-  formatSubscriptionExpiryLine,
-} from "@/lib/learner-learning-goals";
-import {
-  BILLING_PERIODS,
-  BILLING_PERIOD_LABELS,
-  formatBillingPeriodLabel,
-  type BillingPeriod,
-} from "@/domain/subscriptions/subscription.types";
+import { planTitleFromUser, getPlanCardMessage } from "@/lib/learner-learning-goals";
 import { toast } from "sonner";
 
 // ── Plan data ─────────────────────────────────────────────────────────────────
@@ -38,18 +28,11 @@ const PRO_FEATURES = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function callStripeEndpoint(
-  path: string,
-  body?: Record<string, unknown>
-): Promise<string> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+async function callStripeEndpoint(path: string): Promise<string> {
+  const res = await fetch(path, { method: "POST" });
   if (!res.ok) {
-    const responseBody = await res.json().catch(() => ({}));
-    throw new Error(responseBody?.message || "Request failed");
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.message || "Request failed");
   }
   const data = await res.json();
   if (!data.url) throw new Error("No redirect URL returned");
@@ -71,14 +54,6 @@ export default function SubscriptionsPage() {
 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [selectedBillingPeriod, setSelectedBillingPeriod] =
-    useState<BillingPeriod>("monthly");
-
-  const currentBillingPeriod = user?.subscriptionBillingPeriod as
-    | BillingPeriod
-    | null
-    | undefined;
-  const expiryLine = formatSubscriptionExpiryLine(user);
 
   // ── Handle ?checkout=success param ──────────────────────────────────────────
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -129,9 +104,7 @@ export default function SubscriptionsPage() {
   async function handleUpgrade() {
     setCheckoutLoading(true);
     try {
-      const url = await callStripeEndpoint("/api/v1/stripe/checkout", {
-        billingPeriod: selectedBillingPeriod,
-      });
+      const url = await callStripeEndpoint("/api/v1/stripe/checkout");
       window.location.href = url;
     } catch (err: any) {
       toast.error(
@@ -174,12 +147,6 @@ export default function SubscriptionsPage() {
                 {userLoading ? "—" : planTitle}
               </p>
               <p className="text-sm text-muted-foreground mt-2 max-w-sm">{planMessage}</p>
-              {isSubscribed && currentBillingPeriod && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Billing: {formatBillingPeriodLabel(currentBillingPeriod)}
-                  {expiryLine ? ` · Renews ${expiryLine}` : ""}
-                </p>
-              )}
             </div>
             <Calendar className="w-5 h-5 text-green-600 flex-shrink-0" />
           </div>
@@ -250,30 +217,7 @@ export default function SubscriptionsPage() {
                   ))}
                 </ul>
 
-                {!isSubscribed && (
-                  <div className="mb-4 space-y-2">
-                    <p className="text-xs font-semibold text-foreground">
-                      Choose billing period
-                    </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {BILLING_PERIODS.map((period) => (
-                        <button
-                          key={period}
-                          type="button"
-                          onClick={() => setSelectedBillingPeriod(period)}
-                          className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
-                            selectedBillingPeriod === period
-                              ? "border-green-600 bg-green-500/10 text-green-700"
-                              : "border-border text-muted-foreground hover:border-green-600/50"
-                          }`}
-                        >
-                          {BILLING_PERIOD_LABELS[period]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+                {/* CTA button */}
                 {isSubscribed ? (
                   <button
                     onClick={handleManage}
