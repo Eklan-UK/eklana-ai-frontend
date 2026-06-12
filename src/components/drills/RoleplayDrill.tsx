@@ -896,7 +896,7 @@ export default function RoleplayDrill({
       const statsLineForSnapshot = `${completedStudentTurns} lines completed · ${totalAttemptsForSnapshot} total attempts`;
 
       if (weeklyChallengeMeta) {
-        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemIndex, {
+        await completeWeeklyChallengeItem(queryClient, weeklyChallengeMeta.itemId, {
           score: avgScore,
           weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
@@ -982,11 +982,14 @@ export default function RoleplayDrill({
     const linesWithTranscript = completedMessages.filter((m) =>
       Boolean(m.transcript?.trim())
     );
+    const returnPath = weeklyChallengeMeta
+      ? `/account/practice/weekly-challenge/${encodeURIComponent(weeklyChallengeMeta.weekStartDate)}`
+      : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType="roleplay"
-        returnPath="/account/drills"
-        returnLabel="Back to My Plan"
+        drillType={weeklyChallengeMeta ? "Role-play" : "roleplay"}
+        returnPath={returnPath}
+        returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         extraContent={
           linesWithTranscript.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">
@@ -1485,7 +1488,7 @@ export default function RoleplayDrill({
           <div className="pointer-events-auto w-full max-w-md">
             <button
               type="button"
-              onClick={() => setSessionStarted(true)}
+              onClick={() => { stopTTSAudio(); setSessionStarted(true); }}
               className="w-full rounded-full bg-[#388E3C] px-8 py-4 text-center text-base font-bold text-white shadow-md transition-colors hover:bg-[#2f7a33] active:scale-[0.99]"
             >
               Let&apos;s Get Started
