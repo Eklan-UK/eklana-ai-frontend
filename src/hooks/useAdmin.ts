@@ -111,6 +111,21 @@ export function useAllLearners(filters?: {
   });
 }
 
+export function useAdminSubscriptions(filters?: { limit?: number; sync?: boolean }) {
+  return useQuery({
+    queryKey: ['admin', 'subscriptions', filters],
+    queryFn: async () => {
+      const response = await adminAPI.getAdminSubscriptions(filters || {});
+      return {
+        learners: response.data?.learners || [],
+        sync: response.data?.sync || { syncedCount: 0, failedCount: 0 },
+        total: response.data?.pagination?.total || 0,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
 // Get drill by ID (admin)
 export function useDrillById(drillId: string) {
   return useQuery({
@@ -429,6 +444,7 @@ export function useUpdateUserSubscription() {
         );
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard", "stats"] });
       toast.success("Subscription updated");
     },

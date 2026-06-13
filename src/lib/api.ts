@@ -846,6 +846,33 @@ export const adminAPI = {
     });
   },
 
+  getAdminSubscriptions: (params?: { limit?: number; sync?: boolean }) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        learners: any[];
+        sync: {
+          syncedCount: number;
+          failedCount: number;
+        };
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
+      };
+    }>('/admin/subscriptions', {
+      method: 'GET',
+      params: {
+        limit: params?.limit,
+        sync: params?.sync === false ? 'false' : undefined,
+      },
+      cache: false,
+    });
+  },
+
   getDashboardStats: () => {
     return apiRequest<{
       code: string;
@@ -897,6 +924,7 @@ export const adminAPI = {
     }).then((response) => {
       // Subscription changes must be visible on the learners list immediately.
       apiCache.clearPattern('^/admin/learners');
+      apiCache.clearPattern('^/admin/subscriptions');
       apiCache.clearPattern('^/users');
       return response;
     });
