@@ -19,6 +19,7 @@ import {
   extendSubscriptionExpiresAt,
   shouldSkipStripeDowngrade,
 } from '@/lib/api/subscription-reconciliation';
+import { billingPeriodFromStripePriceId } from '@/lib/api/stripe-billing-period';
 
 const inputSchema = z
   .object({
@@ -162,6 +163,12 @@ async function handler(
     user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? fromUnix(activeSub.created);
     user.subscriptionExpiresAt = periodEnd;
     user.subscriptionPaymentMethod = 'stripe';
+    const billingPeriod = billingPeriodFromStripePriceId(
+      activeSub.items?.data?.[0]?.price?.id
+    );
+    if (billingPeriod) {
+      user.subscriptionBillingPeriod = billingPeriod;
+    }
     await user.save();
 
     logger.info('[stripe-sync] Synced subscription — activated premium', {

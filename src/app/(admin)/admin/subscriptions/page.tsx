@@ -3,6 +3,30 @@
 import React, { useState } from "react";
 import { useAllLearners, useUpdateUserSubscription } from "@/hooks/useAdmin";
 import { Loader2, Edit2, Save, X } from "lucide-react";
+import {
+  BILLING_PERIODS,
+  BILLING_PERIOD_LABELS,
+  ZERO_PAUSE_PRODUCTS,
+  ZERO_PAUSE_PRODUCT_LABELS,
+  formatBillingPeriodLabel,
+  type BillingPeriod,
+  type ZeroPauseProduct,
+} from "@/domain/subscriptions/subscription.types";
+
+type SubscriptionForm = {
+  plan: "free" | "premium";
+  billingPeriod: BillingPeriod;
+  zeroPauseProducts: ZeroPauseProduct[];
+  amount?: number;
+  paymentMethod?: string;
+  note?: string;
+};
+
+function monthsToBillingPeriod(months: number | null | undefined): BillingPeriod {
+  if (months === 3) return "quarterly";
+  if (months === 12) return "annual";
+  return "monthly";
+}
 
 const SubscriptionsPage: React.FC = () => {
   const { data, isLoading } = useAllLearners({ limit: 1000, role: "user" });
@@ -10,22 +34,22 @@ const SubscriptionsPage: React.FC = () => {
   const { mutateAsync, isPending: saving } = useUpdateUserSubscription();
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{
-    plan: "free" | "premium";
-    months: number;
-    amount?: number;
-    paymentMethod?: string;
-    note?: string;
-  }>({
+  const [form, setForm] = useState<SubscriptionForm>({
     plan: "free",
-    months: 1,
+    billingPeriod: "monthly",
+    zeroPauseProducts: [],
   });
 
   const startEdit = (l: any) => {
     setEditingId(l._id);
     setForm({
       plan: l.subscriptionPlan === "premium" ? "premium" : "free",
-      months: l.subscriptionMonthsPaidFor || 1,
+      billingPeriod:
+        l.subscriptionBillingPeriod ||
+        monthsToBillingPeriod(l.subscriptionMonthsPaidFor),
+      zeroPauseProducts: Array.isArray(l.zeroPauseProducts)
+        ? l.zeroPauseProducts
+        : [],
       amount: l.subscriptionAmountPaid || undefined,
       paymentMethod: l.subscriptionPaymentMethod || "",
       note: l.subscriptionAdminNote || "",
@@ -36,11 +60,24 @@ const SubscriptionsPage: React.FC = () => {
     setEditingId(null);
   };
 
+  const toggleZeroPauseProduct = (product: ZeroPauseProduct) => {
+    setForm((f) => {
+      const has = f.zeroPauseProducts.includes(product);
+      return {
+        ...f,
+        zeroPauseProducts: has
+          ? f.zeroPauseProducts.filter((p) => p !== product)
+          : [...f.zeroPauseProducts, product],
+      };
+    });
+  };
+
   const save = async (userId: string) => {
     await mutateAsync({
       userId,
       plan: form.plan,
-      months: form.plan === "premium" ? form.months : 0,
+      billingPeriod: form.plan === "premium" ? form.billingPeriod : undefined,
+      zeroPauseProducts: form.zeroPauseProducts,
       amount: form.amount,
       paymentMethod: form.paymentMethod,
       note: form.note,
@@ -62,7 +99,8 @@ const SubscriptionsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
         <p className="text-gray-500 text-sm">
-          View and manage student subscription status
+          View and manage student subscription status, billing periods, and Zero
+          Pause products
         </p>
       </div>
 
@@ -83,6 +121,8 @@ const SubscriptionsPage: React.FC = () => {
                   <th className="px-4 py-3">Learner</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Plan</th>
+                  <th className="px-4 py-3">Billing</th>
+                  <th className="px-4 py-3">Mode</th>
                   <th className="px-4 py-3">Activated</th>
                   <th className="px-4 py-3">Expires</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -93,6 +133,11 @@ const SubscriptionsPage: React.FC = () => {
                   const name =
                     `${l.firstName || ""} ${l.lastName || ""}`.trim() ||
                     "Unknown";
+                  const zeroPause: ZeroPauseProduct[] = Array.isArray(
+                    l.zeroPauseProducts
+                  )
+                    ? l.zeroPauseProducts
+                    : [];
 
                   return (
                     <tr key={l._id} className="hover:bg-gray-50/50">
@@ -110,6 +155,32 @@ const SubscriptionsPage: React.FC = () => {
                         >
                           {l.subscriptionPlan || "free"}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {l.subscriptionPlan === "premium"
+                          ? formatBillingPeriodLabel(
+                              l.subscriptionBillingPeriod ||
+                                monthsToBillingPeriod(
+                                  l.subscriptionMonthsPaidFor
+                                )
+                            )
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {zeroPause.length === 0 ? (
+                          <span className="text-gray-400">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {zeroPause.map((product) => (
+                              <span
+                                key={product}
+                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
+                              >
+                                {ZERO_PAUSE_PRODUCT_LABELS[product]}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {formatDate(l.subscriptionActivatedAt)}
@@ -135,17 +206,16 @@ const SubscriptionsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Edit subscription modal */}
       {editingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   Edit Subscription
                 </h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  Choose plan and duration for this learner.
+                  Manage plan, billing period, and Zero Pause products.
                 </p>
               </div>
               <button
@@ -174,9 +244,7 @@ const SubscriptionsPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-600">
-                  Plan
-                </label>
+                <label className="text-xs font-medium text-gray-600">Plan</label>
                 <select
                   value={form.plan}
                   onChange={(e) =>
@@ -196,20 +264,24 @@ const SubscriptionsPage: React.FC = () => {
                 <>
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-600">
-                      Months paid for
+                      Billing period
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      value={form.months}
+                    <select
+                      value={form.billingPeriod}
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          months: Number(e.target.value) || 1,
+                          billingPeriod: e.target.value as BillingPeriod,
                         }))
                       }
-                    />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    >
+                      {BILLING_PERIODS.map((period) => (
+                        <option key={period} value={period}>
+                          {BILLING_PERIOD_LABELS[period]}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-2">
@@ -255,6 +327,31 @@ const SubscriptionsPage: React.FC = () => {
 
               <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-600">
+                  Zero Pause products
+                </label>
+                <p className="text-xs text-gray-500">
+                  Assign paid Zero Pause add-ons independently of the Pro plan.
+                </p>
+                <div className="space-y-2">
+                  {ZERO_PAUSE_PRODUCTS.map((product) => (
+                    <label
+                      key={product}
+                      className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.zeroPauseProducts.includes(product)}
+                        onChange={() => toggleZeroPauseProduct(product)}
+                        className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      {ZERO_PAUSE_PRODUCT_LABELS[product]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600">
                   Admin note (optional)
                 </label>
                 <textarea
@@ -297,5 +394,3 @@ const SubscriptionsPage: React.FC = () => {
 };
 
 export default SubscriptionsPage;
-
-

@@ -5,6 +5,10 @@ import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import {
+	assertStaffCanReadLearner,
+	resolveLearnerIdToUserIdString,
+} from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -15,6 +19,15 @@ async function handler(
 		await connectToDatabase();
 
 		const { learnerId } = params;
+
+		const canonicalLearnerId = await resolveLearnerIdToUserIdString(learnerId);
+		const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+		if (access === 'forbidden') {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Learner not found or access denied' },
+				{ status: 404 }
+			);
+		}
 
 		// Parse pagination parameters
 		const { searchParams } = new URL(req.url);
