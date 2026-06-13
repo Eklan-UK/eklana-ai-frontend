@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { Calendar, Loader2, PenLine } from "lucide-react";
 import { useAnalyticsDashboard, useLearnerFillBlankAnalytics } from "@/hooks/useAdmin";
+import { AnalyticsAssignmentProgressCard } from "@/components/admin/analytics-assignment-progress-card";
 
 export interface FillBlankAnalyticsComponentProps {
   learnerId?: string;
@@ -139,7 +140,7 @@ export function FillBlankAnalyticsComponent({
     );
   }
 
-  if (!data || data.totalAttempts === 0) {
+  if (!data || (data.totalAssigned === 0 && data.totalAttempts === 0)) {
     return (
       <div className="space-y-4">
         {headerRow}
@@ -155,10 +156,11 @@ export function FillBlankAnalyticsComponent({
   }
 
   const {
-    totalAssignedBlanks,
+    totalAssigned,
+    totalCompleted,
+    completionRatePct,
     correctBlanks,
     accuracyRatePct,
-    totalAttempts,
     averageScore,
   } = data;
 
@@ -168,12 +170,11 @@ export function FillBlankAnalyticsComponent({
       {filterPanel}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-blue-500 bg-blue-900/9 p-5 shadow-sm">
-          <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
-            {totalAssignedBlanks}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">Total Blanks</p>
-        </div>
+        <AnalyticsAssignmentProgressCard
+          totalAssigned={totalAssigned}
+          totalCompleted={totalCompleted}
+          completionRatePct={completionRatePct}
+        />
         <div className="rounded-2xl border border-green-500 bg-green-500/5 p-5 shadow-sm">
           <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
             {correctBlanks}
@@ -190,7 +191,7 @@ export function FillBlankAnalyticsComponent({
           <p className="font-nunito text-3xl font-bold tabular-nums text-foreground">
             {averageScore}%
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">Avg Score ({totalAttempts} attempts)</p>
+          <p className="mt-1 text-sm text-muted-foreground">Avg Score</p>
         </div>
       </div>
     </div>

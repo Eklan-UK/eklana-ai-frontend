@@ -39,6 +39,7 @@ export interface AnalyticsDashboardData {
       passRate: number;
       totalWords?: number;
     };
+    challengingWords?: number;
     wordStats?: Array<{
       status?: string;
       isChallenging?: boolean;
@@ -71,6 +72,9 @@ export interface AnalyticsDashboardData {
     timingAvailableSince?: string | null;
   };
   fillBlank: {
+    totalAssigned: number;
+    totalCompleted: number;
+    completionRatePct: number;
     totalAssignedBlanks: number;
     correctBlanks: number;
     incorrectBlanks: number;
@@ -80,6 +84,9 @@ export interface AnalyticsDashboardData {
     attemptsConsidered?: number;
   };
   keyPhrases: {
+    totalAssigned: number;
+    totalCompleted: number;
+    completionRatePct: number;
     totalAssignedItems: number;
     correctItems: number;
     incorrectItems: number;

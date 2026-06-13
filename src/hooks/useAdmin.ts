@@ -306,7 +306,7 @@ export function useLearnerKeyPhrasesAnalytics(
 
 /** Platform-wide fill-in-the-blank analytics (admin). */
 export function usePlatformFillBlankAnalytics(
-  days = 30,
+  days?: number,
   learnerIds?: string[],
   enabled = true
 ) {
@@ -327,7 +327,7 @@ export function usePlatformFillBlankAnalytics(
 
 /** Platform-wide key phrase analytics (admin). */
 export function usePlatformKeyPhrasesAnalytics(
-  days = 30,
+  days?: number,
   learnerIds?: string[],
   enabled = true
 ) {
@@ -395,6 +395,7 @@ export function useUpdateUserSubscription() {
       months?: number;
       billingPeriod?: "monthly" | "quarterly" | "annual";
       zeroPauseProducts?: ("challenge" | "mastery")[];
+      zeroPauseDate?: string | null;
       amount?: number;
       paymentMethod?: string;
       note?: string;
@@ -417,6 +418,7 @@ export function useUpdateUserSubscription() {
                       subscriptionPlan: updated.subscriptionPlan,
                       subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
                       zeroPauseProducts: updated.zeroPauseProducts,
+                      zeroPauseDate: updated.zeroPauseDate,
                       subscriptionActivatedAt: updated.subscriptionActivatedAt,
                       subscriptionExpiresAt: updated.subscriptionExpiresAt,
                     }

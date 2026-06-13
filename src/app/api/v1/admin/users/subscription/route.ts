@@ -26,6 +26,7 @@ const updateSubscriptionSchema = z.object({
   months: z.number().int().min(0).optional(),
   billingPeriod: z.enum(["monthly", "quarterly", "annual"]).optional(),
   zeroPauseProducts: z.array(z.enum(["challenge", "mastery"])).optional(),
+  zeroPauseDate: z.string().nullable().optional(),
   amount: z.number().nonnegative().optional(),
   paymentMethod: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
@@ -57,6 +58,12 @@ async function handler(
 
     if (input.zeroPauseProducts !== undefined) {
       user.zeroPauseProducts = input.zeroPauseProducts as ZeroPauseProduct[];
+      // Clear the shared date when no products are selected
+      if (input.zeroPauseProducts.length === 0) {
+        user.zeroPauseDate = null;
+      } else if (input.zeroPauseDate !== undefined) {
+        user.zeroPauseDate = input.zeroPauseDate ? new Date(input.zeroPauseDate) : null;
+      }
     }
 
     if (input.plan === "free") {
@@ -122,6 +129,7 @@ async function handler(
           subscriptionPlan: user.subscriptionPlan,
           subscriptionBillingPeriod: user.subscriptionBillingPeriod,
           zeroPauseProducts: user.zeroPauseProducts ?? [],
+          zeroPauseDate: user.zeroPauseDate ?? null,
           subscriptionActivatedAt: user.subscriptionActivatedAt,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
         },

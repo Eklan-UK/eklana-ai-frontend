@@ -11,7 +11,6 @@ interface DrillStats {
   inProgress: number;
   completed: number;
   overdue: number;
-  pendingReview: number;
   completionRatePct: number;
   averageScore: number;
 }
@@ -26,7 +25,7 @@ function StatsContent({ stats }: { stats: DrillStats }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-gray-600 mb-1 font-medium uppercase">Total Drills</p>
           <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
@@ -49,12 +48,6 @@ function StatsContent({ stats }: { stats: DrillStats }) {
           <p className="text-xs text-gray-600 mb-1 font-medium uppercase">Completed</p>
           <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
           <p className="text-xs text-gray-500 mt-1">{completionRate}%</p>
-        </div>
-
-        <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">Pending Review</p>
-          <p className="text-2xl font-bold text-orange-600">{stats.pendingReview}</p>
-          <p className="text-xs text-gray-500 mt-1">Submissions</p>
         </div>
       </div>
 
@@ -103,9 +96,6 @@ function SingleLearnerDrillStats({ learnerId }: { learnerId: string }) {
 
   const stats = useMemo((): DrillStats => {
     const statistics = drillData?.statistics;
-    const pendingReview = drills.filter(
-      (d: { requiresReview?: boolean }) => d.requiresReview
-    ).length;
 
     return {
       total: statistics?.total ?? drills.length,
@@ -113,7 +103,6 @@ function SingleLearnerDrillStats({ learnerId }: { learnerId: string }) {
       inProgress: statistics?.inProgress ?? 0,
       completed: statistics?.completed ?? 0,
       overdue: statistics?.overdue ?? 0,
-      pendingReview,
       completionRatePct: statistics?.completionRate ?? 0,
       averageScore: statistics?.averageScore ?? 0,
     };
@@ -193,7 +182,6 @@ function dashboardToStats(data: AnalyticsDashboardData): DrillStats {
     inProgress: data.drills.inProgress,
     completed: data.drills.completed,
     overdue: data.drills.overdue,
-    pendingReview: data.drills.pendingReview,
     completionRatePct: data.drills.completionRatePct,
     averageScore: data.drills.averageScore,
   };

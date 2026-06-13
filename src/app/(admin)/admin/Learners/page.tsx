@@ -7,7 +7,7 @@ import { adminAPI } from '@/lib/api';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import {
-  ZERO_PAUSE_PRODUCT_LABELS,
+  formatZeroPauseProductWithDate,
   type ZeroPauseProduct,
 } from '@/domain/subscriptions/subscription.types';
 
@@ -324,7 +324,7 @@ const Learners: React.FC = () => {
                                 key={product}
                                 className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
                               >
-                                {ZERO_PAUSE_PRODUCT_LABELS[product]}
+                                {formatZeroPauseProductWithDate(product, l.zeroPauseDate)}
                               </span>
                             ))}
                           </div>

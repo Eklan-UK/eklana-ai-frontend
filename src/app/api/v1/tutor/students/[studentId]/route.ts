@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
-import Profile from '@/models/profile';
 import DrillAssignment from '@/models/drill-assignment';
+import { isTutorAssignedToLearner } from '@/domain/tutor-assignments/tutor-assignment.service';
 import DrillAttempt from '@/models/drill-attempt';
+import '@/models/drill';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
@@ -40,14 +41,8 @@ async function handler(
 		const studentObjectId = new Types.ObjectId(studentId);
 
 		// Verify the student is assigned to this tutor
-		const profile = await Profile.findOne({
-			userId: studentObjectId,
-			tutorId: context.userId,
-		})
-			.lean()
-			.exec();
-
-		if (!profile) {
+		const assigned = await isTutorAssignedToLearner(context.userId, studentObjectId);
+		if (!assigned) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',
@@ -264,12 +259,8 @@ async function patchHandler(
 
 		const studentObjectId = new Types.ObjectId(studentId);
 
-		const profile = await Profile.findOne({
-			userId: studentObjectId,
-			tutorId: context.userId,
-		}).exec();
-
-		if (!profile) {
+		const assigned = await isTutorAssignedToLearner(context.userId, studentObjectId);
+		if (!assigned) {
 			return NextResponse.json(
 				{
 					code: 'NotFoundError',

@@ -846,6 +846,27 @@ export const adminAPI = {
     });
   },
 
+  getDashboardStats: () => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        totalUsers: number;
+        subscribedUsers: number;
+        totalActiveLearners: number;
+        totalDrills: number;
+        zeroPauseChallengeUsers: number;
+        zeroPauseMasteryUsers: number;
+        newSignupsThisWeek: number;
+        discoveryCallsToday: number;
+        videosAwaitingReview: number;
+      };
+    }>('/admin/dashboard/stats', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
   // Update user subscription (admin only)
   updateUserSubscription: (data: {
     userId: string;
@@ -853,6 +874,7 @@ export const adminAPI = {
     months?: number;
     billingPeriod?: "monthly" | "quarterly" | "annual";
     zeroPauseProducts?: ("challenge" | "mastery")[];
+    zeroPauseDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -865,6 +887,7 @@ export const adminAPI = {
         subscriptionPlan: "free" | "premium";
         subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
         zeroPauseProducts: ("challenge" | "mastery")[];
+        zeroPauseDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
@@ -989,6 +1012,9 @@ export const adminAPI = {
       code?: string;
       message?: string;
       data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
         totalAssignedBlanks: number;
         correctBlanks: number;
         incorrectBlanks: number;
@@ -1020,6 +1046,9 @@ export const adminAPI = {
       code?: string;
       message?: string;
       data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
         totalAssignedItems: number;
         correctItems: number;
         incorrectItems: number;
@@ -1053,6 +1082,9 @@ export const adminAPI = {
       message?: string;
       data?: {
         stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
           totalAssignedBlanks: number;
           correctBlanks: number;
           incorrectBlanks: number;
@@ -1085,6 +1117,9 @@ export const adminAPI = {
       message?: string;
       data?: {
         stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
           totalAssignedItems: number;
           correctItems: number;
           incorrectItems: number;

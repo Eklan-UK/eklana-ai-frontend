@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
-import Profile from "@/models/profile";
 import DrillAssignment from "@/models/drill-assignment";
 import config from "@/lib/api/config";
 import { logger } from "@/lib/api/logger";
 import { Types } from "mongoose";
+import { getAssignedLearnerIdsForTutor } from "@/domain/tutor-assignments/tutor-assignment.service";
 
 async function handler(
 	req: NextRequest,
@@ -21,17 +21,10 @@ async function handler(
 		const limit = parseInt(searchParams.get("limit") || String(config.defaultResLimit));
 		const offset = parseInt(searchParams.get("offset") || String(config.defaultResOffset));
 
-		const total = await Profile.countDocuments({ tutorId: context.userId }).exec();
-
-		const profiles = await Profile.find({ tutorId: context.userId })
-			.select("userId")
-			.sort({ createdAt: -1 })
-			.limit(limit)
-			.skip(offset)
-			.lean()
-			.exec();
-
-		const userIds = profiles.map((p) => p.userId);
+		const { learnerIds: userIds, total } = await getAssignedLearnerIdsForTutor(
+			context.userId,
+			{ limit, offset },
+		);
 
 		if (userIds.length === 0) {
 			return NextResponse.json(

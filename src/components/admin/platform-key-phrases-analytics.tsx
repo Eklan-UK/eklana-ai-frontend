@@ -2,6 +2,7 @@
 
 import { Loader2, MessageSquareQuote, Mic } from "lucide-react";
 import { usePlatformKeyPhrasesAnalytics } from "@/hooks/useAdmin";
+import { AnalyticsAssignmentProgressCard } from "@/components/admin/analytics-assignment-progress-card";
 
 interface PlatformKeyPhrasesAnalyticsProps {
   days?: number;
@@ -10,7 +11,7 @@ interface PlatformKeyPhrasesAnalyticsProps {
 }
 
 export function PlatformKeyPhrasesAnalytics({
-  days = 30,
+  days,
   learnerIds,
   showTitle = true,
 }: PlatformKeyPhrasesAnalyticsProps) {
@@ -30,7 +31,7 @@ export function PlatformKeyPhrasesAnalytics({
             <span className="p-2 bg-violet-50 rounded-lg">
               <MessageSquareQuote className="w-4 h-4 text-violet-600" />
             </span>
-            Key Phrase Analytics (Last {days} Days)
+            Key Phrase Analytics
           </h2>
         </div>
       ) : null}
@@ -43,21 +44,19 @@ export function PlatformKeyPhrasesAnalytics({
         <div className="text-center py-8 text-red-500">
           Failed to load key phrase analytics.
         </div>
-      ) : !stats || stats.totalAttempts === 0 ? (
+      ) : !stats || (stats.totalAssigned === 0 && stats.totalAttempts === 0) ? (
         <div className="text-center py-8 text-gray-500">
           No key phrase data available.
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Total Attempts</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAttempts}</p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Total Items</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAssignedItems}</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <AnalyticsAssignmentProgressCard
+              totalAssigned={stats.totalAssigned}
+              totalCompleted={stats.totalCompleted}
+              completionRatePct={stats.completionRatePct}
+              variant="platform"
+            />
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase mb-1">Accuracy Rate</p>
               <p

@@ -45,6 +45,7 @@ export interface IUser extends Document {
   subscriptionExpiresAt?: Date | null;
   // Zero Pause add-on products (admin-assigned)
   zeroPauseProducts?: ("challenge" | "mastery")[];
+  zeroPauseDate?: Date | null;
   // Admin-only bookkeeping
   subscriptionMonthsPaidFor?: number | null;
   subscriptionAmountPaid?: number | null;
@@ -207,6 +208,10 @@ const userSchema = new Schema<IUser>(
     zeroPauseProducts: {
       type: [{ type: String, enum: ["challenge", "mastery"] }],
       default: [],
+    },
+    zeroPauseDate: {
+      type: Date,
+      default: null,
     },
     subscriptionActivatedAt: {
       type: Date,
