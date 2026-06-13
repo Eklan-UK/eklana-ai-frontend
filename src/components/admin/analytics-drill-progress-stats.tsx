@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { BookOpen } from "lucide-react";
 import { useLearnerDrillAssignments, useAnalyticsDashboard } from "@/hooks/useAdmin";
 import type { AnalyticsDashboardData } from "@/types/admin-analytics-dashboard";
-
-type FilterStatus = "all" | "pending" | "in-progress" | "completed" | "review";
 
 interface DrillStats {
   total: number;
@@ -22,15 +20,7 @@ interface AnalyticsDrillProgressStatsProps {
   learnerIds: string[];
 }
 
-function StatsContent({
-  stats,
-  filterStatus,
-  onFilterChange,
-}: {
-  stats: DrillStats;
-  filterStatus: FilterStatus;
-  onFilterChange: (status: FilterStatus) => void;
-}) {
+function StatsContent({ stats }: { stats: DrillStats }) {
   const completionRate = stats.completionRatePct;
   const averageScoreValue = stats.averageScore;
 
@@ -66,43 +56,6 @@ function StatsContent({
           <p className="text-2xl font-bold text-orange-600">{stats.pendingReview}</p>
           <p className="text-xs text-gray-500 mt-1">Submissions</p>
         </div>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {(
-          [
-            ["all", "All", stats.total, "bg-blue-100 text-blue-700"],
-            ["pending", "Pending", stats.pending, "bg-gray-100 text-gray-700"],
-            ["in-progress", "In Progress", stats.inProgress, "bg-indigo-100 text-indigo-700"],
-            ["completed", "Completed", stats.completed, "bg-green-100 text-green-700"],
-          ] as const
-        ).map(([key, label, count, activeClass]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onFilterChange(key)}
-            className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-              filterStatus === key
-                ? activeClass
-                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            {label} ({count})
-          </button>
-        ))}
-        {stats.pendingReview > 0 && (
-          <button
-            type="button"
-            onClick={() => onFilterChange("review")}
-            className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-              filterStatus === "review"
-                ? "bg-orange-100 text-orange-700"
-                : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-            }`}
-          >
-            For Review ({stats.pendingReview})
-          </button>
-        )}
       </div>
 
       {stats.completed > 0 && (
@@ -145,7 +98,6 @@ function StatsContent({
 
 function SingleLearnerDrillStats({ learnerId }: { learnerId: string }) {
   const { data: drillData, isLoading, error } = useLearnerDrillAssignments(learnerId);
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
   const drills = drillData?.assignments || [];
 
@@ -166,10 +118,6 @@ function SingleLearnerDrillStats({ learnerId }: { learnerId: string }) {
       averageScore: statistics?.averageScore ?? 0,
     };
   }, [drillData, drills]);
-
-  const handleFilterChange = useCallback((status: FilterStatus) => {
-    setFilterStatus(status);
-  }, []);
 
   if (isLoading) {
     return (
@@ -196,9 +144,7 @@ function SingleLearnerDrillStats({ learnerId }: { learnerId: string }) {
     );
   }
 
-  return (
-    <StatsContent stats={stats} filterStatus={filterStatus} onFilterChange={handleFilterChange} />
-  );
+  return <StatsContent stats={stats} />;
 }
 
 function DashboardDrillStats({
@@ -209,11 +155,6 @@ function DashboardDrillStats({
   const { data, isLoading, error } = useAnalyticsDashboard(
     learnerIds.length > 0 ? learnerIds : undefined
   );
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-
-  const handleFilterChange = useCallback((status: FilterStatus) => {
-    setFilterStatus(status);
-  }, []);
 
   if (isLoading) {
     return (
@@ -242,9 +183,7 @@ function DashboardDrillStats({
     );
   }
 
-  return (
-    <StatsContent stats={stats} filterStatus={filterStatus} onFilterChange={handleFilterChange} />
-  );
+  return <StatsContent stats={stats} />;
 }
 
 function dashboardToStats(data: AnalyticsDashboardData): DrillStats {
