@@ -12,7 +12,6 @@ interface DashboardStats {
   totalUsers: number;
   subscribedUsers: number;
   totalActiveLearners: number;
-  totalDrills: number;
   zeroPauseChallengeUsers: number;
   zeroPauseMasteryUsers: number;
   newSignupsThisWeek: number;
@@ -37,7 +36,6 @@ const Dashboard: React.FC = () => {
       totalUsers: stats.totalUsers || 0,
       subscribedUsers: stats.subscribedUsers || 0,
       totalActiveLearners: stats.totalActiveLearners || 0,
-      totalDrills: stats.totalDrills || 0,
       zeroPauseChallengeUsers: stats.zeroPauseChallengeUsers || 0,
       zeroPauseMasteryUsers: stats.zeroPauseMasteryUsers || 0,
       newSignupsThisWeek: stats.newSignupsThisWeek || 0,
@@ -48,7 +46,6 @@ const Dashboard: React.FC = () => {
       totalUsers: 0,
       subscribedUsers: 0,
       totalActiveLearners: 0,
-      totalDrills: 0,
       zeroPauseChallengeUsers: 0,
       zeroPauseMasteryUsers: 0,
       newSignupsThisWeek: 0,
@@ -70,21 +67,13 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",
     },
     {
-      title: "Total Active Learners",
+      title: "Total Signups",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
       color: "bg-white border border-primary-200 dark:border-border dark:bg-primary-950/30",
     },
     {
-      title: "Total Drills",
-      value: loading
-        ? "..."
-        : statsWithDefaults.totalDrills.toString(),
-      change: "",
-      color: "bg-white border border-amber-200 dark:border-border dark:bg-amber-950/30",
-    },
-    {
-      title: ZERO_PAUSE_PRODUCT_LABELS.challenge,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.challenge} Subscribers`,
       value: loading
         ? "..."
         : statsWithDefaults.zeroPauseChallengeUsers.toString(),
@@ -92,7 +81,7 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-violet-200 dark:border-border dark:bg-violet-950/30",
     },
     {
-      title: ZERO_PAUSE_PRODUCT_LABELS.mastery,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.mastery} Subscribers`,
       value: loading
         ? "..."
         : statsWithDefaults.zeroPauseMasteryUsers.toString(),

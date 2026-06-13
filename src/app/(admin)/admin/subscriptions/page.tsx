@@ -1,19 +1,48 @@
 "use client";
 
-import React, { useState } from "react";
-import { useAllLearners, useUpdateUserSubscription } from "@/hooks/useAdmin";
-import { Loader2, Edit2, Save, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useAdminSubscriptions, useUpdateUserSubscription } from "@/hooks/useAdmin";
+import { Loader2, Edit2, Save, X, Search } from "lucide-react";
 import {
   BILLING_PERIODS,
   BILLING_PERIOD_LABELS,
   ZERO_PAUSE_PRODUCTS,
   ZERO_PAUSE_PRODUCT_LABELS,
+  billingPeriodFromMonths,
   formatBillingPeriodLabel,
   formatZeroPauseProductWithDate,
+  resolveSubscriptionExpiry,
   type BillingPeriod,
   type ZeroPauseProduct,
 } from "@/domain/subscriptions/subscription.types";
 import { toast } from "sonner";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
+
+function getSubscriptionPlanDisplay(user: {
+  subscriptionPlan?: string | null;
+  subscriptionExpiresAt?: string | Date | null;
+  stripeSubscriptionStatus?: string | null;
+  subscriptionPaymentMethod?: string | null;
+  appleSubscriptionStatus?: string | null;
+  appleOriginalTransactionId?: string | null;
+}): { label: string; className: string } {
+  if (isUserSubscribed(user)) {
+    return {
+      label: "premium",
+      className: "bg-emerald-100 text-emerald-700",
+    };
+  }
+  if (user.subscriptionPlan === "premium") {
+    return {
+      label: "expired",
+      className: "bg-amber-100 text-amber-700",
+    };
+  }
+  return {
+    label: "free",
+    className: "bg-gray-100 text-gray-600",
+  };
+}
 
 type SubscriptionForm = {
   plan: "free" | "premium";
@@ -25,16 +54,40 @@ type SubscriptionForm = {
   note?: string;
 };
 
-function monthsToBillingPeriod(months: number | null | undefined): BillingPeriod {
-  if (months === 3) return "quarterly";
-  if (months === 12) return "annual";
-  return "monthly";
+type PlanFilter = "all" | "free" | "premium";
+
+function getLearnerName(learner: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string {
+  return `${learner.firstName || ""} ${learner.lastName || ""}`.trim() || "Unknown";
+}
+
+function matchesNameSearch(
+  learner: { firstName?: string | null; lastName?: string | null },
+  query: string
+): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+
+  const fullName = getLearnerName(learner).toLowerCase();
+  const firstName = (learner.firstName || "").toLowerCase();
+  const lastName = (learner.lastName || "").toLowerCase();
+
+  return (
+    fullName.includes(normalized) ||
+    firstName.includes(normalized) ||
+    lastName.includes(normalized)
+  );
 }
 
 const SubscriptionsPage: React.FC = () => {
-  const { data, isLoading } = useAllLearners({ limit: 1000 });
+  const { data, isLoading } = useAdminSubscriptions({ limit: 1000 });
   const learners = data?.learners || [];
   const { mutateAsync, isPending: saving } = useUpdateUserSubscription();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savedDates, setSavedDates] = useState<Record<string, string>>({});
@@ -44,6 +97,17 @@ const SubscriptionsPage: React.FC = () => {
     zeroPauseProducts: [],
     zeroPauseDate: "",
   });
+
+  const filteredLearners = useMemo(() => {
+    return learners.filter((learner: any) => {
+      if (!matchesNameSearch(learner, searchQuery)) return false;
+
+      const planLabel = getSubscriptionPlanDisplay(learner).label;
+      if (planFilter === "premium") return planLabel === "premium";
+      if (planFilter === "free") return planLabel !== "premium";
+      return true;
+    });
+  }, [learners, searchQuery, planFilter]);
 
   const toDateInput = (value: Date | string | null | undefined): string => {
     if (!value) return "";
@@ -60,7 +124,7 @@ const SubscriptionsPage: React.FC = () => {
       plan: l.subscriptionPlan === "premium" ? "premium" : "free",
       billingPeriod:
         l.subscriptionBillingPeriod ||
-        monthsToBillingPeriod(l.subscriptionMonthsPaidFor),
+        billingPeriodFromMonths(l.subscriptionMonthsPaidFor),
       zeroPauseProducts: Array.isArray(l.zeroPauseProducts)
         ? l.zeroPauseProducts
         : [],
@@ -133,19 +197,49 @@ const SubscriptionsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
         <p className="text-gray-500 text-sm">
-          View and manage student subscription status, billing periods, and Zero
-          Pause products
+          All learners. Premium dates sync from Stripe and Apple on each load.
         </p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+          <div className="relative w-full md:max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              id="subscription-name-search"
+              type="text"
+              placeholder="Search by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-xl border border-gray-100 bg-gray-50 py-2 pl-10 pr-4 text-sm"
+            />
+          </div>
+          <div className="w-full md:w-48">
+            <label htmlFor="subscription-plan-filter" className="sr-only">
+              Filter by plan
+            </label>
+            <select
+              id="subscription-plan-filter"
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value as PlanFilter)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm"
+            >
+              <option value="all">All plans</option>
+              <option value="premium">Premium</option>
+              <option value="free">Free</option>
+            </select>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           </div>
-        ) : learners.length === 0 ? (
+        ) : filteredLearners.length === 0 ? (
           <div className="py-12 text-center text-gray-500">
-            No learners found.
+            {learners.length === 0
+              ? "No learners found."
+              : "No learners match your search or filter."}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -163,15 +257,15 @@ const SubscriptionsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-sm">
-                {learners.map((l: any) => {
-                  const name =
-                    `${l.firstName || ""} ${l.lastName || ""}`.trim() ||
-                    "Unknown";
+                {filteredLearners.map((l: any) => {
+                  const name = getLearnerName(l);
                   const zeroPause: ZeroPauseProduct[] = Array.isArray(
                     l.zeroPauseProducts
                   )
                     ? l.zeroPauseProducts
                     : [];
+                  const planDisplay = getSubscriptionPlanDisplay(l);
+                  const isActivePremium = planDisplay.label === "premium";
 
                   return (
                     <tr key={l._id} className="hover:bg-gray-50/50">
@@ -181,20 +275,16 @@ const SubscriptionsPage: React.FC = () => {
                       <td className="px-4 py-3 text-gray-500">{l.email}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            l.subscriptionPlan === "premium"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${planDisplay.className}`}
                         >
-                          {l.subscriptionPlan || "free"}
+                          {planDisplay.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500">
-                        {l.subscriptionPlan === "premium"
+                        {isActivePremium
                           ? formatBillingPeriodLabel(
                               l.subscriptionBillingPeriod ||
-                                monthsToBillingPeriod(
+                                billingPeriodFromMonths(
                                   l.subscriptionMonthsPaidFor
                                 )
                             )
@@ -220,10 +310,14 @@ const SubscriptionsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
-                        {formatDate(l.subscriptionActivatedAt)}
+                        {isActivePremium
+                          ? formatDate(l.subscriptionActivatedAt)
+                          : "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
-                        {formatDate(l.subscriptionExpiresAt)}
+                        {isActivePremium
+                          ? formatDate(resolveSubscriptionExpiry(l))
+                          : "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
