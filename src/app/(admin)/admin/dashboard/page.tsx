@@ -55,7 +55,7 @@ const Dashboard: React.FC = () => {
 
   const displayStats = [
     {
-      title: "Total Users",
+      title: "Total Signups",
       value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
       color: "bg-white border border-emerald-200 dark:border-border dark:bg-emerald-950/30",
@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",
     },
     {
-      title: "Total Signups",
+      title: "Total Active Users",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
       color: "bg-white border border-primary-200 dark:border-border dark:bg-primary-950/30",
