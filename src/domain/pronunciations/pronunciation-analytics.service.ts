@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
+import LearnerPronunciationProgress from '@/models/learner-pronunciation-progress';
 
 export interface StrugglingWord {
 	word: string;
@@ -300,4 +301,243 @@ export async function getOverallDifficultWords(
 	]);
 
 	return results;
+}
+
+export interface AggregatedWordStats {
+	totalWords: number;
+	completedWords: number;
+	challengingWords: number;
+}
+
+/**
+ * Returns pronunciation word stats (total practiced, passed, challenging) for a
+ * set of learners, matching the same data sources as the per-learner API:
+ *
+ *  1. Primary: LearnerPronunciationProgress records (modern flow).
+ *  2. Fallback: PronunciationAttempt.wordScores for learners who have no
+ *     progress records yet (older/mobile flow). A word counts as "completed" if
+ *     any attempt scored ≥ 70, and "challenging" if it took > 3 attempts OR the
+ *     average score was < 70.
+ *
+ * All counts are summed across learners so the platform view shows the aggregate
+ * of every learner's individual stats rather than platform-unique word counts.
+ */
+export async function getAggregatedPronunciationWordStats(
+	learnerIds?: string[]
+): Promise<AggregatedWordStats> {
+	const learnerMatch = buildLearnerIdsMatch(learnerIds);
+
+	// ── 1. Progress-based word counts grouped by learner ────────────────────
+	const progressByLearner = await LearnerPronunciationProgress.aggregate([
+		{ $match: learnerMatch },
+		{
+			$group: {
+				_id: '$learnerId',
+				totalWords: { $sum: 1 },
+				completedWords: { $sum: { $cond: ['$passed', 1, 0] } },
+				challengingWords: { $sum: { $cond: ['$isChallenging', 1, 0] } },
+			},
+		},
+	]);
+
+	// Collect the learner IDs that already have progress records so we can
+	// skip them in the attempt fallback below.
+	const learnersWithProgress = new Set(
+		progressByLearner.map((r: { _id: Types.ObjectId }) => r._id.toString())
+	);
+
+	let progressTotal = 0;
+	let progressCompleted = 0;
+	let progressChallenging = 0;
+	for (const r of progressByLearner as Array<{
+		totalWords: number;
+		completedWords: number;
+		challengingWords: number;
+	}>) {
+		progressTotal += r.totalWords;
+		progressCompleted += r.completedWords;
+		progressChallenging += r.challengingWords;
+	}
+
+	// ── 2. Attempt-fallback for learners with no progress records ───────────
+	// Build a learner filter that excludes learners already covered above.
+	const fallbackLearnerFilter = buildAttemptFallbackLearnerFilter(
+		learnerIds,
+		learnersWithProgress
+	);
+
+	// Skip the aggregation entirely when every in-scope learner already has
+	// a progress record (or no learner IDs were given but progress covers all).
+	let fallbackTotal = 0;
+	let fallbackCompleted = 0;
+	let fallbackChallenging = 0;
+
+	if (fallbackLearnerFilter !== null) {
+		const fallbackMatch: Record<string, unknown> = {
+			...fallbackLearnerFilter,
+			'wordScores.0': { $exists: true },
+		};
+
+		const fallbackByLearner = await PronunciationAttempt.aggregate([
+			{ $match: fallbackMatch },
+			{ $unwind: '$wordScores' },
+			{
+				$group: {
+					_id: { learnerId: '$learnerId', word: { $toLower: '$wordScores.word' } },
+					attempts: { $sum: 1 },
+					avgScore: { $avg: '$wordScores.score' },
+					passedAny: { $max: { $cond: [{ $gte: ['$wordScores.score', 70] }, 1, 0] } },
+				},
+			},
+			{
+				$group: {
+					_id: null,
+					totalWords: { $sum: 1 },
+					completedWords: { $sum: '$passedAny' },
+					challengingWords: {
+						$sum: {
+							$cond: [
+								{
+									$or: [
+										{ $gt: ['$attempts', 3] },
+										{ $lt: ['$avgScore', 70] },
+									],
+								},
+								1,
+								0,
+							],
+						},
+					},
+				},
+			},
+		]);
+
+		if (fallbackByLearner.length > 0) {
+			fallbackTotal = fallbackByLearner[0].totalWords ?? 0;
+			fallbackCompleted = fallbackByLearner[0].completedWords ?? 0;
+			fallbackChallenging = fallbackByLearner[0].challengingWords ?? 0;
+		}
+	}
+
+	return {
+		totalWords: progressTotal + fallbackTotal,
+		completedWords: progressCompleted + fallbackCompleted,
+		challengingWords: progressChallenging + fallbackChallenging,
+	};
+}
+
+/**
+ * Builds the learnerId match object for the attempt-fallback aggregation.
+ *
+ * Returns null when there is no point running the fallback:
+ * - No specific learnerIds were requested AND every discovered learner already
+ *   has progress records (we can't cheaply know that without another query, so
+ *   we only skip when learnersWithProgress is non-empty AND no scoped list was
+ *   given – edge-case optimisation, conservative approach otherwise).
+ *
+ * When learnerIds are provided, the returned filter restricts to those IDs that
+ * are NOT already covered by progress records.
+ */
+function buildAttemptFallbackLearnerFilter(
+	learnerIds: string[] | undefined,
+	learnersWithProgress: Set<string>
+): Record<string, unknown> | null {
+	if (!learnerIds?.length) {
+		// Platform-wide: include all learners that have no progress records.
+		// We can't enumerate "all learners" cheaply here, so we just query
+		// PronunciationAttempt and exclude the ones with progress.
+		if (learnersWithProgress.size === 0) {
+			// No progress records at all — fallback covers everyone.
+			return {};
+		}
+		// Exclude learners already covered by the progress aggregation.
+		const excludeIds = [...learnersWithProgress]
+			.filter((id) => Types.ObjectId.isValid(id))
+			.map((id) => new Types.ObjectId(id));
+		return { learnerId: { $nin: excludeIds } };
+	}
+
+	// Scoped to specific learner IDs: only query those not already covered.
+	const remaining = learnerIds
+		.filter((id) => Types.ObjectId.isValid(id) && !learnersWithProgress.has(id))
+		.map((id) => new Types.ObjectId(id));
+
+	if (remaining.length === 0) {
+		// All requested learners are covered by progress records — skip fallback.
+		return null;
+	}
+
+	return { learnerId: { $in: remaining } };
+}
+
+/**
+ * Returns the per-word stats array for a single learner from
+ * PronunciationAttempt.wordScores. This is the fallback used when the learner
+ * has no LearnerPronunciationProgress records (older/mobile flow).
+ *
+ * Exported so the per-learner analytics API route can reuse this logic instead
+ * of maintaining a duplicate pipeline.
+ */
+export async function getLearnerAttemptFallbackWordStats(
+	learnerId: Types.ObjectId
+): Promise<
+	Array<{
+		wordId: null;
+		title: string;
+		text: string;
+		difficulty: string;
+		attempts: number;
+		bestScore: number;
+		averageScore: number;
+		isChallenging: boolean;
+		status: 'completed' | 'in-progress';
+		lastAttemptAt: Date | null;
+	}>
+> {
+	return PronunciationAttempt.aggregate([
+		{
+			$match: {
+				learnerId,
+				'wordScores.0': { $exists: true },
+			},
+		},
+		{ $unwind: '$wordScores' },
+		{
+			$group: {
+				_id: { $toLower: '$wordScores.word' },
+				title: { $first: '$wordScores.word' },
+				text: { $first: '$wordScores.word' },
+				attempts: { $sum: 1 },
+				bestScore: { $max: '$wordScores.score' },
+				averageScore: { $avg: '$wordScores.score' },
+				passedAny: {
+					$max: { $cond: [{ $gte: ['$wordScores.score', 70] }, 1, 0] },
+				},
+				lastAttemptAt: { $max: '$createdAt' },
+			},
+		},
+		{
+			$project: {
+				_id: 0,
+				wordId: { $literal: null },
+				title: 1,
+				text: 1,
+				difficulty: { $literal: '' },
+				attempts: 1,
+				bestScore: { $round: ['$bestScore', 2] },
+				averageScore: { $round: ['$averageScore', 2] },
+				isChallenging: {
+					$or: [
+						{ $gt: ['$attempts', 3] },
+						{ $lt: ['$averageScore', 70] },
+					],
+				},
+				status: {
+					$cond: [{ $eq: ['$passedAny', 1] }, 'completed', 'in-progress'],
+				},
+				lastAttemptAt: 1,
+			},
+		},
+		{ $sort: { lastAttemptAt: -1 } },
+	]);
 }

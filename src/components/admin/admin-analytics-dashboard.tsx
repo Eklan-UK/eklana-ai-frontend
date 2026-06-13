@@ -113,11 +113,9 @@ export function AdminAnalyticsDashboard({ learnerIds }: AdminAnalyticsDashboardP
       ) : (
         <>
           <PlatformFillBlankAnalytics
-            days={30}
             learnerIds={learnerIds.length > 0 ? learnerIds : undefined}
           />
           <PlatformKeyPhrasesAnalytics
-            days={30}
             learnerIds={learnerIds.length > 0 ? learnerIds : undefined}
           />
         </>

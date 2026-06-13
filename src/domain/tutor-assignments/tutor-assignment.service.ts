@@ -84,6 +84,55 @@ export async function getActiveLearnerIdsForTutor(
 }
 
 /**
+ * Returns a deduplicated, paginated list of learner IDs for a tutor.
+ * Sources:
+ *   1. Active TutorAssignment rows (new admin-assigned path)
+ *   2. Legacy Profile.tutorId entries (older learners never migrated)
+ * Pagination is applied after deduplication so counts are stable.
+ */
+export async function getAssignedLearnerIdsForTutor(
+	tutorId: Types.ObjectId,
+	{ limit, offset }: { limit: number; offset: number }
+): Promise<{ learnerIds: Types.ObjectId[]; total: number }> {
+	const [assignments, legacyProfiles] = await Promise.all([
+		TutorAssignment.find({ tutorId, status: 'active' })
+			.select('learnerId assignedAt')
+			.sort({ assignedAt: -1 })
+			.lean()
+			.exec(),
+		Profile.find({ tutorId })
+			.select('userId createdAt')
+			.lean()
+			.exec(),
+	]);
+
+	// Build a deduped ordered list: TutorAssignment entries first, then legacy-only entries
+	const seen = new Set<string>();
+	const ordered: Types.ObjectId[] = [];
+
+	for (const a of assignments) {
+		const key = a.learnerId.toString();
+		if (!seen.has(key)) {
+			seen.add(key);
+			ordered.push(a.learnerId);
+		}
+	}
+
+	for (const p of legacyProfiles) {
+		const key = p.userId.toString();
+		if (!seen.has(key)) {
+			seen.add(key);
+			ordered.push(new Types.ObjectId(p.userId.toString()));
+		}
+	}
+
+	const total = ordered.length;
+	const learnerIds = ordered.slice(offset, offset + limit);
+
+	return { learnerIds, total };
+}
+
+/**
  * Returns the tutor IDs of all tutors actively assigned to a learner.
  */
 export async function getActiveTutorIdsForLearner(

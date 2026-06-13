@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-emerald-200 dark:border-border dark:bg-emerald-950/30",
     },
     {
-      title: "Subscribed Users",
+      title: "Eklan Pro Subscribers",
       value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
       color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",

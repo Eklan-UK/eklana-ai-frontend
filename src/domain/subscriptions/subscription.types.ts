@@ -49,3 +49,21 @@ export function formatZeroPauseProducts(
     .map((p) => ZERO_PAUSE_PRODUCT_LABELS[p as ZeroPauseProduct] ?? p)
     .join(", ");
 }
+
+export function formatZeroPauseProductWithDate(
+  product: ZeroPauseProduct,
+  date?: string | Date | null
+): string {
+  const label = ZERO_PAUSE_PRODUCT_LABELS[product];
+  if (!date) return label;
+  try {
+    const formatted = new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    return `${label} · ${formatted}`;
+  } catch {
+    return label;
+  }
+}

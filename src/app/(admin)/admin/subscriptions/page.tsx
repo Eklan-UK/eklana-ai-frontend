@@ -9,14 +9,17 @@ import {
   ZERO_PAUSE_PRODUCTS,
   ZERO_PAUSE_PRODUCT_LABELS,
   formatBillingPeriodLabel,
+  formatZeroPauseProductWithDate,
   type BillingPeriod,
   type ZeroPauseProduct,
 } from "@/domain/subscriptions/subscription.types";
+import { toast } from "sonner";
 
 type SubscriptionForm = {
   plan: "free" | "premium";
   billingPeriod: BillingPeriod;
   zeroPauseProducts: ZeroPauseProduct[];
+  zeroPauseDate: string;
   amount?: number;
   paymentMethod?: string;
   note?: string;
@@ -34,11 +37,22 @@ const SubscriptionsPage: React.FC = () => {
   const { mutateAsync, isPending: saving } = useUpdateUserSubscription();
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [savedDates, setSavedDates] = useState<Record<string, string>>({});
   const [form, setForm] = useState<SubscriptionForm>({
     plan: "free",
     billingPeriod: "monthly",
     zeroPauseProducts: [],
+    zeroPauseDate: "",
   });
+
+  const toDateInput = (value: Date | string | null | undefined): string => {
+    if (!value) return "";
+    try {
+      return new Date(value).toISOString().slice(0, 10);
+    } catch {
+      return "";
+    }
+  };
 
   const startEdit = (l: any) => {
     setEditingId(l._id);
@@ -50,6 +64,7 @@ const SubscriptionsPage: React.FC = () => {
       zeroPauseProducts: Array.isArray(l.zeroPauseProducts)
         ? l.zeroPauseProducts
         : [],
+      zeroPauseDate: toDateInput(l.zeroPauseDate),
       amount: l.subscriptionAmountPaid || undefined,
       paymentMethod: l.subscriptionPaymentMethod || "",
       note: l.subscriptionAdminNote || "",
@@ -63,25 +78,44 @@ const SubscriptionsPage: React.FC = () => {
   const toggleZeroPauseProduct = (product: ZeroPauseProduct) => {
     setForm((f) => {
       const has = f.zeroPauseProducts.includes(product);
+      const nextProducts = has
+        ? f.zeroPauseProducts.filter((p) => p !== product)
+        : [...f.zeroPauseProducts, product];
       return {
         ...f,
-        zeroPauseProducts: has
-          ? f.zeroPauseProducts.filter((p) => p !== product)
-          : [...f.zeroPauseProducts, product],
+        zeroPauseProducts: nextProducts,
+        // Clear the shared date when all products are deselected
+        zeroPauseDate: nextProducts.length === 0 ? "" : f.zeroPauseDate,
       };
     });
   };
 
   const save = async (userId: string) => {
+    if (form.zeroPauseProducts.length > 0 && !form.zeroPauseDate) {
+      toast.error("Please set a date for the Zero Pause product(s)");
+      return;
+    }
     await mutateAsync({
       userId,
       plan: form.plan,
       billingPeriod: form.plan === "premium" ? form.billingPeriod : undefined,
       zeroPauseProducts: form.zeroPauseProducts,
+      zeroPauseDate: form.zeroPauseProducts.length > 0 ? form.zeroPauseDate : null,
       amount: form.amount,
       paymentMethod: form.paymentMethod,
       note: form.note,
     });
+    // Keep a local record of the saved date so the badge renders immediately,
+    // regardless of React Query cache timing after invalidation.
+    if (form.zeroPauseProducts.length > 0 && form.zeroPauseDate) {
+      setSavedDates((prev) => ({ ...prev, [userId]: form.zeroPauseDate }));
+    } else {
+      setSavedDates((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    }
     setEditingId(null);
   };
 
@@ -176,7 +210,10 @@ const SubscriptionsPage: React.FC = () => {
                                 key={product}
                                 className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
                               >
-                                {ZERO_PAUSE_PRODUCT_LABELS[product]}
+                                {formatZeroPauseProductWithDate(
+                                  product,
+                                  savedDates[l._id] ?? l.zeroPauseDate
+                                )}
                               </span>
                             ))}
                           </div>
@@ -348,6 +385,24 @@ const SubscriptionsPage: React.FC = () => {
                     </label>
                   ))}
                 </div>
+                {form.zeroPauseProducts.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <label className="text-xs font-medium text-gray-600">
+                      Start date
+                    </label>
+                    <input
+                      type="date"
+                      value={form.zeroPauseDate}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          zeroPauseDate: e.target.value,
+                        }))
+                      }
+                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

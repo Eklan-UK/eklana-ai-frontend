@@ -124,7 +124,7 @@ export const adminService = {
     });
   },
 
-  // Get dashboard stats (we'll need to create this endpoint or calculate from existing data)
+  // Get dashboard stats from server-side aggregates
   getDashboardStats: async (): Promise<{
     totalUsers: number;
     subscribedUsers: number;
@@ -136,50 +136,15 @@ export const adminService = {
     discoveryCallsToday: number;
     videosAwaitingReview: number;
   }> => {
-    // For now, we'll fetch data and calculate stats on the frontend
-    const [usersResponse, drills] = await Promise.all([
-      adminAPI.getAllLearners({ limit: 1000 }),
-      adminService.getDrills({ limit: 1 }),
-    ]);
-
-    const users = usersResponse.data?.learners || [];
-    const now = new Date();
-
-    const totalUsers = users.length;
-    const subscribedUsers = users.filter((u: any) => {
-      if (u.subscriptionPlan !== "premium") return false;
-      if (!u.subscriptionExpiresAt) return false;
-      const expiry = new Date(u.subscriptionExpiresAt);
-      return expiry.getTime() > now.getTime();
-    }).length;
-
-    const activeCount = users.filter((u: any) => u.isActive !== false).length;
-
-    const zeroPauseChallengeUsers = users.filter(
-      (u: any) =>
-        Array.isArray(u.zeroPauseProducts) &&
-        u.zeroPauseProducts.includes("challenge"),
-    ).length;
-
-    const zeroPauseMasteryUsers = users.filter(
-      (u: any) =>
-        Array.isArray(u.zeroPauseProducts) &&
-        u.zeroPauseProducts.includes("mastery"),
-    ).length;
-
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const newSignupsThisWeek = users.filter(
-      (u: any) => u.createdAt && new Date(u.createdAt) >= oneWeekAgo
-    ).length;
-
-    return {
-      totalUsers,
-      subscribedUsers,
-      totalActiveLearners: activeCount,
-      totalDrills: drills.total,
-      zeroPauseChallengeUsers,
-      zeroPauseMasteryUsers,
-      newSignupsThisWeek,
+    const response = await adminAPI.getDashboardStats();
+    return response.data ?? {
+      totalUsers: 0,
+      subscribedUsers: 0,
+      totalActiveLearners: 0,
+      totalDrills: 0,
+      zeroPauseChallengeUsers: 0,
+      zeroPauseMasteryUsers: 0,
+      newSignupsThisWeek: 0,
       discoveryCallsToday: 0,
       videosAwaitingReview: 0,
     };

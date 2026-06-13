@@ -10,8 +10,7 @@ import {
   AlertCircle,
   ClipboardList,
 } from "lucide-react";
-import { useLearnerDrillAssignments, useAnalyticsDashboard } from "@/hooks/useAdmin";
-import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
+import { useAnalyticsDashboard } from "@/hooks/useAdmin";
 import type { AnalyticsDashboardData } from "@/types/admin-analytics-dashboard";
 
 interface AnalyticsProgressSummaryProps {
@@ -49,86 +48,6 @@ function ProgressFromDashboard({ data }: { data: AnalyticsDashboardData }) {
   );
 }
 
-function ProgressFromSingleLearner({ learnerId }: { learnerId: string }) {
-  const { data: drillData, isLoading: drillsLoading } = useLearnerDrillAssignments(learnerId);
-  const { data: pronunciationData, isLoading: pronunciationLoading } =
-    useLearnerPronunciationAnalytics(learnerId);
-
-  if (drillsLoading || pronunciationLoading) {
-    return <LoadingSpinner />;
-  }
-
-  const drills = drillData?.assignments || [];
-  const drillStats = drillData?.statistics || {
-    total: 0,
-    completed: 0,
-    inProgress: 0,
-    pending: 0,
-    overdue: 0,
-    averageScore: 0,
-    completionRate: 0,
-  };
-  const pronunciationOverall = pronunciationData?.overall || {};
-  const wordStats = pronunciationData?.wordStats || [];
-
-  const totalDrills = drillStats.total || 0;
-  const completedDrills = drillStats.completed || 0;
-  const drillCompletionRate =
-    totalDrills > 0 ? Math.round((completedDrills / totalDrills) * 100) : 0;
-
-  const totalWords = wordStats.length || 0;
-  const completedWords =
-    wordStats.filter((w: { status?: string }) => w.status === "completed").length || 0;
-  const wordCompletionRate =
-    totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0;
-
-  const drillAverageScore = drillStats.averageScore || 0;
-  const pronunciationAverageScore = pronunciationOverall.averageScore || 0;
-
-  const overallProgress =
-    totalDrills > 0 && totalWords > 0
-      ? Math.round(drillCompletionRate * 0.5 + wordCompletionRate * 0.5)
-      : totalDrills > 0
-        ? drillCompletionRate
-        : totalWords > 0
-          ? wordCompletionRate
-          : 0;
-
-  const overallAverageScore =
-    drillAverageScore > 0 && pronunciationAverageScore > 0
-      ? Math.round((drillAverageScore + pronunciationAverageScore) / 2)
-      : drillAverageScore > 0
-        ? drillAverageScore
-        : pronunciationAverageScore > 0
-          ? pronunciationAverageScore
-          : 0;
-
-  const pendingReviewCount = drills.filter(
-    (d: { requiresReview?: boolean }) => d.requiresReview
-  ).length;
-
-  return (
-    <ProgressLayout
-      overallProgress={overallProgress}
-      overallAverageScore={overallAverageScore}
-      drillStats={{
-        total: totalDrills,
-        completed: completedDrills,
-        pending: drillStats.pending || 0,
-        inProgress: drillStats.inProgress || 0,
-        overdue: drillStats.overdue || 0,
-        averageScore: drillAverageScore,
-        completionRate: drillCompletionRate,
-      }}
-      pronunciationStats={{
-        averageScore: pronunciationAverageScore,
-        completionRate: wordCompletionRate,
-        passRate: pronunciationOverall.passRate || 0,
-      }}
-      pendingReviewCount={pendingReviewCount}
-    />
-  );
-}
 
 function LoadingSpinner() {
   return (
@@ -318,16 +237,10 @@ function ProgressLayout({
 }
 
 export function AnalyticsProgressSummary({ learnerIds }: AnalyticsProgressSummaryProps) {
-  const useDashboard = learnerIds.length !== 1;
   const { data: dashboardData, isLoading } = useAnalyticsDashboard(
-    learnerIds,
-    30,
-    useDashboard
+    learnerIds.length > 0 ? learnerIds : undefined,
+    30
   );
-
-  if (learnerIds.length === 1) {
-    return <ProgressFromSingleLearner learnerId={learnerIds[0]} />;
-  }
 
   if (isLoading) return <LoadingSpinner />;
   if (!dashboardData) {

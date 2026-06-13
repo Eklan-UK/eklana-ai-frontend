@@ -77,49 +77,81 @@ function PronunciationContent({ data }: { data: PronunciationViewData }) {
   );
 }
 
-function SingleLearnerPronunciation({ learnerId }: { learnerId: string }) {
-  const { data: analytics, isLoading, error } = useLearnerPronunciationAnalytics(learnerId);
-
-  if (isLoading) return <LoadingSpinner />;
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-700 text-sm">Failed to load pronunciation analytics</p>
-      </div>
-    );
-  }
-
-  if (!analytics) {
-    return (
-      <div className="text-center py-12 text-gray-500">
-        <Mic className="w-8 h-8 mx-auto mb-2 opacity-50" />
-        <p>No pronunciation data available yet</p>
-      </div>
-    );
-  }
-
-  const wordStats = analytics.wordStats || [];
-  const viewData: PronunciationViewData = {
-    overall: analytics.overall || { averageScore: 0, passRate: 0 },
-    totalWords: wordStats.length,
-    completedWords: wordStats.filter((w: { status?: string }) => w.status === "completed")
-      .length,
-    challengingCount: wordStats.filter((w: { isChallenging?: boolean }) => w.isChallenging)
-      .length,
+function dashboardToPronunciationView(data: AnalyticsDashboardData): PronunciationViewData {
+  const progress = data.progress.pronunciationStats;
+  return {
+    overall: {
+      averageScore: data.pronunciation.overall.averageScore,
+      passRate: data.pronunciation.overall.passRate,
+    },
+    totalWords: progress.totalWords,
+    completedWords: progress.completedWords,
+    challengingCount: data.pronunciation.challengingWords ?? 0,
   };
-
-  return <PronunciationContent data={viewData} />;
 }
 
-function DashboardPronunciation({ learnerIds }: { learnerIds: string[] }) {
-  const { data, isLoading, error } = useAnalyticsDashboard(
-    learnerIds.length > 0 ? learnerIds : undefined
+export function AnalyticsPronunciationSection({ learnerIds }: AnalyticsPronunciationSectionProps) {
+  const isSingleLearner = learnerIds.length === 1;
+
+  // Single-learner path: uses the per-learner API which falls back to
+  // PronunciationAttempt records when LearnerPronunciationProgress is empty.
+  const {
+    data: singleData,
+    isLoading: singleLoading,
+    error: singleError,
+  } = useLearnerPronunciationAnalytics(isSingleLearner ? learnerIds[0] : "");
+
+  // Platform / multi-learner path: uses the dashboard aggregate.
+  const {
+    data: dashData,
+    isLoading: dashLoading,
+    error: dashError,
+  } = useAnalyticsDashboard(
+    learnerIds.length > 0 ? learnerIds : undefined,
+    30,
+    learnerIds.length !== 1
   );
 
-  if (isLoading) return <LoadingSpinner />;
+  if (isSingleLearner ? singleLoading : dashLoading) return <LoadingSpinner />;
 
-  if (error || !data) {
+  if (isSingleLearner) {
+    if (singleError || !singleData) {
+      return (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">Failed to load pronunciation analytics</p>
+        </div>
+      );
+    }
+
+    const wordStats: any[] = singleData.wordStats ?? [];
+    const completedWords = wordStats.filter((w: any) => w.status === "completed").length;
+    const challengingCount = wordStats.filter((w: any) => w.isChallenging).length;
+
+    if (wordStats.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          <Mic className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>No pronunciation data available yet</p>
+        </div>
+      );
+    }
+
+    return (
+      <PronunciationContent
+        data={{
+          overall: {
+            averageScore: singleData.overall?.averageScore ?? 0,
+            passRate: singleData.overall?.passRate ?? 0,
+          },
+          totalWords: wordStats.length,
+          completedWords,
+          challengingCount,
+        }}
+      />
+    );
+  }
+
+  if (dashError || !dashData) {
     return (
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
         <p className="text-red-700 text-sm">Failed to load pronunciation analytics</p>
@@ -127,7 +159,8 @@ function DashboardPronunciation({ learnerIds }: { learnerIds: string[] }) {
     );
   }
 
-  const viewData = dashboardToPronunciationView(data);
+  const viewData = dashboardToPronunciationView(dashData);
+
   if (viewData.totalWords === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -138,25 +171,4 @@ function DashboardPronunciation({ learnerIds }: { learnerIds: string[] }) {
   }
 
   return <PronunciationContent data={viewData} />;
-}
-
-function dashboardToPronunciationView(data: AnalyticsDashboardData): PronunciationViewData {
-  const progress = data.progress.pronunciationStats;
-  return {
-    overall: {
-      averageScore: data.pronunciation.overall.averageScore,
-      passRate: data.pronunciation.overall.passRate,
-    },
-    totalWords: progress.totalWords,
-    completedWords: progress.completedWords,
-    challengingCount: 0,
-  };
-}
-
-export function AnalyticsPronunciationSection({ learnerIds }: AnalyticsPronunciationSectionProps) {
-  if (learnerIds.length === 1) {
-    return <SingleLearnerPronunciation learnerId={learnerIds[0]} />;
-  }
-
-  return <DashboardPronunciation learnerIds={learnerIds} />;
 }
