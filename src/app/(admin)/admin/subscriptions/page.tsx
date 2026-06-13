@@ -29,7 +29,7 @@ function monthsToBillingPeriod(months: number | null | undefined): BillingPeriod
 }
 
 const SubscriptionsPage: React.FC = () => {
-  const { data, isLoading } = useAllLearners({ limit: 1000, role: "user" });
+  const { data, isLoading } = useAllLearners({ limit: 1000 });
   const learners = data?.learners || [];
   const { mutateAsync, isPending: saving } = useUpdateUserSubscription();
 

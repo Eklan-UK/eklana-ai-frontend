@@ -35,7 +35,6 @@ const Learners: React.FC = () => {
     () => ({
       limit,
       offset,
-      role: 'user' as const,
       search: searchQuery.trim() || undefined,
       signupDateFrom: signupDateFrom || undefined,
       signupDateTo: signupDateTo || undefined,

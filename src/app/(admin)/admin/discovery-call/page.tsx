@@ -57,7 +57,7 @@ const DiscoveryCalls: React.FC = () => {
            </div>
            <div className="flex gap-4 items-center">
              <div className="px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium text-gray-600">
-               December 3, 2024
+               {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
              </div>
              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">
                <Filter className="w-4 h-4" /> Filters

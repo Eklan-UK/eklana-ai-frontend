@@ -93,7 +93,6 @@ export function useAnalyticsLearners(filters?: {
 export function useAllLearners(filters?: {
   limit?: number;
   offset?: number;
-  role?: string;
   search?: string;
   signupDateFrom?: string;
   signupDateTo?: string;
@@ -118,7 +117,6 @@ export function useDrillById(drillId: string) {
     queryKey: queryKeys.drills.detail(drillId),
     queryFn: async () => {
       const response = await drillAPI.getById(drillId);
-      console.log("drill fetch Successful", response)
       return response.data?.drill;
     },
     enabled: !!drillId,
@@ -161,18 +159,6 @@ export function useDashboardStats() {
     },
     staleTime: 1000 * 30, // 30 seconds
     refetchOnWindowFocus: true,
-  });
-}
-
-// Get recent learners (for dashboard)
-export function useRecentLearners(limit: number = 10) {
-  return useQuery({
-    queryKey: ["admin", "dashboard", "learners", limit],
-    queryFn: async () => {
-      const response = await adminService.getLearners({ limit });
-      return response.users || [];
-    },
-    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

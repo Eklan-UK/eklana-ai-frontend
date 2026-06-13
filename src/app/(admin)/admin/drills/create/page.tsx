@@ -556,9 +556,8 @@ const DrillBuilder: React.FC = () => {
         setLoadingUsers(true);
         const response = await adminService.getLearners({
           limit: 1000,
-          role: "user",
         });
-        setUsers(response.users);
+        setUsers(response.data?.learners ?? []);
       } catch (error: any) {
         toast.error("Failed to load users: " + error.message);
       } finally {

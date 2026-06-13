@@ -36,12 +36,12 @@ async function handler(
 
 		// Get total count for pagination (using aggregation for better performance)
 		const totalCount = await DrillAssignment.countDocuments({
-			learnerId: new Types.ObjectId(learnerId),
+			learnerId: new Types.ObjectId(canonicalLearnerId),
 		});
 
 		// Get paginated drill assignments for this learner
 		const assignments = await DrillAssignment.find({
-			learnerId: new Types.ObjectId(learnerId),
+			learnerId: new Types.ObjectId(canonicalLearnerId),
 		})
 			.select('_id drillId assignedBy status assignedAt dueDate completedAt score')
 			.populate('drillId', 'title type difficulty')
@@ -111,7 +111,7 @@ async function handler(
 
 		// Calculate statistics using aggregation for better performance (across all assignments, not just current page)
 		const statsAggregation = await DrillAssignment.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{ $match: { learnerId: new Types.ObjectId(canonicalLearnerId) } },
 			{
 				$group: {
 					_id: '$status',
@@ -133,7 +133,7 @@ async function handler(
 
 		// Calculate average score for completed assignments (using aggregation)
 		const avgScoreResult = await DrillAssignment.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId), status: 'completed' } },
+			{ $match: { learnerId: new Types.ObjectId(canonicalLearnerId), status: 'completed' } },
 			{
 				$lookup: {
 					from: 'drill_attempts',

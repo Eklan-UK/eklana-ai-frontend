@@ -6,16 +6,13 @@ export const adminService = {
   getLearners: async (params?: {
     limit?: number;
     offset?: number;
-    role?: string;
     search?: string;
   }) => {
-    const response = await adminAPI.getAllUsers({
+    const response = await adminAPI.getAllLearners({
       limit: params?.limit,
       offset: params?.offset,
-      role: params?.role || 'user',
       search: params?.search,
     });
-    
     return response;
   },
 
@@ -170,6 +167,11 @@ export const adminService = {
         u.zeroPauseProducts.includes("mastery"),
     ).length;
 
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const newSignupsThisWeek = users.filter(
+      (u: any) => u.createdAt && new Date(u.createdAt) >= oneWeekAgo
+    ).length;
+
     return {
       totalUsers,
       subscribedUsers,
@@ -177,46 +179,12 @@ export const adminService = {
       totalDrills: drills.total,
       zeroPauseChallengeUsers,
       zeroPauseMasteryUsers,
-      newSignupsThisWeek: 0, // TODO: Calculate from user creation dates
-      discoveryCallsToday: 0, // TODO: Implement discovery calls tracking
-      videosAwaitingReview: 0, // TODO: Implement video review tracking
+      newSignupsThisWeek,
+      discoveryCallsToday: 0,
+      videosAwaitingReview: 0,
     };
   },
 
-  // Get learners with their drill counts
-  getLearnersWithDrillCounts: async () => {
-    const learners = await adminService.getLearners({ limit: 1000, role: 'user' });
-    
-    // For each learner, get their drill assignments count
-    // This is a simplified version - in production, you'd want a dedicated endpoint
-    const learnersWithCounts = await Promise.all(
-      learners.users.map(async (learner) => {
-        try {
-          const assignments = await apiRequest<{
-            code: string;
-            message: string;
-            data: {
-              assignments: any[];
-              totalAssignments: number;
-            };
-          }>(`/drills/learner/${learner._id}?limit=1`);
-          return {
-            ...learner,
-            drillCount: assignments.data?.totalAssignments || 0,
-            lastPractice: null, // TODO: Get from learning sessions or drill attempts
-          };
-        } catch {
-          return {
-            ...learner,
-            drillCount: 0,
-            lastPractice: null,
-          };
-        }
-      })
-    );
-
-    return learnersWithCounts;
-  },
 
   // Assign role to a user
   assignRole: async (userId: string, role: 'user' | 'tutor' | 'admin', profileData?: any) => {
