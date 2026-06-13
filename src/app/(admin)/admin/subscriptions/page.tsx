@@ -26,7 +26,7 @@ function getSubscriptionPlanDisplay(user: {
   appleSubscriptionStatus?: string | null;
   appleOriginalTransactionId?: string | null;
 }): { label: string; className: string } {
-  if (isUserSubscribed(user)) {
+  if (isUserSubscribed(user as Parameters<typeof isUserSubscribed>[0])) {
     return {
       label: "premium",
       className: "bg-emerald-100 text-emerald-700",
