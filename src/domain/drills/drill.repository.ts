@@ -86,6 +86,7 @@ export class DrillRepository {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
     limit?: number;
     offset?: number;
   }): Promise<DrillType[]> {
@@ -96,9 +97,26 @@ export class DrillRepository {
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
     if (filters.studentEmail) query.assigned_to = filters.studentEmail;
+    if (filters.assignmentStatus === 'saved') {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (filters.assignmentStatus === 'assigned') {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
 
     const queryBuilder = Drill.find(query)
-      .select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to createdById created_by')
+      .select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById created_by')
       .sort({ created_date: -1 });
 
     if (filters.limit) {
@@ -164,6 +182,20 @@ export class DrillRepository {
       }).exec();
     } catch (error: any) {
       logger.error('Error incrementing assignments', { drillId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * Set assignment count directly
+   */
+  async setTotalAssignments(drillId: string, count: number): Promise<void> {
+    try {
+      await Drill.findByIdAndUpdate(drillId, {
+        totalAssignments: count,
+      }).exec();
+    } catch (error: any) {
+      logger.error('Error setting total assignments', { drillId, error: error.message });
       throw error;
     }
   }

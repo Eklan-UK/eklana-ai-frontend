@@ -17,49 +17,12 @@ import {
   ScrollText,
   Link2,
 } from 'lucide-react';
-import { useLearnerById } from '@/hooks/useAdmin';
-import { useQuery } from '@tanstack/react-query';
-import { drillAPI } from '@/lib/api';
+import { useLearnerById, useLearnerDrillAssignments } from '@/hooks/useAdmin';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useEffect } from 'react';
-
-// Hook for student drill assignments
-function useStudentDrillAssignments(studentId: string) {
-  return useQuery({
-    queryKey: ['students', studentId, 'assignments'],
-    queryFn: async () => {
-      const response = await fetch(`/api/v1/drills/learner/${studentId}/assignments`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.data?.assignments || data.assignments || [];
-      }
-
-      // Fallback: fetch from learner drills endpoint
-      const drillsResponse = await drillAPI.getLearnerDrills();
-      if (drillsResponse.data?.drills) {
-        return drillsResponse.data.drills
-          .filter((item: any) => {
-            const userId = item.drill?.created_by || item.userId;
-            return userId === studentId || item.userId?._id === studentId;
-          })
-          .map((item: any) => ({
-            ...item,
-            drill: item.drill || item,
-            assignmentId: item.assignmentId || item._id,
-          }));
-      }
-      return [];
-    },
-    enabled: !!studentId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-  });
-}
 
 export default function StudentDrillsPage() {
   const params = useParams();
@@ -68,7 +31,8 @@ export default function StudentDrillsPage() {
 
   // Use React Query hooks
   const { data: student, isLoading: studentLoading, error: studentError } = useLearnerById(studentId);
-  const { data: assignments = [], isLoading: assignmentsLoading } = useStudentDrillAssignments(studentId);
+  const { data: drillData, isLoading: assignmentsLoading } = useLearnerDrillAssignments(studentId);
+  const assignments = drillData?.assignments ?? [];
 
   const loading = studentLoading || assignmentsLoading;
 
@@ -121,27 +85,28 @@ export default function StudentDrillsPage() {
     return icons[type] || <BookOpen className="w-5 h-5 text-gray-500" />;
   };
 
-  const totalAssigned = assignments.length;
-  const completed = assignments.filter((a: any) =>
+  const stats = drillData?.statistics;
+  const totalAssigned = stats?.total ?? assignments.length;
+  const completed = stats?.completed ?? assignments.filter((a: any) =>
     a.status === 'completed' || a.assignmentStatus === 'completed'
   ).length;
-  const inProgress = assignments.filter((a: any) =>
-    a.status === 'in-progress' || a.status === 'in_progress' || a.assignmentStatus === 'in-progress'
+  const inProgress = stats?.inProgress ?? assignments.filter((a: any) =>
+    a.status === 'in-progress' || a.status === 'in_progress'
   ).length;
-  const pending = assignments.filter((a: any) =>
+  const pending = stats?.pending ?? assignments.filter((a: any) =>
     a.status === 'pending' || a.assignmentStatus === 'pending'
   ).length;
-  const overdue = assignments.filter((a: any) => {
+  const overdue = stats?.overdue ?? assignments.filter((a: any) => {
     const dueDate = a.dueDate ? new Date(a.dueDate) : null;
-    const isOverdue = dueDate && dueDate < new Date() &&
-      a.status !== 'completed' && a.assignmentStatus !== 'completed';
-    return isOverdue || a.status === 'overdue';
+    return (dueDate && dueDate < new Date() && a.status !== 'completed') || a.status === 'overdue';
   }).length;
 
-  const averageScore = assignments
-    .filter((a: any) => a.score !== undefined && a.score !== null)
-    .reduce((acc: number, a: any) => acc + (a.score || 0), 0) /
-    (assignments.filter((a: any) => a.score !== undefined && a.score !== null).length || 1);
+  const averageScore = stats?.averageScore ?? (
+    assignments
+      .filter((a: any) => (a.bestScore ?? a.score) !== undefined && (a.bestScore ?? a.score) !== null)
+      .reduce((acc: number, a: any) => acc + ((a.bestScore ?? a.score) || 0), 0) /
+    (assignments.filter((a: any) => (a.bestScore ?? a.score) !== undefined && (a.bestScore ?? a.score) !== null).length || 1)
+  );
 
   if (loading) {
     return (
@@ -233,14 +198,15 @@ export default function StudentDrillsPage() {
               <div className="space-y-4">
                 {assignments.map((assignment: any) => {
                   const drill = assignment.drill || assignment;
-                  const status = assignment.status || assignment.assignmentStatus || 'pending';
+                  const status = assignment.status || 'pending';
                   const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                   const isOverdue = dueDate && dueDate < new Date() && status !== 'completed';
+                  const score = assignment.bestScore ?? assignment.latestAttempt?.score ?? assignment.score;
 
                   return (
                     <Link
-                      key={assignment.assignmentId || assignment._id}
-                      href={`/admin/drills/${drill._id}`}
+                      key={assignment._id}
+                      href={`/admin/drills/${drill._id || assignment.drillId}`}
                       className="block"
                     >
                       <div className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
@@ -271,13 +237,13 @@ export default function StudentDrillsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            {assignment.score !== undefined && assignment.score !== null && (
+                            {score !== undefined && score !== null && (
                               <div className="text-right">
                                 <p className="text-xs text-gray-500">Score</p>
-                                <p className={`text-lg font-bold ${assignment.score >= 70 ? 'text-green-600' :
-                                    assignment.score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                <p className={`text-lg font-bold ${score >= 70 ? 'text-green-600' :
+                                    score >= 50 ? 'text-yellow-600' : 'text-red-600'
                                   }`}>
-                                  {assignment.score}%
+                                  {score}%
                                 </p>
                               </div>
                             )}

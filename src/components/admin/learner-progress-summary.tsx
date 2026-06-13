@@ -4,7 +4,6 @@ import React from "react";
 import {
   TrendingUp,
   BookOpen,
-  Mic,
   Target,
   CheckCircle2,
   Clock,
@@ -55,6 +54,11 @@ export function LearnerProgressSummary({
     averageScore: 0,
     completionRate: 0,
   };
+  const assignments = drillData?.assignments || [];
+  const pendingReviewCount = assignments.filter(
+    (d: { requiresReview?: boolean; reviewStatus?: string }) =>
+      d.requiresReview || d.reviewStatus === "pending",
+  ).length;
   const pronunciationStats = pronunciationData?.overall || {};
   const wordStats = pronunciationData?.wordStats || [];
 
@@ -137,23 +141,15 @@ export function LearnerProgressSummary({
           )}
         </div>
 
-        {/* Pronunciation Stats */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Mic className="w-4 h-4 text-primary-600" />
-            <p className="text-xs font-semibold text-gray-600 uppercase">Words</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {completedWords}/{totalWords}
+        {/* Pending Review */}
+        <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+          <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
+            Pending Review
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {wordCompletionRate}% completed
+          <p className="text-2xl font-bold text-orange-600">
+            {pendingReviewCount}
           </p>
-          {pronunciationAverageScore > 0 && (
-            <p className="text-xs text-gray-500 mt-1">
-              Avg: {pronunciationAverageScore.toFixed(0)}%
-            </p>
-          )}
+          <p className="text-xs text-gray-500 mt-1">Submissions</p>
         </div>
 
         {/* Overall Score */}

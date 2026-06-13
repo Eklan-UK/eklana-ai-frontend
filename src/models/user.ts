@@ -40,8 +40,12 @@ export interface IUser extends Document {
   deletedAt?: Date | null;
   // Subscription core
   subscriptionPlan?: "free" | "premium";
+  subscriptionBillingPeriod?: "monthly" | "quarterly" | "annual" | null;
   subscriptionActivatedAt?: Date | null;
   subscriptionExpiresAt?: Date | null;
+  // Zero Pause add-on products (admin-assigned)
+  zeroPauseProducts?: ("challenge" | "mastery")[];
+  zeroPauseDate?: Date | null;
   // Admin-only bookkeeping
   subscriptionMonthsPaidFor?: number | null;
   subscriptionAmountPaid?: number | null;
@@ -195,6 +199,19 @@ const userSchema = new Schema<IUser>(
       enum: ["free", "premium"],
       default: "free",
       index: true,
+    },
+    subscriptionBillingPeriod: {
+      type: String,
+      enum: ["monthly", "quarterly", "annual"],
+      default: null,
+    },
+    zeroPauseProducts: {
+      type: [{ type: String, enum: ["challenge", "mastery"] }],
+      default: [],
+    },
+    zeroPauseDate: {
+      type: Date,
+      default: null,
     },
     subscriptionActivatedAt: {
       type: Date,

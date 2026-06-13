@@ -33,6 +33,7 @@ export default function FillBlankDrill({
 }: FillBlankDrillProps) {
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [submittedCount, setSubmittedCount] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
   const [submittedResults, setSubmittedResults] = useState<{
     score: number;
@@ -47,11 +48,14 @@ export default function FillBlankDrill({
 
   // Parse sentence to extract blank positions
   const parseSentence = (sentence: string) => {
-    const parts = sentence.split(/(___)/g);
+    // Collapse any run of 2+ underscores into exactly "___" so a long run
+    // doesn't produce multiple blank slots from a single placeholder.
+    const normalized = sentence.replace(/_{2,}/g, '___');
+    const parts = normalized.split(/(___)/g);
     const blanks: number[] = [];
     parts.forEach((part, idx) => {
       if (part === "___") {
-        blanks.push(Math.floor(idx / 2)); // Position in blank array
+        blanks.push(Math.floor(idx / 2));
       }
     });
     return { parts, blanks };
@@ -63,19 +67,31 @@ export default function FillBlankDrill({
     showAnswers: boolean = false,
     itemIndex?: number,
   ) => {
+    if (!item) return null;
     const sentenceIdx = itemIndex ?? currentIndex;
-    const { parts } = parseSentence(item.sentence);
+    const { parts } = parseSentence(item.sentence || "");
     let blankIndex = 0;
 
     return (
       <span className="text-lg leading-relaxed">
         {parts.map((part: string, partIdx: number) => {
           if (part === "___") {
-            const blank = item.blanks[blankIndex];
-            const currentAnswer = answers[sentenceIdx]?.[blankIndex] || "";
+            const currentBlankIdx = blankIndex;
+            const blank = (item.blanks || [])[currentBlankIdx];
+            const currentAnswer = answers[sentenceIdx]?.[currentBlankIdx] || "";
             const isCorrect =
-              showAnswers && currentAnswer === blank.correctAnswer;
+              showAnswers && currentAnswer === (blank?.correctAnswer || "");
             blankIndex++;
+
+            if (!blank) {
+              return (
+                <span key={partIdx} className="inline-block mx-1">
+                  <select disabled className="px-3 py-1.5 border-2 border-muted rounded bg-card min-w-[120px] text-base opacity-40">
+                    <option>Select...</option>
+                  </select>
+                </span>
+              );
+            }
 
             return (
               <span key={partIdx} className="inline-block mx-1">
@@ -83,7 +99,7 @@ export default function FillBlankDrill({
                   <span
                     className={`px-3 py-1.5 rounded border-2 font-medium ${
                       isCorrect
-                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-900 dark:text-emerald-200"
+                        ? "bg-emerald-500/15 border-emerald-500 text-gray-900 dark:text-foreground"
                         : "bg-red-100 border-red-500 text-red-800"
                     }`}
                   >
@@ -93,7 +109,7 @@ export default function FillBlankDrill({
                         {isCorrect ? (
                           <CheckCircle className="w-4 h-4 inline" />
                         ) : (
-                          `✗ (${blank.correctAnswer})`
+                          `✗ (${blank.correctAnswer || ""})`
                         )}
                       </span>
                     )}
@@ -106,15 +122,15 @@ export default function FillBlankDrill({
                         ...answers,
                         [sentenceIdx]: {
                           ...answers[sentenceIdx],
-                          [blankIndex - 1]: e.target.value,
+                          [currentBlankIdx]: e.target.value,
                         },
                       });
                     }}
                     className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
                   >
                     <option value="">Select...</option>
-                    {blank.options
-                      .filter((opt: string) => opt.trim() !== "")
+                    {(blank.options || [])
+                      .filter((opt: string) => opt && opt.trim() !== "")
                       .map((option: string, optIdx: number) => (
                         <option key={optIdx} value={option}>
                           {option}
@@ -143,6 +159,8 @@ export default function FillBlankDrill({
       toast.error("Please fill all blanks before proceeding");
       return;
     }
+
+    setSubmittedCount(prev => Math.max(prev, currentIndex + 1));
 
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1);
@@ -197,6 +215,7 @@ export default function FillBlankDrill({
     setSubmittedResults(null);
     setAnswers({});
     setCurrentIndex(0);
+    setSubmittedCount(0);
   };
 
   const handleSubmit = async () => {
@@ -212,6 +231,7 @@ export default function FillBlankDrill({
 
     setIsSubmitting(true);
     try {
+      setSubmittedCount(items.length);
       const { fillBlankResults, totalBlanks, correctBlanks, score } =
         buildFillBlankResults();
       const passed = score >= PASS_THRESHOLD;
@@ -219,7 +239,7 @@ export default function FillBlankDrill({
       if (weeklyChallengeMeta) {
         await completeWeeklyChallengeItem(
           queryClient,
-          weeklyChallengeMeta.itemIndex,
+          weeklyChallengeMeta.itemId,
           {
             score,
             weekStartDate: weeklyChallengeMeta.weekStartDate,
@@ -267,7 +287,16 @@ export default function FillBlankDrill({
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="fill_blank" />;
+    const returnPath = weeklyChallengeMeta
+      ? `/account/practice/weekly-challenge/${encodeURIComponent(weeklyChallengeMeta.weekStartDate)}`
+      : "/account/drills";
+    return (
+      <DrillCompletionScreen
+        drillType={weeklyChallengeMeta ? "Vocabulary" : "fill_blank"}
+        returnPath={returnPath}
+        returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+      />
+    );
   }
 
   const currentItemComplete = currentItem?.blanks.every(
@@ -280,7 +309,7 @@ export default function FillBlankDrill({
     <DrillLayout title={drill.title} showBack={true}>
       <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         <DrillProgress
-          current={currentIndex + 1}
+          current={submittedCount}
           total={items.length}
           label="sentences"
         />
@@ -352,38 +381,46 @@ export default function FillBlankDrill({
             )}
           </Card>
         ) : (
-          // Practice Screen
+  // Practice Screen
           <Card className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <h2 className="text-xl font-bold">
-                Sentence {currentIndex + 1} of {items.length}
-              </h2>
-              {currentItem.audioUrl && (
-                <TTSButton
-                  text={currentItem.sentence}
-                  audioUrl={currentItem.audioUrl}
-                />
-              )}
-            </div>
-
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              {renderSentence(currentItem, false)}
-            </div>
-
-            {/* Hints */}
-            {currentItem.blanks.some((b: any) => b.hint) && (
-              <div className="mb-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/25">
-                <p className="text-sm font-semibold mb-2 text-foreground">
-                  💡 Hints:
-                </p>
-                {currentItem.blanks.map((blank: any, blankIdx: number) => (
-                  blank.hint && (
-                    <p key={blankIdx} className="text-sm text-foreground mb-1">
-                      Blank {blankIdx + 1}: {blank.hint}
-                    </p>
-                  )
-                ))}
+            {!currentItem ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No items found.</p>
               </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between mb-4">
+                  <h2 className="text-xl font-bold">
+                    Sentence {currentIndex + 1} of {items.length}
+                  </h2>
+                  {currentItem.audioUrl && (
+                    <TTSButton
+                      text={currentItem.sentence}
+                      audioUrl={currentItem.audioUrl}
+                    />
+                  )}
+                </div>
+
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  {renderSentence(currentItem, false)}
+                </div>
+
+                {/* Hints */}
+                {currentItem.blanks?.some((b: any) => b.hint) && (
+                  <div className="mb-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/25">
+                    <p className="text-sm font-semibold mb-2 text-foreground">
+                      💡 Hints:
+                    </p>
+                    {currentItem.blanks.map((blank: any, blankIdx: number) => (
+                      blank.hint && (
+                        <p key={blankIdx} className="text-sm text-foreground mb-1">
+                          Blank {blankIdx + 1}: {blank.hint}
+                        </p>
+                      )
+                    ))}
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex gap-4 mt-6">
@@ -427,5 +464,3 @@ export default function FillBlankDrill({
     </DrillLayout>
   );
 }
-
-

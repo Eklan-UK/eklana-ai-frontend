@@ -552,15 +552,11 @@ const drillSchema = new Schema<IDrill>(
         "Number of days from assignment date until completion date. Used for calculating due dates when assigning drills.",
     },
 
-    // Assignment - Array of student emails
+    // Assignment - user IDs (empty when drill is saved but not yet assigned)
     assigned_to: {
       type: [String],
-      required: [true, "At least one student email is required"],
-      validate: {
-        validator: (v: string[]) => Array.isArray(v) && v.length > 0,
-        message: "At least one student email must be assigned",
-      },
-      description: "Array of student emails assigned to this drill",
+      default: [],
+      description: "Array of learner user IDs assigned to this drill",
     },
 
     // General Content
@@ -813,6 +809,10 @@ drillSchema.methods.validateTypeSpecificFields = function (): string[] {
   return [];
 };
 
-// Prevent model recompilation in Next.js development
+// Re-register in dev so schema changes apply without a full server restart
+if (process.env.NODE_ENV === "development" && models.Drill) {
+  delete models.Drill;
+}
+
 const DrillModel = models.Drill || model<IDrill>("Drill", drillSchema);
 export default DrillModel;

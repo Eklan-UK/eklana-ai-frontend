@@ -2,16 +2,26 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 import { AlertCircle, Calendar, Clock, Loader2, Shuffle } from "lucide-react";
-import { useLearnerMatchingAnalytics } from "@/hooks/useAdmin";
+import { useAnalyticsDashboard, useLearnerMatchingAnalytics } from "@/hooks/useAdmin";
 
 export interface MatchingAnalyticsComponentProps {
-  learnerId: string;
+  learnerId?: string;
   learnerName?: string;
+  hideConfusions?: boolean;
+  hideResponseSpeed?: boolean;
+  learnerIds?: string[];
 }
 
 export function MatchingAnalyticsComponent({
   learnerId,
+  hideConfusions = false,
+  hideResponseSpeed = false,
+  learnerIds,
 }: MatchingAnalyticsComponentProps) {
+  const useAggregated =
+    learnerIds !== undefined ? learnerIds.length !== 1 : false;
+  const effectiveLearnerId =
+    learnerIds?.length === 1 ? learnerIds[0] : learnerId ?? "";
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
@@ -23,7 +33,26 @@ export function MatchingAnalyticsComponent({
     return { from, to };
   }, [appliedRange]);
 
-  const { data, isLoading, error } = useLearnerMatchingAnalytics(learnerId, rangeForQuery);
+  const { data: learnerData, isLoading: learnerLoading, error: learnerError } =
+    useLearnerMatchingAnalytics(effectiveLearnerId, rangeForQuery);
+
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useAnalyticsDashboard(learnerIds, 30, useAggregated);
+
+  const data = useAggregated
+    ? dashboardData?.matching
+      ? {
+          ...dashboardData.matching,
+          confusions: [],
+        }
+      : null
+    : learnerData;
+
+  const isLoading = useAggregated ? dashboardLoading : learnerLoading;
+  const error = useAggregated ? dashboardError : learnerError;
 
   const applyFilter = useCallback(() => {
     setAppliedRange({
@@ -42,23 +71,25 @@ export function MatchingAnalyticsComponent({
   const headerRow = (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="text-lg font-bold text-foreground">Matching Analytics</h2>
-      <button
-        type="button"
-        onClick={() => setFilterOpen((o) => !o)}
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-      >
-        <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
-        Filter by date
-        {(appliedRange.from || appliedRange.to) && (
-          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
-            Active
-          </span>
-        )}
-      </button>
+      {!useAggregated && (
+        <button
+          type="button"
+          onClick={() => setFilterOpen((o) => !o)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+        >
+          <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Filter by date
+          {(appliedRange.from || appliedRange.to) && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+              Active
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 
-  const filterPanel = filterOpen ? (
+  const filterPanel = !useAggregated && filterOpen ? (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:flex-wrap sm:items-end">
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         From
@@ -136,12 +167,12 @@ export function MatchingAnalyticsComponent({
     totalAssignedPairs,
     accuracyRatePct,
     totalAttempts,
-    confusions,
+    confusions = [],
     fastMatches,
     slowMatches,
     slowestMatchSeconds,
     slowestMatchLabel,
-    hasPairTimingData,
+    hasPairTimingData = false,
     timingAvailableSince,
   } = data;
 
@@ -177,8 +208,14 @@ export function MatchingAnalyticsComponent({
         </div>
       </div>
 
+      {!hideConfusions || !hideResponseSpeed ? (
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div
+          className={`grid grid-cols-1 gap-8 ${
+            hideConfusions || hideResponseSpeed ? "" : "md:grid-cols-2"
+          }`}
+        >
+          {!hideConfusions && (
           <div>
             <div className="mb-1 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 shrink-0 text-red-600" aria-hidden />
@@ -216,7 +253,9 @@ export function MatchingAnalyticsComponent({
               </>
             )}
           </div>
+          )}
 
+          {!hideResponseSpeed && (
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Clock className="h-5 w-5 shrink-0 text-blue-600" aria-hidden />
@@ -279,8 +318,10 @@ export function MatchingAnalyticsComponent({
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

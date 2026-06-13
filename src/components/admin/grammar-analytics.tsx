@@ -2,16 +2,24 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 import { Calendar, Loader2, BookOpen } from "lucide-react";
-import { useLearnerGrammarAnalytics } from "@/hooks/useAdmin";
+import { useAnalyticsDashboard, useLearnerGrammarAnalytics } from "@/hooks/useAdmin";
 
 export interface GrammarAnalyticsComponentProps {
-  learnerId: string;
+  learnerId?: string;
   learnerName?: string;
+  hideProblemAreas?: boolean;
+  learnerIds?: string[];
 }
 
 export function GrammarAnalyticsComponent({
   learnerId,
+  hideProblemAreas = false,
+  learnerIds,
 }: GrammarAnalyticsComponentProps) {
+  const useAggregated =
+    learnerIds !== undefined ? learnerIds.length !== 1 : false;
+  const effectiveLearnerId =
+    learnerIds?.length === 1 ? learnerIds[0] : learnerId ?? "";
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
@@ -23,7 +31,29 @@ export function GrammarAnalyticsComponent({
     return { from, to };
   }, [appliedRange]);
 
-  const { data, isLoading, error } = useLearnerGrammarAnalytics(learnerId, rangeForQuery);
+  const { data: learnerData, isLoading: learnerLoading, error: learnerError } =
+    useLearnerGrammarAnalytics(effectiveLearnerId, rangeForQuery);
+
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useAnalyticsDashboard(learnerIds, 30, useAggregated);
+
+  const data = useAggregated
+    ? dashboardData?.grammar
+      ? {
+          ...dashboardData.grammar,
+          problemRows: [],
+          feedbackRows: [],
+          hasReviewedData: false,
+          attemptsConsidered: dashboardData.grammar.attemptsConsidered ?? 0,
+        }
+      : null
+    : learnerData;
+
+  const isLoading = useAggregated ? dashboardLoading : learnerLoading;
+  const error = useAggregated ? dashboardError : learnerError;
 
   const applyFilter = useCallback(() => {
     setAppliedRange({
@@ -42,19 +72,21 @@ export function GrammarAnalyticsComponent({
   const headerRow = (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="text-lg font-bold text-foreground">Grammar Analytics</h2>
-      <button
-        type="button"
-        onClick={() => setFilterOpen((o) => !o)}
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-      >
-        <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
-        Filter by date
-        {(appliedRange.from || appliedRange.to) && (
-          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
-            Active
-          </span>
-        )}
-      </button>
+      {!useAggregated && (
+        <button
+          type="button"
+          onClick={() => setFilterOpen((o) => !o)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
+        >
+          <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Filter by date
+          {(appliedRange.from || appliedRange.to) && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+              Active
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 
@@ -80,11 +112,18 @@ export function GrammarAnalyticsComponent({
     );
   }
 
-  if (!data || (data.attemptsConsidered === 0 && data.totalAssignedPatterns === 0)) {
+  const attemptsConsidered =
+    data && "attemptsConsidered" in data ? data.attemptsConsidered : undefined;
+
+  if (
+    !data ||
+    ((attemptsConsidered === 0 || attemptsConsidered === undefined) &&
+      data.totalAssignedPatterns === 0)
+  ) {
     return (
       <div className="space-y-4">
         {headerRow}
-        {filterOpen ? (
+        {!useAggregated && filterOpen ? (
           <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               From
@@ -134,16 +173,33 @@ export function GrammarAnalyticsComponent({
     totalAssignedPatterns,
     correctSentence,
     incorrectSentence,
-    problemRows,
-    feedbackRows,
-    hasReviewedData,
-  } = data;
+    problemRows = [],
+    feedbackRows = [],
+    hasReviewedData = false,
+  } = data as {
+    totalAssignedPatterns: number;
+    correctSentence: number;
+    incorrectSentence: number;
+    problemRows?: Array<{
+      id: string;
+      patternLabel: string;
+      sentence: string;
+      count: number;
+    }>;
+    feedbackRows?: Array<{
+      id: string;
+      label: string;
+      sentence: string;
+      count: number;
+    }>;
+    hasReviewedData?: boolean;
+  };
 
   return (
     <div className="space-y-6">
       {headerRow}
 
-      {filterOpen ? (
+      {!useAggregated && filterOpen ? (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:flex-wrap sm:items-end">
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             From
@@ -200,6 +256,7 @@ export function GrammarAnalyticsComponent({
         </div>
       </div>
 
+      {!hideProblemAreas && (
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6">
         <h4 className="mb-5 text-base font-bold text-foreground">Problem Areas breakdown</h4>
 
@@ -257,6 +314,7 @@ export function GrammarAnalyticsComponent({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

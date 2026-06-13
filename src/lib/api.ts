@@ -66,6 +66,7 @@ export const drillAPI = {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -693,15 +694,132 @@ export const adminAPI = {
     });
   },
 
-  // Assign tutor to student
+  // Assign tutor to student (creates TutorAssignment, multiple tutors per student supported)
   assignTutorToStudent: (studentId: string, tutorId: string) => {
     return apiRequest<{
       code: string;
       message: string;
-      data: { learner: any };
+      data: { assignmentId: string };
     }>('/admin/assign-tutor', {
       method: 'POST',
       data: { studentId, tutorId },
+    });
+  },
+
+  // Remove tutor–student assignment
+  unassignTutorFromStudent: (studentId: string, tutorId: string) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+    }>('/admin/unassign-tutor', {
+      method: 'DELETE',
+      data: { studentId, tutorId },
+    });
+  },
+
+  // List learners assigned to a specific tutor
+  getTutorAssignedStudents: (tutorId: string, params?: { search?: string }) => {
+    const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+    return apiRequest<{
+      students: Array<{
+        assignmentId: string;
+        id: string;
+        firstName?: string;
+        lastName?: string;
+        name: string;
+        email: string;
+        assignedAt: string;
+        assignedBy: any;
+      }>;
+      total: number;
+    }>(`/admin/tutors/${tutorId}/students${qs}`);
+  },
+
+  // Platform analytics overview (admin only)
+  getPlatformAnalyticsOverview: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learners: {
+          totalActive: number;
+          totalWithAssignments: number;
+        };
+        drills: {
+          totalAssignments: number;
+          completed: number;
+          inProgress: number;
+          pending: number;
+          overdue: number;
+          averageScore: number;
+          completionRatePct: number;
+        };
+      };
+    }>('/admin/analytics/overview', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  // Aggregated analytics dashboard (platform-wide or filtered learners)
+  getAnalyticsDashboard: (params?: { learnerIds?: string[]; days?: number }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.learnerIds && params.learnerIds.length > 0) {
+      query.learnerIds = params.learnerIds.join(',');
+    }
+    if (params?.days != null) {
+      query.days = params.days;
+    }
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: import('@/types/admin-analytics-dashboard').AnalyticsDashboardData;
+    }>('/admin/analytics/dashboard', {
+      method: 'GET',
+      params: query,
+      cache: false,
+    });
+  },
+
+  // Learners with analytics summaries (admin only)
+  getAnalyticsLearners: (params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    signupDateFrom?: string;
+    signupDateTo?: string;
+    status?: 'active' | 'inactive';
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        learners: Array<{
+          _id: string;
+          firstName?: string;
+          lastName?: string;
+          name?: string;
+          email: string;
+          isActive?: boolean;
+          createdAt: string;
+          summary: {
+            drillCompletionRatePct: number;
+            drillAverageScore: number;
+            pronunciationAverageScore: number;
+            overallProgressPct: number;
+          };
+        }>;
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
+      };
+    }>('/admin/analytics/learners', {
+      method: 'GET',
+      params,
+      cache: false,
     });
   },
 
@@ -709,6 +827,10 @@ export const adminAPI = {
   getAllLearners: (params?: {
     limit?: number;
     offset?: number;
+    search?: string;
+    signupDateFrom?: string;
+    signupDateTo?: string;
+    status?: 'active' | 'inactive';
   }) => {
     return apiRequest<{
       code?: string;
@@ -720,6 +842,55 @@ export const adminAPI = {
     }>('/admin/learners', {
       method: 'GET',
       params,
+      cache: false,
+    });
+  },
+
+  getAdminSubscriptions: (params?: { limit?: number; sync?: boolean }) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        learners: any[];
+        sync: {
+          syncedCount: number;
+          failedCount: number;
+        };
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
+      };
+    }>('/admin/subscriptions', {
+      method: 'GET',
+      params: {
+        limit: params?.limit,
+        sync: params?.sync === false ? 'false' : undefined,
+      },
+      cache: false,
+    });
+  },
+
+  getDashboardStats: () => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        totalUsers: number;
+        subscribedUsers: number;
+        totalActiveLearners: number;
+        totalDrills: number;
+        zeroPauseChallengeUsers: number;
+        zeroPauseMasteryUsers: number;
+        newSignupsThisWeek: number;
+        discoveryCallsToday: number;
+        videosAwaitingReview: number;
+      };
+    }>('/admin/dashboard/stats', {
+      method: 'GET',
+      cache: false,
     });
   },
 
@@ -727,7 +898,10 @@ export const adminAPI = {
   updateUserSubscription: (data: {
     userId: string;
     plan: "free" | "premium";
-    months: number;
+    months?: number;
+    billingPeriod?: "monthly" | "quarterly" | "annual";
+    zeroPauseProducts?: ("challenge" | "mastery")[];
+    zeroPauseDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -738,12 +912,21 @@ export const adminAPI = {
       data: {
         userId: string;
         subscriptionPlan: "free" | "premium";
+        subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
+        zeroPauseProducts: ("challenge" | "mastery")[];
+        zeroPauseDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
     }>('/admin/users/subscription', {
       method: 'POST',
       data,
+    }).then((response) => {
+      // Subscription changes must be visible on the learners list immediately.
+      apiCache.clearPattern('^/admin/learners');
+      apiCache.clearPattern('^/admin/subscriptions');
+      apiCache.clearPattern('^/users');
+      return response;
     });
   },
 
@@ -844,6 +1027,146 @@ export const adminAPI = {
     }>(`/admin/learners/${learnerId}/sentence-analytics`, {
       method: 'GET',
       params,
+      cache: false,
+    });
+  },
+
+  /** Fill-in-the-blank drill analytics for a learner. Admin/tutor. */
+  getLearnerFillBlankAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
+        totalAssignedBlanks: number;
+        correctBlanks: number;
+        incorrectBlanks: number;
+        accuracyRatePct: number;
+        totalAttempts: number;
+        averageScore: number;
+        problemRows: Array<{
+          id: string;
+          sentence: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/fill-blank-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Key phrase drill analytics for a learner. Admin/tutor. */
+  getLearnerKeyPhrasesAnalytics: (
+    learnerId: string,
+    params?: { from?: string; to?: string }
+  ) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
+        totalAssignedItems: number;
+        correctItems: number;
+        incorrectItems: number;
+        accuracyRatePct: number;
+        totalAttempts: number;
+        averageScore: number;
+        averagePronunciationScore: number;
+        problemRows: Array<{
+          id: string;
+          prompt: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+        attemptsConsidered: number;
+      };
+    }>(`/admin/learners/${learnerId}/key-phrases-analytics`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  /** Platform fill-in-the-blank analytics (admin). */
+  getPlatformFillBlankAnalytics: (params?: { days?: number; learnerIds?: string[] }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.days != null) query.days = params.days;
+    if (params?.learnerIds?.length) query.learnerIds = params.learnerIds.join(',');
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
+          totalAssignedBlanks: number;
+          correctBlanks: number;
+          incorrectBlanks: number;
+          accuracyRatePct: number;
+          totalAttempts: number;
+          averageScore: number;
+        };
+        problemRows: Array<{
+          id: string;
+          sentence: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+      };
+    }>('/admin/analytics/fill-blank', {
+      method: 'GET',
+      params: query,
+      cache: false,
+    });
+  },
+
+  /** Platform key phrase analytics (admin). */
+  getPlatformKeyPhrasesAnalytics: (params?: { days?: number; learnerIds?: string[] }) => {
+    const query: Record<string, string | number> = {};
+    if (params?.days != null) query.days = params.days;
+    if (params?.learnerIds?.length) query.learnerIds = params.learnerIds.join(',');
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
+          totalAssignedItems: number;
+          correctItems: number;
+          incorrectItems: number;
+          accuracyRatePct: number;
+          totalAttempts: number;
+          averageScore: number;
+          averagePronunciationScore: number;
+        };
+        problemRows: Array<{
+          id: string;
+          prompt: string;
+          selectedAnswer: string;
+          correctAnswer: string;
+          count: number;
+        }>;
+      };
+    }>('/admin/analytics/key-phrases', {
+      method: 'GET',
+      params: query,
       cache: false,
     });
   },
@@ -1398,6 +1721,7 @@ export const weeklyChallengeAPI = {
 					totalEstimatedMinutes: number;
 					drillSequence: Array<{
 						index: number;
+						itemId: string;
 						drillType: string;
 						label: string;
 						instructions: string;
@@ -1425,6 +1749,7 @@ export const weeklyChallengeAPI = {
 				totalEstimatedMinutes: number;
 				drillSequence: Array<{
 					index: number;
+					itemId: string;
 					drillType: string;
 					label: string;
 					instructions: string;
@@ -1440,17 +1765,18 @@ export const weeklyChallengeAPI = {
 		});
 	},
 
-	getItem: (index: number, weekStartDate?: string) => {
+	getItem: (itemId: string | number, weekStartDate?: string) => {
 		return apiRequest<{
 			code?: string;
 			data?: {
 				challengeId: string;
+				itemId: string;
 				weekStartDate: string;
 				index: number;
 				item: Record<string, unknown>;
 				completed: boolean;
 			};
-		}>(`/learner/weekly-challenge/items/${index}`, {
+		}>(`/learner/weekly-challenge/items/${itemId}`, {
 			method: 'GET',
 			params: weekStartDate ? { weekStartDate } : undefined,
 			cache: false,
@@ -1458,7 +1784,7 @@ export const weeklyChallengeAPI = {
 	},
 
 	completeItem: (
-		index: number,
+		itemId: string | number,
 		data?: { score?: number },
 		weekStartDate?: string,
 	) => {
@@ -1466,12 +1792,13 @@ export const weeklyChallengeAPI = {
 			code?: string;
 			data?: {
 				challengeId: string;
+				itemId: string;
 				index: number;
 				completed: boolean;
 				completedItemIndexes: number[];
 				totalItems: number;
 			};
-		}>(`/learner/weekly-challenge/items/${index}/complete`, {
+		}>(`/learner/weekly-challenge/items/${itemId}/complete`, {
 			method: 'POST',
 			data,
 			params: weekStartDate ? { weekStartDate } : undefined,

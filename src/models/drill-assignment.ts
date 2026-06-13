@@ -1,7 +1,8 @@
 // models/drill-assignment.model.ts
 import { Schema, model, models, Document, Types } from 'mongoose';
-// Import User model to ensure it's registered before this schema references it
+// Import User and Drill models so populate() can resolve refs
 import '@/models/user';
+import '@/models/drill';
 
 export interface IDrillAssignment extends Document {
 	_id: Types.ObjectId;

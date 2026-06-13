@@ -68,7 +68,7 @@ export interface WeaknessProfile {
 }
 
 export interface ChallengeDrillItem {
-	drillType: 'pronunciation' | 'fill_blank' | 'key_phrases' | 'roleplay';
+	drillType: 'pronunciation' | 'vocabulary' | 'fill_blank' | 'key_phrases' | 'roleplay';
 	targetWeakness: WeaknessSignal;
 	instructions: string;
 	generatedContent:

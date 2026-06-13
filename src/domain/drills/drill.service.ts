@@ -7,6 +7,9 @@ import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/api/response';
 import { sendDrillAssignmentNotification } from '@/lib/api/email.service';
 import { onDrillAssigned, onDrillCompleted } from '@/services/notification/triggers';
+import Bookmark from '@/models/bookmark';
+import WordAnalytics from '@/models/word-analytics';
+import PronunciationAttempt from '@/models/pronunciation-attempt';
 import type { AssignDrillParams, Drill, Drill as DrillType, CreateDrillData, CompleteDrillParams } from './drill.types';
 import type { CreateAssignmentData } from '../assignments/assignment.types';
 
@@ -119,6 +122,7 @@ export class DrillService {
     studentEmail?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
     limit?: number;
     offset?: number;
   }): Promise<{ drills: DrillType[]; total: number; limit: number; offset: number }> {
@@ -130,6 +134,23 @@ export class DrillService {
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
     if (filters.studentEmail) query.assigned_to = filters.studentEmail;
+    if (filters.assignmentStatus === 'saved') {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (filters.assignmentStatus === 'assigned') {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
 
     const total = await this.drillRepo.count(query);
 
@@ -155,12 +176,15 @@ export class DrillService {
       'email role firstName lastName name'
     );
 
-    // 2. Validate assigned users
-    const assignedUsers = await userService.findMultipleWithRole(
-      params.assignedUserIds,
-      'user',
-      'email firstName lastName'
-    );
+    // 2. Validate assigned users (skip when saving without assignment)
+    const assignedUsers =
+      params.assignedUserIds.length > 0
+        ? await userService.findMultipleWithRole(
+            params.assignedUserIds,
+            'user',
+            'email firstName lastName'
+          )
+        : [];
 
     // 3. Create drill
     const drill = await this.drillRepo.create({
@@ -300,6 +324,35 @@ export class DrillService {
   }
 
   /**
+   * Delete all learner-side data for a drill (assignments, attempts, bookmarks, etc.)
+   */
+  private async cascadeDeleteLearnerData(drillId: string): Promise<void> {
+    const drillObjectId = new Types.ObjectId(drillId);
+
+    const [assignmentsDeleted, attemptsDeleted, bookmarksDeleted, pronunciationDeleted] =
+      await Promise.all([
+        this.assignmentRepo.deleteByDrillId(drillId),
+        this.attemptRepo.deleteByDrillId(drillId),
+        Bookmark.deleteMany({ drillId: drillObjectId }).exec(),
+        PronunciationAttempt.deleteMany({ drillId: drillObjectId }).exec(),
+      ]);
+
+    const wordAnalyticsResult = await WordAnalytics.updateMany(
+      { 'scoreHistory.drillId': drillObjectId },
+      { $pull: { scoreHistory: { drillId: drillObjectId } } }
+    ).exec();
+
+    logger.info('Cascade deleted learner data for drill', {
+      drillId,
+      assignmentsDeleted,
+      attemptsDeleted,
+      bookmarksDeleted: bookmarksDeleted.deletedCount,
+      pronunciationAttemptsDeleted: pronunciationDeleted.deletedCount,
+      wordAnalyticsUpdated: wordAnalyticsResult.modifiedCount,
+    });
+  }
+
+  /**
    * Update drill
    */
   async updateDrill(
@@ -325,6 +378,17 @@ export class DrillService {
       throw new ForbiddenError('You do not have permission to update this drill');
     }
 
+    const isReassignment = data.assigned_to !== undefined && data.assigned_to.length > 0;
+    const hasExistingLearnerData =
+      (drill.totalAssignments ?? 0) > 0 ||
+      (await this.assignmentRepo.count({ drillId: new Types.ObjectId(drillId) })) > 0;
+
+    // Reassignment path: wipe learner data before updating
+    if (isReassignment && hasExistingLearnerData) {
+      await this.cascadeDeleteLearnerData(drillId);
+      await this.drillRepo.setTotalAssignments(drillId, 0);
+    }
+
     // Update drill
     const updatedDrill = await this.drillRepo.update(drillId, data);
 
@@ -332,39 +396,39 @@ export class DrillService {
       throw new NotFoundError('Drill');
     }
 
-    // Handle new assignments if assigned_to is provided
+    // Create assignments for all selected users when assigned_to is provided
     let newAssignmentsCount = 0;
-    if (data.assigned_to && data.assigned_to.length > 0) {
+    if (isReassignment) {
       const assignedUsers = await userService.findMultipleWithRole(
-        data.assigned_to,
+        data.assigned_to!,
         'user',
-        'email'
+        'email firstName lastName'
       );
 
-      const existingAssignments = await this.assignmentRepo.findExisting(
-        drillId,
-        data.assigned_to
-      );
+      const dueDate = data.date || drill.date || new Date();
+      const assignmentsData: CreateAssignmentData[] = assignedUsers.map((learner) => ({
+        drillId: new Types.ObjectId(drillId),
+        learnerId: learner._id,
+        assignedBy: new Types.ObjectId(userId),
+        assignedAt: new Date(),
+        dueDate: dueDate,
+        status: 'pending' as const,
+      }));
 
-      const newUsers = assignedUsers.filter(
-        (u) => !existingAssignments.has(u._id.toString())
-      );
-
-      if (newUsers.length > 0) {
-        const dueDate = data.date || drill.date || new Date();
-        const newAssignmentsData: CreateAssignmentData[] = newUsers.map((user) => ({
-          drillId: new Types.ObjectId(drillId),
-          learnerId: user._id,
-          assignedBy: new Types.ObjectId(userId),
-          assignedAt: new Date(),
-          dueDate: dueDate,
-          status: 'pending' as const,
-        }));
-
-        const created = await this.assignmentRepo.createBulk(newAssignmentsData);
+      if (assignmentsData.length > 0) {
+        const created = await this.assignmentRepo.createBulk(assignmentsData);
         newAssignmentsCount = created.length;
 
-        await this.drillRepo.incrementAssignments(drillId, newAssignmentsCount);
+        await this.drillRepo.setTotalAssignments(drillId, newAssignmentsCount);
+
+        if (newAssignmentsCount > 0) {
+          updatedDrill.is_active = true;
+          updatedDrill.totalAssignments = newAssignmentsCount;
+
+          this.sendAssignmentNotifications(created, updatedDrill, user, dueDate).catch((err) => {
+            logger.error('Error sending notifications', { error: err.message });
+          });
+        }
       }
     }
 
@@ -396,7 +460,8 @@ export class DrillService {
       throw new ForbiddenError('You do not have permission to delete this drill');
     }
 
-    // Delete drill
+    // Cascade delete learner data, then remove drill
+    await this.cascadeDeleteLearnerData(drillId);
     await this.drillRepo.delete(drillId);
   }
 
