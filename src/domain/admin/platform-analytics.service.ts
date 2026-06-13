@@ -114,6 +114,26 @@ export interface AnalyticsDashboardKeyPhrasesStats extends DrillTypeAssignmentSt
 	averagePronunciationScore: number;
 }
 
+type FillBlankAttemptStats = Omit<
+	AnalyticsDashboardFillBlankStats,
+	keyof DrillTypeAssignmentStats
+>;
+
+type KeyPhrasesAttemptStats = Omit<
+	AnalyticsDashboardKeyPhrasesStats,
+	keyof DrillTypeAssignmentStats
+>;
+
+interface FillBlankFromAttemptsResult {
+	stats: FillBlankAttemptStats;
+	problemRows: FillBlankProblemRow[];
+}
+
+interface KeyPhrasesFromAttemptsResult {
+	stats: KeyPhrasesAttemptStats;
+	problemRows: KeyPhraseProblemRow[];
+}
+
 export interface FillBlankProblemRow {
 	id: string;
 	sentence: string;
@@ -142,6 +162,7 @@ export interface PlatformKeyPhrasesAnalytics {
 
 export interface AnalyticsDashboardPronunciation {
 	overall: OverallPronunciationStats;
+	challengingWords?: number;
 	problemAreas: {
 		topIncorrectPhonemes: PhonemeProblemArea[];
 	};
@@ -817,7 +838,7 @@ const MAX_PROBLEM_ROWS = 20;
 function aggregateFillBlankFromAttempts(
 	attempts: Array<{ fillBlankResults?: FillBlankResultsLean }>,
 	includeProblemRows = false
-): PlatformFillBlankAnalytics {
+): FillBlankFromAttemptsResult {
 	let totalAssignedBlanks = 0;
 	let correctBlanks = 0;
 	let incorrectBlanks = 0;
@@ -903,7 +924,7 @@ function aggregateFillBlankFromAttempts(
 function aggregateKeyPhrasesFromAttempts(
 	attempts: Array<{ keyPhrasesResults?: KeyPhrasesResultsLean }>,
 	includeProblemRows = false
-): PlatformKeyPhrasesAnalytics {
+): KeyPhrasesFromAttemptsResult {
 	let totalAssignedItems = 0;
 	let correctItems = 0;
 	let incorrectItems = 0;
