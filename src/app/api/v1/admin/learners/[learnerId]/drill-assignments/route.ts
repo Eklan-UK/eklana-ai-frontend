@@ -53,8 +53,13 @@ async function handler(
 			.lean()
 			.exec();
 
+		// Exclude assignments whose drill was deleted (populate returns null for missing refs)
+		const validAssignments = assignments.filter(
+			(a: any) => a.drillId && typeof a.drillId === 'object'
+		);
+
 		// Get attempts only for the current page of assignments (optimized)
-		const assignmentIds = assignments.map((a) => a._id);
+		const assignmentIds = validAssignments.map((a) => a._id);
 		const attempts = assignmentIds.length > 0 ? await DrillAttempt.find({
 			drillAssignmentId: { $in: assignmentIds },
 		})
@@ -78,7 +83,7 @@ async function handler(
 		});
 
 		// Enrich assignments with attempt data
-		const enrichedAssignments = assignments.map((assignment: any) => {
+		const enrichedAssignments = validAssignments.map((assignment: any) => {
 			const assignmentAttempts = attemptsByAssignment.get(assignment._id.toString()) || [];
 			const latestAttempt = assignmentAttempts.length > 0 ? assignmentAttempts[0] : null;
 			const bestAttempt = [...assignmentAttempts].sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;

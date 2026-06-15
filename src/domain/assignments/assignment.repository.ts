@@ -237,7 +237,12 @@ export class AssignmentRepository {
 
       const total = await DrillAssignment.countDocuments(query).exec();
 
-      return { assignments, total };
+      // Exclude assignments whose drill was deleted (populate returns null for missing refs)
+      const validAssignments = assignments.filter(
+        (a) => a.drillId && typeof a.drillId === 'object'
+      );
+
+      return { assignments: validAssignments, total };
     } catch (error: any) {
       logger.error('Error finding assignments by learner ID', { learnerId, error: error.message });
       throw error;
