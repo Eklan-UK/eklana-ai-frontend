@@ -191,13 +191,21 @@ async function getHandler(
 			? queryParams.assignmentStatus
 			: undefined;
 
+	// Parse comma-separated assignedToIds param for server-side student filtering
+	const rawAssignedToIds = new URL(req.url).searchParams.get('assignedToIds');
+	const assignedToIds = rawAssignedToIds
+		? rawAssignedToIds.split(',').map(s => s.trim()).filter(Boolean)
+		: undefined;
+
 	const result = await drillService.listDrills({
 		type: queryParams.type,
 		difficulty: queryParams.difficulty,
-		studentEmail: queryParams.search, // Using search param for studentEmail
+		assignedToIds,
+		studentEmail: assignedToIds ? undefined : queryParams.search,
 		createdBy: queryParams.role === 'creator' ? context.userId.toString() : undefined,
 		isActive: queryParams.isActive,
 		assignmentStatus,
+		q: queryParams.q,
 		limit: queryParams.limit,
 		offset: queryParams.offset,
 	});

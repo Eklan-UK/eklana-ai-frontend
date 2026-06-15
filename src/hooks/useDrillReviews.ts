@@ -108,6 +108,9 @@ function transformAttemptsToSubmissions(attempts: any[]): LearnerSubmissions[] {
   }>();
 
   attempts.forEach((attempt) => {
+    // Skip attempts whose drill no longer exists (deleted drill → populate returns null)
+    if (!attempt.drillId || typeof attempt.drillId !== 'object') return;
+
     const learnerId = typeof attempt.learnerId === 'object' && attempt.learnerId?._id
       ? attempt.learnerId._id.toString()
       : attempt.learnerId?.toString() || '';
@@ -120,17 +123,11 @@ function transformAttemptsToSubmissions(attempts: any[]): LearnerSubmissions[] {
       ? attempt.learnerId?.email || ''
       : '';
 
-    const drill = typeof attempt.drillId === 'object' && attempt.drillId
-      ? {
-          _id: attempt.drillId._id?.toString() || '',
-          title: attempt.drillId.title || 'Untitled Drill',
-          type: attempt.drillId.type || 'unknown',
-        }
-      : {
-          _id: attempt.drillId?.toString() || '',
-          title: 'Untitled Drill',
-          type: 'unknown',
-        };
+    const drill = {
+      _id: attempt.drillId._id?.toString() || '',
+      title: attempt.drillId.title || 'Untitled Drill',
+      type: attempt.drillId.type || 'unknown',
+    };
 
     const submission: Submission = {
       attemptId: attempt._id?.toString() || '',

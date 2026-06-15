@@ -31,6 +31,7 @@ function buildLearnerQuery(searchParams: URLSearchParams): Record<string, unknow
 			{ firstName: { $regex: search, $options: 'i' } },
 			{ lastName: { $regex: search, $options: 'i' } },
 			{ name: { $regex: search, $options: 'i' } },
+			{ email: { $regex: search, $options: 'i' } },
 		];
 	}
 

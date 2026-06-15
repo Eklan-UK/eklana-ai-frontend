@@ -61,9 +61,11 @@ export const drillAPI = {
   getAll: (params?: {
     limit?: number;
     offset?: number;
+    q?: string;
     type?: string;
     difficulty?: string;
     studentEmail?: string;
+    assignedToIds?: string;
     createdBy?: string;
     isActive?: boolean;
     assignmentStatus?: 'saved' | 'assigned';
@@ -74,6 +76,7 @@ export const drillAPI = {
       data?: { 
         drills: any[]; 
         pagination: any;
+        total?: number;
       };
       drills?: any[];
       total?: number;
@@ -472,6 +475,7 @@ export const tutorAPI = {
     difficulty?: string;
     studentEmail?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ drills: any[]; total: number; limit: number; offset: number }>(
       '/tutor/drills',
