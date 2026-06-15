@@ -7,29 +7,49 @@ import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 import { adminService } from "@/services/admin.service";
 
-// Get all drills (admin)
-export function useAllDrills(filters?: {
-  limit?: number;
-  type?: string;
-  difficulty?: string;
-  assignmentStatus?: 'saved' | 'assigned';
-}) {
+// Get all drills (admin) — paginated, 50 per page by default
+export function useAllDrills(
+  filters?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    type?: string;
+    difficulty?: string;
+    assignmentStatus?: 'saved' | 'assigned';
+    assignedToIds?: string[];
+  },
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: [...queryKeys.drills.all, "admin", "list", filters],
     queryFn: async () => {
+      const joinedIds = filters?.assignedToIds?.length
+        ? filters.assignedToIds.join(',')
+        : undefined;
       const response = await drillAPI.getAll({
-        limit: filters?.limit || 100,
+        limit: filters?.limit ?? 50,
+        offset: filters?.offset ?? 0,
+        q: filters?.q,
         type: filters?.type,
         difficulty: filters?.difficulty,
         assignmentStatus: filters?.assignmentStatus,
+        assignedToIds: joinedIds,
       });
       const drills =
         response.data?.drills ??
         response.drills ??
         [];
-      return Array.isArray(drills) ? drills : [];
+      const total =
+        response.data?.total ??
+        response.total ??
+        0;
+      return {
+        drills: Array.isArray(drills) ? drills : [],
+        total: typeof total === 'number' ? total : 0,
+      };
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: options?.enabled !== false,
   });
 }
 
@@ -90,14 +110,17 @@ export function useAnalyticsLearners(filters?: {
 }
 
 // Get all learners (admin)
-export function useAllLearners(filters?: {
+export function useAllLearners(
+  filters?: {
   limit?: number;
   offset?: number;
   search?: string;
   signupDateFrom?: string;
   signupDateTo?: string;
   status?: 'active' | 'inactive';
-}) {
+},
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: [...queryKeys.students.all, "admin", "list", filters],
     queryFn: async () => {
@@ -108,6 +131,7 @@ export function useAllLearners(filters?: {
       };
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: options?.enabled !== false,
   });
 }
 

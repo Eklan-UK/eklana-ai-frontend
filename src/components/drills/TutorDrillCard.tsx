@@ -22,6 +22,7 @@ export interface TutorDrillCardProps {
     duration_days?: number;
     assigned_to?: string[] | string;
     is_active?: boolean;
+    totalAssignments?: number;
   };
   onDelete?: (drillId: string) => void;
   isDeleting?: boolean;
@@ -37,15 +38,18 @@ function TutorDrillCardComponent({
   const drillId = drill._id || drill.id || "";
   
   // Memoize computed values
-  const assignedCount = useMemo(
-    () =>
-      Array.isArray(drill.assigned_to)
-    ? drill.assigned_to.length
-    : drill.assigned_to
-    ? 1
-        : 0,
-    [drill.assigned_to]
-  );
+  const assignedCount = useMemo(() => {
+    if (drill.totalAssignments !== undefined) {
+      return drill.totalAssignments;
+    }
+    return Array.isArray(drill.assigned_to)
+      ? drill.assigned_to.length
+      : drill.assigned_to
+        ? 1
+        : 0;
+  }, [drill.assigned_to, drill.totalAssignments]);
+
+  const isAssigned = assignedCount > 0;
 
   // drill.date is now the completion/due date
   const completionDate = useMemo(() => new Date(drill.date), [drill.date]);
@@ -101,7 +105,9 @@ function TutorDrillCardComponent({
             <div className="flex items-center gap-1">
               <Users className="w-4 h-4" />
               <span>
-                {assignedCount} student{assignedCount !== 1 ? "s" : ""}
+                {isAssigned
+                  ? `${assignedCount} student${assignedCount !== 1 ? "s" : ""}`
+                  : "Not assigned"}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -112,12 +118,12 @@ function TutorDrillCardComponent({
             </div>
             <span
               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                drill.is_active
+                isAssigned
                   ? "bg-green-100 text-green-700"
-                  : "bg-muted text-foreground"
+                  : "bg-amber-100 text-amber-700"
               }`}
             >
-              {drill.is_active ? "Active" : "Inactive"}
+              {isAssigned ? "Assigned" : "Saved"}
             </span>
           </div>
         </div>
