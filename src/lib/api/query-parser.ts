@@ -27,7 +27,7 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
   };
   
   // Optional string parameters
-  const stringParams = ['search', 'role', 'status', 'type', 'difficulty', 'assignmentStatus'];
+  const stringParams = ['search', 'q', 'role', 'status', 'type', 'difficulty', 'assignmentStatus'];
   stringParams.forEach(param => {
     const value = searchParams.get(param);
     if (value) {

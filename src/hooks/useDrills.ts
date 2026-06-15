@@ -75,7 +75,10 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
 }
 
 // Get tutor drills
-export function useTutorDrills(filters?: { isActive?: boolean }) {
+export function useTutorDrills(filters?: {
+  isActive?: boolean;
+  assignmentStatus?: 'saved' | 'assigned';
+}) {
   return useQuery({
     queryKey: queryKeys.drills.tutor.list(filters),
     queryFn: async () => {

@@ -13,11 +13,13 @@ interface DrillsListClientProps {
 }
 
 export function DrillsListClient({ initialDrills }: DrillsListClientProps) {
-  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [filter, setFilter] = useState<"all" | "saved" | "assigned">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Use React Query instead of useEffect + useState
-  const filters = filter === "all" ? {} : { isActive: filter === "active" };
+  const filters =
+    filter === "all"
+      ? {}
+      : { assignmentStatus: filter as "saved" | "assigned" };
   const { data: drills = initialDrills, isLoading: loading } = useTutorDrills(filters);
   const deleteMutation = useDeleteDrill();
 
@@ -58,18 +60,18 @@ export function DrillsListClient({ initialDrills }: DrillsListClientProps) {
             All
           </Button>
           <Button
-            variant={filter === "active" ? "primary" : "outline"}
+            variant={filter === "saved" ? "primary" : "outline"}
             size="sm"
-            onClick={() => setFilter("active")}
+            onClick={() => setFilter("saved")}
           >
-            Active
+            Saved
           </Button>
           <Button
-            variant={filter === "inactive" ? "primary" : "outline"}
+            variant={filter === "assigned" ? "primary" : "outline"}
             size="sm"
-            onClick={() => setFilter("inactive")}
+            onClick={() => setFilter("assigned")}
           >
-            Inactive
+            Assigned
           </Button>
         </div>
       </div>

@@ -84,9 +84,11 @@ export class DrillRepository {
     type?: string;
     difficulty?: string;
     studentEmail?: string;
+    assignedToIds?: string[];
     createdBy?: string;
     isActive?: boolean;
     assignmentStatus?: 'saved' | 'assigned';
+    q?: string;
     limit?: number;
     offset?: number;
   }): Promise<DrillType[]> {
@@ -96,7 +98,11 @@ export class DrillRepository {
     if (filters.difficulty) query.difficulty = filters.difficulty;
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
-    if (filters.studentEmail) query.assigned_to = filters.studentEmail;
+    if (filters.assignedToIds && filters.assignedToIds.length > 0) {
+      query.assigned_to = { $in: filters.assignedToIds };
+    } else if (filters.studentEmail) {
+      query.assigned_to = filters.studentEmail;
+    }
     if (filters.assignmentStatus === 'saved') {
       query.$or = [
         { totalAssignments: 0 },
@@ -112,6 +118,13 @@ export class DrillRepository {
             { assigned_to: { $exists: true, $ne: [] } },
           ],
         },
+      ];
+    }
+    if (filters.q) {
+      const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query.$and = [
+        ...(query.$and ?? []),
+        { $or: [{ title: regex }, { context: regex }] },
       ];
     }
 
