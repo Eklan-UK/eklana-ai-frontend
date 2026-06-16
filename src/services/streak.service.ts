@@ -167,7 +167,36 @@ export class StreakService {
   }
 
   /**
-   * Record a qualifying UTC day from login or drill (idempotent per user+day).
+   * Record a qualifying UTC day for weekly-activity display only (idempotent per user+day).
+   * Does NOT recalculate currentStreak — call recordDrillCompletion for that.
+   */
+  private static async recordActivityDayOnly(
+    userId: string,
+    score?: number
+  ): Promise<void> {
+    const todayString = this.getTodayString();
+    const today = new Date(`${todayString}T00:00:00.000Z`);
+    const uid = new Types.ObjectId(userId);
+
+    const update: Record<string, unknown> = {
+      $set: { date: today },
+      $setOnInsert: { userId: uid, dateString: todayString },
+    };
+    if (score != null) {
+      update.$max = { score };
+    }
+
+    await StreakActivityDay.updateOne(
+      { userId: uid, dateString: todayString },
+      update,
+      { upsert: true }
+    ).exec();
+  }
+
+  /**
+   * Record a login-ping activity day (idempotent per user+day).
+   * Writes to StreakActivityDay for weekly-activity display only.
+   * Login pings no longer drive currentStreak — only drill completions do.
    */
   static async recordActivityDay(
     userId: string,
@@ -177,31 +206,114 @@ export class StreakService {
       return { streakUpdated: false };
     }
     try {
-      const todayString = this.getTodayString();
-      const today = new Date(`${todayString}T00:00:00.000Z`);
-      const uid = new Types.ObjectId(userId);
-
-      const update: Record<string, unknown> = {
-        $set: { date: today },
-        $setOnInsert: {
-          userId: uid,
-          dateString: todayString,
-        },
-      };
-      if (opts?.score != null) {
-        update.$max = { score: opts.score };
-      }
-
-      await StreakActivityDay.updateOne(
-        { userId: uid, dateString: todayString },
-        update,
-        { upsert: true }
-      ).exec();
-
-      const streakUpdated = await this.updateStreak(userId);
-      return { streakUpdated };
+      await this.recordActivityDayOnly(userId, opts?.score);
+      return { streakUpdated: false };
     } catch (error: any) {
       logger.error('Error recording streak activity day', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Record a drill completion and apply the 12/36-hour rolling-window streak rules.
+   *
+   * Rules (score must be ≥ 70 to qualify):
+   *   < 12 h since last qualifying drill  → cooldown: no streak change, no timestamp update
+   *   12–36 h                             → sweet spot: increment streak by 1
+   *   > 36 h  (or first ever completion)  → reset: streak = 1
+   *
+   * This is timezone-agnostic; all math is relative UTC durations, not calendar days.
+   */
+  static async recordDrillCompletion(
+    userId: string,
+    score: number
+  ): Promise<{ streakUpdated: boolean; action: 'cooldown' | 'incremented' | 'reset' | 'first' }> {
+    if (!this.streakFeatureEnabled()) {
+      return { streakUpdated: false, action: 'cooldown' };
+    }
+
+    if (score < 70) {
+      return { streakUpdated: false, action: 'cooldown' };
+    }
+
+    try {
+      const uid = new Types.ObjectId(userId);
+      const now = new Date();
+
+      const existing = await UserStreak.findOne({ userId: uid }).lean().exec();
+      const lastAt: Date | null = existing?.lastDrillCompletedAt
+        ? new Date(existing.lastDrillCompletedAt)
+        : null;
+
+      let newStreak: number;
+      let action: 'cooldown' | 'incremented' | 'reset' | 'first';
+      let streakStartDate: Date | null = existing?.streakStartDate
+        ? new Date(existing.streakStartDate)
+        : null;
+
+      if (!lastAt) {
+        newStreak = 1;
+        action = 'first';
+        streakStartDate = now;
+      } else {
+        const hoursDiff = (now.getTime() - lastAt.getTime()) / 3_600_000;
+
+        if (hoursDiff < 12) {
+          // Cooldown — still record the day for weekly display
+          await this.recordActivityDayOnly(userId, score);
+          logger.info('[StreakService] recordDrillCompletion: cooldown', { userId, hoursDiff });
+          return { streakUpdated: false, action: 'cooldown' };
+        } else if (hoursDiff <= 36) {
+          newStreak = (existing?.currentStreak ?? 0) + 1;
+          action = 'incremented';
+        } else {
+          newStreak = 1;
+          action = 'reset';
+          streakStartDate = now;
+        }
+      }
+
+      const newLongest = Math.max(newStreak, existing?.longestStreak ?? 0);
+
+      await UserStreak.findOneAndUpdate(
+        { userId: uid },
+        {
+          $set: {
+            currentStreak: newStreak,
+            longestStreak: newLongest,
+            streakStartDate,
+            lastActivityDate: now,
+            lastDrillCompletedAt: now,
+          },
+        },
+        { upsert: true, new: true }
+      ).exec();
+
+      // Record the day for weekly-activity display
+      await this.recordActivityDayOnly(userId, score);
+
+      // Refresh cached weeklyActivity from merged rows
+      const mergedRows = await this.getMergedStreakDayRows(userId);
+      const weeklyActivity = this.getWeeklyActivity(mergedRows);
+      await UserStreak.updateOne({ userId: uid }, { $set: { weeklyActivity } }).exec();
+
+      // Check for badge unlock
+      await this.checkBadgeUnlock(userId);
+
+      logger.info('[StreakService] recordDrillCompletion', {
+        userId,
+        score,
+        action,
+        newStreak,
+        hoursSinceLast: lastAt ? (now.getTime() - lastAt.getTime()) / 3_600_000 : null,
+      });
+
+      return { streakUpdated: true, action };
+    } catch (error: any) {
+      logger.error('[StreakService] Error in recordDrillCompletion', {
         userId,
         error: error.message,
       });
