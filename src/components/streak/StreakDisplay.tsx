@@ -76,10 +76,16 @@ export function StreakDisplay() {
             </div>
           </div>
           <p className="text-lg font-semibold text-foreground mb-1">
-            Day Streak
+            {streakData.currentStreak > 0
+              ? streakData.currentStreak === 1
+                ? "1-day streak"
+                : `${streakData.currentStreak}-day streak`
+              : "Day Streak"}
           </p>
           {streakData.currentStreak > 0 ? (
-            <p className="text-sm text-muted-foreground">Keep it going! 🔥</p>
+            <p className="text-sm text-muted-foreground">
+              Consecutive UTC days with activity — keep it going! 🔥
+            </p>
           ) : (
             <p className="text-sm text-muted-foreground">Start your streak today!</p>
           )}

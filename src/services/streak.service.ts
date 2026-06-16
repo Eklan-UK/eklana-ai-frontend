@@ -141,8 +141,14 @@ export class StreakService {
         completedAt: new Date(),
       });
 
-      // Update streak
-      const streakUpdated = await this.updateStreak(userId);
+      // Recompute calendar-day streak from merged activity history
+      const streakUpdated = await this.recomputeStreakFromActivity(userId);
+
+      // Track last qualifying activity for rolling reminder cron
+      await UserStreak.updateOne(
+        { userId: new Types.ObjectId(userId) },
+        { $set: { lastDrillCompletedAt: new Date() } }
+      ).exec();
 
       // Check for badge unlock
       const badgeUnlocked = await this.checkBadgeUnlock(userId);
@@ -195,8 +201,7 @@ export class StreakService {
 
   /**
    * Record a login-ping activity day (idempotent per user+day).
-   * Writes to StreakActivityDay for weekly-activity display only.
-   * Login pings no longer drive currentStreak — only drill completions do.
+   * Qualifying UTC days from login count toward the calendar streak.
    */
   static async recordActivityDay(
     userId: string,
@@ -207,7 +212,8 @@ export class StreakService {
     }
     try {
       await this.recordActivityDayOnly(userId, opts?.score);
-      return { streakUpdated: false };
+      const streakUpdated = await this.recomputeStreakFromActivity(userId);
+      return { streakUpdated };
     } catch (error: any) {
       logger.error('Error recording streak activity day', {
         userId,
@@ -218,14 +224,13 @@ export class StreakService {
   }
 
   /**
-   * Record a drill completion and apply the 12/36-hour rolling-window streak rules.
+   * Record a drill completion: update rolling reminder timing, then recompute calendar streak.
    *
-   * Rules (score must be ≥ 70 to qualify):
-   *   < 12 h since last qualifying drill  → cooldown: no streak change, no timestamp update
-   *   12–36 h                             → sweet spot: increment streak by 1
-   *   > 36 h  (or first ever completion)  → reset: streak = 1
+   * Rolling rules (for lastDrillCompletedAt / reminder cron only):
+   *   < 12 h since last qualifying drill  → cooldown: no timestamp update
+   *   ≥ 12 h                              → update lastDrillCompletedAt
    *
-   * This is timezone-agnostic; all math is relative UTC durations, not calendar days.
+   * currentStreak is always derived from consecutive UTC calendar days via recomputeStreakFromActivity.
    */
   static async recordDrillCompletion(
     userId: string,
@@ -248,70 +253,44 @@ export class StreakService {
         ? new Date(existing.lastDrillCompletedAt)
         : null;
 
-      let newStreak: number;
       let action: 'cooldown' | 'incremented' | 'reset' | 'first';
-      let streakStartDate: Date | null = existing?.streakStartDate
-        ? new Date(existing.streakStartDate)
-        : null;
 
       if (!lastAt) {
-        newStreak = 1;
         action = 'first';
-        streakStartDate = now;
       } else {
         const hoursDiff = (now.getTime() - lastAt.getTime()) / 3_600_000;
 
         if (hoursDiff < 12) {
-          // Cooldown — still record the day for weekly display
           await this.recordActivityDayOnly(userId, score);
+          await this.recomputeStreakFromActivity(userId);
           logger.info('[StreakService] recordDrillCompletion: cooldown', { userId, hoursDiff });
           return { streakUpdated: false, action: 'cooldown' };
-        } else if (hoursDiff <= 36) {
-          newStreak = (existing?.currentStreak ?? 0) + 1;
-          action = 'incremented';
-        } else {
-          newStreak = 1;
-          action = 'reset';
-          streakStartDate = now;
         }
+        action = hoursDiff <= 36 ? 'incremented' : 'reset';
       }
 
-      const newLongest = Math.max(newStreak, existing?.longestStreak ?? 0);
+      await this.recordActivityDayOnly(userId, score);
 
       await UserStreak.findOneAndUpdate(
         { userId: uid },
-        {
-          $set: {
-            currentStreak: newStreak,
-            longestStreak: newLongest,
-            streakStartDate,
-            lastActivityDate: now,
-            lastDrillCompletedAt: now,
-          },
-        },
+        { $set: { lastDrillCompletedAt: now, lastActivityDate: now } },
         { upsert: true, new: true }
       ).exec();
 
-      // Record the day for weekly-activity display
-      await this.recordActivityDayOnly(userId, score);
-
-      // Refresh cached weeklyActivity from merged rows
-      const mergedRows = await this.getMergedStreakDayRows(userId);
-      const weeklyActivity = this.getWeeklyActivity(mergedRows);
-      await UserStreak.updateOne({ userId: uid }, { $set: { weeklyActivity } }).exec();
-
-      // Check for badge unlock
+      const streakUpdated = await this.recomputeStreakFromActivity(userId);
       await this.checkBadgeUnlock(userId);
+
+      const updated = await UserStreak.findOne({ userId: uid }).lean().exec();
 
       logger.info('[StreakService] recordDrillCompletion', {
         userId,
         score,
         action,
-        newStreak,
+        currentStreak: updated?.currentStreak,
         hoursSinceLast: lastAt ? (now.getTime() - lastAt.getTime()) / 3_600_000 : null,
       });
 
-      return { streakUpdated: true, action };
+      return { streakUpdated, action };
     } catch (error: any) {
       logger.error('[StreakService] Error in recordDrillCompletion', {
         userId,
@@ -369,21 +348,79 @@ export class StreakService {
   }
 
   /**
-   * Update user's streak based on completions
+   * Compute consecutive UTC calendar-day streak from merged activity rows.
    */
-  private static async updateStreak(userId: string): Promise<boolean> {
+  private static computeCurrentCalendarStreak(completions: StreakDayRow[]): {
+    currentStreak: number;
+    streakStartDate: Date | null;
+  } {
+    if (completions.length === 0) {
+      return { currentStreak: 0, streakStartDate: null };
+    }
+
+    const todayString = this.getTodayString();
+    const yesterdayString = this.getYesterdayString();
+
+    let currentStreak = 0;
+    let streakStartDate: Date | null = null;
+    let expectedDate = new Date(todayString);
+    expectedDate.setUTCHours(0, 0, 0, 0);
+
+    const todayCompletion = completions.find((c) => c.dateString === todayString);
+    if (todayCompletion) {
+      currentStreak = 1;
+      streakStartDate = todayCompletion.date;
+      expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+    } else {
+      const yesterdayCompletion = completions.find(
+        (c) => c.dateString === yesterdayString
+      );
+      if (yesterdayCompletion) {
+        currentStreak = 1;
+        streakStartDate = yesterdayCompletion.date;
+        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+      } else {
+        return { currentStreak: 0, streakStartDate: null };
+      }
+    }
+
+    const completionMap = new Map(completions.map((c) => [c.dateString, c]));
+
+    while (true) {
+      const expectedDateString = this.getDateString(expectedDate);
+      const completion = completionMap.get(expectedDateString);
+
+      if (completion) {
+        currentStreak++;
+        if (!streakStartDate) {
+          streakStartDate = completion.date;
+        }
+        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return { currentStreak, streakStartDate };
+  }
+
+  /**
+   * Recompute currentStreak from consecutive UTC calendar days and refresh cached display fields.
+   */
+  private static async recomputeStreakFromActivity(userId: string): Promise<boolean> {
     try {
       const completions = await this.getMergedStreakDayRows(userId);
+      const uid = new Types.ObjectId(userId);
 
       if (completions.length === 0) {
-        // No completions, reset streak
         await UserStreak.findOneAndUpdate(
-          { userId: new Types.ObjectId(userId) },
+          { userId: uid },
           {
             $set: {
               currentStreak: 0,
               streakStartDate: null,
               lastActivityDate: null,
+              weeklyActivity: this.getEmptyWeeklyActivity(),
             },
           },
           { upsert: true, new: true }
@@ -391,95 +428,38 @@ export class StreakService {
         return false;
       }
 
-      const todayString = this.getTodayString();
-      const yesterdayString = this.getYesterdayString();
-
-      // Calculate current streak
-      let currentStreak = 0;
-      let streakStartDate: Date | null = null;
-      let expectedDate = new Date(todayString);
-      expectedDate.setUTCHours(0, 0, 0, 0);
-
-      // Check if today has completion
-      const todayCompletion = completions.find(c => c.dateString === todayString);
-      if (todayCompletion) {
-        currentStreak = 1;
-        streakStartDate = todayCompletion.date;
-        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-      } else {
-        // Check yesterday
-        const yesterdayCompletion = completions.find(c => c.dateString === yesterdayString);
-        if (yesterdayCompletion) {
-          currentStreak = 1;
-          streakStartDate = yesterdayCompletion.date;
-          expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-        } else {
-          // No recent activity, streak is 0
-          await UserStreak.findOneAndUpdate(
-            { userId: new Types.ObjectId(userId) },
-            {
-              $set: {
-                currentStreak: 0,
-                streakStartDate: null,
-                lastActivityDate: completions[0]?.date || null,
-              },
-            },
-            { upsert: true, new: true }
-          ).exec();
-          return false;
-        }
-      }
-
-      // Continue counting backwards
-      const completionMap = new Map(completions.map(c => [c.dateString, c]));
-
-      while (true) {
-        const expectedDateString = this.getDateString(expectedDate);
-        const completion = completionMap.get(expectedDateString);
-
-        if (completion) {
-          currentStreak++;
-          if (!streakStartDate) {
-            streakStartDate = completion.date;
-          }
-          expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-        } else {
-          // Gap found, streak broken
-          break;
-        }
-      }
-
-      // Calculate longest streak
+      const { currentStreak, streakStartDate } =
+        this.computeCurrentCalendarStreak(completions);
       const longestStreak = this.calculateLongestStreak(completions);
+      const weeklyActivity = this.getWeeklyActivity(completions);
 
-      // Get or create user streak record
-      const userStreak = await UserStreak.findOneAndUpdate(
-        { userId: new Types.ObjectId(userId) },
+      await UserStreak.findOneAndUpdate(
+        { userId: uid },
         {
           $set: {
             currentStreak,
             streakStartDate,
             lastActivityDate: completions[0]?.date || null,
-            longestStreak: Math.max(longestStreak, currentStreak), // Update if current is higher
+            longestStreak: Math.max(longestStreak, currentStreak),
+            weeklyActivity,
           },
         },
         { upsert: true, new: true }
       ).exec();
 
-      // Update weekly activity
-      const weeklyActivity = this.getWeeklyActivity(completions);
-      await UserStreak.findByIdAndUpdate(userStreak._id, {
-        $set: { weeklyActivity },
-      }).exec();
-
       return true;
     } catch (error: any) {
-      logger.error('Error updating streak', {
+      logger.error('Error recomputing streak from activity', {
         userId,
         error: error.message,
       });
       throw error;
     }
+  }
+
+  /** @deprecated Use recomputeStreakFromActivity */
+  private static async refreshStreakDisplayData(userId: string): Promise<void> {
+    await this.recomputeStreakFromActivity(userId);
   }
 
   /**
@@ -638,18 +618,12 @@ export class StreakService {
       const todayString = this.getTodayString();
       const yesterdayString = this.getYesterdayString();
 
-      // Get user streak record
-      let userStreak = await UserStreak.findOne({
+      // Always recompute so UI reflects consecutive UTC calendar days (not stale rolling-window value)
+      await this.recomputeStreakFromActivity(userId);
+
+      const userStreak = await UserStreak.findOne({
         userId: new Types.ObjectId(userId),
       }).lean().exec();
-
-      // If no streak record exists, create one
-      if (!userStreak) {
-        await this.updateStreak(userId);
-        userStreak = await UserStreak.findOne({
-          userId: new Types.ObjectId(userId),
-        }).lean().exec();
-      }
 
       if (!userStreak) {
         return {

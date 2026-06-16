@@ -148,7 +148,15 @@ export class DrillReminderService {
           continue;
         }
 
-        const result = await onStreakReminder(learnerId, doc.currentStreak ?? 0);
+        const streakData = await StreakService.getStreakData(learnerId);
+        const streakDays = streakData.currentStreak;
+
+        if (streakDays <= 0) {
+          skipped += 1;
+          continue;
+        }
+
+        const result = await onStreakReminder(learnerId, streakDays);
 
         if (result) {
           await UserStreak.updateOne(
