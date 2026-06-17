@@ -1,58 +1,36 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Mic, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { usePronunciation } from '@/hooks/usePronunciation';
+import { useProgressScorecard } from '@/hooks/useProgressScorecard';
 
 export function HomePronunciationCard() {
-  const { data: metrics, isLoading } = usePronunciation();
-
-  // Calculate weekly change from history if available
-  const weeklyChange = useMemo(() => {
-    if (!metrics?.history || metrics.history.length === 0) return 0;
-    
-    // Sort history by date desc
-    const sortedHistory = [...metrics.history].sort((a, b) => 
-      new Date(b.computedAt).getTime() - new Date(a.computedAt).getTime()
-    );
-    
-    const latest = sortedHistory[0];
-    const score = latest.score;
-    
-    // Find entry ~1 week ago (or oldest if less than week)
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const oldEntry = sortedHistory.find(h => new Date(h.computedAt) <= oneWeekAgo) || sortedHistory[sortedHistory.length - 1];
-    
-    return score - oldEntry.score;
-  }, [metrics]);
+  const { data: scorecard, isLoading } = useProgressScorecard();
 
   if (isLoading) {
     return (
       <Card className="animate-pulse">
         <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-muted rounded-xl" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-24 bg-muted rounded" />
-              <div className="h-3 w-16 bg-muted rounded" />
-            </div>
-            <div className="w-14 h-14 rounded-full bg-muted" />
+          <div className="w-12 h-12 bg-muted rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-24 bg-muted rounded" />
+            <div className="h-3 w-16 bg-muted rounded" />
+          </div>
+          <div className="w-14 h-14 rounded-full bg-muted" />
         </div>
       </Card>
     );
   }
 
-  const score = metrics?.overallScore ?? 0;
-  // Ensure score is within valid range 0-100
-  const validScore = Math.max(0, Math.min(100, score));
-  
+  const score = Math.max(0, Math.min(100, scorecard?.pronunciation ?? 0));
+  const weeklyChange = scorecard?.pronunciationWeeklyChange ?? 0;
   const isPositive = weeklyChange >= 0;
   const absChange = Math.abs(weeklyChange);
 
-  // Circle progress
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (validScore / 100) * circumference;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
 
   return (
     <Card className="!p-5">
@@ -73,11 +51,9 @@ export function HomePronunciationCard() {
             </div>
           </div>
         </div>
-        
-        {/* Progress Circle */}
+
         <div className="relative w-14 h-14 flex-shrink-0">
           <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
-            {/* Background Circle */}
             <circle
               cx="32" cy="32" r={radius}
               stroke="currentColor"
@@ -85,10 +61,9 @@ export function HomePronunciationCard() {
               fill="none"
               className="text-muted"
             />
-            {/* Progress Circle */}
             <circle
               cx="32" cy="32" r={radius}
-              stroke="#22c55e" /* green-500 */
+              stroke="#22c55e"
               strokeWidth="5"
               fill="none"
               strokeLinecap="round"
@@ -99,7 +74,7 @@ export function HomePronunciationCard() {
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-sm font-extrabold font-nunito text-foreground">
-              {Math.round(validScore)}
+              {score}
             </span>
           </div>
         </div>

@@ -18,7 +18,7 @@ export interface StreakDataResponse {
     badgeId: string;
     badgeName: string;
     unlockedAt: string;
-    milestone: number;
+    milestone?: number;
   }>;
 }
 

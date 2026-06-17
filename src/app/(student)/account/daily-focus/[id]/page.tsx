@@ -20,7 +20,9 @@ import {
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { dailyFocusAPI } from "@/lib/api";
+import { queryKeys } from "@/lib/react-query";
 
 interface DailyFocus {
   _id: string;
@@ -83,6 +85,7 @@ interface UserAnswer {
 export default function DailyFocusPracticePage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const id = params.id as string;
 
   const [dailyFocus, setDailyFocus] = useState<DailyFocus | null>(null);
@@ -420,6 +423,9 @@ export default function DailyFocusPracticePage() {
           duration: 5000,
         });
       }
+
+      void queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
+      void queryClient.invalidateQueries({ queryKey: ["user-streak"] });
 
       setIsCompleted(true);
     } catch (error: any) {

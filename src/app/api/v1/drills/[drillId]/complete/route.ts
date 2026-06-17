@@ -15,6 +15,7 @@ import { AssignmentRepository } from '@/domain/assignments/assignment.repository
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import { computeConfidenceMetrics } from '@/domain/confidence/confidence.service';
 import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
+import { computeProgressScorecard } from '@/domain/progress/progress-scorecard.service';
 import { StreakService } from '@/services/streak.service';
 
 const completeSchema = z.object({
@@ -236,12 +237,13 @@ async function handler(
 	});
 
 
-	// Fire-and-forget: recompute confidence & pronunciation metrics in background
+	// Fire-and-forget: recompute metrics in background
 	// Do not await — this must not block or throw to the user
 	setImmediate(() => {
 		Promise.all([
 			computeConfidenceMetrics(context.userId.toString()).catch(() => {}),
-			computePronunciationMetrics(context.userId.toString()).catch(() => {})
+			computePronunciationMetrics(context.userId.toString()).catch(() => {}),
+			computeProgressScorecard(context.userId.toString()).catch(() => {}),
 		]);
 	});
 
@@ -250,6 +252,12 @@ async function handler(
 			await StreakService.recordDrillCompletion(context.userId.toString(), validated.score);
 		} catch {
 			// streak must not fail drill completion
+		}
+		try {
+			const { BadgeService } = await import('@/domain/badges/badge.service');
+			void BadgeService.evaluateAndUnlock(context.userId.toString());
+		} catch {
+			// badges must not fail drill completion
 		}
 	}
 

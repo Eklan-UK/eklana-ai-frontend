@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { MessageSquareText, TrendingUp, TrendingDown } from "lucide-react";
+import { CheckCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { useHomeProgress } from "@/hooks/useHomeProgress";
+import { useProgressScorecard } from "@/hooks/useProgressScorecard";
 
 export function HomeAccurateSentenceCard() {
-  const { data: metrics, isLoading } = useHomeProgress();
+  const { data: scorecard, isLoading } = useProgressScorecard();
 
   if (isLoading) {
     return (
@@ -23,26 +23,25 @@ export function HomeAccurateSentenceCard() {
     );
   }
 
-  const score = metrics?.accurateSentenceUsage ?? 0;
-  const weeklyChange = metrics?.sentenceWeeklyChange ?? 0;
-  const validScore = Math.max(0, Math.min(100, score));
+  const score = Math.max(0, Math.min(100, scorecard?.accuracy ?? 0));
+  const weeklyChange = scorecard?.accuracyWeeklyChange ?? 0;
   const isPositive = weeklyChange >= 0;
   const absChange = Math.abs(weeklyChange);
 
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (validScore / 100) * circumference;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
 
   return (
     <Card className="!p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-sky-500/10 rounded-xl flex items-center justify-center">
-            <MessageSquareText className="w-6 h-6 text-sky-600" />
+            <CheckCircle className="w-6 h-6 text-sky-600" />
           </div>
           <div>
             <p className="text-sm font-bold font-satoshi text-foreground">
-              Accurate Sentence Usage
+              Accuracy
             </p>
             <div
               className={`text-xs flex items-center gap-1 mt-0.5 font-medium ${
@@ -88,7 +87,7 @@ export function HomeAccurateSentenceCard() {
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-sm font-extrabold font-nunito text-foreground">
-              {Math.round(validScore)}
+              {score}
             </span>
           </div>
         </div>
