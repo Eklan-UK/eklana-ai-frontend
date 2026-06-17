@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
 import { drillAPI, pronunciationAPI } from "@/lib/api";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
@@ -783,7 +784,7 @@ export default function RoleplayDrill({
     } finally {
       setIsSavingProgress(false);
     }
-  }, [sceneBreak, progressContext, progressDrillId, buildSavePayload, router]);
+  }, [sceneBreak, progressContext, progressDrillId, buildSavePayload, router, queryClient]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
