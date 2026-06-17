@@ -1,6 +1,8 @@
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 import { getDrillStatus } from '@/utils/drill';
 
+export type PlanTab = 'ongoing' | 'reviewed' | 'completed';
+
 export function isFreeTalkPlanItem(item: {
   itemType?: string;
   drill?: { type?: string };
@@ -11,16 +13,52 @@ export function isFreeTalkPlanItem(item: {
   );
 }
 
-export function isActiveAssignedPlanItem(item: {
+export function isCompletedPlanItem(item: {
   itemType?: string;
-  drill?: { type?: string };
+  drill?: { type?: string; date?: string };
   completedAt?: string | Date | null;
   status?: string;
+  assignmentStatus?: string;
+  dueDate?: string;
+  latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
 }): boolean {
   if (isFreeTalkPlanItem(item)) {
-    return !item.completedAt && item.status !== 'completed';
+    return Boolean(item.completedAt) || item.status === 'completed';
   }
-  return getDrillStatus(item) !== 'completed';
+  return (
+    getDrillStatus({
+      ...item,
+      assignmentStatus: item.assignmentStatus ?? item.status,
+    }) === 'completed'
+  );
+}
+
+/** Non-completed drills shown on the home "Assigned Drills" section. */
+export function isActiveAssignedPlanItem(item: {
+  itemType?: string;
+  drill?: { type?: string; date?: string };
+  completedAt?: string | Date | null;
+  status?: string;
+  assignmentStatus?: string;
+  dueDate?: string;
+  latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
+}): boolean {
+  return !isCompletedPlanItem(item);
+}
+
+/** Tab bucket for My Plan (Ongoing / Reviewed / Completed). */
+export function drillPlanTab(item: {
+  itemType?: string;
+  drill?: { type?: string; date: string };
+  completedAt?: string | Date | null;
+  status?: string;
+  assignmentStatus?: string;
+  dueDate?: string;
+  latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
+}): PlanTab {
+  if (!isCompletedPlanItem(item)) return 'ongoing';
+  if (item.latestAttempt?.reviewStatus === 'reviewed') return 'reviewed';
+  return 'completed';
 }
 
 export function freeTalkScenarioTypeLabel(scenarioType: string): string {

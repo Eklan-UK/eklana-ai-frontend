@@ -4,6 +4,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { drillAPI, tutorAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 
@@ -145,11 +146,9 @@ export function useCompleteDrill() {
       drillId: string;
       data: any;
     }) => {
-      return await drillAPI.complete(drillId, data);
+      return await completeLearnerDrill(queryClient, drillId, data);
     },
     onSuccess: () => {
-      // Invalidate learner drills to show updated status
-      queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
       toast.success("Drill completed successfully!");
     },
     onError: (error: any) => {

@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillLayout } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
@@ -60,6 +61,7 @@ function findUnmatchedCanonicalPairIndex(
 }
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
@@ -272,7 +274,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       const totalPairs = pairs.length;
       const accuracy = totalPairs > 0 ? (pairsMatched / totalPairs) * 100 : 0;
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,

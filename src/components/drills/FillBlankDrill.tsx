@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { drillAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
@@ -251,7 +251,7 @@ export default function FillBlankDrill({
           score,
         });
       } else if (passed) {
-        await drillAPI.complete(drill._id, {
+        await completeLearnerDrill(queryClient, drill._id, {
           drillAssignmentId: assignmentId!,
           score,
           timeSpent: Math.floor((Date.now() - startTime) / 1000),

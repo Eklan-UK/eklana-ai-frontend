@@ -9,33 +9,20 @@ import { Loader2, BookOpen } from "lucide-react";
 import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useLearnerClasses } from "@/hooks/useClasses";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import { getDrillStatus } from "@/utils/drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { pickNextLearnerSession } from "@/lib/classes/pick-next-learner-session";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
-import { isFreeTalkPlanItem, sortAssignedPlanItems } from "@/lib/learner-assigned-plan";
+import {
+  drillPlanTab,
+  isFreeTalkPlanItem,
+  sortAssignedPlanItems,
+  type PlanTab,
+} from "@/lib/learner-assigned-plan";
 import { LearnerNextSessionCard } from "@/components/classes/LearnerNextSessionCard";
 import { StreakBadge } from "@/components/streak/StreakBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-
-type PlanTab = "ongoing" | "reviewed" | "completed";
-
-function drillPlanTab(item: {
-  itemType?: string;
-  completedAt?: string;
-  dueDate?: string;
-  status?: string;
-  drill: { date: string; type?: string };
-  latestAttempt?: { reviewStatus?: "pending" | "reviewed" };
-}): PlanTab {
-  if (isFreeTalkPlanItem(item)) return "ongoing";
-  const status = getDrillStatus(item);
-  if (status !== "completed") return "ongoing";
-  if (item.latestAttempt?.reviewStatus === "reviewed") return "reviewed";
-  return "completed";
-}
 
 export default function DrillsPage() {
   const router = useRouter();
