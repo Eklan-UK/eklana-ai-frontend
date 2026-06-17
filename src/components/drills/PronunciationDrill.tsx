@@ -26,6 +26,7 @@ import {
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface PronunciationDrillProps {
   drill: any;
@@ -388,6 +389,7 @@ export default function PronunciationDrill({
         });
 
         if (passed) {
+          playPracticeFeedback("success");
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"
@@ -401,6 +403,7 @@ export default function PronunciationDrill({
             });
           }, 50);
         } else {
+          playPracticeFeedback("failure");
           toast.warning(
             `Score: ${score.toFixed(
               0

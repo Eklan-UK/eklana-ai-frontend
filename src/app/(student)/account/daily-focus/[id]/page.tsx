@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { dailyFocusAPI } from "@/lib/api";
@@ -329,12 +330,15 @@ export default function DailyFocusPracticePage() {
     setIsSubmitted(true);
 
     if (isCorrect) {
+      playPracticeFeedback("success");
       confetti({
         particleCount: 50,
         spread: 60,
         origin: { y: 0.7 },
         colors: ["#22c55e", "#16a34a"],
       });
+    } else {
+      playPracticeFeedback("failure");
     }
   };
 

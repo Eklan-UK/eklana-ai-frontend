@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface SentenceDrillProps {
@@ -211,6 +212,7 @@ export default function SentenceDrill({
       });
 
       setIsCompleted(true);
+      playPracticeFeedback("success");
       toast.success("Drill submitted! Your submission is pending review.");
 
       // Track activity locally (no API call)

@@ -638,11 +638,3 @@ export class StreakService {
   }
 }
 
-// Export Badge type
-export type Badge = {
-  badgeId: string;
-  badgeName: string;
-  unlockedAt: Date;
-  milestone: number;
-};
-
