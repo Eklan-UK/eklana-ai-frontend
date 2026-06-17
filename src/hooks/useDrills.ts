@@ -72,6 +72,7 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
         });
     },
     staleTime: 1000 * 60 * 2, // 2 minutes for learner drills
+    refetchOnMount: true, // Override global false: refetch when stale/invalidated on mount (e.g. after drill completion)
   });
 }
 
