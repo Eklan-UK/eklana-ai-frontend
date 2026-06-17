@@ -72,6 +72,8 @@ export function PlanDrillRow({
     assignmentStatus: status,
   });
   const isCompleted = drillStatus === "completed";
+  const isInProgress =
+    status === "in-progress" || status === "in_progress";
   const href =
     isCompleted && assignmentId
       ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
@@ -113,6 +115,9 @@ export function PlanDrillRow({
         </h3>
         <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
           • {getDrillTypeLabel(drill.type)}
+          {isInProgress && !isCompleted ? (
+            <span className="ml-1.5 text-sky-600">· In progress</span>
+          ) : null}
         </p>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <Clock3 className="w-3.5 h-3.5 shrink-0" />
