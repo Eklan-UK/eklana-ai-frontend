@@ -61,11 +61,14 @@ export const drillAPI = {
   getAll: (params?: {
     limit?: number;
     offset?: number;
+    q?: string;
     type?: string;
     difficulty?: string;
     studentEmail?: string;
+    assignedToIds?: string;
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -73,6 +76,7 @@ export const drillAPI = {
       data?: { 
         drills: any[]; 
         pagination: any;
+        total?: number;
       };
       drills?: any[];
       total?: number;
@@ -133,6 +137,82 @@ export const drillAPI = {
       method: 'GET',
       params,
       cache: false,
+    });
+  },
+
+  getRoleplayProgress: (
+    drillId: string,
+    params:
+      | { source: 'assignment'; assignmentId: string }
+      | {
+          source: 'weekly_challenge';
+          challengeId: string;
+          challengeItemIndex: number;
+        },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { progress: Record<string, unknown> | null };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  saveRoleplayProgress: (
+    drillId: string,
+    data: {
+      source: 'assignment' | 'weekly_challenge';
+      assignmentId?: string;
+      challengeId?: string;
+      challengeItemIndex?: number;
+      weekStartDate?: string;
+      currentSceneIndex: number;
+      currentTurnIndex: number;
+      pausedAtSceneBreak: boolean;
+      completedSceneIndex?: number;
+      turnProgress: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      sessionAnalytics: Array<{
+        sceneIndex: number;
+        turnIndex: number;
+        text: string;
+        score: number;
+        textScore?: unknown;
+        attempts: number;
+        timestamp: string | Date;
+      }>;
+      roleMode: 'original' | 'swapped';
+      originalRoleProgress?: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      swappedRoleProgress?: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      startedAt?: string | Date;
+    },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { progress: Record<string, unknown> };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  clearRoleplayProgress: (
+    drillId: string,
+    params:
+      | { source: 'assignment'; assignmentId: string }
+      | {
+          source: 'weekly_challenge';
+          challengeId: string;
+          challengeItemIndex: number;
+        },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { deleted: boolean };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'DELETE',
+      params,
     });
   },
 
@@ -471,6 +551,7 @@ export const tutorAPI = {
     difficulty?: string;
     studentEmail?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
   }) => {
     return apiRequest<{ drills: any[]; total: number; limit: number; offset: number }>(
       '/tutor/drills',
@@ -693,16 +774,45 @@ export const adminAPI = {
     });
   },
 
-  // Assign tutor to student
+  // Assign tutor to student (creates TutorAssignment, multiple tutors per student supported)
   assignTutorToStudent: (studentId: string, tutorId: string) => {
     return apiRequest<{
       code: string;
       message: string;
-      data: { learner: any };
+      data: { assignmentId: string };
     }>('/admin/assign-tutor', {
       method: 'POST',
       data: { studentId, tutorId },
     });
+  },
+
+  // Remove tutor–student assignment
+  unassignTutorFromStudent: (studentId: string, tutorId: string) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+    }>('/admin/unassign-tutor', {
+      method: 'DELETE',
+      data: { studentId, tutorId },
+    });
+  },
+
+  // List learners assigned to a specific tutor
+  getTutorAssignedStudents: (tutorId: string, params?: { search?: string }) => {
+    const qs = params?.search ? `?search=${encodeURIComponent(params.search)}` : '';
+    return apiRequest<{
+      students: Array<{
+        assignmentId: string;
+        id: string;
+        firstName?: string;
+        lastName?: string;
+        name: string;
+        email: string;
+        assignedAt: string;
+        assignedBy: any;
+      }>;
+      total: number;
+    }>(`/admin/tutors/${tutorId}/students${qs}`);
   },
 
   // Platform analytics overview (admin only)
@@ -797,6 +907,10 @@ export const adminAPI = {
   getAllLearners: (params?: {
     limit?: number;
     offset?: number;
+    search?: string;
+    signupDateFrom?: string;
+    signupDateTo?: string;
+    status?: 'active' | 'inactive';
   }) => {
     return apiRequest<{
       code?: string;
@@ -808,6 +922,55 @@ export const adminAPI = {
     }>('/admin/learners', {
       method: 'GET',
       params,
+      cache: false,
+    });
+  },
+
+  getAdminSubscriptions: (params?: { limit?: number; sync?: boolean }) => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        learners: any[];
+        sync: {
+          syncedCount: number;
+          failedCount: number;
+        };
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
+      };
+    }>('/admin/subscriptions', {
+      method: 'GET',
+      params: {
+        limit: params?.limit,
+        sync: params?.sync === false ? 'false' : undefined,
+      },
+      cache: false,
+    });
+  },
+
+  getDashboardStats: () => {
+    return apiRequest<{
+      code: string;
+      message: string;
+      data: {
+        totalUsers: number;
+        subscribedUsers: number;
+        totalActiveLearners: number;
+        totalDrills: number;
+        zeroPauseChallengeUsers: number;
+        zeroPauseMasteryUsers: number;
+        newSignupsThisWeek: number;
+        discoveryCallsToday: number;
+        videosAwaitingReview: number;
+      };
+    }>('/admin/dashboard/stats', {
+      method: 'GET',
+      cache: false,
     });
   },
 
@@ -815,7 +978,10 @@ export const adminAPI = {
   updateUserSubscription: (data: {
     userId: string;
     plan: "free" | "premium";
-    months: number;
+    months?: number;
+    billingPeriod?: "monthly" | "quarterly" | "annual";
+    zeroPauseProducts?: ("challenge" | "mastery")[];
+    zeroPauseDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -826,6 +992,9 @@ export const adminAPI = {
       data: {
         userId: string;
         subscriptionPlan: "free" | "premium";
+        subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
+        zeroPauseProducts: ("challenge" | "mastery")[];
+        zeroPauseDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
@@ -835,6 +1004,7 @@ export const adminAPI = {
     }).then((response) => {
       // Subscription changes must be visible on the learners list immediately.
       apiCache.clearPattern('^/admin/learners');
+      apiCache.clearPattern('^/admin/subscriptions');
       apiCache.clearPattern('^/users');
       return response;
     });
@@ -950,6 +1120,9 @@ export const adminAPI = {
       code?: string;
       message?: string;
       data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
         totalAssignedBlanks: number;
         correctBlanks: number;
         incorrectBlanks: number;
@@ -981,6 +1154,9 @@ export const adminAPI = {
       code?: string;
       message?: string;
       data?: {
+        totalAssigned: number;
+        totalCompleted: number;
+        completionRatePct: number;
         totalAssignedItems: number;
         correctItems: number;
         incorrectItems: number;
@@ -1014,6 +1190,9 @@ export const adminAPI = {
       message?: string;
       data?: {
         stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
           totalAssignedBlanks: number;
           correctBlanks: number;
           incorrectBlanks: number;
@@ -1046,6 +1225,9 @@ export const adminAPI = {
       message?: string;
       data?: {
         stats: {
+          totalAssigned: number;
+          totalCompleted: number;
+          completionRatePct: number;
           totalAssignedItems: number;
           correctItems: number;
           incorrectItems: number;

@@ -6,6 +6,7 @@ import LearnerPronunciationProgress from '@/models/learner-pronunciation-progres
 import {
 	getOverallProblemAreasWithWords,
 	getOverallStats,
+	getAggregatedPronunciationWordStats,
 	type OverallPronunciationStats,
 	type PhonemeProblemArea,
 } from '@/domain/pronunciations/pronunciation-analytics.service';
@@ -88,7 +89,13 @@ export interface AnalyticsDashboardMatchingStats {
 	slowestMatchLabel: string | null;
 }
 
-export interface AnalyticsDashboardFillBlankStats {
+export interface DrillTypeAssignmentStats {
+	totalAssigned: number;
+	totalCompleted: number;
+	completionRatePct: number;
+}
+
+export interface AnalyticsDashboardFillBlankStats extends DrillTypeAssignmentStats {
 	totalAssignedBlanks: number;
 	correctBlanks: number;
 	incorrectBlanks: number;
@@ -97,7 +104,7 @@ export interface AnalyticsDashboardFillBlankStats {
 	averageScore: number;
 }
 
-export interface AnalyticsDashboardKeyPhrasesStats {
+export interface AnalyticsDashboardKeyPhrasesStats extends DrillTypeAssignmentStats {
 	totalAssignedItems: number;
 	correctItems: number;
 	incorrectItems: number;
@@ -105,6 +112,26 @@ export interface AnalyticsDashboardKeyPhrasesStats {
 	totalAttempts: number;
 	averageScore: number;
 	averagePronunciationScore: number;
+}
+
+type FillBlankAttemptStats = Omit<
+	AnalyticsDashboardFillBlankStats,
+	keyof DrillTypeAssignmentStats
+>;
+
+type KeyPhrasesAttemptStats = Omit<
+	AnalyticsDashboardKeyPhrasesStats,
+	keyof DrillTypeAssignmentStats
+>;
+
+interface FillBlankFromAttemptsResult {
+	stats: FillBlankAttemptStats;
+	problemRows: FillBlankProblemRow[];
+}
+
+interface KeyPhrasesFromAttemptsResult {
+	stats: KeyPhrasesAttemptStats;
+	problemRows: KeyPhraseProblemRow[];
 }
 
 export interface FillBlankProblemRow {
@@ -135,6 +162,7 @@ export interface PlatformKeyPhrasesAnalytics {
 
 export interface AnalyticsDashboardPronunciation {
 	overall: OverallPronunciationStats;
+	challengingWords?: number;
 	problemAreas: {
 		topIncorrectPhonemes: PhonemeProblemArea[];
 	};
@@ -484,6 +512,41 @@ function computeOverallAverageScore(
 	return 0;
 }
 
+async function getDrillTypeAssignmentStats(
+	learnerMatch: Record<string, unknown>,
+	drillType: 'fill_blank' | 'key_phrases'
+): Promise<DrillTypeAssignmentStats> {
+	const result = await DrillAssignment.aggregate([
+		{ $match: learnerMatch },
+		{
+			$lookup: {
+				from: 'drills',
+				localField: 'drillId',
+				foreignField: '_id',
+				as: 'drill',
+			},
+		},
+		{ $unwind: '$drill' },
+		{ $match: { 'drill.type': drillType } },
+		{
+			$group: {
+				_id: null,
+				totalAssigned: { $sum: 1 },
+				totalCompleted: {
+					$sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+				},
+			},
+		},
+	]);
+
+	const totalAssigned = result[0]?.totalAssigned ?? 0;
+	const totalCompleted = result[0]?.totalCompleted ?? 0;
+	const completionRatePct =
+		totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0;
+
+	return { totalAssigned, totalCompleted, completionRatePct };
+}
+
 async function getDrillAssignmentAggregates(
 	learnerMatch: Record<string, unknown>
 ): Promise<{
@@ -556,38 +619,6 @@ async function getDrillAssignmentAggregates(
 		statusCounts,
 		averageScore,
 		pendingReview: pendingReviewResult[0]?.count ?? 0,
-	};
-}
-
-async function getPronunciationProgressAggregates(
-	learnerMatch: Record<string, unknown>
-): Promise<{
-	totalWords: number;
-	completedWords: number;
-	averageScore: number;
-}> {
-	const result = await LearnerPronunciationProgress.aggregate([
-		{ $match: learnerMatch },
-		{
-			$group: {
-				_id: null,
-				totalWords: { $sum: 1 },
-				completedWords: {
-					$sum: { $cond: ['$passed', 1, 0] },
-				},
-				avgScore: { $avg: '$averageScore' },
-			},
-		},
-	]);
-
-	if (result.length === 0) {
-		return { totalWords: 0, completedWords: 0, averageScore: 0 };
-	}
-
-	return {
-		totalWords: result[0].totalWords || 0,
-		completedWords: result[0].completedWords || 0,
-		averageScore: Math.round(result[0].avgScore || 0),
 	};
 }
 
@@ -807,7 +838,7 @@ const MAX_PROBLEM_ROWS = 20;
 function aggregateFillBlankFromAttempts(
 	attempts: Array<{ fillBlankResults?: FillBlankResultsLean }>,
 	includeProblemRows = false
-): PlatformFillBlankAnalytics {
+): FillBlankFromAttemptsResult {
 	let totalAssignedBlanks = 0;
 	let correctBlanks = 0;
 	let incorrectBlanks = 0;
@@ -893,7 +924,7 @@ function aggregateFillBlankFromAttempts(
 function aggregateKeyPhrasesFromAttempts(
 	attempts: Array<{ keyPhrasesResults?: KeyPhrasesResultsLean }>,
 	includeProblemRows = false
-): PlatformKeyPhrasesAnalytics {
+): KeyPhrasesFromAttemptsResult {
 	let totalAssignedItems = 0;
 	let correctItems = 0;
 	let incorrectItems = 0;
@@ -991,12 +1022,15 @@ async function aggregateFillBlankStats(
 		...buildCompletedAtFilter(days),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('fillBlankResults')
-		.lean()
-		.exec();
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('fillBlankResults').lean().exec(),
+		getDrillTypeAssignmentStats(learnerMatch, 'fill_blank'),
+	]);
 
-	return aggregateFillBlankFromAttempts(attempts).stats;
+	return {
+		...assignmentStats,
+		...aggregateFillBlankFromAttempts(attempts).stats,
+	};
 }
 
 async function aggregateKeyPhrasesStats(
@@ -1009,12 +1043,15 @@ async function aggregateKeyPhrasesStats(
 		...buildCompletedAtFilter(days),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('keyPhrasesResults')
-		.lean()
-		.exec();
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('keyPhrasesResults').lean().exec(),
+		getDrillTypeAssignmentStats(learnerMatch, 'key_phrases'),
+	]);
 
-	return aggregateKeyPhrasesFromAttempts(attempts).stats;
+	return {
+		...assignmentStats,
+		...aggregateKeyPhrasesFromAttempts(attempts).stats,
+	};
 }
 
 function buildDateRangeFilter(
@@ -1048,13 +1085,20 @@ export async function getLearnerFillBlankAnalytics(
 		...buildDateRangeFilter(range),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('fillBlankResults')
-		.lean()
-		.exec();
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('fillBlankResults').lean().exec(),
+		getDrillTypeAssignmentStats(
+			{ learnerId: new Types.ObjectId(learnerId) },
+			'fill_blank'
+		),
+	]);
 
 	const result = aggregateFillBlankFromAttempts(attempts, true);
-	return { ...result, attemptsConsidered: result.stats.totalAttempts };
+	return {
+		...result,
+		stats: { ...assignmentStats, ...result.stats },
+		attemptsConsidered: result.stats.totalAttempts,
+	};
 }
 
 export async function getLearnerKeyPhrasesAnalytics(
@@ -1067,13 +1111,20 @@ export async function getLearnerKeyPhrasesAnalytics(
 		...buildDateRangeFilter(range),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('keyPhrasesResults')
-		.lean()
-		.exec();
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('keyPhrasesResults').lean().exec(),
+		getDrillTypeAssignmentStats(
+			{ learnerId: new Types.ObjectId(learnerId) },
+			'key_phrases'
+		),
+	]);
 
 	const result = aggregateKeyPhrasesFromAttempts(attempts, true);
-	return { ...result, attemptsConsidered: result.stats.totalAttempts };
+	return {
+		...result,
+		stats: { ...assignmentStats, ...result.stats },
+		attemptsConsidered: result.stats.totalAttempts,
+	};
 }
 
 export async function getPlatformFillBlankAnalytics(
@@ -1086,12 +1137,17 @@ export async function getPlatformFillBlankAnalytics(
 		...buildCompletedAtFilter(days),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('fillBlankResults')
-		.lean()
-		.exec();
+	const learnerMatch = buildLearnerIdMatch(learnerIds);
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('fillBlankResults').lean().exec(),
+		getDrillTypeAssignmentStats(learnerMatch, 'fill_blank'),
+	]);
 
-	return aggregateFillBlankFromAttempts(attempts, true);
+	const result = aggregateFillBlankFromAttempts(attempts, true);
+	return {
+		...result,
+		stats: { ...assignmentStats, ...result.stats },
+	};
 }
 
 export async function getPlatformKeyPhrasesAnalytics(
@@ -1104,12 +1160,17 @@ export async function getPlatformKeyPhrasesAnalytics(
 		...buildCompletedAtFilter(days),
 	};
 
-	const attempts = await DrillAttempt.find(filter)
-		.select('keyPhrasesResults')
-		.lean()
-		.exec();
+	const learnerMatch = buildLearnerIdMatch(learnerIds);
+	const [attempts, assignmentStats] = await Promise.all([
+		DrillAttempt.find(filter).select('keyPhrasesResults').lean().exec(),
+		getDrillTypeAssignmentStats(learnerMatch, 'key_phrases'),
+	]);
 
-	return aggregateKeyPhrasesFromAttempts(attempts, true);
+	const result = aggregateKeyPhrasesFromAttempts(attempts, true);
+	return {
+		...result,
+		stats: { ...assignmentStats, ...result.stats },
+	};
 }
 
 async function aggregateMatchingStats(
@@ -1181,7 +1242,7 @@ export async function getAnalyticsDashboard(
 
 	const [
 		drillAggregates,
-		pronunciationProgress,
+		pronunciationWordStats,
 		pronunciationOverall,
 		problemAreas,
 		grammar,
@@ -1191,11 +1252,11 @@ export async function getAnalyticsDashboard(
 		keyPhrases,
 	] = await Promise.all([
 		getDrillAssignmentAggregates(learnerMatch),
-		getPronunciationProgressAggregates(learnerMatch),
+		getAggregatedPronunciationWordStats(learnerIds),
 		getOverallStats(days, learnerIds),
 		getOverallProblemAreasWithWords(days, learnerIds),
-		aggregateGrammarStats(learnerMatch, days),
-		aggregateSentenceStats(learnerMatch, days),
+		aggregateGrammarStats(learnerMatch, undefined),
+		aggregateSentenceStats(learnerMatch, undefined),
 		aggregateMatchingStats(learnerMatch, days),
 		aggregateFillBlankStats(learnerMatch, days),
 		aggregateKeyPhrasesStats(learnerMatch, days),
@@ -1215,22 +1276,22 @@ export async function getAnalyticsDashboard(
 	const drillCompletionRatePct =
 		total > 0 ? Math.round((completed / total) * 100) : 0;
 	const wordCompletionRatePct =
-		pronunciationProgress.totalWords > 0
+		pronunciationWordStats.totalWords > 0
 			? Math.round(
-					(pronunciationProgress.completedWords / pronunciationProgress.totalWords) * 100
+					(pronunciationWordStats.completedWords / pronunciationWordStats.totalWords) * 100
 				)
 			: 0;
 
 	const overallProgressPct = computeOverallProgressPct(
 		total,
 		completed,
-		pronunciationProgress.totalWords,
-		pronunciationProgress.completedWords
+		pronunciationWordStats.totalWords,
+		pronunciationWordStats.completedWords
 	);
 
 	const overallAverageScore = computeOverallAverageScore(
 		drillAggregates.averageScore,
-		pronunciationProgress.averageScore
+		pronunciationOverall.averageScore
 	);
 
 	const drills: AnalyticsDashboardDrillStats = {
@@ -1256,15 +1317,16 @@ export async function getAnalyticsDashboard(
 				averageScore: drillAggregates.averageScore,
 			},
 			pronunciationStats: {
-				totalWords: pronunciationProgress.totalWords,
-				completedWords: pronunciationProgress.completedWords,
+				totalWords: pronunciationWordStats.totalWords,
+				completedWords: pronunciationWordStats.completedWords,
 				completionRatePct: wordCompletionRatePct,
-				averageScore: pronunciationProgress.averageScore,
+				averageScore: pronunciationOverall.averageScore,
 			},
 		},
 		drills,
 		pronunciation: {
 			overall: pronunciationOverall,
+			challengingWords: pronunciationWordStats.challengingWords,
 			problemAreas: {
 				topIncorrectPhonemes: problemAreas.topIncorrectPhonemes,
 			},

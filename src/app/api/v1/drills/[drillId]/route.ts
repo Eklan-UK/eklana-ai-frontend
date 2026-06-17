@@ -171,16 +171,26 @@ async function putHandler(
 	const body = await parseRequestBody(req);
 	const validated = validateRequest(updateDrillSchema, body);
 
-	// Validate assigned_to if provided
-	if (validated.assigned_to !== undefined && validated.assigned_to.length === 0) {
-		return apiResponse.validationError("At least one user ID must be assigned");
-	}
-
 	// Initialize services
 	const drillRepo = new DrillRepository();
 	const assignmentRepo = new AssignmentRepository();
 	const attemptRepo = new AttemptRepository();
 	const drillService = new DrillService(drillRepo, assignmentRepo, attemptRepo);
+
+	const existing = await drillRepo.findById(drillId);
+	if (!existing) {
+		return apiResponse.notFound("Drill");
+	}
+
+	// Validate assigned_to if provided
+	if (validated.assigned_to !== undefined && validated.assigned_to.length === 0) {
+		const totalAssignments = (existing as { totalAssignments?: number }).totalAssignments ?? 0;
+		if (totalAssignments > 0) {
+			return apiResponse.validationError(
+				"Cannot clear assignments on a drill that has already been assigned"
+			);
+		}
+	}
 
 	// Prepare update data
 	const updateData: any = {};
@@ -189,7 +199,12 @@ async function putHandler(
 	if (validated.difficulty !== undefined) updateData.difficulty = validated.difficulty;
 	if (validated.date !== undefined) updateData.date = new Date(validated.date);
 	if (validated.duration_days !== undefined) updateData.duration_days = validated.duration_days;
-	if (validated.assigned_to !== undefined) updateData.assigned_to = validated.assigned_to;
+	if (validated.assigned_to !== undefined) {
+		updateData.assigned_to = validated.assigned_to;
+		if (validated.assigned_to.length === 0) {
+			updateData.is_active = false;
+		}
+	}
 	if (validated.is_active !== undefined) updateData.is_active = validated.is_active;
 	if (validated.context !== undefined) updateData.context = validated.context;
 	if (validated.audio_example_url !== undefined) updateData.audio_example_url = validated.audio_example_url;
@@ -213,11 +228,6 @@ async function putHandler(
 	if (validated.article_audio_url !== undefined) updateData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) updateData.fill_blank_items = validated.fill_blank_items;
 	if (validated.key_phrase_items !== undefined) updateData.key_phrase_items = validated.key_phrase_items;
-
-	const existing = await drillRepo.findById(drillId);
-	if (!existing) {
-		return apiResponse.notFound("Drill");
-	}
 
 	const finalType = (validated.type !== undefined ? validated.type : existing.type) as string;
 	const mergedTarget =

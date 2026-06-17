@@ -29,6 +29,7 @@ import {
   applyAudioUrls,
 } from "@/services/drill-audio.service";
 import {
+  mergeMediaFieldsFromSource,
   normalizeFillBlankItems,
   validateFillBlankItems,
 } from "@/utils/drill";
@@ -131,136 +132,6 @@ function getDefaultCompletionDate(): string {
   const defaultDate = new Date();
   defaultDate.setDate(defaultDate.getDate() + 7);
   return defaultDate.toISOString().split("T")[0];
-}
-
-function copyMediaFields<T extends Record<string, unknown>>(
-  target: T,
-  source: Record<string, unknown> | undefined,
-  fields: string[]
-): T {
-  if (!source) return target;
-  const result = { ...target };
-  for (const field of fields) {
-    const value = source[field];
-    if (value) {
-      (result as Record<string, unknown>)[field] = value;
-    }
-  }
-  return result;
-}
-
-function mergeArrayMedia<T extends Record<string, unknown>>(
-  items: T[] | undefined,
-  sourceItems: Array<Record<string, unknown>> | undefined,
-  fields: string[]
-): T[] | undefined {
-  if (!items || !sourceItems) return items;
-  return items.map((item, index) =>
-    copyMediaFields(item, sourceItems[index], fields)
-  );
-}
-
-function mergeMediaFieldsFromSource(
-  payload: Record<string, unknown>,
-  source: Record<string, unknown>
-): Record<string, unknown> {
-  const merged = { ...payload };
-  const drillType = (payload.type as string) || (source.type as string);
-
-  for (const field of [
-    "audio_example_url",
-    "sentence_drill_audio_url",
-    "listening_drill_audio_url",
-    "article_audio_url",
-  ]) {
-    if (source[field]) {
-      merged[field] = source[field];
-    }
-  }
-
-  switch (drillType) {
-    case "vocabulary":
-      merged.target_sentences = mergeArrayMedia(
-        merged.target_sentences as Array<Record<string, unknown>>,
-        source.target_sentences as Array<Record<string, unknown>>,
-        ["wordAudioUrl", "sentenceAudioUrl"]
-      );
-      break;
-    case "pronunciation":
-      merged.pronunciation_items = mergeArrayMedia(
-        merged.pronunciation_items as Array<Record<string, unknown>>,
-        source.pronunciation_items as Array<Record<string, unknown>>,
-        ["soundAudioUrl", "wordAudioUrl", "sentenceAudioUrl"]
-      );
-      break;
-    case "roleplay": {
-      const scenes = merged.roleplay_scenes as Array<{
-        scene_name: string;
-        context?: string;
-        dialogue: Array<Record<string, unknown>>;
-      }>;
-      const sourceScenes = source.roleplay_scenes as Array<{
-        dialogue?: Array<Record<string, unknown>>;
-      }>;
-      if (scenes && sourceScenes) {
-        merged.roleplay_scenes = scenes.map((scene, sceneIndex) => ({
-          ...scene,
-          dialogue: scene.dialogue.map((turn, turnIndex) =>
-            copyMediaFields(
-              turn,
-              sourceScenes[sceneIndex]?.dialogue?.[turnIndex],
-              ["audioUrl"]
-            )
-          ),
-        }));
-      }
-      break;
-    }
-    case "matching":
-      merged.matching_pairs = mergeArrayMedia(
-        merged.matching_pairs as Array<Record<string, unknown>>,
-        source.matching_pairs as Array<Record<string, unknown>>,
-        ["leftAudioUrl", "rightAudioUrl"]
-      );
-      break;
-    case "grammar":
-      merged.grammar_items = mergeArrayMedia(
-        merged.grammar_items as Array<Record<string, unknown>>,
-        source.grammar_items as Array<Record<string, unknown>>,
-        ["patternAudioUrl", "exampleAudioUrl"]
-      );
-      break;
-    case "sentence_writing":
-      merged.sentence_writing_items = mergeArrayMedia(
-        merged.sentence_writing_items as Array<Record<string, unknown>>,
-        source.sentence_writing_items as Array<Record<string, unknown>>,
-        ["audioUrl"]
-      );
-      break;
-    case "fill_blank":
-      merged.fill_blank_items = mergeArrayMedia(
-        merged.fill_blank_items as Array<Record<string, unknown>>,
-        source.fill_blank_items as Array<Record<string, unknown>>,
-        ["audioUrl"]
-      );
-      break;
-    case "key_phrases":
-      merged.key_phrase_items = mergeArrayMedia(
-        merged.key_phrase_items as Array<Record<string, unknown>>,
-        source.key_phrase_items as Array<Record<string, unknown>>,
-        ["promptAudioUrl"]
-      );
-      break;
-    case "definition":
-      merged.definition_items = mergeArrayMedia(
-        merged.definition_items as Array<Record<string, unknown>>,
-        source.definition_items as Array<Record<string, unknown>>,
-        ["audioUrl"]
-      );
-      break;
-  }
-
-  return merged;
 }
 
 function getDefaultAdminDrillDraft(): AdminDrillDraft {
@@ -556,9 +427,8 @@ const DrillBuilder: React.FC = () => {
         setLoadingUsers(true);
         const response = await adminService.getLearners({
           limit: 1000,
-          role: "user",
         });
-        setUsers(response.users);
+        setUsers(response.data?.learners ?? []);
       } catch (error: any) {
         toast.error("Failed to load users: " + error.message);
       } finally {
@@ -1439,7 +1309,7 @@ const DrillBuilder: React.FC = () => {
         await drillAPI.create(drillData);
         clearDraft();
         toast.success("Drill created successfully!");
-        router.push("/admin/drill");
+        router.push("/admin/drills/assignment");
       }
     } catch (error: any) {
       toast.error(
@@ -2664,7 +2534,7 @@ const DrillBuilder: React.FC = () => {
                           updated[itemIndex].options.push("");
                           setKeyPhraseItems(updated);
                         }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 text-white text-xs rounded-lg hover:bg-emerald-600"
                       >
                         <Plus className="w-3 h-3" />
                         Add Option

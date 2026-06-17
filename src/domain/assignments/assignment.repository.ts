@@ -229,7 +229,7 @@ export class AssignmentRepository {
             'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names',
         })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
-        .sort({ assignedAt: -1 })
+        .sort({ assignedAt: 1 })
         .limit(filters?.limit || 20)
         .skip(filters?.offset || 0)
         .lean()
@@ -237,7 +237,12 @@ export class AssignmentRepository {
 
       const total = await DrillAssignment.countDocuments(query).exec();
 
-      return { assignments, total };
+      // Exclude assignments whose drill was deleted (populate returns null for missing refs)
+      const validAssignments = assignments.filter(
+        (a) => a.drillId && typeof a.drillId === 'object'
+      );
+
+      return { assignments: validAssignments, total };
     } catch (error: any) {
       logger.error('Error finding assignments by learner ID', { learnerId, error: error.message });
       throw error;

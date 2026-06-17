@@ -84,8 +84,11 @@ export class DrillRepository {
     type?: string;
     difficulty?: string;
     studentEmail?: string;
+    assignedToIds?: string[];
     createdBy?: string;
     isActive?: boolean;
+    assignmentStatus?: 'saved' | 'assigned';
+    q?: string;
     limit?: number;
     offset?: number;
   }): Promise<DrillType[]> {
@@ -95,10 +98,38 @@ export class DrillRepository {
     if (filters.difficulty) query.difficulty = filters.difficulty;
     if (filters.isActive !== undefined) query.is_active = filters.isActive;
     if (filters.createdBy) query.created_by = filters.createdBy;
-    if (filters.studentEmail) query.assigned_to = filters.studentEmail;
+    if (filters.assignedToIds && filters.assignedToIds.length > 0) {
+      query.assigned_to = { $in: filters.assignedToIds };
+    } else if (filters.studentEmail) {
+      query.assigned_to = filters.studentEmail;
+    }
+    if (filters.assignmentStatus === 'saved') {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (filters.assignmentStatus === 'assigned') {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
+    if (filters.q) {
+      const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query.$and = [
+        ...(query.$and ?? []),
+        { $or: [{ title: regex }, { context: regex }] },
+      ];
+    }
 
     const queryBuilder = Drill.find(query)
-      .select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to createdById created_by')
+      .select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById created_by')
       .sort({ created_date: -1 });
 
     if (filters.limit) {

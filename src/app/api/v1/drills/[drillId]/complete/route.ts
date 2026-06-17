@@ -245,11 +245,9 @@ async function handler(
 		]);
 	});
 
-	if (context.userRole === 'user' && validated.score >= 70) {
+	if (context.userRole === 'user') {
 		try {
-			await StreakService.recordActivityDay(context.userId.toString(), {
-				score: validated.score,
-			});
+			await StreakService.recordDrillCompletion(context.userId.toString(), validated.score);
 		} catch {
 			// streak must not fail drill completion
 		}

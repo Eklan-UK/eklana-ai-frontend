@@ -7,24 +7,49 @@ import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 import { adminService } from "@/services/admin.service";
 
-// Get all drills (admin)
-export function useAllDrills(filters?: {
-  limit?: number;
-  type?: string;
-  difficulty?: string;
-}) {
+// Get all drills (admin) — paginated, 50 per page by default
+export function useAllDrills(
+  filters?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    type?: string;
+    difficulty?: string;
+    assignmentStatus?: 'saved' | 'assigned';
+    assignedToIds?: string[];
+  },
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: [...queryKeys.drills.all, "admin", "list", filters],
     queryFn: async () => {
+      const joinedIds = filters?.assignedToIds?.length
+        ? filters.assignedToIds.join(',')
+        : undefined;
       const response = await drillAPI.getAll({
-        limit: filters?.limit || 100,
+        limit: filters?.limit ?? 50,
+        offset: filters?.offset ?? 0,
+        q: filters?.q,
         type: filters?.type,
         difficulty: filters?.difficulty,
+        assignmentStatus: filters?.assignmentStatus,
+        assignedToIds: joinedIds,
       });
-      console.log(response)
-      return response.data?.drills || [];
+      const drills =
+        response.data?.drills ??
+        response.drills ??
+        [];
+      const total =
+        response.data?.total ??
+        response.total ??
+        0;
+      return {
+        drills: Array.isArray(drills) ? drills : [],
+        total: typeof total === 'number' ? total : 0,
+      };
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: options?.enabled !== false,
   });
 }
 
@@ -85,12 +110,17 @@ export function useAnalyticsLearners(filters?: {
 }
 
 // Get all learners (admin)
-export function useAllLearners(filters?: {
+export function useAllLearners(
+  filters?: {
   limit?: number;
   offset?: number;
-  role?: string;
   search?: string;
-}) {
+  signupDateFrom?: string;
+  signupDateTo?: string;
+  status?: 'active' | 'inactive';
+},
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: [...queryKeys.students.all, "admin", "list", filters],
     queryFn: async () => {
@@ -101,6 +131,22 @@ export function useAllLearners(filters?: {
       };
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: options?.enabled !== false,
+  });
+}
+
+export function useAdminSubscriptions(filters?: { limit?: number; sync?: boolean }) {
+  return useQuery({
+    queryKey: ['admin', 'subscriptions', filters],
+    queryFn: async () => {
+      const response = await adminAPI.getAdminSubscriptions(filters || {});
+      return {
+        learners: response.data?.learners || [],
+        sync: response.data?.sync || { syncedCount: 0, failedCount: 0 },
+        total: response.data?.pagination?.total || 0,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -110,7 +156,6 @@ export function useDrillById(drillId: string) {
     queryKey: queryKeys.drills.detail(drillId),
     queryFn: async () => {
       const response = await drillAPI.getById(drillId);
-      console.log("drill fetch Successful", response)
       return response.data?.drill;
     },
     enabled: !!drillId,
@@ -153,18 +198,6 @@ export function useDashboardStats() {
     },
     staleTime: 1000 * 30, // 30 seconds
     refetchOnWindowFocus: true,
-  });
-}
-
-// Get recent learners (for dashboard)
-export function useRecentLearners(limit: number = 10) {
-  return useQuery({
-    queryKey: ["admin", "dashboard", "learners", limit],
-    queryFn: async () => {
-      const response = await adminService.getLearners({ limit });
-      return response.users || [];
-    },
-    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 
@@ -312,7 +345,7 @@ export function useLearnerKeyPhrasesAnalytics(
 
 /** Platform-wide fill-in-the-blank analytics (admin). */
 export function usePlatformFillBlankAnalytics(
-  days = 30,
+  days?: number,
   learnerIds?: string[],
   enabled = true
 ) {
@@ -333,7 +366,7 @@ export function usePlatformFillBlankAnalytics(
 
 /** Platform-wide key phrase analytics (admin). */
 export function usePlatformKeyPhrasesAnalytics(
-  days = 30,
+  days?: number,
   learnerIds?: string[],
   enabled = true
 ) {
@@ -398,20 +431,91 @@ export function useUpdateUserSubscription() {
     mutationFn: async (data: {
       userId: string;
       plan: "free" | "premium";
-      months: number;
+      months?: number;
+      billingPeriod?: "monthly" | "quarterly" | "annual";
+      zeroPauseProducts?: ("challenge" | "mastery")[];
+      zeroPauseDate?: string | null;
       amount?: number;
       paymentMethod?: string;
       note?: string;
     }) => {
       return adminAPI.updateUserSubscription(data);
     },
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
+      const updated = response?.data;
+      if (updated?.userId) {
+        queryClient.setQueriesData(
+          { queryKey: [...queryKeys.students.all, "admin", "list"] },
+          (old: { learners: Array<Record<string, unknown>>; total: number } | undefined) => {
+            if (!old?.learners) return old;
+            return {
+              ...old,
+              learners: old.learners.map((learner) =>
+                String(learner._id) === String(variables.userId)
+                  ? {
+                      ...learner,
+                      subscriptionPlan: updated.subscriptionPlan,
+                      subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
+                      zeroPauseProducts: updated.zeroPauseProducts,
+                      zeroPauseDate: updated.zeroPauseDate,
+                      subscriptionActivatedAt: updated.subscriptionActivatedAt,
+                      subscriptionExpiresAt: updated.subscriptionExpiresAt,
+                    }
+                  : learner
+              ),
+            };
+          }
+        );
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.students.all });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard", "stats"] });
       toast.success("Subscription updated");
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to update subscription");
+    },
+  });
+}
+
+// Get learners assigned to a specific tutor
+export function useTutorAssignedStudents(tutorId: string, search?: string) {
+  return useQuery({
+    queryKey: ["admin", "tutor-assignments", tutorId, search],
+    queryFn: () => adminAPI.getTutorAssignedStudents(tutorId, search ? { search } : undefined),
+    enabled: !!tutorId,
+    staleTime: 30_000,
+  });
+}
+
+// Assign a learner to a tutor
+export function useAssignTutorToStudent(tutorId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) =>
+      adminAPI.assignTutorToStudent(studentId, tutorId),
+    onSuccess: () => {
+      toast.success("Student assigned");
+      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to assign student");
+    },
+  });
+}
+
+// Remove a learner from a tutor
+export function useUnassignTutorFromStudent(tutorId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) =>
+      adminAPI.unassignTutorFromStudent(studentId, tutorId),
+    onSuccess: () => {
+      toast.success("Student removed");
+      queryClient.invalidateQueries({ queryKey: ["admin", "tutor-assignments", tutorId] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to remove student");
     },
   });
 }

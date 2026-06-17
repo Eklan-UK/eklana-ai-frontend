@@ -10,6 +10,7 @@ export interface ParsedQueryParams {
   type?: string;
   difficulty?: string;
   isActive?: boolean;
+  assignmentStatus?: 'saved' | 'assigned';
   [key: string]: any;
 }
 
@@ -26,7 +27,7 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
   };
   
   // Optional string parameters
-  const stringParams = ['search', 'role', 'status', 'type', 'difficulty'];
+  const stringParams = ['search', 'q', 'role', 'status', 'type', 'difficulty', 'assignmentStatus'];
   stringParams.forEach(param => {
     const value = searchParams.get(param);
     if (value) {
@@ -38,6 +39,11 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
   const isActive = searchParams.get('isActive');
   if (isActive !== null) {
     params.isActive = isActive === 'true';
+  }
+
+  const assignmentStatus = searchParams.get('assignmentStatus');
+  if (assignmentStatus === 'saved' || assignmentStatus === 'assigned') {
+    params.assignmentStatus = assignmentStatus;
   }
   
   return params;

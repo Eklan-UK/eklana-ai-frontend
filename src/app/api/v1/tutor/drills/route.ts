@@ -26,6 +26,7 @@ async function handler(
     const difficulty = searchParams.get("difficulty");
     const studentEmail = searchParams.get("studentEmail");
     const isActive = searchParams.get("isActive");
+    const assignmentStatus = searchParams.get("assignmentStatus");
 
     // Build query - use createdById directly (no need to fetch tutor email)
     const query: any = { createdById: context.userId };
@@ -33,12 +34,34 @@ async function handler(
     if (difficulty) query.difficulty = difficulty;
     if (isActive !== null) query.is_active = isActive === "true";
     if (studentEmail) query.assigned_to = studentEmail;
+    if (assignmentStatus === "saved") {
+      query.$or = [
+        { totalAssignments: 0 },
+        { totalAssignments: { $exists: false } },
+      ];
+    }
+    if (assignmentStatus === "assigned") {
+      query.$or = [
+        { totalAssignments: { $gt: 0 } },
+        {
+          $and: [
+            {
+              $or: [
+                { totalAssignments: 0 },
+                { totalAssignments: { $exists: false } },
+              ],
+            },
+            { assigned_to: { $exists: true, $ne: [] } },
+          ],
+        },
+      ];
+    }
 
     const total = await Drill.countDocuments(query).exec();
     // Only select metadata fields, not large content arrays
     const drills = await Drill.find(query)
       .select(
-        "title type difficulty date duration_days context audio_example_url created_date is_active assigned_to createdById"
+        "title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById"
       )
       .limit(limit)
       .skip(offset)

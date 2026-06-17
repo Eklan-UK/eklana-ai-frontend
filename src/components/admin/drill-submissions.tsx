@@ -66,7 +66,10 @@ export function DrillSubmissionsComponent({
   } = useLearnerDrillAssignments(learnerId);
 
   // Extract data with safe defaults (must be before conditional returns)
-  const drills = drillData?.assignments || [];
+  // Filter out assignments whose drill was deleted (drill field is null/missing)
+  const drills = (drillData?.assignments || []).filter(
+    (d: any) => d.drill && typeof d.drill === 'object' && d.drill.title
+  );
   const [filterStatus, setFilterStatus] = useState<
     "all" | "pending" | "in-progress" | "completed" | "review"
   >("all");

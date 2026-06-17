@@ -8,27 +8,27 @@ import { logger } from "@/lib/api/logger";
 import { Types } from "mongoose";
 import { z } from "zod";
 import {
-  extendSubscriptionExpiresAt,
-  subscriptionExpiresAtMs,
-} from "@/lib/api/subscription-reconciliation";
-import { isUserSubscribed } from "@/lib/api/user-subscription";
+  addMonthsToDate,
+  billingPeriodToMonths,
+  hasProviderBillingLink,
+  type BillingPeriod,
+  type ZeroPauseProduct,
+} from "@/domain/subscriptions/subscription.types";
+import { syncUserSubscriptionFromProvider } from "@/domain/subscriptions/subscription-provider-sync.service";
 
 const updateSubscriptionSchema = z.object({
   userId: z.string().refine((id) => Types.ObjectId.isValid(id), {
     message: "Invalid user ID format",
   }),
   plan: z.enum(["free", "premium"]),
-  months: z.number().int().min(0),
+  months: z.number().int().min(0).optional(),
+  billingPeriod: z.enum(["monthly", "quarterly", "annual"]).optional(),
+  zeroPauseProducts: z.array(z.enum(["challenge", "mastery"])).optional(),
+  zeroPauseDate: z.string().nullable().optional(),
   amount: z.number().nonnegative().optional(),
   paymentMethod: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
 });
-
-function addMonths(date: Date, months: number): Date {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() + months);
-  return result;
-}
 
 async function handler(
   req: NextRequest,
@@ -48,8 +48,19 @@ async function handler(
       );
     }
 
+    if (input.zeroPauseProducts !== undefined) {
+      user.zeroPauseProducts = input.zeroPauseProducts as ZeroPauseProduct[];
+      // Clear the shared date when no products are selected
+      if (input.zeroPauseProducts.length === 0) {
+        user.zeroPauseDate = null;
+      } else if (input.zeroPauseDate !== undefined) {
+        user.zeroPauseDate = input.zeroPauseDate ? new Date(input.zeroPauseDate) : null;
+      }
+    }
+
     if (input.plan === "free") {
       user.subscriptionPlan = "free";
+      user.subscriptionBillingPeriod = null;
       user.subscriptionActivatedAt = null;
       user.subscriptionExpiresAt = null;
       user.subscriptionMonthsPaidFor = 0;
@@ -58,25 +69,44 @@ async function handler(
       user.subscriptionAdminNote = input.note || undefined;
       user.subscriptionUpdatedBy = context.userId;
     } else {
-      const activation = new Date();
-      const expiry = addMonths(activation, input.months);
-      const prevExpiryMs = subscriptionExpiresAtMs(user);
+      const providerResult = await syncUserSubscriptionFromProvider(user);
 
-      extendSubscriptionExpiresAt(user, expiry);
+      if (providerResult.synced) {
+        user.subscriptionAdminNote = input.note || undefined;
+        user.subscriptionUpdatedBy = context.userId;
+      } else if (!hasProviderBillingLink(user)) {
+        const billingPeriod: BillingPeriod =
+          input.billingPeriod ??
+          (input.months === 3
+            ? "quarterly"
+            : input.months === 12
+              ? "annual"
+              : "monthly");
+        const months =
+          input.months && input.months > 0
+            ? input.months
+            : billingPeriodToMonths(billingPeriod);
 
-      if (expiry.getTime() > prevExpiryMs) {
-        user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? activation;
-        user.subscriptionMonthsPaidFor = input.months;
-        user.subscriptionAmountPaid = input.amount ?? 0;
-        user.subscriptionPaymentMethod = input.paymentMethod || "manual";
+        const activation = user.subscriptionActivatedAt ?? new Date();
+        if (!user.subscriptionActivatedAt) {
+          user.subscriptionActivatedAt = activation;
+        }
+
+        const expiry = addMonthsToDate(activation, months);
+
+        user.subscriptionExpiresAt = expiry;
+        user.subscriptionBillingPeriod = billingPeriod;
+        user.subscriptionMonthsPaidFor = months;
+        user.subscriptionAmountPaid = input.amount ?? user.subscriptionAmountPaid ?? 0;
+        user.subscriptionPaymentMethod =
+          input.paymentMethod || user.subscriptionPaymentMethod || "manual";
         user.subscriptionProvider = "manual";
-      }
-
-      user.subscriptionAdminNote = input.note || undefined;
-      user.subscriptionUpdatedBy = context.userId;
-
-      if (isUserSubscribed(user) || expiry.getTime() > Date.now()) {
         user.subscriptionPlan = "premium";
+        user.subscriptionAdminNote = input.note || undefined;
+        user.subscriptionUpdatedBy = context.userId;
+      } else {
+        user.subscriptionAdminNote = input.note || undefined;
+        user.subscriptionUpdatedBy = context.userId;
       }
     }
 
@@ -95,6 +125,9 @@ async function handler(
         data: {
           userId: user._id,
           subscriptionPlan: user.subscriptionPlan,
+          subscriptionBillingPeriod: user.subscriptionBillingPeriod,
+          zeroPauseProducts: user.zeroPauseProducts ?? [],
+          zeroPauseDate: user.zeroPauseDate ?? null,
           subscriptionActivatedAt: user.subscriptionActivatedAt,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
         },

@@ -1,16 +1,17 @@
 "use client";
 
 import React from "react";
-import { Plus, Clock, ArrowUpRight } from "lucide-react";
+import { Plus, Clock, ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useDashboardStats } from "@/hooks/useAdmin";
 import { ZERO_PAUSE_PRODUCT_LABELS } from "@/domain/subscriptions/subscription.types";
+import { useQuery } from "@tanstack/react-query";
+import { adminAPI } from "@/lib/api";
 
 interface DashboardStats {
   totalUsers: number;
   subscribedUsers: number;
   totalActiveLearners: number;
-  totalDrills: number;
   zeroPauseChallengeUsers: number;
   zeroPauseMasteryUsers: number;
   newSignupsThisWeek: number;
@@ -21,12 +22,20 @@ interface DashboardStats {
 const Dashboard: React.FC = () => {
   const { data: stats, isLoading: loading } = useDashboardStats();
 
+  const { data: discoveryCallsData, isLoading: callsLoading } = useQuery({
+    queryKey: ["admin", "discovery-calls", "recent"],
+    queryFn: async () => {
+      const res = await adminAPI.getDiscoveryCalls({ limit: 5 });
+      return res.data?.calls ?? [];
+    },
+    staleTime: 1000 * 60 * 2,
+  });
+
   const statsWithDefaults: DashboardStats = stats
     ? {
       totalUsers: stats.totalUsers || 0,
       subscribedUsers: stats.subscribedUsers || 0,
       totalActiveLearners: stats.totalActiveLearners || 0,
-      totalDrills: stats.totalDrills || 0,
       zeroPauseChallengeUsers: stats.zeroPauseChallengeUsers || 0,
       zeroPauseMasteryUsers: stats.zeroPauseMasteryUsers || 0,
       newSignupsThisWeek: stats.newSignupsThisWeek || 0,
@@ -37,7 +46,6 @@ const Dashboard: React.FC = () => {
       totalUsers: 0,
       subscribedUsers: 0,
       totalActiveLearners: 0,
-      totalDrills: 0,
       zeroPauseChallengeUsers: 0,
       zeroPauseMasteryUsers: 0,
       newSignupsThisWeek: 0,
@@ -47,33 +55,25 @@ const Dashboard: React.FC = () => {
 
   const displayStats = [
     {
-      title: "Total Users",
+      title: "Total Signups",
       value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
       color: "bg-white border border-emerald-200 dark:border-border dark:bg-emerald-950/30",
     },
     {
-      title: "Subscribed Users",
+      title: "Eklan Pro Subscribers",
       value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
       color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",
     },
     {
-      title: "Total Active Learners",
+      title: "Total Active Users",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
       color: "bg-white border border-primary-200 dark:border-border dark:bg-primary-950/30",
     },
     {
-      title: "Total Drills",
-      value: loading
-        ? "..."
-        : statsWithDefaults.totalDrills.toString(),
-      change: "",
-      color: "bg-white border border-amber-200 dark:border-border dark:bg-amber-950/30",
-    },
-    {
-      title: ZERO_PAUSE_PRODUCT_LABELS.challenge,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.challenge} Subscribers`,
       value: loading
         ? "..."
         : statsWithDefaults.zeroPauseChallengeUsers.toString(),
@@ -81,7 +81,7 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-violet-200 dark:border-border dark:bg-violet-950/30",
     },
     {
-      title: ZERO_PAUSE_PRODUCT_LABELS.mastery,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.mastery} Subscribers`,
       value: loading
         ? "..."
         : statsWithDefaults.zeroPauseMasteryUsers.toString(),
@@ -90,7 +90,7 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  const discoveryCalls: any[] = []; // TODO: Implement discovery calls endpoint
+  const discoveryCalls = discoveryCallsData ?? [];
 
   return (
     <div className="space-y-8 pb-12">
@@ -158,23 +158,48 @@ const Dashboard: React.FC = () => {
           </Link>
         </div>
         <div className="space-y-4 flex-1">
-          {discoveryCalls.map((call, idx) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:bg-gray-50 transition-all cursor-pointer"
-            >
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">
-                  {call.name}
-                </h3>
-                <p className="text-xs text-gray-500">{call.purpose}</p>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
-                <Clock className="w-3 h-3" />
-                {call.time}
-              </div>
+          {callsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
             </div>
-          ))}
+          ) : discoveryCalls.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Clock className="w-8 h-8 text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">No upcoming discovery calls</p>
+            </div>
+          ) : (
+            discoveryCalls.map((call: any, idx: number) => (
+              <div
+                key={call._id ?? idx}
+                className="flex items-center justify-between p-4 rounded-xl border border-gray-50 hover:bg-gray-50 transition-all cursor-pointer"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    {call.name || call.firstName
+                      ? `${call.firstName ?? ""} ${call.lastName ?? ""}`.trim() || call.name
+                      : "Unknown"}
+                  </h3>
+                  <p className="text-xs text-gray-500">{call.purpose ?? call.notes ?? ""}</p>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                  <Clock className="w-3 h-3" />
+                  {call.scheduledAt
+                    ? new Date(call.scheduledAt).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : call.createdAt
+                      ? new Date(call.createdAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                        })
+                      : "—"}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>

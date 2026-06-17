@@ -50,8 +50,14 @@ export function getDrillStatus(drill: any): DrillStatus {
     : new Date(drill.date || drill.drill?.date);
   completionDate.setHours(23, 59, 59, 999);
 
+  const assignmentStatus = drill.assignmentStatus ?? drill.status;
+
   // Check if drill is completed
-  if (drill.completedAt || drill.assignmentStatus === "completed" || drill.status === "completed") {
+  if (
+    drill.completedAt ||
+    assignmentStatus === "completed" ||
+    drill.latestAttempt?.completedAt
+  ) {
     return "completed";
   }
 
@@ -59,8 +65,8 @@ export function getDrillStatus(drill: any): DrillStatus {
   if (
     now > completionDate &&
     !drill.completedAt &&
-    drill.assignmentStatus !== "completed" &&
-    drill.status !== "completed"
+    assignmentStatus !== "completed" &&
+    !drill.latestAttempt?.completedAt
   ) {
     return "missed";
   }
@@ -263,6 +269,137 @@ export function validateFillBlankItems(items: FillBlankItemInput[]): string | nu
   }
 
   return null;
+}
+
+function copyMediaFields<T extends Record<string, unknown>>(
+  target: T,
+  source: Record<string, unknown> | undefined,
+  fields: string[]
+): T {
+  if (!source) return target;
+  const result = { ...target };
+  for (const field of fields) {
+    const value = source[field];
+    if (value) {
+      (result as Record<string, unknown>)[field] = value;
+    }
+  }
+  return result;
+}
+
+function mergeArrayMedia<T extends Record<string, unknown>>(
+  items: T[] | undefined,
+  sourceItems: Array<Record<string, unknown>> | undefined,
+  fields: string[]
+): T[] | undefined {
+  if (!items || !sourceItems) return items;
+  return items.map((item, index) =>
+    copyMediaFields(item, sourceItems[index], fields)
+  );
+}
+
+/** Preserve pre-generated audio URLs when copying a drill. */
+export function mergeMediaFieldsFromSource(
+  payload: Record<string, unknown>,
+  source: Record<string, unknown>
+): Record<string, unknown> {
+  const merged = { ...payload };
+  const drillType = (payload.type as string) || (source.type as string);
+
+  for (const field of [
+    "audio_example_url",
+    "sentence_drill_audio_url",
+    "listening_drill_audio_url",
+    "article_audio_url",
+  ]) {
+    if (source[field]) {
+      merged[field] = source[field];
+    }
+  }
+
+  switch (drillType) {
+    case "vocabulary":
+      merged.target_sentences = mergeArrayMedia(
+        merged.target_sentences as Array<Record<string, unknown>>,
+        source.target_sentences as Array<Record<string, unknown>>,
+        ["wordAudioUrl", "sentenceAudioUrl"]
+      );
+      break;
+    case "pronunciation":
+      merged.pronunciation_items = mergeArrayMedia(
+        merged.pronunciation_items as Array<Record<string, unknown>>,
+        source.pronunciation_items as Array<Record<string, unknown>>,
+        ["soundAudioUrl", "wordAudioUrl", "sentenceAudioUrl"]
+      );
+      break;
+    case "roleplay": {
+      const scenes = merged.roleplay_scenes as Array<{
+        scene_name: string;
+        context?: string;
+        dialogue: Array<Record<string, unknown>>;
+      }>;
+      const sourceScenes = source.roleplay_scenes as Array<{
+        dialogue?: Array<Record<string, unknown>>;
+      }>;
+      if (scenes && sourceScenes) {
+        merged.roleplay_scenes = scenes.map((scene, sceneIndex) => ({
+          ...scene,
+          dialogue: scene.dialogue.map((turn, turnIndex) =>
+            copyMediaFields(
+              turn,
+              sourceScenes[sceneIndex]?.dialogue?.[turnIndex],
+              ["audioUrl"]
+            )
+          ),
+        }));
+      }
+      break;
+    }
+    case "matching":
+      merged.matching_pairs = mergeArrayMedia(
+        merged.matching_pairs as Array<Record<string, unknown>>,
+        source.matching_pairs as Array<Record<string, unknown>>,
+        ["leftAudioUrl", "rightAudioUrl"]
+      );
+      break;
+    case "grammar":
+      merged.grammar_items = mergeArrayMedia(
+        merged.grammar_items as Array<Record<string, unknown>>,
+        source.grammar_items as Array<Record<string, unknown>>,
+        ["patternAudioUrl", "exampleAudioUrl"]
+      );
+      break;
+    case "sentence_writing":
+      merged.sentence_writing_items = mergeArrayMedia(
+        merged.sentence_writing_items as Array<Record<string, unknown>>,
+        source.sentence_writing_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+    case "fill_blank":
+      merged.fill_blank_items = mergeArrayMedia(
+        merged.fill_blank_items as Array<Record<string, unknown>>,
+        source.fill_blank_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+    case "key_phrases":
+      merged.key_phrase_items = mergeArrayMedia(
+        merged.key_phrase_items as Array<Record<string, unknown>>,
+        source.key_phrase_items as Array<Record<string, unknown>>,
+        ["promptAudioUrl"]
+      );
+      break;
+    case "definition":
+      merged.definition_items = mergeArrayMedia(
+        merged.definition_items as Array<Record<string, unknown>>,
+        source.definition_items as Array<Record<string, unknown>>,
+        ["audioUrl"]
+      );
+      break;
+  }
+
+  return merged;
 }
 
 export function getDrillTypeInfo(type: string): {

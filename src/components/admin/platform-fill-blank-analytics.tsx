@@ -2,6 +2,7 @@
 
 import { Loader2, PenLine } from "lucide-react";
 import { usePlatformFillBlankAnalytics } from "@/hooks/useAdmin";
+import { AnalyticsAssignmentProgressCard } from "@/components/admin/analytics-assignment-progress-card";
 
 interface PlatformFillBlankAnalyticsProps {
   days?: number;
@@ -10,7 +11,7 @@ interface PlatformFillBlankAnalyticsProps {
 }
 
 export function PlatformFillBlankAnalytics({
-  days = 30,
+  days,
   learnerIds,
   showTitle = true,
 }: PlatformFillBlankAnalyticsProps) {
@@ -30,7 +31,7 @@ export function PlatformFillBlankAnalytics({
             <span className="p-2 bg-indigo-50 rounded-lg">
               <PenLine className="w-4 h-4 text-indigo-600" />
             </span>
-            Fill in the Blank Analytics (Last {days} Days)
+            Fill in the Blank Analytics
           </h2>
         </div>
       ) : null}
@@ -43,21 +44,19 @@ export function PlatformFillBlankAnalytics({
         <div className="text-center py-8 text-red-500">
           Failed to load fill-in-the-blank analytics.
         </div>
-      ) : !stats || stats.totalAttempts === 0 ? (
+      ) : !stats || (stats.totalAssigned === 0 && stats.totalAttempts === 0) ? (
         <div className="text-center py-8 text-gray-500">
           No fill-in-the-blank data available.
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Total Attempts</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAttempts}</p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Total Blanks</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAssignedBlanks}</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <AnalyticsAssignmentProgressCard
+              totalAssigned={stats.totalAssigned}
+              totalCompleted={stats.totalCompleted}
+              completionRatePct={stats.completionRatePct}
+              variant="platform"
+            />
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase mb-1">Accuracy Rate</p>
               <p

@@ -38,11 +38,18 @@ import {
   generateDrillAudio,
 } from "@/services/drill-audio.service";
 import {
+  mergeMediaFieldsFromSource,
   normalizeFillBlankItems,
   validateFillBlankItems,
 } from "@/utils/drill";
 
 const DRAFT_KEY = "drill_draft";
+
+function getDefaultCompletionDate(): string {
+  const defaultDate = new Date();
+  defaultDate.setDate(defaultDate.getDate() + 7);
+  return defaultDate.toISOString().split("T")[0];
+}
 
 interface DrillFormData {
   title: string;
@@ -130,6 +137,7 @@ function CreateDrillPageContent() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [existingDrill, setExistingDrill] = useState<any>(null);
 
   // Use React Query instead of useEffect
@@ -444,165 +452,377 @@ function CreateDrillPageContent() {
   const totalAssignments = existingDrill?.totalAssignments ?? 0;
   const isAssignedDrill = isEditMode && totalAssignments > 0;
 
-  const executeSubmit = async () => {
-    setSaving(true);
-    try {
-      const submitData: any = { ...formData };
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+  };
 
-      // Clean up data based on drill type
-      if (formData.type === "roleplay") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-        if (submitData.ai_character_name) {
-          delete submitData.ai_character_name;
+  const validateDrillContent = (): boolean => {
+    if (!formData.title?.trim()) {
+      toast.error("Please enter a drill title");
+      return false;
+    }
+
+    if (!formData.date) {
+      toast.error("Please select a completion date");
+      return false;
+    }
+
+    if (formData.type === "vocabulary") {
+      const items = formData.target_sentences || [];
+      if (items.length === 0 || items.some((v) => !v.text?.trim())) {
+        toast.error("Please add at least one vocabulary item with a sentence");
+        return false;
+      }
+    } else if (formData.type === "pronunciation") {
+      const pItems = formData.pronunciation_items || [];
+      if (
+        pItems.length === 0 ||
+        pItems.some(
+          (p) => !p.sound?.trim() || !p.word?.trim() || !p.sentence?.trim()
+        )
+      ) {
+        toast.error(
+          "Pronunciation drills need at least one item with Sound, Word, and Sentence."
+        );
+        return false;
+      }
+    } else if (formData.type === "roleplay") {
+      if (!formData.context?.trim()) {
+        toast.error("Please provide a context/scenario for the roleplay");
+        return false;
+      }
+      if (!formData.student_character_name?.trim()) {
+        toast.error("Please provide a student character name");
+        return false;
+      }
+      if ((formData.ai_character_names || []).some((name) => !name.trim())) {
+        toast.error("Please provide all AI character names");
+        return false;
+      }
+      const scenes = formData.roleplay_scenes || [];
+      if (
+        scenes.length === 0 ||
+        scenes.some(
+          (s) =>
+            s.dialogue.length < 2 || s.dialogue.some((d) => !d.text.trim())
+        )
+      ) {
+        toast.error("Please add at least one scene with complete dialogue");
+        return false;
+      }
+    } else if (formData.type === "matching") {
+      const pairs = formData.matching_pairs || [];
+      if (
+        pairs.length === 0 ||
+        pairs.some((p) => !p.left.trim() || !p.right.trim())
+      ) {
+        toast.error(
+          "Please add at least one matching pair with both sides filled"
+        );
+        return false;
+      }
+    } else if (formData.type === "grammar") {
+      const items = formData.grammar_items || [];
+      if (
+        items.length === 0 ||
+        items.some((g) => !g.pattern.trim() || !g.example.trim())
+      ) {
+        toast.error(
+          "Please add at least one grammar pattern with an example sentence"
+        );
+        return false;
+      }
+    } else if (formData.type === "sentence_writing") {
+      const items = formData.sentence_writing_items || [];
+      if (items.length === 0 || items.some((s) => !s.word.trim())) {
+        toast.error("Please add at least one word for sentence writing");
+        return false;
+      }
+    } else if (formData.type === "summary") {
+      if (!formData.article_title?.trim() || !formData.article_content?.trim()) {
+        toast.error("Please provide both article title and content");
+        return false;
+      }
+    } else if (formData.type === "listening") {
+      if (
+        !formData.listening_drill_title?.trim() ||
+        !formData.listening_drill_content?.trim()
+      ) {
+        toast.error("Please provide both listening title and content");
+        return false;
+      }
+    } else if (formData.type === "fill_blank") {
+      const fillBlankError = validateFillBlankItems(
+        formData.fill_blank_items || []
+      );
+      if (fillBlankError) {
+        toast.error(fillBlankError);
+        return false;
+      }
+    } else if (formData.type === "key_phrases") {
+      const items = formData.key_phrase_items || [];
+      if (items.length === 0 || !items.some((item) => item.prompt.trim())) {
+        toast.error("Please add at least one key phrase question");
+        return false;
+      }
+      for (const item of items) {
+        if (!item.prompt.trim()) continue;
+        if (item.options.filter((o) => o.trim()).length < 2) {
+          toast.error("Each question must have at least 2 options");
+          return false;
         }
-      } else if (formData.type === "matching") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-      } else if (formData.type === "definition") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-      } else if (formData.type === "summary") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-      } else if (formData.type === "grammar") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-      } else if (formData.type === "sentence_writing") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-      } else if (formData.type === "fill_blank") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-        delete submitData.sentence_drill_word;
-        delete submitData.key_phrase_items;
-      } else if (formData.type === "key_phrases") {
-        delete submitData.target_sentences;
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-        delete submitData.sentence_drill_word;
-        delete submitData.fill_blank_items;
-      } else if (formData.type === "pronunciation") {
-        delete submitData.target_sentences;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-        delete submitData.fill_blank_items;
-        delete submitData.sentence_drill_word;
+        if (!item.correctAnswer.trim()) {
+          toast.error("Please select a correct answer for each question");
+          return false;
+        }
+        if (!item.options.includes(item.correctAnswer)) {
+          toast.error("Correct answer must be one of the options");
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const buildSubmitPayload = (options?: {
+    assignedTo?: string[];
+    isActive?: boolean;
+    omitAssignment?: boolean;
+  }): Record<string, unknown> => {
+    const submitData: any = { ...formData };
+
+    if (formData.type === "roleplay") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+      if (submitData.ai_character_name) {
+        delete submitData.ai_character_name;
+      }
+    } else if (formData.type === "matching") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+    } else if (formData.type === "definition") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+    } else if (formData.type === "summary") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+    } else if (formData.type === "grammar") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+    } else if (formData.type === "sentence_writing") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+    } else if (formData.type === "fill_blank") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+      delete submitData.sentence_drill_word;
+      delete submitData.key_phrase_items;
+    } else if (formData.type === "key_phrases") {
+      delete submitData.target_sentences;
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+      delete submitData.sentence_drill_word;
+      delete submitData.fill_blank_items;
+    } else if (formData.type === "pronunciation") {
+      delete submitData.target_sentences;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+      delete submitData.fill_blank_items;
+      delete submitData.sentence_drill_word;
+    } else {
+      delete submitData.pronunciation_items;
+      delete submitData.roleplay_dialogue;
+      delete submitData.roleplay_scenes;
+      delete submitData.student_character_name;
+      delete submitData.ai_character_names;
+      delete submitData.matching_pairs;
+      delete submitData.definition_items;
+      delete submitData.grammar_items;
+      delete submitData.sentence_writing_items;
+      delete submitData.article_content;
+      delete submitData.article_title;
+      delete submitData.listening_drill_title;
+      delete submitData.listening_drill_content;
+      delete submitData.fill_blank_items;
+      delete submitData.key_phrase_items;
+    }
+
+    // Ensure date is always a full ISO 8601 datetime string (schema: z.string().datetime())
+    // The date input returns YYYY-MM-DD; new Date("YYYY-MM-DD") parses as UTC midnight.
+    const parsedDate = new Date(submitData.date);
+    submitData.date = isNaN(parsedDate.getTime())
+      ? new Date().toISOString()
+      : parsedDate.toISOString();
+
+    // Sanitize optional URL field: empty string fails z.string().url() validation.
+    if (!submitData.audio_example_url) {
+      delete submitData.audio_example_url;
+    }
+
+    if (formData.type === "fill_blank") {
+      submitData.fill_blank_items = normalizeFillBlankItems(
+        submitData.fill_blank_items || []
+      );
+    }
+
+    if (!options?.omitAssignment) {
+      if (options?.assignedTo !== undefined) {
+        submitData.assigned_to = options.assignedTo;
+      }
+      if (options?.isActive !== undefined) {
+        submitData.is_active = options.isActive;
+      }
+    } else {
+      delete submitData.assigned_to;
+      delete submitData.is_active;
+    }
+
+    return submitData;
+  };
+
+  const handleSaveDrill = async () => {
+    if (!validateDrillContent()) return;
+
+    try {
+      setSaving(true);
+
+      const payload = buildSubmitPayload(
+        isAssignedDrill
+          ? { omitAssignment: true }
+          : { assignedTo: [], isActive: false }
+      );
+
+      if (isEditMode && drillId) {
+        await drillAPI.update(drillId, payload);
+        clearDraft();
+        toast.success("Drill saved successfully!");
       } else {
-        // vocabulary
-        delete submitData.pronunciation_items;
-        delete submitData.roleplay_dialogue;
-        delete submitData.roleplay_scenes;
-        delete submitData.student_character_name;
-        delete submitData.ai_character_names;
-        delete submitData.matching_pairs;
-        delete submitData.definition_items;
-        delete submitData.grammar_items;
-        delete submitData.sentence_writing_items;
-        delete submitData.article_content;
-        delete submitData.article_title;
-        delete submitData.listening_drill_title;
-        delete submitData.listening_drill_content;
-        delete submitData.fill_blank_items;
-        delete submitData.key_phrase_items;
+        await drillAPI.create(payload);
+        clearDraft();
+        if (formData.assigned_to.length > 0) {
+          toast.success(
+            'Drill saved as draft. Use Assign to assign it to selected students.'
+          );
+        } else {
+          toast.success("Drill saved successfully!");
+        }
       }
 
-      // Pre-generate drill audio URLs for all supported drill types before save.
+      router.push("/tutor/drills");
+    } catch (error: any) {
+      toast.error(
+        "Failed to save drill: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const executeSubmit = async () => {
+    try {
+      setLoading(true);
+
+      let submitData: any = buildSubmitPayload({
+        assignedTo: formData.assigned_to,
+        isActive: true,
+      });
+
       const textsToGenerate = extractTextsForDrillType(submitData, formData.type);
       if (textsToGenerate.length > 0) {
         const audioResponse = await generateDrillAudio(
@@ -611,27 +831,23 @@ function CreateDrillPageContent() {
           isEditMode ? drillId || undefined : undefined
         );
         if (audioResponse.success && audioResponse.data) {
-          Object.assign(submitData, applyAudioUrls(submitData, audioResponse.data.results));
+          submitData = applyAudioUrls(submitData, audioResponse.data.results);
           const { success, failed } = audioResponse.data.summary;
           if (failed > 0) {
-            toast.warning(`Generated ${success}/${success + failed} audio files. Some failed.`);
+            toast.warning(
+              `Generated ${success}/${success + failed} audio files. Some failed.`
+            );
           }
         } else {
-          toast.warning("Audio generation failed. Saving drill without pre-generated audio.");
+          toast.warning(
+            "Audio generation failed. Saving drill without pre-generated audio."
+          );
         }
-      }
-
-      // Convert date to ISO string
-      submitData.date = new Date(submitData.date).toISOString();
-
-      if (formData.type === "fill_blank") {
-        submitData.fill_blank_items = normalizeFillBlankItems(
-          submitData.fill_blank_items || []
-        );
       }
 
       if (isEditMode) {
         await drillAPI.update(drillId!, submitData);
+        clearDraft();
         if (isAssignedDrill) {
           toast.success(
             `Drill updated and reassigned to ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}. All previous progress has been reset.`
@@ -643,48 +859,27 @@ function CreateDrillPageContent() {
         }
       } else {
         await drillAPI.create(submitData);
-        localStorage.removeItem(DRAFT_KEY);
-        alert(
-          `Drill created for ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""
-          }!`
+        clearDraft();
+        toast.success(
+          `Drill created for ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}!`
         );
       }
 
       router.push("/tutor/drills");
     } catch (error: any) {
-      alert(error.message || "Failed to save drill");
+      toast.error(error.message || "Failed to save drill");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateDrillContent()) return;
+
     if (formData.assigned_to.length === 0) {
-      alert("Please select at least one student");
+      toast.error("Please select at least one student");
       return;
-    }
-
-    if (formData.type === "pronunciation") {
-      const pItems = formData.pronunciation_items || [];
-      if (
-        pItems.length === 0 ||
-        pItems.some(
-          (p) =>
-            !p.sound?.trim() || !p.word?.trim() || !p.sentence?.trim()
-        )
-      ) {
-        alert("Pronunciation drills need at least one item with Sound, Word, and Sentence.");
-        return;
-      }
-    }
-
-    if (formData.type === "fill_blank") {
-      const fillBlankError = validateFillBlankItems(formData.fill_blank_items || []);
-      if (fillBlankError) {
-        alert(fillBlankError);
-        return;
-      }
     }
 
     if (isEditMode && isAssignedDrill) {
@@ -693,6 +888,43 @@ function CreateDrillPageContent() {
     }
 
     await executeSubmit();
+  };
+
+  const handleCopyDrill = async () => {
+    if (!validateDrillContent()) return;
+
+    setCopying(true);
+    try {
+      let payload = buildSubmitPayload({ assignedTo: [], isActive: false });
+      if (isEditMode && existingDrill) {
+        payload = mergeMediaFieldsFromSource(
+          payload,
+          existingDrill as Record<string, unknown>
+        );
+      }
+      const response: any = await drillAPI.create(payload);
+      const newDrillId =
+        response?.data?.drill?._id ?? response?.drill?._id;
+      if (!newDrillId) {
+        throw new Error("New drill ID not returned");
+      }
+      clearDraft();
+      setFormData((prev) => ({
+        ...prev,
+        assigned_to: [],
+        date: getDefaultCompletionDate(),
+      }));
+      toast.success(
+        "Drill copied. Select students and a completion date, then assign."
+      );
+      router.push(`/tutor/drills/create?drillId=${newDrillId}`);
+    } catch (error: any) {
+      toast.error(
+        "Failed to copy drill: " + (error.message || "Unknown error")
+      );
+    } finally {
+      setCopying(false);
+    }
   };
 
   if (loading || (isEditMode && !formData)) {
@@ -759,9 +991,9 @@ function CreateDrillPageContent() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">
-                    {isEditMode ? "Assigned to Student *" : "Assign to Students *"}
+                    {isAssignedDrill ? "Assigned to Students" : "Assign to Students"}
                   </Label>
-                  {!isEditMode && (
+                  {!isAssignedDrill && (
                     <Button
                       type="button"
                       variant="outline"
@@ -772,7 +1004,7 @@ function CreateDrillPageContent() {
                         } else {
                           setFormData({
                             ...formData,
-                            assigned_to: students.map((s) => s.email),
+                            assigned_to: students.map((s) => (s._id as any)?.toString() || s.email),
                           });
                         }
                       }}
@@ -798,31 +1030,34 @@ function CreateDrillPageContent() {
                         >
                           <Checkbox
                             id={student.email}
-                            checked={formData.assigned_to.includes(student.email)}
+                            checked={formData.assigned_to.includes(
+                              (student._id as any)?.toString() || student.email
+                            )}
                             onChange={(e) => {
-                              if (isEditMode) return;
+                              if (isAssignedDrill) return;
+                              const studentId = (student._id as any)?.toString() || student.email;
                               if (e.target.checked) {
                                 setFormData({
                                   ...formData,
                                   assigned_to: [
                                     ...formData.assigned_to,
-                                    student.email,
+                                    studentId,
                                   ],
                                 });
                               } else {
                                 setFormData({
                                   ...formData,
                                   assigned_to: formData.assigned_to.filter(
-                                    (email) => email !== student.email
+                                    (id) => id !== studentId
                                   ),
                                 });
                               }
                             }}
-                            disabled={isEditMode}
+                            disabled={isAssignedDrill}
                           />
                           <label
                             htmlFor={student.email}
-                            className={`flex-1 select-none ${isEditMode ? "cursor-default" : "cursor-pointer"
+                            className={`flex-1 select-none ${isAssignedDrill ? "cursor-default" : "cursor-pointer"
                               }`}
                           >
                             <div className="font-medium text-gray-900">
@@ -2359,28 +2594,62 @@ function CreateDrillPageContent() {
             </Card>
           )}
 
-          <div className="flex justify-end gap-4">
-            <Link href="/tutor/drills">
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </Link>
-            <Button type="submit" disabled={saving}>
+          <div className="flex flex-wrap justify-end gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSaveDrill}
+              disabled={loading || saving || copying}
+              className="border-amber-300 text-amber-900 hover:bg-amber-50"
+            >
               {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : isEditMode ? (
+                isAssignedDrill ? "Save Changes" : "Save Drill"
+              ) : (
+                "Save Drill"
+              )}
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading || saving || copying}
+            >
+              {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   {isEditMode ? "Updating..." : "Creating..."}
                 </>
+              ) : isEditMode && !isAssignedDrill ? (
+                `Assign to ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}`
+              ) : isEditMode ? (
+                `Update Drill for ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}`
               ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  {isEditMode
-                    ? "Update Drill"
-                    : `Create Drill for ${formData.assigned_to.length} Student${formData.assigned_to.length !== 1 ? "s" : ""
-                    }`}
-                </>
+                `Create Drill for ${formData.assigned_to.length} student${formData.assigned_to.length !== 1 ? "s" : ""}`
               )}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCopyDrill}
+              disabled={loading || saving || copying}
+            >
+              {copying ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Copying...
+                </>
+              ) : (
+                "Copy Drill"
+              )}
+            </Button>
+            <Link href="/tutor/drills">
+              <Button type="button" variant="outline" disabled={loading || saving || copying}>
+                Cancel
+              </Button>
+            </Link>
           </div>
         </form>
 
@@ -2402,7 +2671,7 @@ function CreateDrillPageContent() {
                   type="button"
                   variant="outline"
                   onClick={() => setShowReassignConfirm(false)}
-                  disabled={saving}
+                  disabled={loading}
                 >
                   Cancel
                 </Button>
@@ -2412,7 +2681,7 @@ function CreateDrillPageContent() {
                     setShowReassignConfirm(false);
                     await executeSubmit();
                   }}
-                  disabled={saving}
+                  disabled={loading}
                 >
                   Update Drill
                 </Button>

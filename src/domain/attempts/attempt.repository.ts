@@ -242,7 +242,10 @@ export class AttemptRepository {
 
       const total = await DrillAttempt.countDocuments(query).exec();
 
-      return { attempts, total };
+      // Exclude attempts whose drill was deleted (populate returns null for missing refs)
+      const validAttempts = attempts.filter((a) => a.drillId && typeof a.drillId === 'object');
+
+      return { attempts: validAttempts, total };
     } catch (error: any) {
       logger.error('Error getting sentence submissions', { error: error.message });
       throw error;
@@ -279,7 +282,10 @@ export class AttemptRepository {
 
       const total = await DrillAttempt.countDocuments(query).exec();
 
-      return { attempts, total };
+      // Exclude attempts whose drill was deleted (populate returns null for missing refs)
+      const validAttempts = attempts.filter((a) => a.drillId && typeof a.drillId === 'object');
+
+      return { attempts: validAttempts, total };
     } catch (error: any) {
       logger.error('Error getting grammar submissions', { error: error.message });
       throw error;
@@ -317,7 +323,10 @@ export class AttemptRepository {
 
       const total = await DrillAttempt.countDocuments(query).exec();
 
-      return { attempts, total };
+      // Exclude attempts whose drill was deleted (populate returns null for missing refs)
+      const validAttempts = attempts.filter((a) => a.drillId && typeof a.drillId === 'object');
+
+      return { attempts: validAttempts, total };
     } catch (error: any) {
       logger.error('Error getting summary submissions', { error: error.message });
       throw error;

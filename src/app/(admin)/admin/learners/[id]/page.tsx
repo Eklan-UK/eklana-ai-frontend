@@ -1,46 +1,30 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Loader2,
   Mail,
   Calendar,
-  BookOpen,
-  Mic,
-  MessageSquare,
-  BarChart3,
-  AlertCircle,
   Pencil,
   X,
   Check,
 } from "lucide-react";
 import { useLearnerById, useLearnerDrills, useUpdateLearnerName } from "@/hooks/useAdmin";
-import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
-import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciation-analytics";
-import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics";
-import { SentenceAnalyticsComponent } from "@/components/admin/sentence-analytics";
-import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytics";
-import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
-import { LearnerFreeTalkAttemptsSection } from "@/components/admin/learner-free-talk-attempts";
-import { ChallengingWordsComponent } from "@/components/admin/challenging-words";
-import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
+import { LearnerProfileAnalytics } from "@/components/shared/learner-profile-analytics";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useEffect } from "react";
 
 export default function LearnerProfilePage() {
   const params = useParams();
   const router = useRouter();
   const learnerId = params.id as string;
 
-  // Inline name edit state
   const [editingName, setEditingName] = useState(false);
   const [editFirst, setEditFirst] = useState("");
   const [editLast, setEditLast] = useState("");
 
-  // React Query hooks for learner data
   const {
     data: learner,
     isLoading: learnerLoading,
@@ -49,17 +33,8 @@ export default function LearnerProfilePage() {
 
   const updateNameMutation = useUpdateLearnerName(learnerId);
 
-  // Fetch drills assigned to this learner
-  const { data: drills = [], isLoading: drillsLoading } = useLearnerDrills(
-    learnerId,
-    learner?.email,
-  );
-
-  // Get pronunciation analytics
-  const { data: pronunciationAnalytics, isLoading: analyticsLoading } =
-    useLearnerPronunciationAnalytics(learnerId);
-
-  const loading = learnerLoading;
+  // kept for any consumers that rely on this hook being called
+  useLearnerDrills(learnerId, learner?.email);
 
   const startEditName = () => {
     if (!learner) return;
@@ -87,7 +62,6 @@ export default function LearnerProfilePage() {
     );
   };
 
-  // Handle error
   useEffect(() => {
     if (learnerError) {
       toast.error("Failed to load learner");
@@ -107,7 +81,7 @@ export default function LearnerProfilePage() {
     }
   };
 
-  if (loading) {
+  if (learnerLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
@@ -120,10 +94,7 @@ export default function LearnerProfilePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500 mb-4">Learner not found</p>
-          <Link
-            href="/admin/Learners"
-            className="text-emerald-600 hover:text-emerald-700"
-          >
+          <Link href="/admin/Learners" className="text-emerald-600 hover:text-emerald-700">
             Back to Learners
           </Link>
         </div>
@@ -232,9 +203,7 @@ export default function LearnerProfilePage() {
             <label className="text-xs font-bold text-gray-400 uppercase mb-2 flex items-center gap-2">
               <Calendar className="w-3 h-3" /> Signup Date
             </label>
-            <p className="text-base text-gray-900">
-              {formatDate(learner.createdAt)}
-            </p>
+            <p className="text-base text-gray-900">{formatDate(learner.createdAt)}</p>
           </div>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">
@@ -253,63 +222,8 @@ export default function LearnerProfilePage() {
         </div>
       </div>
 
-      {/* Overall Progress Summary */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" /> Overall Progress
-        </h2>
-        <LearnerProgressSummary learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Eklan Free Talk */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" /> Eklan Free Talk
-        </h2>
-        <LearnerFreeTalkAttemptsSection learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Drill Submissions & Analytics */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <BookOpen className="w-5 h-5" /> Assigned Drills & Submissions
-        </h2>
-        <DrillSubmissionsComponent learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Pronunciation Analytics */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <Mic className="w-5 h-5" /> Pronunciation Analytics
-        </h2>
-        <PronunciationAnalyticsComponent
-          learnerId={learnerId}
-          learnerName={name}
-        />
-      </div>
-
-      {/* Grammar Analytics */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <GrammarAnalyticsComponent learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Sentence Analytics */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <SentenceAnalyticsComponent learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Matching Analytics */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <MatchingAnalyticsComponent learnerId={learnerId} learnerName={name} />
-      </div>
-
-      {/* Challenging Words */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-orange-500" /> Words with Challenges
-        </h2>
-        <ChallengingWordsComponent learnerId={learnerId} learnerName={name} />
-      </div>
+      {/* All analytics sections */}
+      <LearnerProfileAnalytics learnerId={learnerId} learnerName={name} />
     </div>
   );
 }

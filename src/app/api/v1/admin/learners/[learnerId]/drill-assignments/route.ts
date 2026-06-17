@@ -3,8 +3,13 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
+import '@/models/drill';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
+import {
+	assertStaffCanReadLearner,
+	resolveLearnerIdToUserIdString,
+} from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -16,6 +21,15 @@ async function handler(
 
 		const { learnerId } = params;
 
+		const canonicalLearnerId = await resolveLearnerIdToUserIdString(learnerId);
+		const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+		if (access === 'forbidden') {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Learner not found or access denied' },
+				{ status: 404 }
+			);
+		}
+
 		// Parse pagination parameters
 		const { searchParams } = new URL(req.url);
 		const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100); // Max 100 per page
@@ -23,12 +37,12 @@ async function handler(
 
 		// Get total count for pagination (using aggregation for better performance)
 		const totalCount = await DrillAssignment.countDocuments({
-			learnerId: new Types.ObjectId(learnerId),
+			learnerId: new Types.ObjectId(canonicalLearnerId),
 		});
 
 		// Get paginated drill assignments for this learner
 		const assignments = await DrillAssignment.find({
-			learnerId: new Types.ObjectId(learnerId),
+			learnerId: new Types.ObjectId(canonicalLearnerId),
 		})
 			.select('_id drillId assignedBy status assignedAt dueDate completedAt score')
 			.populate('drillId', 'title type difficulty')
@@ -39,8 +53,13 @@ async function handler(
 			.lean()
 			.exec();
 
+		// Exclude assignments whose drill was deleted (populate returns null for missing refs)
+		const validAssignments = assignments.filter(
+			(a: any) => a.drillId && typeof a.drillId === 'object'
+		);
+
 		// Get attempts only for the current page of assignments (optimized)
-		const assignmentIds = assignments.map((a) => a._id);
+		const assignmentIds = validAssignments.map((a) => a._id);
 		const attempts = assignmentIds.length > 0 ? await DrillAttempt.find({
 			drillAssignmentId: { $in: assignmentIds },
 		})
@@ -64,7 +83,7 @@ async function handler(
 		});
 
 		// Enrich assignments with attempt data
-		const enrichedAssignments = assignments.map((assignment: any) => {
+		const enrichedAssignments = validAssignments.map((assignment: any) => {
 			const assignmentAttempts = attemptsByAssignment.get(assignment._id.toString()) || [];
 			const latestAttempt = assignmentAttempts.length > 0 ? assignmentAttempts[0] : null;
 			const bestAttempt = [...assignmentAttempts].sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;
@@ -98,7 +117,7 @@ async function handler(
 
 		// Calculate statistics using aggregation for better performance (across all assignments, not just current page)
 		const statsAggregation = await DrillAssignment.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId) } },
+			{ $match: { learnerId: new Types.ObjectId(canonicalLearnerId) } },
 			{
 				$group: {
 					_id: '$status',
@@ -120,7 +139,7 @@ async function handler(
 
 		// Calculate average score for completed assignments (using aggregation)
 		const avgScoreResult = await DrillAssignment.aggregate([
-			{ $match: { learnerId: new Types.ObjectId(learnerId), status: 'completed' } },
+			{ $match: { learnerId: new Types.ObjectId(canonicalLearnerId), status: 'completed' } },
 			{
 				$lookup: {
 					from: 'drill_attempts',

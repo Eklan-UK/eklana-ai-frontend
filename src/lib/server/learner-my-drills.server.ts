@@ -4,6 +4,7 @@ import { AssignmentRepository } from '@/domain/assignments/assignment.repository
 import type { DrillAssignment as AssignmentRow } from '@/domain/assignments/assignment.types';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import Drill from '@/models/drill';
+import Bookmark from '@/models/bookmark';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
@@ -32,6 +33,7 @@ export type LearnerMyDrillsPayload = {
       correctCount?: number;
       totalCount?: number;
     } | null;
+    hasBookmarks: boolean;
   }>;
   pagination: {
     total: number;
@@ -105,6 +107,12 @@ export async function getLearnerMyDrillsPayload(
   );
   const attemptMap = await attemptRepo.getLatestAttemptsForAssignments(assignmentIds);
 
+  const bookmarkRows = await Bookmark.find({ userId: learnerId, type: 'drill' })
+    .select('drillId')
+    .lean()
+    .exec();
+  const bookmarkedDrillIds = new Set(bookmarkRows.map((row) => String(row.drillId)));
+
   // Repository types drillId as ObjectId; lean+populate returns a drill subdocument at runtime.
   const populated = result.assignments as unknown as PopulatedLearnerAssignment[];
 
@@ -145,9 +153,11 @@ export async function getLearnerMyDrillsPayload(
 
   const drills = populated.map((assignment) => {
     const attemptData = attemptMap.get(assignment._id.toString());
+    const drillDoc = resolveDrillDoc(assignment);
+    const drillId = drillRefId(drillDoc);
     return {
       assignmentId: assignment._id,
-      drill: resolveDrillDoc(assignment),
+      drill: drillDoc,
       assignedBy: assignment.assignedBy,
       assignedAt: assignment.assignedAt,
       dueDate: assignment.dueDate,
@@ -163,6 +173,7 @@ export async function getLearnerMyDrillsPayload(
             totalCount: attemptData.totalCount,
           }
         : null,
+      hasBookmarks: drillId != null && bookmarkedDrillIds.has(drillId),
     };
   });
 
@@ -227,6 +238,7 @@ export async function getLearnerMyDrillsPayload(
       status: completedAt ? 'completed' : 'pending',
       completedAt,
       latestAttempt: null,
+      hasBookmarks: bookmarkedDrillIds.has(idStr),
     };
   });
 
