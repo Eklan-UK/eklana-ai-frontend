@@ -1,7 +1,7 @@
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 import { getDrillStatus } from '@/utils/drill';
 
-export type PlanTab = 'ongoing' | 'reviewed' | 'completed';
+export type PlanTab = 'ongoing' | 'completed' | 'bookmarked';
 
 export function isFreeTalkPlanItem(item: {
   itemType?: string;
@@ -46,18 +46,19 @@ export function isActiveAssignedPlanItem(item: {
   return !isCompletedPlanItem(item);
 }
 
-/** Tab bucket for My Plan (Ongoing / Reviewed / Completed). */
+/** Tab bucket for My Plan (Ongoing / Completed / Bookmarked). */
 export function drillPlanTab(item: {
   itemType?: string;
-  drill?: { type?: string; date: string };
+  drill?: { type?: string; date: string; _id?: string };
   completedAt?: string | Date | null;
   status?: string;
   assignmentStatus?: string;
   dueDate?: string;
+  hasBookmarks?: boolean;
   latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
 }): PlanTab {
+  if (item.hasBookmarks) return 'bookmarked';
   if (!isCompletedPlanItem(item)) return 'ongoing';
-  if (item.latestAttempt?.reviewStatus === 'reviewed') return 'reviewed';
   return 'completed';
 }
 

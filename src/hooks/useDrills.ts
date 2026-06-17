@@ -61,6 +61,7 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
               status: item.status || "pending",
               completedAt: item.completedAt,
               latestAttempt: item.latestAttempt,
+              hasBookmarks: item.hasBookmarks === true,
             };
           }
           return item;

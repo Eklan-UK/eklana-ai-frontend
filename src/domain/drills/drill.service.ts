@@ -5,12 +5,11 @@ import { AssignmentRepository } from '../assignments/assignment.repository';
 import { AttemptRepository, CreateAttemptData } from '../attempts/attempt.repository';
 import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/api/response';
-import { sendDrillAssignmentNotification } from '@/lib/api/email.service';
-import { onDrillAssigned, onDrillCompleted } from '@/services/notification/triggers';
+import { onDrillCompleted } from '@/services/notification/triggers';
 import Bookmark from '@/models/bookmark';
 import WordAnalytics from '@/models/word-analytics';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
-import type { AssignDrillParams, Drill, Drill as DrillType, CreateDrillData, CompleteDrillParams } from './drill.types';
+import type { AssignDrillParams, Drill as DrillType, CreateDrillData, CompleteDrillParams } from './drill.types';
 import type { CreateAssignmentData } from '../assignments/assignment.types';
 
 /**
@@ -26,7 +25,7 @@ export class DrillService {
 
   /** 
    * Assign drill to multiple users
-   * Handles validation, duplicate checking, assignment creation, and notifications
+   * Handles validation, duplicate checking, and assignment creation
    */
   async assignDrill(params: AssignDrillParams) {
     // 1. Validate drill exists
@@ -87,13 +86,7 @@ export class DrillService {
     if (newAssignmentsData.length > 0) {
       successfulAssignments = await this.assignmentRepo.createBulk(newAssignmentsData);
 
-      // 8. Send notifications asynchronously (don't block response)
-      this.sendAssignmentNotifications(successfulAssignments, drill, assigner, dueDate!)
-        .catch((err) => {
-          logger.error('Error sending notifications', { error: err.message });
-        });
-
-      // 9. Update drill's totalAssignments count
+      // 8. Update drill's totalAssignments count
       await this.drillRepo.incrementAssignments(
         params.drillId,
         successfulAssignments.length
@@ -233,12 +226,6 @@ export class DrillService {
       if (newAssignmentsData.length > 0) {
         const createdAssignments = await this.assignmentRepo.createBulk(newAssignmentsData);
         assignmentCount = createdAssignments.length;
-
-        // Send notifications asynchronously
-        this.sendAssignmentNotifications(createdAssignments, drill, creator, dueDate)
-          .catch((err) => {
-            logger.error('Error sending notifications', { error: err.message });
-          });
 
         // Update drill assignment count
         await this.drillRepo.incrementAssignments(drill._id.toString(), assignmentCount);
@@ -437,10 +424,6 @@ export class DrillService {
         if (newAssignmentsCount > 0) {
           updatedDrill.is_active = true;
           updatedDrill.totalAssignments = newAssignmentsCount;
-
-          this.sendAssignmentNotifications(created, updatedDrill, user, dueDate).catch((err) => {
-            logger.error('Error sending notifications', { error: err.message });
-          });
         }
       }
     }
@@ -626,72 +609,6 @@ export class DrillService {
         error: error.message,
       });
     }
-  }
-
-  /**
-   * Send email and push notifications for drill assignments
-   * Runs asynchronously to not block the API response
-   */
-  private async sendAssignmentNotifications(
-    assignments: any[],
-    drill: Drill,
-    assigner: any,
-    dueDate: Date
-  ): Promise<void> {
-    const assignerName = userService.getDisplayName(assigner);
-    console.log('assignerName', assignerName);
-
-    await Promise.all(
-      assignments.map(async (assignment: any) => {
-        const user = await userService.findById(
-          assignment.learnerId.toString(),
-          'email firstName lastName'
-        );
-
-        if (!user.email) return;
-
-        // Send email notification
-        try {
-          await sendDrillAssignmentNotification({
-            studentEmail: user.email,
-            studentName: user.firstName || 'Student',
-            drillTitle: drill.title,
-            drillType: drill.type,
-            dueDate: dueDate,
-            assignerName: assignerName,
-            drillId: drill._id.toString(),
-            assignmentId: assignment._id?.toString(),
-          });
-        } catch (emailError: any) {
-          logger.error('Failed to send drill assignment email', {
-            error: emailError.message,
-            studentEmail: user.email,
-          });
-        }
-
-        // Send push notification
-        try {
-          await onDrillAssigned(
-            assignment.learnerId.toString(),
-            {
-              _id: drill._id.toString(),
-              title: drill.title,
-              type: drill.type,
-            },
-            {
-              name: assigner.name,
-              firstName: assigner.firstName,
-              lastName: assigner.lastName,
-            }
-          );
-        } catch (pushError: any) {
-          logger.error('Failed to send drill assignment push notification', {
-            error: pushError.message,
-            userId: assignment.learnerId.toString(),
-          });
-        }
-      })
-    );
   }
 }
 
