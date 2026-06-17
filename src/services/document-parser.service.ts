@@ -20,7 +20,6 @@ async function loadPdfParse() {
   if (!pdfParse) {
     try {
       const pdfParseModule = await import("pdf-parse");
-      // pdf-parse exports the function directly
       pdfParse = (pdfParseModule as any).default || pdfParseModule;
     } catch (error) {
       throw new Error(
@@ -162,7 +161,6 @@ class DocumentParserService {
     const pdfParseModule = await loadPdfParse();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-
     const data = await pdfParseModule(buffer);
     const text = data.text;
 

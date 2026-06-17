@@ -315,16 +315,21 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
   const tool: FunctionTool = tools[params.drillType];
   const toolsArray: OpenAI.Chat.Completions.ChatCompletionTool[] = [tool];
 
+  const context = params.context.length > 500 ? params.context.slice(0, 500) : params.context;
+  const prompt = params.prompt.length > 1000 ? params.prompt.slice(0, 1000) : params.prompt;
+
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
       {
         role: 'user',
-        content: `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${params.context}\n${params.prompt}`,
+        content: `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,
       },
     ],
     tools: toolsArray,
     tool_choice: { type: 'function', function: { name: tool.function.name } },
+    temperature: 0.3,
+    max_tokens: 1500,
   });
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
