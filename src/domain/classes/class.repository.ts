@@ -215,6 +215,8 @@ export class ClassRepository {
             recurrenceRule: recurrence === 'weekly' ? 'weekly' : 'none',
             createdBy,
             isActive: true,
+            remindersEnabled: body.remindersEnabled !== false,
+            reminderMinutes: body.reminderMinutes ?? [10, 30],
           },
         ],
         { session: mongoSession },
