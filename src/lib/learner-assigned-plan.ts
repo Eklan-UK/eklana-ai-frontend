@@ -79,5 +79,21 @@ export function assignedPlanSortTime(item: {
 export function sortAssignedPlanItems<T extends { assignedAt?: string | Date | null; drill?: { date?: string | Date | null } }>(
   items: T[],
 ): T[] {
-  return [...items].sort((a, b) => assignedPlanSortTime(b) - assignedPlanSortTime(a));
+  return [...items].sort((a, b) => assignedPlanSortTime(a) - assignedPlanSortTime(b));
+}
+
+export function isInProgressPlanItem(item: { status?: string }): boolean {
+  return item.status === 'in-progress' || item.status === 'in_progress';
+}
+
+type ActivePlanItem = Parameters<typeof isActiveAssignedPlanItem>[0] & {
+  assignedAt?: string | Date | null;
+  drill?: { date?: string | Date | null };
+  status?: string;
+};
+
+/** Next drill for Start/Continue Practice: resume in-progress, else oldest incomplete assignment. */
+export function pickNextPracticeDrill<T extends ActivePlanItem>(items: T[]): T | undefined {
+  const active = sortAssignedPlanItems(items.filter(isActiveAssignedPlanItem));
+  return active.find(isInProgressPlanItem) ?? active[0];
 }
