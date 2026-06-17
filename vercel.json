@@ -8,6 +8,10 @@
     {
       "path": "/api/v1/cron/drill-daily-reminder",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/v1/cron/drill-assigned-reminder",
+      "schedule": "0 18 * * *"
     }
   ]
 }
