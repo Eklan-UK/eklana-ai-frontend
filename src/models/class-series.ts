@@ -14,6 +14,9 @@ export interface IClassSeries extends Document {
   recurrenceRule: 'weekly' | 'none';
   createdBy: Types.ObjectId;
   isActive: boolean;
+  /** Minutes before session start to send reminders, e.g. [10, 30]. */
+  reminderMinutes: number[];
+  remindersEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +51,8 @@ const classSeriesSchema = new Schema<IClassSeries>(
       required: true,
     },
     isActive: { type: Boolean, default: true },
+    reminderMinutes: { type: [Number], default: [10, 30] },
+    remindersEnabled: { type: Boolean, default: true },
   },
   { timestamps: true, collection: 'class_series' },
 );

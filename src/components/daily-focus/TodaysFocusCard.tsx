@@ -11,6 +11,11 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ContinuePracticeCard } from "@/components/practice/ContinuePracticeCard";
 import { WeeklyChallengeCard } from "@/components/weekly-challenge/WeeklyChallengeCard";
 import { isSundayUtc } from "@/lib/challenges/utc-week-challenge";
+import {
+  isActiveAssignedPlanItem,
+  isInProgressPlanItem,
+  pickNextPracticeDrill,
+} from "@/lib/learner-assigned-plan";
 
 interface DailyFocus {
   _id: string;
@@ -47,11 +52,8 @@ export function TodaysFocusCard() {
   const { data: weeklyChallenge } = useWeeklyChallenge(undefined, { enabled: isSunday });
   const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
 
-  const activeDrills = (drillsData ?? []).filter(
-    (a: any) => a.status === "pending" || a.status === "in_progress"
-  );
-  const inProgressDrill = activeDrills.find((a: any) => a.status === "in_progress");
-  const continueDrill = inProgressDrill || activeDrills[0];
+  const activeDrills = (drillsData ?? []).filter(isActiveAssignedPlanItem);
+  const continueDrill = pickNextPracticeDrill(drillsData ?? []);
 
   const [dailyFocus, setDailyFocus] = useState<DailyFocus | null>(null);
   const [personalization, setPersonalization] =
@@ -143,7 +145,7 @@ export function TodaysFocusCard() {
       return (
         <ContinuePracticeCard
           drill={continueDrill}
-          isResume={!!inProgressDrill}
+          isResume={isInProgressPlanItem(continueDrill)}
         />
       );
     }

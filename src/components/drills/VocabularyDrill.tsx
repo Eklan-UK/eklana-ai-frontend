@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { pronunciationAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import type { TextScore } from "@/services/speechace.service";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService } from "@/services/speechace.service";
@@ -117,6 +119,7 @@ export default function VocabularyDrill({
   drill,
   assignmentId,
 }: VocabularyDrillProps) {
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -482,7 +485,7 @@ export default function VocabularyDrill({
         };
       });
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,

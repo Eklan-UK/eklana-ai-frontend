@@ -39,6 +39,12 @@ const REMINDER_OPTIONS = [
   "1 hour before",
 ] as const;
 
+function parseReminderMinutes(opt: string): number {
+  if (opt === "1 hour before") return 60;
+  const m = parseInt(opt, 10);
+  return Number.isNaN(m) ? 10 : m;
+}
+
 /** Same as schedule modal: native `type="date"` value to display pill */
 function formatIsoToDisplayDate(iso: string) {
   if (!iso) return "";
@@ -393,6 +399,13 @@ export default function ScheduleOneTimePage() {
         scheduleEndTime,
         totalSessionsPlanned: m,
         firstSessionSequenceNumber: n,
+        remindersEnabled,
+        reminderMinutes: remindersEnabled
+          ? [
+              parseReminderMinutes(reminderBeforeSession),
+              parseReminderMinutes(reminderSecondary),
+            ]
+          : [],
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;

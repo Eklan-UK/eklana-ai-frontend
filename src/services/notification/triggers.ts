@@ -12,6 +12,7 @@ import {
 import { connectToDatabase } from "@/lib/api/db";
 import FCMToken from "@/models/fcm-token";
 import User from "@/models/user";
+import { StreakService } from "@/services/streak.service";
 import { sendNotification } from "@/services/notification";
 import { PushToken } from "@/models/push-token.model";
 
@@ -523,8 +524,15 @@ export async function onStreakReminder(studentId: string, streakDays: number) {
   try {
     await connectToDatabase();
 
+    const liveStreakData = await StreakService.getStreakData(studentId);
+    const resolvedStreakDays = liveStreakData.currentStreak;
+
+    if (resolvedStreakDays <= 0) {
+      return null;
+    }
+
     const title = "Don't Break Your Streak! 🔥";
-    const body = `You have a ${streakDays}-day streak. Complete a drill today to keep it going!`;
+    const body = `You have a ${resolvedStreakDays}-day streak. Complete a drill today to keep it going!`;
     const notifData = { screen: "Home", url: "/account" };
 
     // Step 1: Always fire unified path (Expo mobile + modern Web Push)

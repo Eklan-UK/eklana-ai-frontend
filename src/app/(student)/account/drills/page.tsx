@@ -1,44 +1,35 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { Loader2, BookOpen } from "lucide-react";
 import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useLearnerClasses } from "@/hooks/useClasses";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import { getDrillStatus } from "@/utils/drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { pickNextLearnerSession } from "@/lib/classes/pick-next-learner-session";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
-import { isFreeTalkPlanItem, sortAssignedPlanItems } from "@/lib/learner-assigned-plan";
+import {
+  drillPlanTab,
+  isFreeTalkPlanItem,
+  sortAssignedPlanItems,
+  type PlanTab,
+} from "@/lib/learner-assigned-plan";
 import { LearnerNextSessionCard } from "@/components/classes/LearnerNextSessionCard";
 import { StreakBadge } from "@/components/streak/StreakBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-
-type PlanTab = "ongoing" | "reviewed" | "completed";
-
-function drillPlanTab(item: {
-  itemType?: string;
-  completedAt?: string;
-  dueDate?: string;
-  status?: string;
-  drill: { date: string; type?: string };
-  latestAttempt?: { reviewStatus?: "pending" | "reviewed" };
-}): PlanTab {
-  if (isFreeTalkPlanItem(item)) return "ongoing";
-  const status = getDrillStatus(item);
-  if (status !== "completed") return "ongoing";
-  if (item.latestAttempt?.reviewStatus === "reviewed") return "reviewed";
-  return "completed";
-}
+import { queryKeys } from "@/lib/react-query";
 
 export default function DrillsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: me, isLoading: meLoading } = useUserCurrent();
 
   useEffect(() => {
@@ -75,15 +66,61 @@ export default function DrillsPage() {
 
   const stats = {
     ongoing: drills.filter((d) => drillPlanTab(d) === "ongoing").length,
-    reviewed: drills.filter((d) => drillPlanTab(d) === "reviewed").length,
     completed: drills.filter((d) => drillPlanTab(d) === "completed").length,
+    bookmarked: drills.filter((d) => drillPlanTab(d) === "bookmarked").length,
   };
 
   const tabLabels: Record<PlanTab, string> = {
     ongoing: "Ongoing",
-    reviewed: "Reviewed",
     completed: "Completed",
+    bookmarked: "Bookmarked",
   };
+
+  const handleBookmarkToggle = useCallback(
+    async (drillId: string, currentlyBookmarked: boolean) => {
+      try {
+        if (currentlyBookmarked) {
+          const response = await fetch(`/api/v1/bookmarks/by-drill/${drillId}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Failed to remove bookmark");
+          }
+          toast.success("Removed from bookmarks");
+        } else {
+          const response = await fetch("/api/v1/bookmarks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              drillId,
+              type: "drill",
+              content: drillId,
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || "Failed to bookmark");
+          }
+          if (data.message === "Already bookmarked") {
+            toast.info("Already bookmarked");
+          } else {
+            toast.success("Added to bookmarks!");
+          }
+        }
+
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.drills.learner.all(),
+        });
+      } catch {
+        toast.error(
+          currentlyBookmarked
+            ? "Could not remove bookmark"
+            : "Could not save bookmark",
+        );
+      }
+    },
+    [queryClient],
+  );
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
@@ -132,7 +169,7 @@ export default function DrillsPage() {
           <h2 className="text-lg font-bold text-foreground mb-3">Assigned Drills</h2>
 
           <div className="bg-card rounded-2xl border border-border shadow-sm p-1 mb-4 flex gap-1">
-            {(["ongoing", "reviewed", "completed"] as const).map((tab) => (
+            {(["ongoing", "completed", "bookmarked"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -172,9 +209,9 @@ export default function DrillsPage() {
               <p className="text-muted-foreground text-sm">
                 {activeTab === "ongoing"
                   ? "You don't have any ongoing drills."
-                  : activeTab === "reviewed"
-                    ? "No reviewed drills yet."
-                    : "You haven't completed any drills yet."}
+                  : activeTab === "completed"
+                    ? "You haven't completed any drills yet."
+                    : "No bookmarked drills yet."}
               </p>
             </Card>
           ) : (
@@ -201,7 +238,9 @@ export default function DrillsPage() {
                     dueDate={item.dueDate}
                     completedAt={item.completedAt}
                     status={item.status}
+                    hasBookmarks={item.hasBookmarks === true}
                     onPrefetch={prefetchDrill}
+                    onBookmarkToggle={handleBookmarkToggle}
                     onNavigate={() =>
                       trackActivity("drill", item.drill._id, "started", {
                         title: item.drill?.title,

@@ -229,7 +229,7 @@ export class AssignmentRepository {
             'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names',
         })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
-        .sort({ assignedAt: -1 })
+        .sort({ assignedAt: 1 })
         .limit(filters?.limit || 20)
         .skip(filters?.offset || 0)
         .lean()
