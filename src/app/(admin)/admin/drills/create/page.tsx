@@ -28,6 +28,11 @@ import {
   extractTextsForDrillType,
   applyAudioUrls,
 } from "@/services/drill-audio.service";
+import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
+import {
+  isValidPartTopicPair,
+  type LearningJourneyPartId,
+} from "@/domain/learning-journey/learning-journey.catalog";
 import {
   mergeMediaFieldsFromSource,
   normalizeFillBlankItems,
@@ -126,6 +131,8 @@ interface AdminDrillDraft {
   audioExampleUrl: string;
   selectedUsers: string[];
   generateTTSAudio: boolean;
+  journeyPart: LearningJourneyPartId | "";
+  journeyTopic: string;
 }
 
 function getDefaultCompletionDate(): string {
@@ -188,6 +195,8 @@ function getDefaultAdminDrillDraft(): AdminDrillDraft {
     audioExampleUrl: "",
     selectedUsers: [],
     generateTTSAudio: true,
+    journeyPart: "",
+    journeyTopic: "",
   };
 }
 
@@ -291,6 +300,8 @@ const DrillBuilder: React.FC = () => {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState("");
   const [showReassignConfirm, setShowReassignConfirm] = useState(false);
+  const [journeyPart, setJourneyPart] = useState<LearningJourneyPartId | "">("");
+  const [journeyTopic, setJourneyTopic] = useState("");
 
   const applyDraft = useCallback((draft: AdminDrillDraft) => {
     setVocabularyItems(draft.vocabularyItems);
@@ -317,6 +328,8 @@ const DrillBuilder: React.FC = () => {
     setAudioExampleUrl(draft.audioExampleUrl);
     setSelectedUsers(new Set(draft.selectedUsers));
     setGenerateTTSAudio(draft.generateTTSAudio);
+    setJourneyPart(draft.journeyPart ?? "");
+    setJourneyTopic(draft.journeyTopic ?? "");
   }, []);
 
   const buildDraft = useCallback((): AdminDrillDraft => {
@@ -345,6 +358,8 @@ const DrillBuilder: React.FC = () => {
       audioExampleUrl,
       selectedUsers: Array.from(selectedUsers),
       generateTTSAudio,
+      journeyPart,
+      journeyTopic,
     };
   }, [
     vocabularyItems,
@@ -371,6 +386,8 @@ const DrillBuilder: React.FC = () => {
     audioExampleUrl,
     selectedUsers,
     generateTTSAudio,
+    journeyPart,
+    journeyTopic,
   ]);
 
   const saveDraft = useCallback(() => {
@@ -468,6 +485,12 @@ const DrillBuilder: React.FC = () => {
       setDurationDays(drill.duration_days || 7);
       setContext(drill.context || "");
       setAudioExampleUrl(drill.audio_example_url || "");
+      setJourneyPart(
+        drill.learning_journey_part != null
+          ? (drill.learning_journey_part as LearningJourneyPartId)
+          : "",
+      );
+      setJourneyTopic(drill.learning_journey_topic || "");
 
       // Set assigned users (IDs or legacy emails)
       if (drill.assigned_to && Array.isArray(drill.assigned_to)) {
@@ -1110,6 +1133,11 @@ const DrillBuilder: React.FC = () => {
       audio_example_url: audioExampleUrl || undefined,
     };
 
+    if (journeyPart && journeyTopic) {
+      payload.learning_journey_part = journeyPart;
+      payload.learning_journey_topic = journeyTopic;
+    }
+
     if (!options?.omitAssignment) {
       if (options?.assignedTo !== undefined) {
         payload.assigned_to = options.assignedTo;
@@ -1327,6 +1355,16 @@ const DrillBuilder: React.FC = () => {
 
     if (selectedUsers.size === 0) {
       toast.error("Please select at least one user");
+      return;
+    }
+
+    if (!journeyPart || !journeyTopic) {
+      toast.error("Please select a learning journey part and topic");
+      return;
+    }
+
+    if (!isValidPartTopicPair(journeyPart, journeyTopic)) {
+      toast.error("Selected topic does not belong to the selected part");
       return;
     }
 
@@ -2668,6 +2706,14 @@ const DrillBuilder: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              <LearningJourneyPartTopicFields
+                journeyPart={journeyPart}
+                journeyTopic={journeyTopic}
+                onPartChange={setJourneyPart}
+                onTopicChange={setJourneyTopic}
+                required={selectedUsers.size > 0}
+              />
 
               {drillType !== "roleplay" && (
                 <div>

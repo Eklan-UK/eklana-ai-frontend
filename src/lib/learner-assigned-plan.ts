@@ -1,4 +1,5 @@
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
+import { FREE_TALK_SCENARIO_TYPE_LABELS } from '@/models/free-talk-scenario.shared';
 import { getDrillStatus } from '@/utils/drill';
 
 export type PlanTab = 'ongoing' | 'completed' | 'bookmarked';
@@ -63,6 +64,8 @@ export function drillPlanTab(item: {
 }
 
 export function freeTalkScenarioTypeLabel(scenarioType: string): string {
+  const label = FREE_TALK_SCENARIO_TYPE_LABELS[scenarioType as keyof typeof FREE_TALK_SCENARIO_TYPE_LABELS];
+  if (label) return label;
   const t = scenarioType.replace(/_/g, ' ').trim();
   if (!t) return 'Eklan Free Talk';
   return t.replace(/\b\w/g, (c) => c.toUpperCase());
