@@ -5,15 +5,29 @@ import {
 } from "@/domain/learning-journey/learning-journey.catalog";
 import {
   isCompletedPlanItem,
+  isFreeTalkPlanItem,
   sortAssignedPlanItems,
 } from "@/lib/learner-assigned-plan";
 import type { LearnerMyDrillRow } from "@/lib/server/learner-my-drills.server";
 
-export type JourneyDrillItem = LearnerMyDrillRow & {
-  drill: LearnerMyDrillRow["drill"] & {
-    learning_journey_part?: LearningJourneyPartId;
-    learning_journey_topic?: string;
-  };
+/** Drill subdocument shape needed by the journey utilities. */
+type JourneyDrillDoc = {
+  _id?: string;
+  type?: string;
+  date?: string | Date | null;
+  title?: string;
+  scenarioType?: string;
+  completionDate?: string | null;
+  learning_journey_part?: LearningJourneyPartId;
+  learning_journey_topic?: string;
+};
+
+/**
+ * A learner drill row whose `drill` field is narrowed to include the
+ * learning-journey metadata fields alongside the base shape.
+ */
+export type JourneyDrillItem = Omit<LearnerMyDrillRow, "drill"> & {
+  drill: JourneyDrillDoc;
 };
 
 export type JourneyTopicGroup = {
@@ -21,9 +35,11 @@ export type JourneyTopicGroup = {
   items: JourneyDrillItem[];
 };
 
-function drillBelongsToPart(item: JourneyDrillItem, part: LearningJourneyPartId): boolean {
-  const drill = item.drill as { learning_journey_part?: number } | undefined;
-  return drill?.learning_journey_part === part;
+function drillBelongsToPart(
+  item: JourneyDrillItem,
+  part: LearningJourneyPartId,
+): boolean {
+  return item.drill?.learning_journey_part === part;
 }
 
 export function filterDrillsForPart(
@@ -43,11 +59,10 @@ export function groupDrillsByJourney(
   return topics.map((topic) => ({
     topic,
     items: sortAssignedPlanItems(
-      partDrills.filter((item) => {
-        const drill = item.drill as { learning_journey_topic?: string } | undefined;
-        return drill?.learning_journey_topic === topic.id;
-      }),
-    ),
+      partDrills.filter(
+        (item) => item.drill?.learning_journey_topic === topic.id,
+      ),
+    ) as JourneyDrillItem[],
   }));
 }
 
@@ -56,10 +71,18 @@ export function countPartJourneyProgress(
   part: LearningJourneyPartId,
 ): { completed: number; total: number } {
   const partDrills = filterDrillsForPart(drills, part);
-  const completed = partDrills.filter((item) => isCompletedPlanItem(item)).length;
+  const completed = partDrills.filter((item) =>
+    isCompletedPlanItem(item),
+  ).length;
   return { completed, total: partDrills.length };
 }
 
-export function filterBookmarkedDrills(drills: JourneyDrillItem[]): JourneyDrillItem[] {
-  return sortAssignedPlanItems(drills.filter((item) => item.hasBookmarks === true));
+export function filterBookmarkedDrills(
+  drills: JourneyDrillItem[],
+): JourneyDrillItem[] {
+  return sortAssignedPlanItems(
+    drills.filter((item) => item.hasBookmarks === true),
+  ) as JourneyDrillItem[];
 }
+
+export { isFreeTalkPlanItem };

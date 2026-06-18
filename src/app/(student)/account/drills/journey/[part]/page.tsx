@@ -11,7 +11,7 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useDrillBookmarkToggle } from "@/hooks/useDrillBookmarkToggle";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
-import { isFreeTalkPlanItem } from "@/lib/learner-assigned-plan";
+import { isFreeTalkPlanItem } from "@/lib/learning-journey/group-journey-drills";
 import {
   getPartById,
   parseLearningJourneyPartId,
