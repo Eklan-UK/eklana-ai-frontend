@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface DefinitionDrillProps {
@@ -109,6 +110,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       });
 
       setIsCompleted(true);
+      playPracticeFeedback("success");
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)

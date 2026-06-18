@@ -7,7 +7,7 @@ export interface Badge {
   badgeId: string;
   badgeName: string;
   unlockedAt: Date;
-  milestone: number; // days
+  milestone?: number; // legacy streak milestone
 }
 
 export interface IUserStreak extends Document {

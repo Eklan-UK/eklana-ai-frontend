@@ -18,6 +18,7 @@ import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-c
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -271,8 +272,10 @@ export default function FillBlankDrill({
       }
 
       if (passed) {
+        playPracticeFeedback("success");
         toast.success("Drill passed! Great job!");
       } else {
+        playPracticeFeedback("failure");
         toast.error(
           `Score: ${score}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`,
         );

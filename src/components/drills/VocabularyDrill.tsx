@@ -23,6 +23,7 @@ import {
   type PerformanceReviewGroup,
 } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface VocabularyDrillProps {
   drill: any;
@@ -377,12 +378,14 @@ export default function VocabularyDrill({
         });
 
         if (passed) {
+          playPracticeFeedback("success");
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"
             } passed!`
           );
         } else {
+          playPracticeFeedback("failure");
           toast.warning(
             `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`
           );

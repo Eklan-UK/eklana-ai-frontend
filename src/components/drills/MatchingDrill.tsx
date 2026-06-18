@@ -11,6 +11,7 @@ import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillLayout } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface MatchingDrillProps {
   drill: any;
@@ -213,6 +214,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         return newSet;
       });
 
+      playPracticeFeedback("success");
       toast.success("Correct match! ✓");
 
       const allMatched = matchedPairs.size + 1 === pairs.length;
@@ -241,6 +243,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       setSelectedLeftIndex(null);
       setSelectedRightIndex(null);
 
+      playPracticeFeedback("failure");
       toast.error("Incorrect match. Try again!");
 
       setTimeout(() => {

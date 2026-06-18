@@ -1,0 +1,85 @@
+import { unlockAudioContext } from "@/lib/ios-audio-utils";
+
+export type PracticeFeedbackKind = "success" | "failure";
+
+const HAPTIC_PATTERNS: Record<PracticeFeedbackKind, number[]> = {
+  success: [40, 30, 40],
+  failure: [120, 60, 120],
+};
+
+const TONE_SEQUENCES: Record<
+  PracticeFeedbackKind,
+  Array<{ frequency: number; durationMs: number; gapMs: number }>
+> = {
+  success: [
+    { frequency: 523, durationMs: 90, gapMs: 30 },
+    { frequency: 659, durationMs: 110, gapMs: 0 },
+  ],
+  failure: [
+    { frequency: 220, durationMs: 120, gapMs: 40 },
+    { frequency: 165, durationMs: 130, gapMs: 0 },
+  ],
+};
+
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (!audioContext) {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    audioContext = new AudioContextCtor();
+  }
+  return audioContext;
+}
+
+export function triggerHaptic(kind: PracticeFeedbackKind): void {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+    return;
+  }
+  try {
+    navigator.vibrate(HAPTIC_PATTERNS[kind]);
+  } catch {
+    /* best-effort */
+  }
+}
+
+export async function playTone(kind: PracticeFeedbackKind): Promise<void> {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  await unlockAudioContext(ctx);
+
+  const now = ctx.currentTime;
+  let offset = 0;
+
+  for (const step of TONE_SEQUENCES[kind]) {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.type = kind === "success" ? "sine" : "triangle";
+    oscillator.frequency.setValueAtTime(step.frequency, now + offset);
+
+    gain.gain.setValueAtTime(0.0001, now + offset);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.01);
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      now + offset + step.durationMs / 1000
+    );
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(now + offset);
+    oscillator.stop(now + offset + step.durationMs / 1000 + 0.02);
+
+    offset += step.durationMs / 1000 + step.gapMs / 1000;
+  }
+}
+
+export function playPracticeFeedback(kind: PracticeFeedbackKind): void {
+  triggerHaptic(kind);
+  void playTone(kind);
+}
