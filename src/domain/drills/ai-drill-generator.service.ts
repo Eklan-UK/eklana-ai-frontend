@@ -19,6 +19,8 @@ interface GenerateDrillParams {
   difficulty: string;
   context: string;
   prompt: string;
+  topic: string;
+  part: string;
 }
 
 type FunctionTool = Extract<OpenAI.Chat.Completions.ChatCompletionTool, { type: 'function' }>;
@@ -321,6 +323,10 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
+      {
+        role: 'system',
+        content: `This drill is for ${params.part}, Topic: ${params.topic}. If the drill includes translations, always translate to Korean unless the tutor explicitly specifies a different language.`,
+      },
       {
         role: 'user',
         content: `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,

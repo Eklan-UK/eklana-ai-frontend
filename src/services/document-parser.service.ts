@@ -68,6 +68,8 @@ export interface ParsedContent {
     | "listening"
     | "sentence"
     | "fill_blank"
+    | "pronunciation"
+    | "key_phrases"
     | "unknown";
   confidence: number;
   extractedData: {
@@ -126,26 +128,26 @@ class DocumentParserService {
   /**
    * Parse a document file
    */
-  async parseDocument(file: File | Blob): Promise<ParsedContent> {
+  async parseDocument(file: File | Blob, drillType?: string): Promise<ParsedContent> {
     const fileName = file instanceof File ? file.name : "document";
     const extension = fileName.split(".").pop()?.toLowerCase() || "";
 
     try {
       switch (extension) {
         case "pdf":
-          return await this.parsePDF(file);
+          return await this.parsePDF(file, drillType);
         case "docx":
         case "doc":
-          return await this.parseWord(file);
+          return await this.parseWord(file, drillType);
         case "xlsx":
         case "xls":
         case "csv":
-          return await this.parseExcel(file);
+          return await this.parseExcel(file, drillType);
         case "txt":
-          return await this.parseText(file as File);
+          return await this.parseText(file as File, drillType);
         case "md":
         case "markdown":
-          return await this.parseMarkdown(file as File);
+          return await this.parseMarkdown(file as File, drillType);
         default:
           throw new Error(`Unsupported file format: ${extension}`);
       }
@@ -157,7 +159,7 @@ class DocumentParserService {
   /**
    * Parse PDF file
    */
-  private async parsePDF(file: File | Blob): Promise<ParsedContent> {
+  private async parsePDF(file: File | Blob, drillType?: string): Promise<ParsedContent> {
     const pdfParseModule = await loadPdfParse();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -165,13 +167,13 @@ class DocumentParserService {
     const text = data.text;
 
     const fileName = file instanceof File ? file.name : "document.pdf";
-    return this.parseTextContent(text, fileName);
+    return this.parseTextContent(text, fileName, drillType);
   }
 
   /**
    * Parse Word document
    */
-  private async parseWord(file: File | Blob): Promise<ParsedContent> {
+  private async parseWord(file: File | Blob, drillType?: string): Promise<ParsedContent> {
     const mammothModule = await loadMammoth();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -180,13 +182,13 @@ class DocumentParserService {
     const text = result.value;
 
     const fileName = file instanceof File ? file.name : "document.docx";
-    return this.parseTextContent(text, fileName);
+    return this.parseTextContent(text, fileName, drillType);
   }
 
   /**
    * Parse Excel/CSV file
    */
-  private async parseExcel(file: File | Blob): Promise<ParsedContent> {
+  private async parseExcel(file: File | Blob, drillType?: string): Promise<ParsedContent> {
     const XLSXModule = await loadXLSX();
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -202,37 +204,37 @@ class DocumentParserService {
     });
 
     const fileName = file instanceof File ? file.name : "document.xlsx";
-    // Detect structure and parse
-    return this.parseExcelData(jsonData, fileName);
+    return this.parseExcelData(jsonData, fileName, drillType);
   }
 
   /**
    * Parse plain text file
    */
-  private async parseText(file: File): Promise<ParsedContent> {
+  private async parseText(file: File, drillType?: string): Promise<ParsedContent> {
     const text = await file.text();
-    return this.parseTextContent(text, file.name);
+    return this.parseTextContent(text, file.name, drillType);
   }
 
   /**
    * Parse Markdown file
    */
-  private async parseMarkdown(file: File): Promise<ParsedContent> {
+  private async parseMarkdown(file: File, drillType?: string): Promise<ParsedContent> {
     const text = await file.text();
-    return this.parseTextContent(text, file.name);
+    return this.parseTextContent(text, file.name, drillType);
   }
 
   /**
    * Parse text content and detect structure
    */
-  private parseTextContent(text: string, filename: string): ParsedContent {
+  private parseTextContent(text: string, filename: string, drillType?: string): ParsedContent {
     const lines = text
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    // Try to detect drill type
-    const detectedType = this.detectDrillType(text);
+    const detectedType = drillType
+      ? { type: drillType as ParsedContent["type"], confidence: 1.0 }
+      : this.detectDrillType(text);
 
     let items: any[] = [];
 
@@ -283,7 +285,7 @@ class DocumentParserService {
   /**
    * Parse Excel/CSV data
    */
-  private parseExcelData(data: any[][], filename: string): ParsedContent {
+  private parseExcelData(data: any[][], filename: string, drillType?: string): ParsedContent {
     if (data.length === 0) {
       throw new Error("Empty file");
     }
@@ -293,9 +295,10 @@ class DocumentParserService {
     const hasHeaders = this.looksLikeHeader(firstRow);
     const startRow = hasHeaders ? 1 : 0;
 
-    // Detect structure based on column count and content
     const columnCount = firstRow.length;
-    const detectedType = this.detectExcelStructure(data, columnCount);
+    const detectedType = drillType
+      ? { type: drillType as ParsedContent["type"], confidence: 1.0 }
+      : this.detectExcelStructure(data, columnCount);
 
     let items: any[] = [];
 
@@ -307,7 +310,30 @@ class DocumentParserService {
         items = this.parseExcelMatching(data, startRow, columnCount);
         break;
       case "roleplay":
-        items = this.parseExcelRoleplay(data, startRow);
+        items = [this.parseExcelRoleplay(data, startRow)];
+        break;
+      case "pronunciation":
+        items = this.parseExcelPronunciation(data, startRow);
+        break;
+      case "definition":
+        items = this.parseExcelDefinition(data, startRow);
+        break;
+      case "grammar":
+        items = this.parseExcelGrammar(data, startRow);
+        break;
+      case "sentence_writing":
+        items = this.parseExcelSentenceWriting(data, startRow);
+        break;
+      case "key_phrases":
+        items = this.parseExcelKeyPhrases(data, startRow);
+        break;
+      case "fill_blank":
+        console.log("fill_blank parser called", { startRow, rowCount: data.length, firstRow: data[0] });
+        items = this.parseExcelFillBlank(data, startRow);
+        break;
+      case "summary":
+      case "listening":
+        items = this.parseExcelSummary(data, startRow);
         break;
       default:
         items = this.parseExcelVocabulary(data, startRow, columnCount);
@@ -615,6 +641,124 @@ class DocumentParserService {
     return items;
   }
 
+  private parseExcelPronunciation(data: any[][], startRow: number): { sound: string; word: string; sentence: string }[] {
+    const items: { sound: string; word: string; sentence: string }[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const sound = String(row[0] || "").trim();
+      const word = String(row[1] || "").trim();
+      if (sound || word) {
+        items.push({ sound, word, sentence: String(row[2] || "").trim() });
+      }
+    }
+    return items;
+  }
+
+  private parseExcelDefinition(data: any[][], startRow: number): DefinitionItem[] {
+    const items: DefinitionItem[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const word = String(row[0] || "").trim();
+      if (word) {
+        items.push({ word, hint: String(row[1] || "").trim() || undefined });
+      }
+    }
+    return items;
+  }
+
+  private parseExcelGrammar(data: any[][], startRow: number): GrammarItem[] {
+    const items: GrammarItem[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const pattern = String(row[0] || "").trim();
+      if (pattern) {
+        items.push({
+          pattern,
+          hint: String(row[1] || "").trim() || undefined,
+          example: String(row[2] || "").trim(),
+        });
+      }
+    }
+    return items;
+  }
+
+  private parseExcelSentenceWriting(data: any[][], startRow: number): SentenceWritingItem[] {
+    const items: SentenceWritingItem[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const word = String(row[0] || "").trim();
+      if (word) {
+        items.push({ word, hint: String(row[1] || "").trim() || undefined });
+      }
+    }
+    return items;
+  }
+
+  private parseExcelKeyPhrases(data: any[][], startRow: number): { respondentName: string; prompt: string; options: string[]; correctAnswer: string }[] {
+    const items: { respondentName: string; prompt: string; options: string[]; correctAnswer: string }[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const stripPrefix = (s: string) => s.replace(/^[A-Da-d]\.\s*/, "").trim();
+      const prompt = String(row[0] || "").trim();
+      if (!prompt) continue;
+      const respondentName = String(row[1] || "").trim();
+      const correctAnswer = stripPrefix(String(row[2] || "").trim());
+      const option2 = stripPrefix(String(row[3] || "").trim());
+      const option3 = stripPrefix(String(row[4] || "").trim());
+      const options = [correctAnswer, option2, option3].filter(Boolean);
+      for (let j = options.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [options[j], options[k]] = [options[k], options[j]];
+      }
+      items.push({ respondentName, prompt, options: options.length > 0 ? options : ["", ""], correctAnswer });
+    }
+    return items;
+  }
+
+  private parseExcelFillBlank(data: any[][], startRow: number): { sentence: string; translation: string; blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[] }[] {
+    const items: { sentence: string; translation: string; blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[] }[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const sentence = String(row[0] || "").trim();
+      if (!sentence) continue;
+      const correctAnswer = String(row[1] || "").trim();
+      const option2 = String(row[2] || "").trim();
+      const option3 = String(row[3] || "").trim();
+      const hint = String(row[4] || "").trim();
+      items.push({
+        sentence,
+        translation: "",
+        blanks: [{
+          position: 0,
+          correctAnswer,
+          options: [correctAnswer, option2, option3].filter(Boolean),
+          hint,
+        }],
+      });
+    }
+    return items;
+  }
+
+  private parseExcelSummary(data: any[][], startRow: number): { title: string; content: string }[] {
+    const items: { title: string; content: string }[] = [];
+    for (let i = startRow; i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
+      const title = String(row[0] || "").trim();
+      const content = String(row[1] || "").trim();
+      if (title || content) {
+        items.push({ title, content });
+      }
+    }
+    return items;
+  }
+
   /**
    * Parse Excel vocabulary
    */
@@ -674,42 +818,62 @@ class DocumentParserService {
   /**
    * Parse Excel roleplay
    */
-  private parseExcelRoleplay(data: any[][], startRow: number): RoleplayScene[] {
-    // Simple roleplay parsing - each row is a dialogue turn
+  private parseExcelRoleplay(data: any[][], startRow: number): {
+    roleplay_scenes: RoleplayScene[];
+    student_character_name: string;
+    ai_character_names: string[];
+    drill_intro: string;
+    context: string;
+  } {
+    const metadataKeys = new Set(["student_character", "ai_character", "drill_intro", "context"]);
+    let student_character_name = "";
+    const ai_character_names: string[] = [];
+    let drill_intro = "";
+    let context = "";
     const dialogue: DialogueTurn[] = [];
 
     for (let i = startRow; i < data.length; i++) {
       const row = data[i];
       if (!row || !row[0]) continue;
 
-      const speaker = String(row[0] || "student").toLowerCase();
-      const text = String(row[1] || "").trim();
+      const key = String(row[0] || "").trim().toLowerCase();
+      const value = String(row[1] || "").trim();
 
-      const speakerEnum: DialogueTurn["speaker"] = speaker.startsWith("ai")
-        ? parseRoleplayAiSpeakerId(speaker) ?? "ai_0"
+      if (metadataKeys.has(key)) {
+        if (key === "student_character") student_character_name = value;
+        else if (key === "ai_character") ai_character_names.push(value);
+        else if (key === "drill_intro") drill_intro = value;
+        else if (key === "context") context = value;
+        continue;
+      }
+
+      const speakerEnum: DialogueTurn["speaker"] = key.startsWith("ai")
+        ? parseRoleplayAiSpeakerId(key) ?? "ai_0"
         : "student";
 
-      if (text) {
+      if (value) {
         dialogue.push({
           speaker: speakerEnum,
-          text,
+          text: value,
           translation: String(row[2] || "").trim() || undefined,
         });
       }
     }
 
-    return [
-      {
-        scene_name: "Scene 1",
-        dialogue:
-          dialogue.length > 0
+    return {
+      student_character_name,
+      ai_character_names: ai_character_names.length > 0 ? ai_character_names : [""],
+      drill_intro,
+      context,
+      roleplay_scenes: [
+        {
+          scene_name: "Scene 1",
+          dialogue: dialogue.length > 0
             ? dialogue
-            : [
-                { speaker: "ai_0", text: "" },
-                { speaker: "student", text: "" },
-              ],
-      },
-    ];
+            : [{ speaker: "ai_0", text: "" }, { speaker: "student", text: "" }],
+        },
+      ],
+    };
   }
 
   /**
@@ -789,9 +953,36 @@ class DocumentParserService {
       "text",
       "pattern",
       "example",
+      "sound",
+      "hint",
+      "phrase",
+      "prompt",
+      "respondent",
+      "answer",
+      "option",
+      "title",
+      "article",
+      "content",
+      "english",
+      "korean",
+      "column",
+      "field",
+      "type",
+      "item",
     ];
-    const firstCell = String(row[0] || "").toLowerCase();
 
+    // Every cell must be a short, non-empty string with no Korean/CJK characters
+    // and no digits — real data rows typically contain Korean text or numbers
+    const korean = /[가-힣一-鿿]/;
+    const purelyNumeric = /^\d+(\.\d+)?$/;
+    const allCellsLookLikeLabels = row.every((cell) => {
+      const s = String(cell || "").trim();
+      return s.length > 0 && s.length <= 40 && !korean.test(s) && !purelyNumeric.test(s);
+    });
+
+    if (!allCellsLookLikeLabels) return false;
+
+    const firstCell = String(row[0] || "").toLowerCase();
     return headerKeywords.some((keyword) => firstCell.includes(keyword));
   }
 

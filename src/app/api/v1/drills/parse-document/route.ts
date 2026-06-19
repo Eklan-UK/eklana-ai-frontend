@@ -84,8 +84,11 @@ async function handler(
       );
     }
 
+    const drillType = formData.get("drillType");
+    const drillTypeStr = typeof drillType === "string" ? drillType : undefined;
+
     // Parse document
-    const parsed = await documentParserService.parseDocument(fileToProcess);
+    const parsed = await documentParserService.parseDocument(fileToProcess, drillTypeStr);
 
     logger.info("Document parsed successfully", {
       fileName: fileName,

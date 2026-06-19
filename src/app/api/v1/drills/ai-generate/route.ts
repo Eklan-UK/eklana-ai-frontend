@@ -9,14 +9,18 @@ async function handler(
 ): Promise<NextResponse> {
   try {
     const body = await req.json();
-    const { drillType, difficulty, context: drillContext, prompt, studentId } = body;
+    const { drillType, difficulty, context: drillContext, prompt, topic, part, studentId } = body;
 
     if (!drillType || !prompt) {
       return NextResponse.json(
-        {
-          code: "ValidationError",
-          message: "drillType and prompt are required",
-        },
+        { code: "ValidationError", message: "drillType and prompt are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!part || !topic) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "part and topic are required" },
         { status: 400 }
       );
     }
@@ -32,6 +36,8 @@ async function handler(
       difficulty: difficulty ?? "intermediate",
       context: drillContext ?? "",
       prompt,
+      topic,
+      part,
     });
 
     return NextResponse.json(
