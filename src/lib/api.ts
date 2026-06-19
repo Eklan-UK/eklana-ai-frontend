@@ -140,6 +140,82 @@ export const drillAPI = {
     });
   },
 
+  getRoleplayProgress: (
+    drillId: string,
+    params:
+      | { source: 'assignment'; assignmentId: string }
+      | {
+          source: 'weekly_challenge';
+          challengeId: string;
+          challengeItemIndex: number;
+        },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { progress: Record<string, unknown> | null };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  saveRoleplayProgress: (
+    drillId: string,
+    data: {
+      source: 'assignment' | 'weekly_challenge';
+      assignmentId?: string;
+      challengeId?: string;
+      challengeItemIndex?: number;
+      weekStartDate?: string;
+      currentSceneIndex: number;
+      currentTurnIndex: number;
+      pausedAtSceneBreak: boolean;
+      completedSceneIndex?: number;
+      turnProgress: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      sessionAnalytics: Array<{
+        sceneIndex: number;
+        turnIndex: number;
+        text: string;
+        score: number;
+        textScore?: unknown;
+        attempts: number;
+        timestamp: string | Date;
+      }>;
+      roleMode: 'original' | 'swapped';
+      originalRoleProgress?: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      swappedRoleProgress?: Record<string, { passed: boolean; score: number | null; attempts: number }>;
+      startedAt?: string | Date;
+    },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { progress: Record<string, unknown> };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  clearRoleplayProgress: (
+    drillId: string,
+    params:
+      | { source: 'assignment'; assignmentId: string }
+      | {
+          source: 'weekly_challenge';
+          challengeId: string;
+          challengeItemIndex: number;
+        },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { deleted: boolean };
+    }>(`/drills/${drillId}/roleplay-progress`, {
+      method: 'DELETE',
+      params,
+    });
+  },
+
   // Complete drill
   complete: (drillId: string, data: {
     drillAssignmentId: string;
@@ -1257,6 +1333,26 @@ export const adminAPI = {
     }>('/admin/discovery-calls', {
       method: 'GET',
       params,
+    });
+  },
+
+  getNpsFormSettings: () => {
+    return apiRequest<{
+      data: import('@/domain/admin/nps-form.types').NpsFormSettings | null;
+    }>('/admin/settings/nps-form', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  updateNpsFormSettings: (
+    data: import('@/domain/admin/nps-form.types').UpdateNpsFormSettingsBody,
+  ) => {
+    return apiRequest<{
+      data: import('@/domain/admin/nps-form.types').NpsFormSettings;
+    }>('/admin/settings/nps-form', {
+      method: 'PUT',
+      data,
     });
   },
 };

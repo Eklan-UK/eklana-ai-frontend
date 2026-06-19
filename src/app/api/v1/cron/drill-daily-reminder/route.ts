@@ -1,4 +1,4 @@
-// GET /api/v1/cron/drill-daily-reminder — Daily practice nudge for every learner
+// GET /api/v1/cron/drill-daily-reminder — Rolling streak reminder (every 30 min)
 // Secure with DRILL_REMINDER_CRON_SECRET: Authorization: Bearer <secret> or x-cron-secret
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
@@ -6,6 +6,7 @@ import { DrillReminderService } from '@/domain/drills/drill-reminder.service';
 import '@/models/fcm-token';
 import '@/models/drill-assignment';
 import '@/models/profile';
+import '@/models/user-streak';
 
 function authorize(req: NextRequest): boolean {
   const secret = process.env.DRILL_REMINDER_CRON_SECRET;
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   await connectToDatabase();
   const svc = new DrillReminderService();
-  const result = await svc.runDailyReminders();
+  const result = await svc.runRollingReminders();
 
   return NextResponse.json({ code: 'Success', data: result });
 }

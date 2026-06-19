@@ -7,7 +7,8 @@ import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { pronunciationAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import type { TextScore } from "@/services/speechace.service";
@@ -25,6 +26,7 @@ import {
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface PronunciationDrillProps {
   drill: any;
@@ -387,6 +389,7 @@ export default function PronunciationDrill({
         });
 
         if (passed) {
+          playPracticeFeedback("success");
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"
@@ -400,6 +403,7 @@ export default function PronunciationDrill({
             });
           }, 50);
         } else {
+          playPracticeFeedback("failure");
           toast.warning(
             `Score: ${score.toFixed(
               0
@@ -535,7 +539,7 @@ export default function PronunciationDrill({
           weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
       } else {
-        await drillAPI.complete(drill._id, {
+        await completeLearnerDrill(queryClient, drill._id, {
           drillAssignmentId: assignmentId!,
           score,
           timeSpent,

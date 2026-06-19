@@ -9,8 +9,10 @@ import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Loader2, BookOpen, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { drillAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface DefinitionDrillProps {
@@ -20,6 +22,7 @@ interface DefinitionDrillProps {
 
 export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrillProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
@@ -96,7 +99,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         hint: item.hint || "",
       }));
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,
@@ -107,6 +110,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       });
 
       setIsCompleted(true);
+      playPracticeFeedback("success");
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)

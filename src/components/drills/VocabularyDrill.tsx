@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { pronunciationAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import type { TextScore } from "@/services/speechace.service";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService } from "@/services/speechace.service";
@@ -21,6 +23,7 @@ import {
   type PerformanceReviewGroup,
 } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface VocabularyDrillProps {
   drill: any;
@@ -117,6 +120,7 @@ export default function VocabularyDrill({
   drill,
   assignmentId,
 }: VocabularyDrillProps) {
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -374,12 +378,14 @@ export default function VocabularyDrill({
         });
 
         if (passed) {
+          playPracticeFeedback("success");
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"
             } passed!`
           );
         } else {
+          playPracticeFeedback("failure");
           toast.warning(
             `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`
           );
@@ -482,7 +488,7 @@ export default function VocabularyDrill({
         };
       });
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,

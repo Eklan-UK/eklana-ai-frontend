@@ -16,9 +16,11 @@ import {
   Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 import { useTTS } from "@/hooks/useTTS";
 
@@ -31,6 +33,7 @@ export default function SummaryDrill({
   drill,
   assignmentId,
 }: SummaryDrillProps) {
+  const queryClient = useQueryClient();
   const [summary, setSummary] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,7 +169,7 @@ export default function SummaryDrill({
     try {
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score: 0, // Score will be set after review
         timeSpent,
@@ -182,6 +185,7 @@ export default function SummaryDrill({
       });
 
       setIsCompleted(true);
+      playPracticeFeedback("success");
       toast.success("Summary submitted for review!");
 
       trackActivity("drill", drill._id, "completed", {

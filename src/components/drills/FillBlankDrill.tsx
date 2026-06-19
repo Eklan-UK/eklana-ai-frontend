@@ -13,11 +13,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { drillAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -251,7 +252,7 @@ export default function FillBlankDrill({
           score,
         });
       } else if (passed) {
-        await drillAPI.complete(drill._id, {
+        await completeLearnerDrill(queryClient, drill._id, {
           drillAssignmentId: assignmentId!,
           score,
           timeSpent: Math.floor((Date.now() - startTime) / 1000),
@@ -271,8 +272,10 @@ export default function FillBlankDrill({
       }
 
       if (passed) {
+        playPracticeFeedback("success");
         toast.success("Drill passed! Great job!");
       } else {
+        playPracticeFeedback("failure");
         toast.error(
           `Score: ${score}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`,
         );

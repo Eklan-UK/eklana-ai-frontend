@@ -20,9 +20,16 @@ const createBookmarkSchema = z.object({
 async function getBookmarks(req: NextRequest, context: { userId: Types.ObjectId; userRole: string }) {
   try {
     await connectToDatabase();
-    
-    // Sort by most recent first
-    const bookmarks = await Bookmark.find({ userId: context.userId })
+
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get('type');
+
+    const query: Record<string, unknown> = { userId: context.userId };
+    if (type && ['word', 'sentence', 'drill'].includes(type)) {
+      query.type = type;
+    }
+
+    const bookmarks = await Bookmark.find(query)
       .sort({ createdAt: -1 })
       .lean();
 
@@ -75,6 +82,13 @@ async function createBookmark(req: NextRequest, context: { userId: Types.ObjectI
       translation,
       context: bookmarkContext,
     });
+
+    try {
+      const { BadgeService } = await import('@/domain/badges/badge.service');
+      void BadgeService.evaluateAndUnlock(context.userId.toString());
+    } catch {
+      // badges must not fail bookmark creation
+    }
 
     return NextResponse.json({ bookmark }, { status: 201 });
   } catch (error: any) {

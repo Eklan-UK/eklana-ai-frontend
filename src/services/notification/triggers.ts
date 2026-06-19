@@ -12,6 +12,9 @@ import {
 import { connectToDatabase } from "@/lib/api/db";
 import FCMToken from "@/models/fcm-token";
 import User from "@/models/user";
+import { StreakService } from "@/services/streak.service";
+import { sendNotification } from "@/services/notification";
+import { PushToken } from "@/models/push-token.model";
 
 /**
  * Trigger when a drill is assigned to a student
@@ -504,7 +507,13 @@ export async function onAchievementUnlocked(
 }
 
 /**
- * Trigger for streak reminders
+ * Trigger for streak reminders.
+ *
+ * Waterfall delivery — no duplicates:
+ *   1. Always fire the unified path (Expo mobile + modern Web Push).
+ *   2. Check if the student has an active modern web push token.
+ *   3. Only run legacy FCM if they do NOT — prevents double-notifying
+ *      web users who are registered in both collections.
  */
 export async function onStreakReminder(studentId: string, streakDays: number) {
   console.log("[Notification Trigger] onStreakReminder called:", {
@@ -515,34 +524,60 @@ export async function onStreakReminder(studentId: string, streakDays: number) {
   try {
     await connectToDatabase();
 
-    // Get student's FCM tokens
-    const fcmTokens = await FCMToken.find({
-      userId: studentId,
-      isActive: true,
-    })
-      .select("token")
-      .lean()
-      .exec();
+    const liveStreakData = await StreakService.getStreakData(studentId);
+    const resolvedStreakDays = liveStreakData.currentStreak;
 
-    if (fcmTokens.length === 0) {
-      console.warn(
-        "[Notification Trigger] No active FCM tokens found for student:",
-        studentId,
-      );
+    if (resolvedStreakDays <= 0) {
       return null;
     }
 
-    const tokens = fcmTokens.map((t) => t.token);
+    const title = "Don't Break Your Streak! 🔥";
+    const body = `You have a ${resolvedStreakDays}-day streak. Complete a drill today to keep it going!`;
+    const notifData = { screen: "Home", url: "/account" };
 
-    const result = await sendNotificationToUsers([studentId], tokens, {
-      title: "Don't Break Your Streak! 🔥",
-      body: `You have a ${streakDays}-day streak. Complete a drill today to keep it going!`,
-      type: NotificationType.LESSON_REMINDER,
-      data: {
-        screen: "Home",
-        url: "/account",
-      },
+    // Step 1: Always fire unified path (Expo mobile + modern Web Push)
+    const unifiedResult = await sendNotification({
+      userId: studentId,
+      title,
+      body,
+      type: "drill_reminder",
+      data: notifData,
     });
+
+    // Step 2: Lightweight check for a modern web push token
+    const hasModernWebToken = await PushToken.exists({
+      userId: studentId,
+      platform: "web",
+      isActive: true,
+    });
+
+    // Step 3: FCM fallback only when user has no modern web token
+    let fcmResult = null;
+    if (!hasModernWebToken) {
+      const fcmTokens = await FCMToken.find({
+        userId: studentId,
+        isActive: true,
+      })
+        .select("token")
+        .lean()
+        .exec();
+
+      if (fcmTokens.length > 0) {
+        fcmResult = await sendNotificationToUsers(
+          [studentId],
+          fcmTokens.map((t) => t.token),
+          {
+            title,
+            body,
+            type: NotificationType.LESSON_REMINDER,
+            data: { screen: "Home", url: "/account" },
+          },
+        );
+      }
+    }
+
+    const anySent = unifiedResult.totalSent > 0 || fcmResult !== null;
+    const result = anySent ? { unified: unifiedResult, fcm: fcmResult } : null;
 
     console.log("[Notification Trigger] onStreakReminder result:", result);
     return result;

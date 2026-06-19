@@ -20,6 +20,9 @@ async function handler(
       "grammar",
       "sentence_writing",
       "summary",
+      "listening",
+      "fill_blank",
+      "key_phrases",
     ];
 
     if (!validTypes.includes(type)) {
@@ -105,19 +108,23 @@ function generateTemplate(type: string): { data: any[][] } {
     case "roleplay":
       return {
         data: [
+          ["student_character", "Student"],
+          ["ai_character", "Waiter"],
+          ["drill_intro", "You are at a restaurant and want to order food."],
+          ["context", "Restaurant ordering scenario"],
           ["Speaker", "Text", "Translation"],
           [
             "ai_0",
             "Good evening! Welcome to our restaurant.",
-            "¡Buenas noches! Bienvenido a nuestro restaurante.",
+            "좋은 저녁이에요! 저희 식당에 오신 것을 환영합니다.",
           ],
           [
             "student",
             "Hello! Can I see the menu, please?",
-            "¡Hola! ¿Puedo ver el menú, por favor?",
+            "안녕하세요! 메뉴를 볼 수 있을까요?",
           ],
-          ["ai_0", "Of course! Here you go.", "¡Por supuesto! Aquí tienes."],
-          ["student", "Thank you!", "¡Gracias!"],
+          ["ai_0", "Of course! Here you go.", "물론이죠! 여기 있습니다."],
+          ["student", "Thank you!", "감사합니다!"],
         ],
       };
 
@@ -163,6 +170,22 @@ function generateTemplate(type: string): { data: any[][] } {
         ],
       };
 
+    case "key_phrases":
+      return {
+        data: [
+          ["Prompt", "Respondent Name", "Correct Answer", "Option 2", "Option 3"],
+          ["What do you say when you arrive at a hotel?", "Receptionist", "I'd like to check in, please.", "Do you have a room?", "Where is my room?"],
+        ],
+      };
+
+    case "fill_blank":
+      return {
+        data: [
+          ["Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
+          ["She ___ to school every day.", "walks", "runs", "drives", "A verb meaning to travel on foot"],
+        ],
+      };
+
     case "summary":
       return {
         data: [
@@ -170,6 +193,17 @@ function generateTemplate(type: string): { data: any[][] } {
           [
             "Sample Article",
             "This is a sample article for summary drills. Replace this with your actual article content.",
+          ],
+        ],
+      };
+
+    case "listening":
+      return {
+        data: [
+          ["Content Title", "Content"],
+          [
+            "Sample Listening Passage",
+            "This is a sample listening passage. Replace this with your actual audio transcript or reading content for the listening drill.",
           ],
         ],
       };

@@ -412,6 +412,10 @@ await sound.unloadAsync();
 
 For PCM chunks streamed from AI (base64 PCM 16kHz), you'll need to write to a temp file and play with `Audio.Sound` or use a native audio buffer library.
 
+### Practice pass/fail feedback
+
+See [`mobile-practice-feedback.md`](mobile-practice-feedback.md) for haptics + optional sounds when learners pass or fail drill sections, free talk, and other practice surfaces. Web implementation: `src/lib/practice-feedback.ts`.
+
 ---
 
 ## Internationalization

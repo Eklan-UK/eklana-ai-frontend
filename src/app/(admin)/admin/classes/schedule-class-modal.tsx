@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { adminAPI } from "@/lib/api";
 import { useCreateAdminClass } from "@/hooks/useClasses";
+import { useNpsFormSettings } from "@/hooks/useAdmin";
+import { NpsFormReviewToggle } from "@/components/admin/NpsFormReviewToggle";
 import {
   computeFirstSessionRange,
   countSessionsThroughEndDate,
@@ -40,6 +42,12 @@ const REMINDER_OPTIONS = [
   "30 minutes before",
   "1 hour before",
 ] as const;
+
+function parseReminderMinutes(opt: string): number {
+  if (opt === "1 hour before") return 60;
+  const m = parseInt(opt, 10);
+  return Number.isNaN(m) ? 10 : m;
+}
 
 /** Visual match for date pill: "DD   MM   YYYY" spacing from native date value */
 function formatIsoToDisplayDate(iso: string) {
@@ -238,6 +246,7 @@ export function ScheduleClassModal({
     useState<(typeof REMINDER_OPTIONS)[number]>("10 minutes before");
   const [reminderSecondary, setReminderSecondary] =
     useState<(typeof REMINDER_OPTIONS)[number]>("30 minutes before");
+  const [npsEnabled, setNpsEnabled] = useState(false);
   /** Index of connector segment animating fill (between step i and i+1) */
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number | null>(
     null,
@@ -247,6 +256,10 @@ export function ScheduleClassModal({
   /** Review step circle pulse after Schedule → Review transition */
   const [reviewStepPulse, setReviewStepPulse] = useState(false);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: npsFormConfig, isLoading: npsFormLoading } = useNpsFormSettings({
+    enabled: open,
+  });
 
   const STEP_ADVANCE_MS = 600;
 
@@ -289,6 +302,7 @@ export function ScheduleClassModal({
     setRemindersEnabled(true);
     setReminderBeforeSession("10 minutes before");
     setReminderSecondary("30 minutes before");
+    setNpsEnabled(false);
     setAnimatingLineIndex(null);
     setTutorStepPulse(false);
     setReviewStepPulse(false);
@@ -482,6 +496,14 @@ export function ScheduleClassModal({
         scheduleStartTime,
         scheduleEndTime,
         totalSessionsPlanned: totalPlanned,
+        remindersEnabled,
+        reminderMinutes: remindersEnabled
+          ? [
+              parseReminderMinutes(reminderBeforeSession),
+              parseReminderMinutes(reminderSecondary),
+            ]
+          : [],
+        npsEnabled,
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;
@@ -1271,6 +1293,13 @@ export function ScheduleClassModal({
                     </div>
                   </div>
                 </div>
+
+                <NpsFormReviewToggle
+                  npsEnabled={npsEnabled}
+                  onNpsEnabledChange={setNpsEnabled}
+                  npsFormConfig={npsFormConfig}
+                  isLoading={npsFormLoading}
+                />
               </div>
             ) : null}
           </div>

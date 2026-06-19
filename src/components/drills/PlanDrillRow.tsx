@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Clock3 } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, Clock3, Bookmark, BookmarkCheck, Loader2, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { getDrillIcon, getDrillTypeInfo, getDrillStatus, getDrillTypeLabel, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const CATEGORY_TEXT: Record<string, string> = {
@@ -43,9 +45,11 @@ export interface PlanDrillRowProps {
   dueDate?: string;
   completedAt?: string;
   status?: string;
+  hasBookmarks?: boolean;
   onPrefetch?: (drillId: string) => void;
   /** Fires before navigation (e.g. activity tracking). */
   onNavigate?: () => void;
+  onBookmarkToggle?: (drillId: string, bookmarked: boolean) => void | Promise<void>;
 }
 
 export function PlanDrillRow({
@@ -54,9 +58,12 @@ export function PlanDrillRow({
   dueDate,
   completedAt,
   status,
+  hasBookmarks = false,
   onPrefetch,
   onNavigate,
+  onBookmarkToggle,
 }: PlanDrillRowProps) {
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const typeInfo = getDrillTypeInfo(drill.type);
   const drillStatus = getDrillStatus({
     drill,
@@ -65,6 +72,8 @@ export function PlanDrillRow({
     assignmentStatus: status,
   });
   const isCompleted = drillStatus === "completed";
+  const isInProgress =
+    status === "in-progress" || status === "in_progress";
   const href =
     isCompleted && assignmentId
       ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
@@ -75,6 +84,18 @@ export function PlanDrillRow({
   const catClass =
     CATEGORY_TEXT[typeInfo.color] ?? CATEGORY_TEXT.gray!;
   const thumbGrad = THUMB_GRADIENT[typeInfo.color] ?? THUMB_GRADIENT.gray!;
+
+  const handleBookmarkClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onBookmarkToggle || bookmarkLoading) return;
+    setBookmarkLoading(true);
+    try {
+      await onBookmarkToggle(drill._id, hasBookmarks);
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
 
   return (
     <Link
@@ -94,13 +115,48 @@ export function PlanDrillRow({
         </h3>
         <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
           • {getDrillTypeLabel(drill.type)}
+          {isInProgress && !isCompleted ? (
+            <span className="ml-1.5 text-sky-600">· In progress</span>
+          ) : null}
         </p>
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <Clock3 className="w-3.5 h-3.5 shrink-0" />
           {DRILL_ESTIMATED_DURATION_LABEL}
         </div>
       </div>
-      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+      <div className="flex items-center gap-1 shrink-0">
+        {isCompleted ? (
+          <CheckCircle2
+            className="w-5 h-5 text-[#22c55e] shrink-0"
+            aria-label="Completed"
+          />
+        ) : null}
+        {onBookmarkToggle ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={`p-2 h-auto rounded-full ${
+              hasBookmarks
+                ? "text-[#22c55e] hover:text-[#16a34a] hover:bg-green-50"
+                : "text-muted-foreground hover:text-[#22c55e] hover:bg-green-50"
+            }`}
+            onClick={handleBookmarkClick}
+            disabled={bookmarkLoading}
+            title={hasBookmarks ? "Remove from bookmarks" : "Save to bookmarks"}
+            aria-label={hasBookmarks ? "Remove from bookmarks" : "Save to bookmarks"}
+          >
+            {bookmarkLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : hasBookmarks ? (
+              <BookmarkCheck className="w-5 h-5" />
+            ) : (
+              <Bookmark className="w-5 h-5" />
+            )}
+          </Button>
+        ) : null}
+        <ChevronRight className="w-5 h-5 text-muted-foreground" aria-hidden />
+      </div>
     </Link>
   );
 }

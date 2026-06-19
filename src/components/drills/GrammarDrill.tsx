@@ -16,9 +16,11 @@ import {
   FileText,
 } from "lucide-react";
 import { toast } from "sonner";
-import { drillAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface GrammarDrillProps {
@@ -43,6 +45,7 @@ export default function GrammarDrill({
   drill,
   assignmentId,
 }: GrammarDrillProps) {
+  const queryClient = useQueryClient();
   const patternItems: PatternItem[] = useMemo(() => {
     return (drill.grammar_items || []).map((item: any) => ({
       pattern: item.pattern || "",
@@ -173,7 +176,7 @@ export default function GrammarDrill({
         reviewStatus: "pending",
       };
 
-      await drillAPI.complete(drill._id, {
+      await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score: 0, // Score will be calculated after review
         timeSpent,
@@ -182,6 +185,7 @@ export default function GrammarDrill({
       });
 
       setIsCompleted(true);
+      playPracticeFeedback("success");
       toast.success("Drill submitted! Your submission is pending review.");
 
       // Track activity locally (no API call)

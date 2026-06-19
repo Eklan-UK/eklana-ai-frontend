@@ -7,7 +7,7 @@ import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, XCircle, Mic, Loader2, Square, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { drillAPI } from "@/lib/api";
+import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import type { TextScore } from "@/services/speechace.service";
@@ -25,6 +25,7 @@ import {
 } from "./shared";
 import { preloadTTSAudio } from "@/hooks/useTTS";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface KeyPhrasesDrillProps {
   drill: any;
@@ -248,12 +249,15 @@ export default function KeyPhrasesDrill({
       });
 
       if (!isCorrect) {
+        playPracticeFeedback("failure");
         toast.error(
           `Wrong choice — the correct answer was "${currentItem.correctAnswer}". Score: 0.`
         );
       } else if (passed) {
+        playPracticeFeedback("success");
         toast.success(`Correct! Pronunciation: ${score.toFixed(0)}% ✓`);
       } else {
+        playPracticeFeedback("failure");
         toast.warning(
           `Correct choice, but pronunciation needs work: ${score.toFixed(0)}% (need ${PASS_THRESHOLD}%). Try again!`
         );
@@ -384,7 +388,7 @@ export default function KeyPhrasesDrill({
           weekStartDate: weeklyChallengeMeta.weekStartDate,
         });
       } else {
-        await drillAPI.complete(drill._id, {
+        await completeLearnerDrill(queryClient, drill._id, {
           drillAssignmentId: assignmentId!,
           score: avgScore,
           timeSpent,
