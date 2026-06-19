@@ -936,9 +936,11 @@ const DrillBuilder: React.FC = () => {
   // Apply parsed content to form
   const handleApplyParsedContent = (content?: ParsedContent) => {
     const pc = content ?? parsedContent;
+    console.log("[apply] pc:", pc, "parsedContent:", parsedContent);
     if (!pc) return;
 
     const { extractedData, type } = pc;
+    console.log("[apply] pc full object:", JSON.stringify(pc));
     const { title, items, metadata } = extractedData;
 
     // Update form data
