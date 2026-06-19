@@ -16,12 +16,15 @@ export function isFreeTalkPlanItem(item: {
 
 export function isCompletedPlanItem(item: {
   itemType?: string;
-  drill?: { type?: string; date?: string };
+  drill?: { type?: string; date?: string | Date | null };
   completedAt?: string | Date | null;
   status?: string;
   assignmentStatus?: string;
-  dueDate?: string;
-  latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
+  dueDate?: string | Date;
+  latestAttempt?: {
+    completedAt?: string | Date | null;
+    reviewStatus?: string;
+  } | null;
 }): boolean {
   if (isFreeTalkPlanItem(item)) {
     return Boolean(item.completedAt) || item.status === 'completed';
@@ -37,12 +40,15 @@ export function isCompletedPlanItem(item: {
 /** Non-completed drills shown on the home "Assigned Drills" section. */
 export function isActiveAssignedPlanItem(item: {
   itemType?: string;
-  drill?: { type?: string; date?: string };
+  drill?: { type?: string; date?: string | Date | null };
   completedAt?: string | Date | null;
   status?: string;
   assignmentStatus?: string;
-  dueDate?: string;
-  latestAttempt?: { completedAt?: string | Date | null; reviewStatus?: 'pending' | 'reviewed' };
+  dueDate?: string | Date;
+  latestAttempt?: {
+    completedAt?: string | Date | null;
+    reviewStatus?: string;
+  } | null;
 }): boolean {
   return !isCompletedPlanItem(item);
 }
