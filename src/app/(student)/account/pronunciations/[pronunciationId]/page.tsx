@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { toast } from "sonner";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import Link from "next/link";
 import {
   useLearnerPronunciationById,
@@ -207,10 +206,8 @@ export default function PronunciationPracticePage() {
           }
 
           if (attemptData.passed) {
-            playPracticeFeedback("success");
             toast.success(`Great! You passed with a score of ${attemptData.textScore}%`);
           } else {
-            playPracticeFeedback("failure");
             toast.warning(`Score: ${attemptData.textScore}%. Keep practicing!`);
           }
         } catch (error: any) {

@@ -14,11 +14,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
+import { drillAPI } from "@/lib/api";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface SentenceDrillProps {
@@ -77,7 +75,6 @@ export default function SentenceDrill({
   drill,
   assignmentId,
 }: SentenceDrillProps) {
-  const queryClient = useQueryClient();
   const wordItems = useMemo(() => getWordItems(drill), [drill]);
   const totalWords = wordItems.length;
 
@@ -203,7 +200,7 @@ export default function SentenceDrill({
         reviewStatus: "pending",
       };
 
-      await completeLearnerDrill(queryClient, drill._id, {
+      await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
         score: 0, // Score will be calculated after review
         timeSpent,
@@ -212,7 +209,6 @@ export default function SentenceDrill({
       });
 
       setIsCompleted(true);
-      playPracticeFeedback("success");
       toast.success("Drill submitted! Your submission is pending review.");
 
       // Track activity locally (no API call)

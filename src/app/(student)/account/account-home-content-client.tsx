@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
-import { CalendarDays, Lock } from "lucide-react";
+import { ChevronRight, CalendarDays, Lock } from "lucide-react";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
-import { SavedDrillsSection } from "@/components/drills/SavedDrillsSection";
 
 export function AccountHomeContentClient({
   children,
@@ -58,9 +57,20 @@ export function AccountHomeContentClient({
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
 
-        <div className="mt-3">
-          <SavedDrillsSection />
-        </div>
+        <Link
+          href="/account/bookmarks"
+          className="mt-3 flex items-center justify-between w-full border border-border rounded-full px-4 py-3 hover:bg-muted transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+              <span className="text-base">📘</span>
+            </div>
+            <span className="text-sm font-semibold font-satoshi text-foreground">
+              {t("savedDrills")}
+            </span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-text-secondary transition-colors" />
+        </Link>
       </div>
     </>
   );

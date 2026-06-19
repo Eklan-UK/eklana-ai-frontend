@@ -4,7 +4,6 @@ import { spawn } from "child_process";
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import type { FreeTalkScenarioType } from '@/models/free-talk-scenario.shared';
-import { GRADING_RUBRICS, type GradingBehaviour } from '@/domain/free-talk/free-talk-grading-rubrics';
 // Bundled static binary — works in serverless environments where ffmpeg is not on PATH.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegBin: string = require('ffmpeg-static');
@@ -1737,6 +1736,58 @@ export interface FreeTalkScenario {
 	/** Admin-defined bullets — woven into the grading prompt when present. */
 	include?: string[];
 }
+
+interface GradingBehaviour {
+	id: number;
+	name: string;
+	description: string;
+}
+
+const GRADING_RUBRICS: Record<FreeTalkScenarioType, GradingBehaviour[]> = {
+	icu_emergency: [
+		{ id: 1, name: 'Recognizes patient deterioration quickly', description: 'Identifies emergency signs such as low oxygen saturation, chest pain, respiratory distress, hypotension, or confusion without delay' },
+		{ id: 2, name: 'Provides immediate appropriate intervention', description: 'Initiates correct first actions such as increasing oxygen, monitoring vital signs, positioning patient safely, or assessing symptoms' },
+		{ id: 3, name: 'Gives clear patient instructions', description: 'Uses short, direct instructions such as "Take slow deep breaths" or "Please stay still"' },
+		{ id: 4, name: 'Uses professional ICU terminology', description: 'Correctly uses terms like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm' },
+	],
+	admission: [
+		{ id: 1, name: 'Introduces self clearly', description: 'States name and role confidently and professionally' },
+		{ id: 2, name: 'Explains role and purpose of interaction', description: 'Clearly explains why they are there and what will happen during admission' },
+		{ id: 3, name: 'Confirms patient identity correctly', description: 'Uses at least two identifiers appropriately (e.g., name and date of birth) to support patient safety' },
+		{ id: 4, name: 'Encourages patient questions or concerns', description: 'Invites the patient to ask questions and demonstrates openness to communication' },
+	],
+	small_talk_patient: [
+		{ id: 1, name: 'Uses appropriate social language', description: 'Uses natural conversational phrases suitable for healthcare settings without sounding overly formal or robotic' },
+		{ id: 2, name: 'Responds naturally in conversation', description: 'Avoids scripted or awkward responses and maintains smooth conversational flow' },
+		{ id: 3, name: 'Maintains professionalism throughout interaction', description: 'Keeps appropriate boundaries, respectful tone, and professional bedside behavior' },
+		{ id: 4, name: 'Encourages patient comfort and engagement', description: 'Helps the patient feel relaxed, included, and willing to continue communication' },
+	],
+	handover: [
+		{ id: 1, name: 'Gives concise and focused report', description: 'Communicates important information clearly without unnecessary details or excessive rambling' },
+		{ id: 2, name: 'Organizes information logically', description: 'Presents information in clear sequence (e.g., diagnosis → events → treatment → monitoring needs)' },
+		{ id: 3, name: 'Includes critical patient details', description: 'Mentions important clinical information such as diagnosis, vital changes, medications, procedures, safety concerns, or pending tasks' },
+		{ id: 4, name: 'Uses SBAR/ISBAR communication structure appropriately', description: 'Demonstrates structured handoff communication with clear situation, background, assessment, and recommendations' },
+		
+	],
+	decline_request: [
+		{ id: 1, name: 'Maintains respectful and calm tone', description: 'Speaks politely and professionally without sounding rude, dismissive, or irritated' },
+		{ id: 2, name: 'States limitation or refusal clearly', description: 'Clearly explains why the request cannot be fulfilled without being vague or overly apologetic' },
+		{ id: 3, name: 'Avoids confrontation or defensive language', description: 'Maintains composure and avoids arguing, blaming, or escalating tension' },
+		{ id: 4, name: 'Provides alternative solution or assistance', description: 'Offers another option, compromise, or next step when appropriate' },
+	],
+	phone_doctor: [
+		{ id: 1, name: 'Identifies self, unit, and patient appropriately', description: 'Clearly introduces themselves, unit/department, and patient information at the start of the call' },
+		{ id: 2, name: 'States reason for call immediately', description: 'Quickly explains why they are calling without unnecessary delays or excessive background information' },
+		{ id: 3, name: 'Gives accurate and relevant patient data', description: 'Provides correct vital signs, symptoms, assessment findings, medications, or changes in condition' },
+		{ id: 4, name: 'Requests recommendation, orders, or action appropriately', description: 'Clearly states what is needed from the physician (evaluation, medication order, intervention, etc.)' },
+	],
+	small_talk_colleague: [
+		{ id: 1, name: 'Maintains friendly and professional tone', description: 'Sounds respectful, calm, and collegial' },
+		{ id: 2, name: 'Responds naturally in conversation', description: 'Avoids robotic or overly scripted responses' },
+		{ id: 3, name: 'Maintains conversational flow', description: 'Keeps conversation going smoothly without awkward breakdowns' },
+		{ id: 4, name: 'Uses clear and understandable communication', description: 'Speech is understandable, organized, and appropriate' },
+	],
+};
 
 function freeTalkBehavioursForScenario(scenario: FreeTalkScenario): GradingBehaviour[] {
 	return GRADING_RUBRICS[scenario.scenarioType] ?? GRADING_RUBRICS.icu_emergency;

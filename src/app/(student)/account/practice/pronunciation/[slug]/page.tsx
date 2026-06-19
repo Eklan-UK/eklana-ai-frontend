@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import type { TextScore } from "@/services/speechace.service";
 import { speechaceService } from "@/services/speechace.service";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function PronunciationWordPracticePage() {
@@ -202,8 +201,6 @@ export default function PronunciationWordPracticePage() {
 
       if (textScore) {
         setPronunciationScore(textScore);
-        const score = textScore.speechace_score.pronunciation;
-        playPracticeFeedback(score >= 70 ? "success" : "failure");
         toast.success("Pronunciation analyzed successfully!");
         setIsAnalyzing(false);
       } else {

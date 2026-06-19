@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Flame, Award, Calendar } from "lucide-react";
-import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { streakAPI } from "@/lib/api";
 import { Loader2 } from "lucide-react";
-import type { BadgeId } from "@/domain/badges/badge.types";
-import { BADGE_BY_ID, normalizeBadgeId } from "@/domain/badges/badge.definitions";
 
 interface StreakData {
   currentStreak: number;
@@ -25,8 +22,7 @@ interface StreakData {
     badgeId: string;
     badgeName: string;
     unlockedAt: string;
-    milestone?: number;
-    icon?: string;
+    milestone: number;
   }>;
 }
 
@@ -80,16 +76,10 @@ export function StreakDisplay() {
             </div>
           </div>
           <p className="text-lg font-semibold text-foreground mb-1">
-            {streakData.currentStreak > 0
-              ? streakData.currentStreak === 1
-                ? "1-day streak"
-                : `${streakData.currentStreak}-day streak`
-              : "Day Streak"}
+            Day Streak
           </p>
           {streakData.currentStreak > 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Consecutive UTC days with activity — keep it going! 🔥
-            </p>
+            <p className="text-sm text-muted-foreground">Keep it going! 🔥</p>
           ) : (
             <p className="text-sm text-muted-foreground">Start your streak today!</p>
           )}
@@ -146,39 +136,24 @@ export function StreakDisplay() {
       {/* Badges */}
       {streakData.badges.length > 0 && (
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-foreground">Your Badges</h3>
-            <Link
-              href="/account/badges"
-              className="text-sm text-primary font-medium hover:underline"
-            >
-              View all
-            </Link>
-          </div>
+          <h3 className="text-lg font-bold text-foreground mb-4">Your Badges</h3>
           <div className="space-y-3">
-            {streakData.badges.map((badge) => {
-              const canonicalId = normalizeBadgeId(badge.badgeId);
-              const def = BADGE_BY_ID.get(canonicalId as BadgeId);
-              const icon = badge.icon ?? def?.icon ?? "🏅";
-              const name = def?.badgeName ?? badge.badgeName;
-
-              return (
+            {streakData.badges.map((badge) => (
               <div
                 key={badge.badgeId}
                 className="flex items-center gap-3 p-3 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg border border-border"
               >
                 <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-400 rounded-full flex items-center justify-center text-2xl">
-                  {icon}
+                  🔥
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-foreground">{name}</p>
+                  <p className="font-semibold text-foreground">{badge.badgeName}</p>
                   <p className="text-xs text-muted-foreground">
                     Unlocked {new Date(badge.unlockedAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
-            );
-            })}
+            ))}
           </div>
         </Card>
       )}

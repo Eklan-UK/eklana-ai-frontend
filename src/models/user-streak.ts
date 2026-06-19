@@ -7,7 +7,7 @@ export interface Badge {
   badgeId: string;
   badgeName: string;
   unlockedAt: Date;
-  milestone?: number; // legacy streak milestone
+  milestone: number; // days
 }
 
 export interface IUserStreak extends Document {
@@ -18,12 +18,6 @@ export interface IUserStreak extends Document {
   currentStreak: number; // days
   streakStartDate: Date | null;
   lastActivityDate: Date | null;
-
-  // Rolling-window streak fields
-  /** Exact UTC timestamp of the last qualifying drill completion (score ≥ 70). Used for the 12/36-hour rolling window. */
-  lastDrillCompletedAt: Date | null;
-  /** UTC timestamp of the last streak reminder sent. Used to deduplicate rolling reminders (max one per 23 h). */
-  lastReminderSentAt: Date | null;
   
   // Longest streak (all time)
   longestStreak: number;
@@ -61,14 +55,6 @@ const userStreakSchema = new Schema<IUserStreak>(
       default: null,
     },
     lastActivityDate: {
-      type: Date,
-      default: null,
-    },
-    lastDrillCompletedAt: {
-      type: Date,
-      default: null,
-    },
-    lastReminderSentAt: {
       type: Date,
       default: null,
     },

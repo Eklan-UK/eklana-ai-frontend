@@ -77,9 +77,6 @@ export const queryKeys = {
     recent: (filters?: Record<string, any>) =>
       [...queryKeys.activities.all, "recent", filters] as const,
   },
-  badges: {
-    all: ["user-badges"] as const,
-  },
   weeklyChallenge: {
     all: ['weeklyChallenge'] as const,
     history: () => [...queryKeys.weeklyChallenge.all, 'history'] as const,
