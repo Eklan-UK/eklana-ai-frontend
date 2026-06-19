@@ -177,7 +177,7 @@ export const ContentPreview: React.FC<ContentPreviewProps> = ({
 			{/* Actions */}
 			<div className="flex items-center gap-3 pt-4 border-t border-border">
 				<Button
-					onClick={onConfirm}
+					onClick={() => onConfirm()}
 					className="flex-1 flex items-center justify-center gap-2"
 				>
 					<CheckCircle className="w-4 h-4" />
