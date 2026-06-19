@@ -110,6 +110,8 @@ export interface CreateAdminClassBody {
   reminderMinutes?: number[];
   /** When false, no reminders are sent for this class series. */
   remindersEnabled?: boolean;
+  /** When true, learners receive a post-session NPS form for this class series. */
+  npsEnabled?: boolean;
 }
 
 export interface CreateAdminClassResponse {

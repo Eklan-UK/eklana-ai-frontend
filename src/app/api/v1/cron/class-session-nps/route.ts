@@ -1,13 +1,14 @@
-// GET /api/v1/cron/class-session-reminders — Phase 7 class reminders (T−60m / T−10m FCM)
-// Secure with CLASS_REMINDER_CRON_SECRET: Authorization: Bearer <secret> or x-cron-secret
+// GET /api/v1/cron/class-session-nps — post-session NPS form emails
+// Secure with CLASS_NPS_CRON_SECRET: Authorization: Bearer <secret> or x-cron-secret
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
-import { ClassReminderService } from '@/domain/classes/class-reminder.service';
+import { ClassNpsService } from '@/domain/classes/class-nps.service';
 import '@/models/class-session';
-import '@/models/session-reminder-dispatch';
+import '@/models/session-nps-dispatch';
+import '@/models/nps-form';
 
 function authorize(req: NextRequest): boolean {
-  const secret = process.env.CLASS_REMINDER_CRON_SECRET;
+  const secret = process.env.CLASS_NPS_CRON_SECRET;
   if (!secret) return false;
 
   const auth = req.headers.get('authorization');
@@ -17,11 +18,11 @@ function authorize(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  if (!process.env.CLASS_REMINDER_CRON_SECRET) {
+  if (!process.env.CLASS_NPS_CRON_SECRET) {
     return NextResponse.json(
       {
         code: 'NotConfigured',
-        message: 'CLASS_REMINDER_CRON_SECRET is not set',
+        message: 'CLASS_NPS_CRON_SECRET is not set',
       },
       { status: 503 },
     );
@@ -32,11 +33,8 @@ export async function GET(req: NextRequest) {
   }
 
   await connectToDatabase();
-  const svc = new ClassReminderService();
-  const debug =
-    req.nextUrl.searchParams.get('debug') === '1' ||
-    process.env.NODE_ENV === 'development';
-  const result = await svc.runDueReminders(new Date(), { debug });
+  const svc = new ClassNpsService();
+  const result = await svc.runDueNpsEmails();
 
   return NextResponse.json({
     code: 'Success',

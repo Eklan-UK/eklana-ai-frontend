@@ -17,6 +17,8 @@ export interface IClassSeries extends Document {
   /** Minutes before session start to send reminders, e.g. [10, 30]. */
   reminderMinutes: number[];
   remindersEnabled: boolean;
+  /** When true, send post-session NPS form email to present/late attendees. */
+  npsEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +55,7 @@ const classSeriesSchema = new Schema<IClassSeries>(
     isActive: { type: Boolean, default: true },
     reminderMinutes: { type: [Number], default: [10, 30] },
     remindersEnabled: { type: Boolean, default: true },
+    npsEnabled: { type: Boolean, default: false },
   },
   { timestamps: true, collection: 'class_series' },
 );

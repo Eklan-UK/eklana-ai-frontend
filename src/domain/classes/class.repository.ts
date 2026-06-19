@@ -217,6 +217,7 @@ export class ClassRepository {
             isActive: true,
             remindersEnabled: body.remindersEnabled !== false,
             reminderMinutes: body.reminderMinutes ?? [10, 30],
+            npsEnabled: body.npsEnabled === true,
           },
         ],
         { session: mongoSession },
