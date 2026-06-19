@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Clock3, Lock, MessageSquare, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronRight, Clock3, Lock, MessageSquare, AlertCircle } from "lucide-react";
 import { freeTalkScenarioTypeLabel } from "@/lib/learner-assigned-plan";
 import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 import {
@@ -73,15 +73,7 @@ export function PlanFreeTalkRow({
           </ProLockedCtaSwap>
         </ProLockHoverWrap>
       ) : (
-        <div className="flex items-center gap-1 shrink-0">
-          {completed ? (
-            <CheckCircle2
-              className="w-5 h-5 text-[#22c55e]"
-              aria-label="Completed"
-            />
-          ) : null}
-          <ChevronRight className="w-5 h-5 text-muted-foreground" aria-hidden />
-        </div>
+        <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
       )}
     </div>
   );

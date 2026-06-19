@@ -195,13 +195,6 @@ async function postHandler(
       hasAudio: Boolean(audioUrl),
     });
 
-    try {
-      const { BadgeService } = await import('@/domain/badges/badge.service');
-      void BadgeService.evaluateAndUnlock(context.userId.toString());
-    } catch {
-      // badges must not fail attempt save
-    }
-
     return NextResponse.json({
       success: true,
       attempt: serializeAttempt(doc),

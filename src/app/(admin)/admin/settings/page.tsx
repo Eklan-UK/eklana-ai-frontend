@@ -15,7 +15,6 @@ import {
   Shield,
   Upload,
   User,
-  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
@@ -23,7 +22,6 @@ import { getUserDisplayName, getUserInitials } from "@/utils/user";
 import { profileService } from "@/services/profile.service";
 import { authService } from "@/services/auth.service";
 import { PrivacyPolicyAccordion } from "@/components/legal/PrivacyPolicyAccordion";
-import { NpsFormSettingsSection } from "@/components/admin/NpsFormSettingsSection";
 
 const PRESET_AVATARS: string[] = Array.from(
   { length: 30 },
@@ -33,7 +31,7 @@ const PRESET_AVATARS: string[] = Array.from(
     }&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&size=128`
 );
 
-type SettingsSectionId = "profile" | "password" | "privacy" | "nps";
+type SettingsSectionId = "profile" | "password" | "privacy";
 
 interface SettingsCardProps {
   id: SettingsSectionId;
@@ -529,13 +527,6 @@ export default function AdminSettingsPage() {
       title: "Privacy Policy",
       description: "How Eklan collects, uses, and protects your data",
       content: <PrivacyPolicyAccordion />,
-    },
-    {
-      id: "nps",
-      icon: <ClipboardList className="w-5 h-5" />,
-      title: "NPS Form",
-      description: "Configure the post-session Google Forms survey",
-      content: <NpsFormSettingsSection />,
     },
   ];
 

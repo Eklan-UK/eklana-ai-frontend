@@ -15,11 +15,6 @@ import { DrillRepository } from '@/domain/drills/drill.repository';
 import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import { roleplaySpeakerIdSchema } from '@/lib/roleplay-speakers';
-import {
-	learningJourneyPartSchema,
-	learningJourneyTopicSchema,
-	refineLearningJourneyFields,
-} from '@/domain/learning-journey/learning-journey.validation';
 
 // Validation schemas
 const targetSentenceSchema = z.object({
@@ -154,10 +149,7 @@ const createDrillSchema = z.object({
 	fill_blank_items: z.array(fillBlankItemSchema).optional(),
 	key_phrase_items: z.array(keyPhraseItemSchema).optional(),
 	is_active: z.boolean().optional(),
-	learning_journey_part: learningJourneyPartSchema.optional(),
-	learning_journey_topic: learningJourneyTopicSchema.optional(),
 }).superRefine((data, ctx) => {
-	refineLearningJourneyFields(data, ctx);
 	if (data.type === 'vocabulary') {
 		if (!data.target_sentences || data.target_sentences.length < 1) {
 			ctx.addIssue({
@@ -296,12 +288,6 @@ async function postHandler(
 	if (validated.article_audio_url !== undefined) drillData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) drillData.fill_blank_items = validated.fill_blank_items;
 	if (validated.key_phrase_items !== undefined) drillData.key_phrase_items = validated.key_phrase_items;
-	if (validated.learning_journey_part !== undefined) {
-		drillData.learning_journey_part = validated.learning_journey_part;
-	}
-	if (validated.learning_journey_topic !== undefined) {
-		drillData.learning_journey_topic = validated.learning_journey_topic;
-	}
 
 	// Create drill
 	const result = await drillService.createDrill({

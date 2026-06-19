@@ -1,8 +1,8 @@
 import { Schema, model, models, Document, Types } from 'mongoose';
 import '@/models/class-session';
 
-/** Dedup record per session + reminder offset (stored as string minutes, e.g. '10', '30', '60'). */
-export type ReminderKind = string;
+/** Dedup FCM sends for Phase 7 class reminders (T−60m and T−10m). */
+export type ReminderKind = '60' | '10';
 
 export interface ISessionReminderDispatch extends Document {
   _id: Types.ObjectId;
@@ -19,7 +19,7 @@ const schema = new Schema<ISessionReminderDispatch>(
       required: true,
       index: true,
     },
-    kind: { type: String, required: true },
+    kind: { type: String, enum: ['60', '10'], required: true },
     sentAt: { type: Date, default: Date.now },
   },
   { timestamps: false, collection: 'session_reminder_dispatches' },

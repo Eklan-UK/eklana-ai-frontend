@@ -33,10 +33,7 @@ export async function GET(req: NextRequest) {
 
   await connectToDatabase();
   const svc = new ClassReminderService();
-  const debug =
-    req.nextUrl.searchParams.get('debug') === '1' ||
-    process.env.NODE_ENV === 'development';
-  const result = await svc.runDueReminders(new Date(), { debug });
+  const result = await svc.runDueReminders();
 
   return NextResponse.json({
     code: 'Success',

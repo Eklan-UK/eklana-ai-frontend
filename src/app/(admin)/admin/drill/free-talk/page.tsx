@@ -19,7 +19,6 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { useAllLearners } from "@/hooks/useAdmin";
 import {
   FREE_TALK_SCENARIO_TYPES,
-  FREE_TALK_SCENARIO_TYPE_LABELS,
   type FreeTalkScenarioType,
   normalizeFreeTalkScenarioStringList,
   freeTalkStringListToMultiline,
@@ -47,22 +46,24 @@ type ScenarioDraft = {
   form: ScenarioFormFields;
 };
 
+const SCENARIO_TYPE_LABELS: Record<FreeTalkScenarioType, string> = {
+  icu_emergency: "ICU Emergency",
+  admission: "Admission",
+  small_talk_patient: "Small Talk — Patient",
+  handover: "Handover",
+  decline_request: "Decline Request",
+  phone_doctor: "Phone the Doctor",
+  small_talk_colleague: "Small Talk — Colleague",
+};
+
 const BADGE_COLORS: Record<FreeTalkScenarioType, string> = {
   icu_emergency: "bg-red-100 text-red-700",
-  cpr: "bg-rose-100 text-rose-700",
-  patient_follow_up: "bg-indigo-100 text-indigo-700",
   admission: "bg-blue-100 text-blue-700",
   small_talk_patient: "bg-purple-100 text-purple-700",
-  handover_receive: "bg-yellow-100 text-yellow-700",
   handover: "bg-amber-100 text-amber-700",
   decline_request: "bg-orange-100 text-orange-700",
-  small_talk_colleague: "bg-emerald-100 text-emerald-700",
   phone_doctor: "bg-cyan-100 text-cyan-700",
-  doctor_rounds: "bg-teal-100 text-teal-700",
-  phone_colleague: "bg-sky-100 text-sky-700",
-  phone_department: "bg-violet-100 text-violet-700",
-  family_questions: "bg-pink-100 text-pink-700",
-  phone_family: "bg-fuchsia-100 text-fuchsia-700",
+  small_talk_colleague: "bg-emerald-100 text-emerald-700",
 };
 
 const emptyForm = () => ({
@@ -427,7 +428,7 @@ export default function AdminFreeTalkPage() {
                         <option value="">Select type…</option>
                         {FREE_TALK_SCENARIO_TYPES.map((t) => (
                           <option key={t} value={t}>
-                            {FREE_TALK_SCENARIO_TYPE_LABELS[t]}
+                            {SCENARIO_TYPE_LABELS[t]}
                           </option>
                         ))}
                       </select>
@@ -590,7 +591,7 @@ export default function AdminFreeTalkPage() {
                               <option value="">Select type…</option>
                               {FREE_TALK_SCENARIO_TYPES.map((t) => (
                                 <option key={t} value={t}>
-                                  {FREE_TALK_SCENARIO_TYPE_LABELS[t]}
+                                  {SCENARIO_TYPE_LABELS[t]}
                                 </option>
                               ))}
                             </select>
@@ -755,7 +756,7 @@ export default function AdminFreeTalkPage() {
                             <span
                               className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE_COLORS[sc.scenarioType]}`}
                             >
-                              {FREE_TALK_SCENARIO_TYPE_LABELS[sc.scenarioType]}
+                              {SCENARIO_TYPE_LABELS[sc.scenarioType]}
                             </span>
                             <span className="truncate text-sm font-semibold text-gray-900">{sc.title}</span>
                             <span className="hidden shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 sm:inline-flex">

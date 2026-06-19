@@ -481,11 +481,6 @@ export interface IDrill extends Document {
   updated_date: Date;
   is_active: boolean;
 
-  /** Learning journey part (1–4) from eklan-learners-journey.md */
-  learning_journey_part?: 1 | 2 | 3 | 4;
-  /** Learning journey topic slug within the part */
-  learning_journey_topic?: string;
-
   // Analytics (aggregated - updated by background jobs)
   totalAssignments?: number;
   totalCompletions?: number;
@@ -751,20 +746,6 @@ const drillSchema = new Schema<IDrill>(
       description: "Whether the drill is currently active/available",
     },
 
-    learning_journey_part: {
-      type: Number,
-      enum: [1, 2, 3, 4],
-      required: false,
-      description: "Learning journey part (1–4)",
-    },
-
-    learning_journey_topic: {
-      type: String,
-      trim: true,
-      required: false,
-      description: "Learning journey topic slug within the part",
-    },
-
     // Analytics fields (updated by background jobs)
     totalAssignments: {
       type: Number,
@@ -800,7 +781,6 @@ drillSchema.index({ created_by: 1 }); // Keep for backward compatibility
 drillSchema.index({ createdById: 1, created_date: -1 }); // New preferred index
 drillSchema.index({ type: 1 });
 drillSchema.index({ is_active: 1, date: 1 });
-drillSchema.index({ learning_journey_part: 1, learning_journey_topic: 1 });
 
 // Pre-save middleware to update updated_date
 drillSchema.pre("save", function () {

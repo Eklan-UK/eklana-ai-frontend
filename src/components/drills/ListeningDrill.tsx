@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { MarkdownText } from "@/components/ui/MarkdownText";
 import { Loader2, Volume2, Pause, Play, CheckCircle, Headphones } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
+import { drillAPI } from "@/lib/api";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 
 interface ListeningDrillProps {
@@ -19,7 +17,6 @@ interface ListeningDrillProps {
 }
 
 export default function ListeningDrill({ drill, assignmentId }: ListeningDrillProps) {
-  const queryClient = useQueryClient();
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
@@ -154,7 +151,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         return;
       }
 
-      await completeLearnerDrill(queryClient, drillId, {
+      await drillAPI.complete(drillId, {
         drillAssignmentId: assignmentId,
         score: 100, // Listening drills are completion-based
         timeSpent,
@@ -166,7 +163,6 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       });
 
       setIsCompleted(true);
-      playPracticeFeedback("success");
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)

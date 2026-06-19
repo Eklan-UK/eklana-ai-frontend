@@ -94,29 +94,14 @@ So: **viewport-fixed** = **mic dock** (and pre-start CTA), not the “Say this l
 
 ---
 
-## 7. Scene break (multi-scene drills only)
-
-When the learner finishes **all lines in a scene** and there is **another scene ahead**, the drill **pauses** instead of auto-advancing:
-
-- A **sky-tinted banner** inside the card: **“Scene complete: {name}”**, preview of the **next scene**, and two actions:
-  - **Continue to Next Scene** (primary) — starts the next scene.
-  - **Continue Later** (outline) — saves checkpoint server-side and returns to **My Plan** (assigned drills) or the **weekly challenge week** list.
-- The **conversation transcript** from the finished scene stays visible in the scroll area above.
-- The **mic dock is hidden** during the scene break (no active line to record).
-- **Single-scene** drills skip this screen entirely.
-
-On return, saved progress restores the same scene-break screen (or the in-scene position if extended later). Assignment status becomes **in-progress** so **Resume** appears on the home practice card.
-
----
-
-## 8. When the scenario is finished
+## 7. When the scenario is finished
 
 - A full-width **emerald banner** inside the card: **“Conversation Complete!”**, role summary, **Review Performance**, **Switch Roles**, **Restart drill**.
 - No mic dock until you start again / new flow.
 
 ---
 
-## 9. Visual summary (mental model)
+## 8. Visual summary (mental model)
 
 ```text
 ┌─────────────────────────────────────┐
@@ -141,6 +126,6 @@ On return, saved progress restores the same scene-break screen (or the in-scene 
 
 ---
 
-## 10. One-line takeaway
+## 9. One-line takeaway
 
 The **scenario drill UI** keeps **context and progress at the top**, puts **past lines in a short, scrollable chat window** (`max-h-64`), and keeps the **current script to say** in a **dedicated card below that window** so it is always the next thing you read—while the **microphone** stays **fixed to the bottom of the screen** for recording.

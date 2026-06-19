@@ -106,12 +106,6 @@ export interface CreateAdminClassBody {
   totalSessionsPlanned?: number;
   /** 1-based session index in the program; must be ≤ totalSessionsPlanned. Defaults to 1. */
   firstSessionSequenceNumber?: number;
-  /** Minutes before each session start to send reminders, e.g. [10, 30]. Empty array = no reminders. */
-  reminderMinutes?: number[];
-  /** When false, no reminders are sent for this class series. */
-  remindersEnabled?: boolean;
-  /** When true, learners receive a post-session NPS form for this class series. */
-  npsEnabled?: boolean;
 }
 
 export interface CreateAdminClassResponse {

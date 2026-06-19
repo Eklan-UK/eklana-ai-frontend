@@ -6,12 +6,10 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
+import { drillAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillLayout } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface MatchingDrillProps {
   drill: any;
@@ -62,7 +60,6 @@ function findUnmatchedCanonicalPairIndex(
 }
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
-  const queryClient = useQueryClient();
   const router = useRouter();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
@@ -214,7 +211,6 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         return newSet;
       });
 
-      playPracticeFeedback("success");
       toast.success("Correct match! ✓");
 
       const allMatched = matchedPairs.size + 1 === pairs.length;
@@ -243,7 +239,6 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       setSelectedLeftIndex(null);
       setSelectedRightIndex(null);
 
-      playPracticeFeedback("failure");
       toast.error("Incorrect match. Try again!");
 
       setTimeout(() => {
@@ -277,7 +272,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       const totalPairs = pairs.length;
       const accuracy = totalPairs > 0 ? (pairsMatched / totalPairs) * 100 : 0;
 
-      await completeLearnerDrill(queryClient, drill._id, {
+      await drillAPI.complete(drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,

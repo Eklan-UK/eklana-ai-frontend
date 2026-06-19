@@ -13,11 +13,6 @@ import { DrillService } from "@/domain/drills/drill.service";
 import { DrillRepository } from "@/domain/drills/drill.repository";
 import { AssignmentRepository } from "@/domain/assignments/assignment.repository";
 import { AttemptRepository } from "@/domain/attempts/attempt.repository";
-import {
-	learningJourneyPartSchema,
-	learningJourneyTopicSchema,
-	refineLearningJourneyFields,
-} from "@/domain/learning-journey/learning-journey.validation";
 
 // Update drill schema
 const updateDrillSchema = z.object({
@@ -133,10 +128,6 @@ const updateDrillSchema = z.object({
 		correctAnswer: z.string().min(1),
 		promptAudioUrl: z.string().optional(),
 	})).optional(),
-	learning_journey_part: learningJourneyPartSchema.optional(),
-	learning_journey_topic: learningJourneyTopicSchema.optional(),
-}).superRefine((data, ctx) => {
-	refineLearningJourneyFields(data, ctx);
 });
 
 // GET handler
@@ -237,12 +228,6 @@ async function putHandler(
 	if (validated.article_audio_url !== undefined) updateData.article_audio_url = validated.article_audio_url;
 	if (validated.fill_blank_items !== undefined) updateData.fill_blank_items = validated.fill_blank_items;
 	if (validated.key_phrase_items !== undefined) updateData.key_phrase_items = validated.key_phrase_items;
-	if (validated.learning_journey_part !== undefined) {
-		updateData.learning_journey_part = validated.learning_journey_part;
-	}
-	if (validated.learning_journey_topic !== undefined) {
-		updateData.learning_journey_topic = validated.learning_journey_topic;
-	}
 
 	const finalType = (validated.type !== undefined ? validated.type : existing.type) as string;
 	const mergedTarget =

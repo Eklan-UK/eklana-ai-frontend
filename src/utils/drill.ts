@@ -50,14 +50,8 @@ export function getDrillStatus(drill: any): DrillStatus {
     : new Date(drill.date || drill.drill?.date);
   completionDate.setHours(23, 59, 59, 999);
 
-  const assignmentStatus = drill.assignmentStatus ?? drill.status;
-
   // Check if drill is completed
-  if (
-    drill.completedAt ||
-    assignmentStatus === "completed" ||
-    drill.latestAttempt?.completedAt
-  ) {
+  if (drill.completedAt || drill.assignmentStatus === "completed" || drill.status === "completed") {
     return "completed";
   }
 
@@ -65,8 +59,8 @@ export function getDrillStatus(drill: any): DrillStatus {
   if (
     now > completionDate &&
     !drill.completedAt &&
-    assignmentStatus !== "completed" &&
-    !drill.latestAttempt?.completedAt
+    drill.assignmentStatus !== "completed" &&
+    drill.status !== "completed"
   ) {
     return "missed";
   }

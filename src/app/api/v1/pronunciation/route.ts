@@ -1,30 +1,22 @@
 // GET /api/v1/pronunciation
-// Returns the current learner's pronunciation metrics derived from the progress scorecard.
-// The scorecard is the canonical source; this route exists for backward compatibility with
-// usePronunciation() on the Profile page.
+// Compute and return the current learner's pronunciation metrics
 import { NextRequest } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { withErrorHandler } from '@/lib/api/error-handler';
+import { connectToDatabase } from '@/lib/api/db';
 import { Types } from 'mongoose';
 import { apiResponse } from '@/lib/api/response';
-import { computeProgressScorecard } from '@/domain/progress/progress-scorecard.service';
+import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
 
 async function getHandler(
-  _req: NextRequest,
+  req: NextRequest,
   context: { userId: Types.ObjectId; userRole: string }
 ) {
-  const scorecard = await computeProgressScorecard(context.userId.toString());
+  await connectToDatabase();
 
-  // Map to the PronunciationMetrics shape expected by usePronunciation()
-  return apiResponse.success({
-    pronunciation: {
-      learnerId: context.userId.toString(),
-      overallScore: scorecard.pronunciation,
-      totalWordsPronounced: scorecard.sampleCounts.pronunciationDrills,
-      history: [],
-      lastComputedAt: new Date().toISOString(),
-    },
-  });
+  const metrics = await computePronunciationMetrics(context.userId.toString());
+
+  return apiResponse.success({ pronunciation: metrics });
 }
 
 export const GET = withRole(['user'], withErrorHandler(getHandler));

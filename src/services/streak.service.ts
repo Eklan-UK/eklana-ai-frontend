@@ -1,12 +1,9 @@
 // services/streak.service.ts
 import DailyFocusCompletion from '@/models/daily-focus-completion';
 import StreakActivityDay from '@/models/streak-activity-day';
-import UserStreak, { type Badge } from '@/models/user-streak';
+import UserStreak from '@/models/user-streak';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
-import { BadgeService } from '@/domain/badges/badge.service';
-import { BADGE_BY_ID } from '@/domain/badges/badge.definitions';
-import type { BadgeId } from '@/domain/badges/badge.types';
 
 /** Merged row for streak math (daily focus + login/drill activity days). */
 type StreakDayRow = { dateString: string; date: Date; score?: number };
@@ -27,28 +24,30 @@ export interface StreakData {
     badgeId: string;
     badgeName: string;
     unlockedAt: Date;
-    icon?: string;
-    milestone?: number;
+    milestone: number;
   }>;
 }
 
-async function triggerBadgeEvaluation(userId: string): Promise<Badge | null> {
-  try {
-    const newlyUnlocked = await BadgeService.evaluateAndUnlock(userId);
-    if (newlyUnlocked.length === 0) return null;
-    const firstId = newlyUnlocked[0] as BadgeId;
-    const def = BADGE_BY_ID.get(firstId);
-    return {
-      badgeId: firstId,
-      badgeName: def?.badgeName ?? firstId,
-      unlockedAt: new Date(),
-    };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error('Badge evaluation failed', { userId, error: message });
-    return null;
-  }
-}
+// Badge definitions
+export const BADGE_DEFINITIONS = [
+  {
+    badgeId: 'week-warrior',
+    badgeName: 'Week Warrior',
+    description: 'Complete daily focus for 7 consecutive days',
+    milestone: 7,
+    icon: '🔥',
+    color: 'orange',
+  },
+  // Future badges can be added here
+  // {
+  //   badgeId: 'monthly-master',
+  //   badgeName: 'Monthly Master',
+  //   description: 'Complete daily focus for 30 consecutive days',
+  //   milestone: 30,
+  //   icon: '⭐',
+  //   color: 'gold',
+  // },
+];
 
 export class StreakService {
   /** Streaks run unless `STREAK_ENABLED=false` in environment. */
@@ -142,17 +141,11 @@ export class StreakService {
         completedAt: new Date(),
       });
 
-      // Recompute calendar-day streak from merged activity history
-      const streakUpdated = await this.recomputeStreakFromActivity(userId);
-
-      // Track last qualifying activity for rolling reminder cron
-      await UserStreak.updateOne(
-        { userId: new Types.ObjectId(userId) },
-        { $set: { lastDrillCompletedAt: new Date() } }
-      ).exec();
+      // Update streak
+      const streakUpdated = await this.updateStreak(userId);
 
       // Check for badge unlock
-      const badgeUnlocked = await triggerBadgeEvaluation(userId);
+      const badgeUnlocked = await this.checkBadgeUnlock(userId);
 
       logger.info('Daily focus completion recorded', {
         userId,
@@ -174,35 +167,7 @@ export class StreakService {
   }
 
   /**
-   * Record a qualifying UTC day for weekly-activity display only (idempotent per user+day).
-   * Does NOT recalculate currentStreak — call recordDrillCompletion for that.
-   */
-  private static async recordActivityDayOnly(
-    userId: string,
-    score?: number
-  ): Promise<void> {
-    const todayString = this.getTodayString();
-    const today = new Date(`${todayString}T00:00:00.000Z`);
-    const uid = new Types.ObjectId(userId);
-
-    const update: Record<string, unknown> = {
-      $set: { date: today },
-      $setOnInsert: { userId: uid, dateString: todayString },
-    };
-    if (score != null) {
-      update.$max = { score };
-    }
-
-    await StreakActivityDay.updateOne(
-      { userId: uid, dateString: todayString },
-      update,
-      { upsert: true }
-    ).exec();
-  }
-
-  /**
-   * Record a login-ping activity day (idempotent per user+day).
-   * Qualifying UTC days from login count toward the calendar streak.
+   * Record a qualifying UTC day from login or drill (idempotent per user+day).
    */
   static async recordActivityDay(
     userId: string,
@@ -212,88 +177,31 @@ export class StreakService {
       return { streakUpdated: false };
     }
     try {
-      await this.recordActivityDayOnly(userId, opts?.score);
-      const streakUpdated = await this.recomputeStreakFromActivity(userId);
+      const todayString = this.getTodayString();
+      const today = new Date(`${todayString}T00:00:00.000Z`);
+      const uid = new Types.ObjectId(userId);
+
+      const update: Record<string, unknown> = {
+        $set: { date: today },
+        $setOnInsert: {
+          userId: uid,
+          dateString: todayString,
+        },
+      };
+      if (opts?.score != null) {
+        update.$max = { score: opts.score };
+      }
+
+      await StreakActivityDay.updateOne(
+        { userId: uid, dateString: todayString },
+        update,
+        { upsert: true }
+      ).exec();
+
+      const streakUpdated = await this.updateStreak(userId);
       return { streakUpdated };
     } catch (error: any) {
       logger.error('Error recording streak activity day', {
-        userId,
-        error: error.message,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Record a drill completion: update rolling reminder timing, then recompute calendar streak.
-   *
-   * Rolling rules (for lastDrillCompletedAt / reminder cron only):
-   *   < 12 h since last qualifying drill  → cooldown: no timestamp update
-   *   ≥ 12 h                              → update lastDrillCompletedAt
-   *
-   * currentStreak is always derived from consecutive UTC calendar days via recomputeStreakFromActivity.
-   */
-  static async recordDrillCompletion(
-    userId: string,
-    score: number
-  ): Promise<{ streakUpdated: boolean; action: 'cooldown' | 'incremented' | 'reset' | 'first' }> {
-    if (!this.streakFeatureEnabled()) {
-      return { streakUpdated: false, action: 'cooldown' };
-    }
-
-    if (score < 70) {
-      return { streakUpdated: false, action: 'cooldown' };
-    }
-
-    try {
-      const uid = new Types.ObjectId(userId);
-      const now = new Date();
-
-      const existing = await UserStreak.findOne({ userId: uid }).lean().exec();
-      const lastAt: Date | null = existing?.lastDrillCompletedAt
-        ? new Date(existing.lastDrillCompletedAt)
-        : null;
-
-      let action: 'cooldown' | 'incremented' | 'reset' | 'first';
-
-      if (!lastAt) {
-        action = 'first';
-      } else {
-        const hoursDiff = (now.getTime() - lastAt.getTime()) / 3_600_000;
-
-        if (hoursDiff < 12) {
-          await this.recordActivityDayOnly(userId, score);
-          await this.recomputeStreakFromActivity(userId);
-          logger.info('[StreakService] recordDrillCompletion: cooldown', { userId, hoursDiff });
-          return { streakUpdated: false, action: 'cooldown' };
-        }
-        action = hoursDiff <= 36 ? 'incremented' : 'reset';
-      }
-
-      await this.recordActivityDayOnly(userId, score);
-
-      await UserStreak.findOneAndUpdate(
-        { userId: uid },
-        { $set: { lastDrillCompletedAt: now, lastActivityDate: now } },
-        { upsert: true, new: true }
-      ).exec();
-
-      const streakUpdated = await this.recomputeStreakFromActivity(userId);
-      void triggerBadgeEvaluation(userId);
-
-      const updated = await UserStreak.findOne({ userId: uid }).lean().exec();
-
-      logger.info('[StreakService] recordDrillCompletion', {
-        userId,
-        score,
-        action,
-        currentStreak: updated?.currentStreak,
-        hoursSinceLast: lastAt ? (now.getTime() - lastAt.getTime()) / 3_600_000 : null,
-      });
-
-      return { streakUpdated, action };
-    } catch (error: any) {
-      logger.error('[StreakService] Error in recordDrillCompletion', {
         userId,
         error: error.message,
       });
@@ -349,79 +257,21 @@ export class StreakService {
   }
 
   /**
-   * Compute consecutive UTC calendar-day streak from merged activity rows.
+   * Update user's streak based on completions
    */
-  private static computeCurrentCalendarStreak(completions: StreakDayRow[]): {
-    currentStreak: number;
-    streakStartDate: Date | null;
-  } {
-    if (completions.length === 0) {
-      return { currentStreak: 0, streakStartDate: null };
-    }
-
-    const todayString = this.getTodayString();
-    const yesterdayString = this.getYesterdayString();
-
-    let currentStreak = 0;
-    let streakStartDate: Date | null = null;
-    let expectedDate = new Date(todayString);
-    expectedDate.setUTCHours(0, 0, 0, 0);
-
-    const todayCompletion = completions.find((c) => c.dateString === todayString);
-    if (todayCompletion) {
-      currentStreak = 1;
-      streakStartDate = todayCompletion.date;
-      expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-    } else {
-      const yesterdayCompletion = completions.find(
-        (c) => c.dateString === yesterdayString
-      );
-      if (yesterdayCompletion) {
-        currentStreak = 1;
-        streakStartDate = yesterdayCompletion.date;
-        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-      } else {
-        return { currentStreak: 0, streakStartDate: null };
-      }
-    }
-
-    const completionMap = new Map(completions.map((c) => [c.dateString, c]));
-
-    while (true) {
-      const expectedDateString = this.getDateString(expectedDate);
-      const completion = completionMap.get(expectedDateString);
-
-      if (completion) {
-        currentStreak++;
-        if (!streakStartDate) {
-          streakStartDate = completion.date;
-        }
-        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
-      } else {
-        break;
-      }
-    }
-
-    return { currentStreak, streakStartDate };
-  }
-
-  /**
-   * Recompute currentStreak from consecutive UTC calendar days and refresh cached display fields.
-   */
-  private static async recomputeStreakFromActivity(userId: string): Promise<boolean> {
+  private static async updateStreak(userId: string): Promise<boolean> {
     try {
       const completions = await this.getMergedStreakDayRows(userId);
-      const uid = new Types.ObjectId(userId);
 
       if (completions.length === 0) {
+        // No completions, reset streak
         await UserStreak.findOneAndUpdate(
-          { userId: uid },
+          { userId: new Types.ObjectId(userId) },
           {
             $set: {
               currentStreak: 0,
               streakStartDate: null,
               lastActivityDate: null,
-              weeklyActivity: this.getEmptyWeeklyActivity(),
             },
           },
           { upsert: true, new: true }
@@ -429,40 +279,95 @@ export class StreakService {
         return false;
       }
 
-      const { currentStreak, streakStartDate } =
-        this.computeCurrentCalendarStreak(completions);
-      const longestStreak = this.calculateLongestStreak(completions);
-      const weeklyActivity = this.getWeeklyActivity(completions);
+      const todayString = this.getTodayString();
+      const yesterdayString = this.getYesterdayString();
 
-      await UserStreak.findOneAndUpdate(
-        { userId: uid },
+      // Calculate current streak
+      let currentStreak = 0;
+      let streakStartDate: Date | null = null;
+      let expectedDate = new Date(todayString);
+      expectedDate.setUTCHours(0, 0, 0, 0);
+
+      // Check if today has completion
+      const todayCompletion = completions.find(c => c.dateString === todayString);
+      if (todayCompletion) {
+        currentStreak = 1;
+        streakStartDate = todayCompletion.date;
+        expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+      } else {
+        // Check yesterday
+        const yesterdayCompletion = completions.find(c => c.dateString === yesterdayString);
+        if (yesterdayCompletion) {
+          currentStreak = 1;
+          streakStartDate = yesterdayCompletion.date;
+          expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+        } else {
+          // No recent activity, streak is 0
+          await UserStreak.findOneAndUpdate(
+            { userId: new Types.ObjectId(userId) },
+            {
+              $set: {
+                currentStreak: 0,
+                streakStartDate: null,
+                lastActivityDate: completions[0]?.date || null,
+              },
+            },
+            { upsert: true, new: true }
+          ).exec();
+          return false;
+        }
+      }
+
+      // Continue counting backwards
+      const completionMap = new Map(completions.map(c => [c.dateString, c]));
+
+      while (true) {
+        const expectedDateString = this.getDateString(expectedDate);
+        const completion = completionMap.get(expectedDateString);
+
+        if (completion) {
+          currentStreak++;
+          if (!streakStartDate) {
+            streakStartDate = completion.date;
+          }
+          expectedDate.setUTCDate(expectedDate.getUTCDate() - 1);
+        } else {
+          // Gap found, streak broken
+          break;
+        }
+      }
+
+      // Calculate longest streak
+      const longestStreak = this.calculateLongestStreak(completions);
+
+      // Get or create user streak record
+      const userStreak = await UserStreak.findOneAndUpdate(
+        { userId: new Types.ObjectId(userId) },
         {
           $set: {
             currentStreak,
             streakStartDate,
             lastActivityDate: completions[0]?.date || null,
-            longestStreak: Math.max(longestStreak, currentStreak),
-            weeklyActivity,
+            longestStreak: Math.max(longestStreak, currentStreak), // Update if current is higher
           },
         },
         { upsert: true, new: true }
       ).exec();
 
-      void triggerBadgeEvaluation(userId);
+      // Update weekly activity
+      const weeklyActivity = this.getWeeklyActivity(completions);
+      await UserStreak.findByIdAndUpdate(userStreak._id, {
+        $set: { weeklyActivity },
+      }).exec();
 
       return true;
     } catch (error: any) {
-      logger.error('Error recomputing streak from activity', {
+      logger.error('Error updating streak', {
         userId,
         error: error.message,
       });
       throw error;
     }
-  }
-
-  /** @deprecated Use recomputeStreakFromActivity */
-  private static async refreshStreakDisplayData(userId: string): Promise<void> {
-    await this.recomputeStreakFromActivity(userId);
   }
 
   /**
@@ -545,6 +450,62 @@ export class StreakService {
   }
 
   /**
+   * Check if user should unlock a badge and unlock it
+   */
+  private static async checkBadgeUnlock(userId: string): Promise<Badge | null> {
+    try {
+      const userStreak = await UserStreak.findOne({
+        userId: new Types.ObjectId(userId),
+      }).lean().exec();
+
+      if (!userStreak || userStreak.currentStreak === 0) {
+        return null;
+      }
+
+      // Check each badge definition
+      for (const badgeDef of BADGE_DEFINITIONS) {
+        // Check if badge is already unlocked
+        const alreadyUnlocked = userStreak.badges.some(
+          (b: Badge) => b.badgeId === badgeDef.badgeId
+        );
+
+        if (!alreadyUnlocked && userStreak.currentStreak >= badgeDef.milestone) {
+          // Unlock badge
+          const newBadge: Badge = {
+            badgeId: badgeDef.badgeId,
+            badgeName: badgeDef.badgeName,
+            unlockedAt: new Date(),
+            milestone: badgeDef.milestone,
+          };
+
+          await UserStreak.findOneAndUpdate(
+            { userId: new Types.ObjectId(userId) },
+            {
+              $push: { badges: newBadge },
+            }
+          ).exec();
+
+          logger.info('Badge unlocked', {
+            userId,
+            badgeId: badgeDef.badgeId,
+            streak: userStreak.currentStreak,
+          });
+
+          return newBadge;
+        }
+      }
+
+      return null;
+    } catch (error: any) {
+      logger.error('Error checking badge unlock', {
+        userId,
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  /**
    * Get streak data for a user
    */
   static async getStreakData(userId: string): Promise<StreakData> {
@@ -565,12 +526,18 @@ export class StreakService {
       const todayString = this.getTodayString();
       const yesterdayString = this.getYesterdayString();
 
-      // Always recompute so UI reflects consecutive UTC calendar days (not stale rolling-window value)
-      await this.recomputeStreakFromActivity(userId);
-
-      const userStreak = await UserStreak.findOne({
+      // Get user streak record
+      let userStreak = await UserStreak.findOne({
         userId: new Types.ObjectId(userId),
       }).lean().exec();
+
+      // If no streak record exists, create one
+      if (!userStreak) {
+        await this.updateStreak(userId);
+        userStreak = await UserStreak.findOne({
+          userId: new Types.ObjectId(userId),
+        }).lean().exec();
+      }
 
       if (!userStreak) {
         return {
@@ -601,7 +568,7 @@ export class StreakService {
         todayCompleted,
         yesterdayCompleted,
         weeklyActivity: userStreak.weeklyActivity || this.getEmptyWeeklyActivity(),
-        badges: BadgeService.formatBadgesForStreak(userStreak.badges as Badge[]),
+        badges: userStreak.badges || [],
       };
     } catch (error: any) {
       logger.error('Error getting streak data', {
@@ -637,4 +604,12 @@ export class StreakService {
     return result;
   }
 }
+
+// Export Badge type
+export type Badge = {
+  badgeId: string;
+  badgeName: string;
+  unlockedAt: Date;
+  milestone: number;
+};
 

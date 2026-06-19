@@ -3,167 +3,77 @@ import ClassSeries from '@/models/class-series';
 import ClassEnrollment from '@/models/class-enrollment';
 import SessionReminderDispatch from '@/models/session-reminder-dispatch';
 import FCMToken from '@/models/fcm-token';
-import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import {
   sendNotificationToUser,
   NotificationType,
 } from '@/lib/fcm-trigger';
-import { sendClassReminderEmail } from '@/lib/api/email.service';
 
-/** Maximum reminder offset supported (minutes). Sessions starting further out are ignored. */
-const MAX_REMINDER_MINUTES = 120;
+type ReminderKind = '60' | '10';
 
-/** Tolerance window around a scheduled reminder time (±1 minute). */
-const TOLERANCE_MS = 60 * 1000;
-
-function reminderTitle(minutesBefore: number): string {
-  if (minutesBefore === 60) return 'Class starts in 1 hour';
-  return `Class starts in ${minutesBefore} minute${minutesBefore === 1 ? '' : 's'}`;
-}
-
-export type ClassReminderDebugEntry = {
-  sessionId: string;
-  minutesUntilStart: number;
-  reminderMinutes: number[];
-  reason:
-    | 'series_inactive'
-    | 'reminders_disabled'
-    | 'not_in_reminder_window'
-    | 'already_sent'
-    | 'no_enrollments'
-    | 'sent';
-  closestReminderMin?: number;
-  closestDiffSeconds?: number;
-};
+const WINDOWS: {
+  kind: ReminderKind;
+  minBeforeStartMs: number;
+  maxBeforeStartMs: number;
+}[] = [
+  { kind: '60', minBeforeStartMs: 59 * 60 * 1000, maxBeforeStartMs: 61 * 60 * 1000 },
+  { kind: '10', minBeforeStartMs: 9 * 60 * 1000, maxBeforeStartMs: 11 * 60 * 1000 },
+];
 
 export class ClassReminderService {
   /**
-   * Called every minute by the cron route.
-   * Finds sessions whose start time matches any per-series configured reminder
-   * offset (within ±1 min of now + offset) and sends FCM + email once per
-   * session/offset pair (deduped via SessionReminderDispatch).
+   * Find sessions whose start falls in the "about T+X from now" window and send FCM once per kind.
    */
-  async runDueReminders(
-    now: Date = new Date(),
-    options?: { debug?: boolean },
-  ): Promise<{
+  async runDueReminders(now: Date = new Date()): Promise<{
     examined: number;
     sent: number;
     skipped: number;
     errors: string[];
-    debug?: ClassReminderDebugEntry[];
   }> {
     const errors: string[] = [];
-    const debug: ClassReminderDebugEntry[] = [];
     let sent = 0;
     let skipped = 0;
     let examined = 0;
-    const includeDebug = options?.debug === true;
 
-    const nowMs = now.getTime();
+    const t = now.getTime();
 
-    // Fetch all scheduled sessions starting within the next MAX_REMINDER_MINUTES + 1 min.
-    // This is the broadest window we ever need to check.
-    const windowEnd = new Date(nowMs + (MAX_REMINDER_MINUTES + 1) * 60 * 1000);
-    const windowStart = new Date(nowMs + TOLERANCE_MS); // at least 1 min from now
+    for (const w of WINDOWS) {
+      const winStart = new Date(t + w.minBeforeStartMs);
+      const winEnd = new Date(t + w.maxBeforeStartMs);
 
-    const sessions = await ClassSession.find({
-      status: 'scheduled',
-      startUtc: { $gte: windowStart, $lte: windowEnd },
-    })
-      .lean()
-      .exec();
+      const sessions = await ClassSession.find({
+        status: 'scheduled',
+        startUtc: { $gte: winStart, $lte: winEnd },
+      })
+        .lean()
+        .exec();
 
-    for (const session of sessions) {
-      examined += 1;
-
-      const series = await ClassSeries.findById(session.classSeriesId).lean();
-      const minutesUntilStart = Math.round(
-        (new Date(session.startUtc).getTime() - nowMs) / 60_000,
-      );
-
-      if (!series?.isActive) {
-        if (includeDebug) {
-          debug.push({
-            sessionId: session._id.toString(),
-            minutesUntilStart,
-            reminderMinutes: [],
-            reason: 'series_inactive',
-          });
-        }
-        continue;
-      }
-      if (!series.remindersEnabled) {
-        if (includeDebug) {
-          debug.push({
-            sessionId: session._id.toString(),
-            minutesUntilStart,
-            reminderMinutes: [],
-            reason: 'reminders_disabled',
-          });
-        }
-        continue;
-      }
-
-      const reminderMinutes: number[] =
-        Array.isArray(series.reminderMinutes) && series.reminderMinutes.length > 0
-          ? series.reminderMinutes
-          : [10, 30];
-
-      const msUntilStart = new Date(session.startUtc).getTime() - nowMs;
-
-      let matchedReminder = false;
-      for (const m of reminderMinutes) {
-        const targetMs = m * 60 * 1000;
-        const diff = Math.abs(msUntilStart - targetMs);
-        if (diff > TOLERANCE_MS) continue;
-        matchedReminder = true;
-
-        const kind = String(m);
-
-        const alreadySent = await SessionReminderDispatch.findOne({
+      for (const session of sessions) {
+        examined += 1;
+        const exists = await SessionReminderDispatch.findOne({
           sessionId: session._id,
-          kind,
+          kind: w.kind,
         }).lean();
-        if (alreadySent) {
+        if (exists) {
           skipped += 1;
-          if (includeDebug) {
-            debug.push({
-              sessionId: session._id.toString(),
-              minutesUntilStart,
-              reminderMinutes,
-              closestReminderMin: m,
-              reason: 'already_sent',
-            });
-          }
           continue;
         }
+
+        const series = await ClassSeries.findById(session.classSeriesId).lean();
+        if (!series?.isActive) continue;
+
+        const seriesTitle = series.title?.trim() || 'Your class';
 
         const enrollments = await ClassEnrollment.find({
           classSeriesId: session.classSeriesId,
           status: 'active',
         }).lean();
 
-        const seriesTitle = series.title?.trim() || 'Your class';
         let anySent = false;
-
-        if (enrollments.length === 0 && includeDebug) {
-          debug.push({
-            sessionId: session._id.toString(),
-            minutesUntilStart,
-            reminderMinutes,
-            closestReminderMin: m,
-            reason: 'no_enrollments',
-          });
-        }
-
-        for (const enrollment of enrollments) {
-          const learnerId = enrollment.learnerId.toString();
-
-          // --- FCM push ---
+        for (const e of enrollments) {
+          const learnerId = e.learnerId.toString();
           const tokens = await FCMToken.find({
-            userId: enrollment.learnerId,
+            userId: e.learnerId,
             isActive: true,
           })
             .select('token')
@@ -173,115 +83,44 @@ export class ClassReminderService {
             try {
               await sendNotificationToUser(learnerId, tok.token, {
                 type: NotificationType.CLASS_SESSION_REMINDER,
-                title: reminderTitle(m),
+                title:
+                  w.kind === '60'
+                    ? 'Class starts in about 1 hour'
+                    : 'Class starts in about 10 minutes',
                 body: `${seriesTitle} — tap to open your schedule.`,
                 actionUrl: '/account/classes',
                 data: {
                   sessionId: session._id.toString(),
                   classSeriesId: session.classSeriesId.toString(),
-                  reminderKind: kind,
+                  reminderKind: w.kind,
                 },
               });
               anySent = true;
               sent += 1;
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : String(err);
-              errors.push(`${session._id}/${kind}/${learnerId}/fcm: ${msg}`);
-              logger.warn('Class reminder FCM failed', {
-                sessionId: session._id,
-                kind,
-                learnerId,
-                msg,
-              });
-            }
-          }
-
-          // --- Email ---
-          const learner = await User.findById(enrollment.learnerId)
-            .select('email firstName lastName name')
-            .lean();
-          if (learner?.email) {
-            const name =
-              `${(learner as { firstName?: string }).firstName ?? ''} ${(learner as { lastName?: string }).lastName ?? ''}`.trim() ||
-              (learner as { name?: string }).name ||
-              'Student';
-            try {
-              await sendClassReminderEmail({
-                studentEmail: learner.email as string,
-                studentName: name,
-                classTitle: seriesTitle,
-                minutesBefore: m,
-                sessionStart: new Date(session.startUtc),
-                meetingUrl: session.meetingUrl,
-              });
-              anySent = true;
-              sent += 1;
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              errors.push(`${session._id}/${kind}/${learnerId}/email: ${msg}`);
-              logger.warn('Class reminder email failed', {
-                sessionId: session._id,
-                kind,
-                learnerId,
-                msg,
-              });
+              errors.push(`${session._id}/${w.kind}/${learnerId}: ${msg}`);
+              logger.warn('Class reminder FCM failed', { sessionId: session._id, kind: w.kind, msg });
             }
           }
         }
 
-        if (includeDebug && anySent) {
-          debug.push({
-            sessionId: session._id.toString(),
-            minutesUntilStart,
-            reminderMinutes,
-            closestReminderMin: m,
-            reason: 'sent',
+        if (enrollments.length === 0) {
+          await SessionReminderDispatch.create({
+            sessionId: session._id,
+            kind: w.kind,
+            sentAt: new Date(),
+          });
+        } else if (anySent) {
+          await SessionReminderDispatch.create({
+            sessionId: session._id,
+            kind: w.kind,
+            sentAt: new Date(),
           });
         }
-
-        // Record dispatch so this session/kind pair is never re-sent.
-        if (enrollments.length === 0 || anySent) {
-          try {
-            await SessionReminderDispatch.create({
-              sessionId: session._id,
-              kind,
-              sentAt: new Date(),
-            });
-          } catch (err: unknown) {
-            // Unique index violation means a concurrent cron run already saved it — fine.
-            const msg = err instanceof Error ? err.message : String(err);
-            if (!msg.includes('duplicate key') && !msg.includes('E11000')) {
-              logger.warn('SessionReminderDispatch.create failed', { msg });
-            }
-          }
-        }
-      }
-
-      if (!matchedReminder && includeDebug) {
-        const closest = reminderMinutes.reduce(
-          (best, m) => {
-            const diff = Math.abs(msUntilStart - m * 60_000);
-            return diff < best.diff ? { m, diff } : best;
-          },
-          { m: reminderMinutes[0] ?? 0, diff: Infinity },
-        );
-        debug.push({
-          sessionId: session._id.toString(),
-          minutesUntilStart,
-          reminderMinutes,
-          closestReminderMin: closest.m,
-          closestDiffSeconds: Math.round(closest.diff / 1000),
-          reason: 'not_in_reminder_window',
-        });
       }
     }
 
-    return {
-      examined,
-      sent,
-      skipped,
-      errors,
-      ...(includeDebug ? { debug } : {}),
-    };
+    return { examined, sent, skipped, errors };
   }
 }
