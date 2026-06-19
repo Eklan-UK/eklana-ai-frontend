@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
+import { Checkbox } from "@/components/ui/Checkbox";
 import {
   ArrowLeft,
   FileText,
@@ -12,7 +20,6 @@ import {
   Volume2,
   Search,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { useDrill } from "@/hooks/useDrills";
@@ -228,6 +235,13 @@ function CreateDrillPageContent() {
       ],
     },
   ]);
+
+  // AI Generate state (Goodness)
+  const lastUploadedFile = useRef<File | null>(null);
+  const [aiPart, setAiPart] = useState("");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
 
   // Matching
   const [matchingPairs, setMatchingPairs] = useState<MatchingPair[]>([
@@ -838,16 +852,56 @@ function CreateDrillPageContent() {
     setSelectedUsers(updated);
   };
 
+  const AI_PARTS = [
+    "Part 1: Communication with Patients",
+    "Part 2: Communication with Colleagues",
+    "Part 3: Communication with Doctors, Families and Friends",
+    "Part 4: Bonus Scenarios",
+  ];
+
+  const AI_TOPICS = [
+    "Handling Emergency/Critical Situation",
+    "Conducting CPR",
+    "Follow-up with Patients",
+    "Admitting a Patient",
+    "Small Talk with a Patient",
+  ];
+
+  const handleAIGenerate = async () => {
+    if (!aiPart) { toast.error("Please select a part"); return; }
+    if (!aiTopic) { toast.error("Please select a topic"); return; }
+    if (!aiPrompt.trim()) { toast.error("Please enter a prompt"); return; }
+    try {
+      setIsGeneratingDrill(true);
+      const res = await fetch("/api/v1/drills/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ drillType, difficulty, context: "", prompt: aiPrompt, part: aiPart, topic: aiTopic }),
+      });
+      const json = await res.json();
+      if (!res.ok) { toast.error(json.message || "AI generation failed"); return; }
+      handleApplyParsedContent({ type: drillType as import("@/services/document-parser.service").ParsedContent["type"], confidence: 1, extractedData: { title: "", items: [], metadata: {}, ...json.data } });
+      toast.success("Drill content generated");
+    } catch {
+      toast.error("AI generation failed");
+    } finally {
+      setIsGeneratingDrill(false);
+    }
+  };
+
   // Handle file upload
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = async (file: File, overrideType?: string) => {
+    lastUploadedFile.current = file;
     try {
       setIsParsing(true);
-      const formData = new FormData();
-      formData.append("file", file);
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("drillType", overrideType ?? drillType ?? "");
 
       const response = await fetch("/api/v1/drills/parse-document", {
         method: "POST",
-        body: formData,
+        body: uploadData,
         credentials: "include",
       });
 
@@ -874,10 +928,11 @@ function CreateDrillPageContent() {
   };
 
   // Apply parsed content to form
-  const handleApplyParsedContent = () => {
-    if (!parsedContent) return;
+  const handleApplyParsedContent = (content?: ParsedContent) => {
+    const pc = content ?? parsedContent;
+    if (!pc) return;
 
-    const { extractedData, type } = parsedContent;
+    const { extractedData, type } = pc;
     const { title, items, metadata } = extractedData;
 
     // Update form data
@@ -886,7 +941,7 @@ function CreateDrillPageContent() {
     }
 
     // Set type if detected with high confidence
-    if (type !== "unknown" && parsedContent.confidence >= 0.6) {
+    if (type !== "unknown" && pc.confidence >= 0.6) {
       setDrillType(type);
     }
 
@@ -923,20 +978,31 @@ function CreateDrillPageContent() {
             ]
         );
         break;
-      case "roleplay":
-        setRoleplayScenes(
-          items.length > 0
-            ? items
-            : [
-              {
-                scene_name: "Scene 1",
-                dialogue: [
-                  { speaker: "ai_0", text: "", translation: "" },
-                  { speaker: "student", text: "", translation: "" },
-                ],
-              },
-            ]
-        );
+      case "roleplay": {
+        const defaultScenes = [
+          {
+            scene_name: "Scene 1",
+            dialogue: [
+              { speaker: "ai_0", text: "", translation: "" },
+              { speaker: "student", text: "", translation: "" },
+            ],
+          },
+        ];
+        const first = items[0];
+        if (first?.roleplay_scenes) {
+          // Excel import — compound object
+          setRoleplayScenes(first.roleplay_scenes.length > 0 ? first.roleplay_scenes : defaultScenes);
+          if (first.student_character_name) setStudentCharacterName(first.student_character_name);
+          if (first.ai_character_names?.length) setAiCharacterNames(first.ai_character_names);
+          if (first.context) setContext(first.context);
+        } else {
+          // Text-based import — plain RoleplayScene[]
+          setRoleplayScenes(items.length > 0 ? items : defaultScenes);
+        }
+        break;
+      }
+      case "definition":
+        // definition items are not a separate drill type in the tutor UI; no-op
         break;
       case "grammar":
         setGrammarItems(
@@ -952,31 +1018,50 @@ function CreateDrillPageContent() {
         if (items.length > 0 && items[0].content) {
           setArticleContent(items[0].content);
         }
-        if (title) {
-          setArticleTitle(title);
+        if (title || items[0]?.title) {
+          setArticleTitle(title || items[0].title);
         }
         break;
       case "listening":
+        console.log("[listening import] extractedData:", extractedData, "items[0]:", items[0]);
         if (items.length > 0 && items[0].content) {
           setListeningContent(items[0].content);
         }
-        if (title) {
-          setListeningTitle(title);
+        if (title || items[0]?.title) {
+          setListeningTitle(title || items[0].title);
         }
+        break;
+      case "sentence":
+        // sentence_drill_word not a separate state in tutor — no-op
         break;
       case "fill_blank":
         setFillBlankItems(
           items.length > 0
-            ? items
-            : [
-              {
-                sentence: "",
-                blanks: [
-                  { position: 0, correctAnswer: "", options: ["", ""], hint: "" },
-                ],
-                translation: "",
-              },
-            ]
+            ? items.map((item: any) => ({
+              sentence: item.sentence || "",
+              translation: item.translation || "",
+              blanks: Array.isArray(item.blanks) && item.blanks.length > 0
+                ? item.blanks
+                : [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }],
+            }))
+            : [{ sentence: "", blanks: [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }], translation: "" }]
+        );
+        break;
+      case "pronunciation":
+        setPronunciationItems(
+          items.length > 0 ? items : [{ sound: "", word: "", sentence: "" }]
+        );
+        break;
+      case "key_phrases":
+        setKeyPhraseItems(
+          items.length > 0
+            ? items.map((item: any) => ({
+              respondentName: item.respondentName || "",
+              prompt: item.prompt || item.word || "",
+              options: Array.isArray(item.options) && item.options.length > 0 ? item.options : ["", ""],
+              correctAnswer: item.correctAnswer || "",
+            }))
+            : [{ respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" }]
         );
         break;
     }
@@ -1450,6 +1535,35 @@ function CreateDrillPageContent() {
             </div>
 
             <div className="space-y-4 mt-6">
+              {/* AI Generate (Goodness) */}
+              <div className="border-b pb-6">
+                <h3 className="text-base font-bold text-gray-900 mb-1">AI Generate</h3>
+                <p className="text-sm text-gray-500 mb-4">Generate drill content using AI based on a part, topic, and prompt.</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Part <span className="text-red-500">*</span></label>
+                    <select value={aiPart} onChange={(e) => setAiPart(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                      <option value="">Select a part</option>
+                      {AI_PARTS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Topic <span className="text-red-500">*</span></label>
+                    <select value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                      <option value="">Select a topic</option>
+                      {AI_TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt <span className="text-red-500">*</span></label>
+                    <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={3} placeholder="Describe what you want to generate..." className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                  </div>
+                  <button onClick={handleAIGenerate} disabled={isGeneratingDrill} className="w-full py-2.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    {isGeneratingDrill ? "Generating…" : "Generate with AI"}
+                  </button>
+                </div>
+              </div>
+
               {/* File Upload */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2">
