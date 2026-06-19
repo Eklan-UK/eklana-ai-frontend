@@ -11,6 +11,10 @@ export async function completeLearnerDrill(
   data: CompleteDrillPayload,
 ) {
   const result = await drillAPI.complete(drillId, data);
-  await queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.badges.all }),
+    queryClient.invalidateQueries({ queryKey: ["user-streak"] }),
+  ]);
   return result;
 }

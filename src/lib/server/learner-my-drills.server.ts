@@ -48,7 +48,7 @@ export type LearnerMyDrillRow = LearnerMyDrillsPayload['drills'][number];
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 
 const LEARNER_DRILL_SELECT =
-  'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names';
+  'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
 
 function isPopulatedDrillDoc(
   value: unknown,

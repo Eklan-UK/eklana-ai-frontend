@@ -28,6 +28,7 @@ import { releaseMediaStream } from "@/lib/ios-audio-utils";
 import { appendFreeTalkHistoryEntry } from "@/lib/free-talk-history";
 import { freeTalkStringListToMultiline } from "@/models/free-talk-scenario.shared";
 import { toast } from "sonner";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,6 +213,19 @@ function FreeTalkSessionInner() {
   const [scenarioIndex, setScenarioIndex] = useState(0);
 
   const pro = !meLoading && learnerHasProAccess(me?.user);
+  const playedGradeFeedbackRef = useRef(false);
+
+  useEffect(() => {
+    if (phase !== "result" || !gradeResult) {
+      if (phase !== "result") {
+        playedGradeFeedbackRef.current = false;
+      }
+      return;
+    }
+    if (playedGradeFeedbackRef.current) return;
+    playedGradeFeedbackRef.current = true;
+    playPracticeFeedback(gradeResult.overallScore >= 60 ? "success" : "failure");
+  }, [phase, gradeResult]);
 
   useEffect(() => {
     if (!meLoading && me?.user != null && !learnerHasProAccess(me.user)) {

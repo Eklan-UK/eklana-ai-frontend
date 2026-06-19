@@ -39,6 +39,7 @@ const createSchema = z
     firstSessionSequenceNumber: z.number().int().min(1).optional(),
     reminderMinutes: z.array(z.number().int().min(1).max(120)).max(5).optional(),
     remindersEnabled: z.boolean().optional(),
+    npsEnabled: z.boolean().optional(),
   })
   .superRefine((val, ctx) => {
     const m = Math.max(

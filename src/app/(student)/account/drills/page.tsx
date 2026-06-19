@@ -1,35 +1,30 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Card } from "@/components/ui/Card";
-import { Loader2, BookOpen } from "lucide-react";
-import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
+import { useLearnerDrills } from "@/hooks/useDrills";
 import { useLearnerClasses } from "@/hooks/useClasses";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
-import { trackActivity } from "@/utils/activity-cache";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { pickNextLearnerSession } from "@/lib/classes/pick-next-learner-session";
-import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
-import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
-import {
-  drillPlanTab,
-  isFreeTalkPlanItem,
-  sortAssignedPlanItems,
-  type PlanTab,
-} from "@/lib/learner-assigned-plan";
 import { LearnerNextSessionCard } from "@/components/classes/LearnerNextSessionCard";
 import { StreakBadge } from "@/components/streak/StreakBadge";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { queryKeys } from "@/lib/react-query";
+import { SavedDrillsSection } from "@/components/drills/SavedDrillsSection";
+import { LearningJourneyPartCard } from "@/components/drills/LearningJourneyPartCard";
+import {
+  LEARNING_JOURNEY_PARTS,
+  type LearningJourneyPartId,
+} from "@/domain/learning-journey/learning-journey.catalog";
+import {
+  countPartJourneyProgress,
+  type JourneyDrillItem,
+} from "@/lib/learning-journey/group-journey-drills";
 
 export default function DrillsPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { data: me, isLoading: meLoading } = useUserCurrent();
 
   useEffect(() => {
@@ -38,13 +33,7 @@ export default function DrillsPage() {
     }
   }, [meLoading, me, router]);
 
-  const [activeTab, setActiveTab] = useState<PlanTab>("ongoing");
-  const prefetchDrill = usePrefetchDrill();
-
-  const {
-    data: drills = [],
-    isLoading: loading,
-  } = useLearnerDrills({ limit: 100 });
+  const { data: drills = [] } = useLearnerDrills({ limit: 100 });
 
   const { data: classData, isLoading: classesLoading } = useLearnerClasses({
     limit: 100,
@@ -60,67 +49,18 @@ export default function DrillsPage() {
     [teachingClasses],
   );
 
-  const filteredDrills = sortAssignedPlanItems(
-    drills.filter((item) => drillPlanTab(item) === activeTab),
-  );
+  const journeyDrills = drills as JourneyDrillItem[];
 
-  const stats = {
-    ongoing: drills.filter((d) => drillPlanTab(d) === "ongoing").length,
-    completed: drills.filter((d) => drillPlanTab(d) === "completed").length,
-    bookmarked: drills.filter((d) => drillPlanTab(d) === "bookmarked").length,
-  };
-
-  const tabLabels: Record<PlanTab, string> = {
-    ongoing: "Ongoing",
-    completed: "Completed",
-    bookmarked: "Bookmarked",
-  };
-
-  const handleBookmarkToggle = useCallback(
-    async (drillId: string, currentlyBookmarked: boolean) => {
-      try {
-        if (currentlyBookmarked) {
-          const response = await fetch(`/api/v1/bookmarks/by-drill/${drillId}`, {
-            method: "DELETE",
-          });
-          if (!response.ok) {
-            throw new Error("Failed to remove bookmark");
-          }
-          toast.success("Removed from bookmarks");
-        } else {
-          const response = await fetch("/api/v1/bookmarks", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              drillId,
-              type: "drill",
-              content: drillId,
-            }),
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.message || "Failed to bookmark");
-          }
-          if (data.message === "Already bookmarked") {
-            toast.info("Already bookmarked");
-          } else {
-            toast.success("Added to bookmarks!");
-          }
-        }
-
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.drills.learner.all(),
-        });
-      } catch {
-        toast.error(
-          currentlyBookmarked
-            ? "Could not remove bookmark"
-            : "Could not save bookmark",
-        );
-      }
-    },
-    [queryClient],
-  );
+  const partProgress = useMemo(() => {
+    const map = new Map<LearningJourneyPartId, { completed: number; total: number }>();
+    for (const partDef of LEARNING_JOURNEY_PARTS) {
+      map.set(
+        partDef.part,
+        countPartJourneyProgress(journeyDrills, partDef.part),
+      );
+    }
+    return map;
+  }, [journeyDrills]);
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
@@ -162,98 +102,29 @@ export default function DrillsPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-6">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-8">
         <LearnerNextSessionCard session={nextSession} isLoading={classesLoading} />
 
+        <SavedDrillsSection />
+
         <div>
-          <h2 className="text-lg font-bold text-foreground mb-3">Assigned Drills</h2>
-
-          <div className="bg-card rounded-2xl border border-border shadow-sm p-1 mb-4 flex gap-1">
-            {(["ongoing", "completed", "bookmarked"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-2 sm:px-4 py-3 rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                  activeTab === tab
-                    ? "bg-[#22c55e] text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                <span>{tabLabels[tab]}</span>
-                {stats[tab] > 0 && (
-                  <span
-                    className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${
-                      activeTab === tab
-                        ? "bg-white/20 text-white"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {stats[tab]}
-                  </span>
-                )}
-              </button>
-            ))}
+          <h2 className="text-lg font-bold text-foreground mb-3">My Learning Journey</h2>
+          <div className="space-y-3">
+            {LEARNING_JOURNEY_PARTS.map((partDef) => {
+              const progress = partProgress.get(partDef.part) ?? {
+                completed: 0,
+                total: 0,
+              };
+              return (
+                <LearningJourneyPartCard
+                  key={partDef.part}
+                  part={partDef.part}
+                  completedCount={progress.completed}
+                  totalCount={progress.total}
+                />
+              );
+            })}
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-[#22c55e]" />
-            </div>
-          ) : filteredDrills.length === 0 ? (
-            <Card className="p-8 text-center">
-              <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                No drills found
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                {activeTab === "ongoing"
-                  ? "You don't have any ongoing drills."
-                  : activeTab === "completed"
-                    ? "You haven't completed any drills yet."
-                    : "No bookmarked drills yet."}
-              </p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {filteredDrills.map((item) => {
-                const key = String(item.assignmentId ?? item.drill?._id ?? "");
-                if (isFreeTalkPlanItem(item)) {
-                  return (
-                    <PlanFreeTalkRow
-                      key={`free-talk-${key}`}
-                      scenarioId={key}
-                      title={item.drill?.title ?? "Free Talk"}
-                      scenarioType={item.drill?.scenarioType ?? ""}
-                      completionDate={item.drill?.completionDate ?? item.dueDate}
-                      completedAt={item.completedAt}
-                    />
-                  );
-                }
-                return (
-                  <PlanDrillRow
-                    key={key}
-                    drill={item.drill}
-                    assignmentId={item.assignmentId}
-                    dueDate={item.dueDate}
-                    completedAt={item.completedAt}
-                    status={item.status}
-                    hasBookmarks={item.hasBookmarks === true}
-                    onPrefetch={prefetchDrill}
-                    onBookmarkToggle={handleBookmarkToggle}
-                    onNavigate={() =>
-                      trackActivity("drill", item.drill._id, "started", {
-                        title: item.drill?.title,
-                        drillTitle: item.drill?.title,
-                        type: item.drill?.type,
-                        assignmentId: item.assignmentId,
-                      })
-                    }
-                  />
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 

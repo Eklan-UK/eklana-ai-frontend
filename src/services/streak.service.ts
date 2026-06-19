@@ -1,9 +1,12 @@
 // services/streak.service.ts
 import DailyFocusCompletion from '@/models/daily-focus-completion';
 import StreakActivityDay from '@/models/streak-activity-day';
-import UserStreak from '@/models/user-streak';
+import UserStreak, { type Badge } from '@/models/user-streak';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
+import { BadgeService } from '@/domain/badges/badge.service';
+import { BADGE_BY_ID } from '@/domain/badges/badge.definitions';
+import type { BadgeId } from '@/domain/badges/badge.types';
 
 /** Merged row for streak math (daily focus + login/drill activity days). */
 type StreakDayRow = { dateString: string; date: Date; score?: number };
@@ -24,30 +27,28 @@ export interface StreakData {
     badgeId: string;
     badgeName: string;
     unlockedAt: Date;
-    milestone: number;
+    icon?: string;
+    milestone?: number;
   }>;
 }
 
-// Badge definitions
-export const BADGE_DEFINITIONS = [
-  {
-    badgeId: 'week-warrior',
-    badgeName: 'Week Warrior',
-    description: 'Complete daily focus for 7 consecutive days',
-    milestone: 7,
-    icon: '🔥',
-    color: 'orange',
-  },
-  // Future badges can be added here
-  // {
-  //   badgeId: 'monthly-master',
-  //   badgeName: 'Monthly Master',
-  //   description: 'Complete daily focus for 30 consecutive days',
-  //   milestone: 30,
-  //   icon: '⭐',
-  //   color: 'gold',
-  // },
-];
+async function triggerBadgeEvaluation(userId: string): Promise<Badge | null> {
+  try {
+    const newlyUnlocked = await BadgeService.evaluateAndUnlock(userId);
+    if (newlyUnlocked.length === 0) return null;
+    const firstId = newlyUnlocked[0] as BadgeId;
+    const def = BADGE_BY_ID.get(firstId);
+    return {
+      badgeId: firstId,
+      badgeName: def?.badgeName ?? firstId,
+      unlockedAt: new Date(),
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Badge evaluation failed', { userId, error: message });
+    return null;
+  }
+}
 
 export class StreakService {
   /** Streaks run unless `STREAK_ENABLED=false` in environment. */
@@ -151,7 +152,7 @@ export class StreakService {
       ).exec();
 
       // Check for badge unlock
-      const badgeUnlocked = await this.checkBadgeUnlock(userId);
+      const badgeUnlocked = await triggerBadgeEvaluation(userId);
 
       logger.info('Daily focus completion recorded', {
         userId,
@@ -278,7 +279,7 @@ export class StreakService {
       ).exec();
 
       const streakUpdated = await this.recomputeStreakFromActivity(userId);
-      await this.checkBadgeUnlock(userId);
+      void triggerBadgeEvaluation(userId);
 
       const updated = await UserStreak.findOne({ userId: uid }).lean().exec();
 
@@ -447,6 +448,8 @@ export class StreakService {
         { upsert: true, new: true }
       ).exec();
 
+      void triggerBadgeEvaluation(userId);
+
       return true;
     } catch (error: any) {
       logger.error('Error recomputing streak from activity', {
@@ -542,62 +545,6 @@ export class StreakService {
   }
 
   /**
-   * Check if user should unlock a badge and unlock it
-   */
-  private static async checkBadgeUnlock(userId: string): Promise<Badge | null> {
-    try {
-      const userStreak = await UserStreak.findOne({
-        userId: new Types.ObjectId(userId),
-      }).lean().exec();
-
-      if (!userStreak || userStreak.currentStreak === 0) {
-        return null;
-      }
-
-      // Check each badge definition
-      for (const badgeDef of BADGE_DEFINITIONS) {
-        // Check if badge is already unlocked
-        const alreadyUnlocked = userStreak.badges.some(
-          (b: Badge) => b.badgeId === badgeDef.badgeId
-        );
-
-        if (!alreadyUnlocked && userStreak.currentStreak >= badgeDef.milestone) {
-          // Unlock badge
-          const newBadge: Badge = {
-            badgeId: badgeDef.badgeId,
-            badgeName: badgeDef.badgeName,
-            unlockedAt: new Date(),
-            milestone: badgeDef.milestone,
-          };
-
-          await UserStreak.findOneAndUpdate(
-            { userId: new Types.ObjectId(userId) },
-            {
-              $push: { badges: newBadge },
-            }
-          ).exec();
-
-          logger.info('Badge unlocked', {
-            userId,
-            badgeId: badgeDef.badgeId,
-            streak: userStreak.currentStreak,
-          });
-
-          return newBadge;
-        }
-      }
-
-      return null;
-    } catch (error: any) {
-      logger.error('Error checking badge unlock', {
-        userId,
-        error: error.message,
-      });
-      return null;
-    }
-  }
-
-  /**
    * Get streak data for a user
    */
   static async getStreakData(userId: string): Promise<StreakData> {
@@ -654,7 +601,7 @@ export class StreakService {
         todayCompleted,
         yesterdayCompleted,
         weeklyActivity: userStreak.weeklyActivity || this.getEmptyWeeklyActivity(),
-        badges: userStreak.badges || [],
+        badges: BadgeService.formatBadgesForStreak(userStreak.badges as Badge[]),
       };
     } catch (error: any) {
       logger.error('Error getting streak data', {
@@ -690,12 +637,4 @@ export class StreakService {
     return result;
   }
 }
-
-// Export Badge type
-export type Badge = {
-  badgeId: string;
-  badgeName: string;
-  unlockedAt: Date;
-  milestone: number;
-};
 

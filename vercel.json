@@ -6,6 +6,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/v1/cron/class-session-nps",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/v1/cron/drill-daily-reminder",
       "schedule": "*/30 * * * *"
     },

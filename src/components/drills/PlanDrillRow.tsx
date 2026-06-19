@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronRight, Clock3, Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
+import { ChevronRight, Clock3, Bookmark, BookmarkCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getDrillIcon, getDrillTypeInfo, getDrillStatus, getDrillTypeLabel, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
@@ -125,6 +125,12 @@ export function PlanDrillRow({
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
+        {isCompleted ? (
+          <CheckCircle2
+            className="w-5 h-5 text-[#22c55e] shrink-0"
+            aria-label="Completed"
+          />
+        ) : null}
         {onBookmarkToggle ? (
           <Button
             type="button"

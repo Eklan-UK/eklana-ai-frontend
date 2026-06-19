@@ -83,6 +83,13 @@ async function createBookmark(req: NextRequest, context: { userId: Types.ObjectI
       context: bookmarkContext,
     });
 
+    try {
+      const { BadgeService } = await import('@/domain/badges/badge.service');
+      void BadgeService.evaluateAndUnlock(context.userId.toString());
+    } catch {
+      // badges must not fail bookmark creation
+    }
+
     return NextResponse.json({ bookmark }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating bookmark:', error);
