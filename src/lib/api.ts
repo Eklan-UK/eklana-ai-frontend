@@ -1335,6 +1335,26 @@ export const adminAPI = {
       params,
     });
   },
+
+  getNpsFormSettings: () => {
+    return apiRequest<{
+      data: import('@/domain/admin/nps-form.types').NpsFormSettings | null;
+    }>('/admin/settings/nps-form', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  updateNpsFormSettings: (
+    data: import('@/domain/admin/nps-form.types').UpdateNpsFormSettingsBody,
+  ) => {
+    return apiRequest<{
+      data: import('@/domain/admin/nps-form.types').NpsFormSettings;
+    }>('/admin/settings/nps-form', {
+      method: 'PUT',
+      data,
+    });
+  },
 };
 
 // Classes (admin teaching sessions)

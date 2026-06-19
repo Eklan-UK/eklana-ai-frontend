@@ -22,6 +22,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { adminAPI } from "@/lib/api";
 import { useCreateAdminClass } from "@/hooks/useClasses";
+import { useNpsFormSettings } from "@/hooks/useAdmin";
+import { NpsFormReviewToggle } from "@/components/admin/NpsFormReviewToggle";
 import {
   computeSessionRangeOnLocalDate,
   parseEndsOnDisplayToLocalDate,
@@ -187,12 +189,16 @@ export default function ScheduleOneTimePage() {
   const [reminderSecondary, setReminderSecondary] = useState<
     (typeof REMINDER_OPTIONS)[number]
   >("30 minutes before");
+  const [npsEnabled, setNpsEnabled] = useState(false);
   const [animatingLineIndex, setAnimatingLineIndex] = useState<number | null>(
     null,
   );
   const [tutorStepPulse, setTutorStepPulse] = useState(false);
   const [reviewStepPulse, setReviewStepPulse] = useState(false);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: npsFormConfig, isLoading: npsFormLoading } =
+    useNpsFormSettings();
 
   const classCountM = useMemo(
     () => parseClassCount(totalProgramInput),
@@ -406,6 +412,7 @@ export default function ScheduleOneTimePage() {
               parseReminderMinutes(reminderSecondary),
             ]
           : [],
+        npsEnabled,
       };
       const result = await createClass.mutateAsync(body);
       const raw = result?.data?.class?.bucket;
@@ -1087,6 +1094,13 @@ export default function ScheduleOneTimePage() {
                     </div>
                   </div>
                 </div>
+
+                <NpsFormReviewToggle
+                  npsEnabled={npsEnabled}
+                  onNpsEnabledChange={setNpsEnabled}
+                  npsFormConfig={npsFormConfig}
+                  isLoading={npsFormLoading}
+                />
               </div>
             ) : null}
           </div>

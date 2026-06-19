@@ -519,3 +519,38 @@ export function useUnassignTutorFromStudent(tutorId: string) {
     },
   });
 }
+
+const npsFormSettingsQueryKey = ["admin", "settings", "nps-form"] as const;
+
+/** Global post-session NPS Google Form configuration (admin settings). */
+export function useNpsFormSettings(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: npsFormSettingsQueryKey,
+    queryFn: async () => {
+      const response = await adminAPI.getNpsFormSettings();
+      return response.data ?? null;
+    },
+    enabled: options?.enabled !== false,
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateNpsFormSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      name: string;
+      url: string;
+      isActive?: boolean;
+    }) => adminAPI.updateNpsFormSettings(body),
+    onSuccess: () => {
+      toast.success("NPS form settings saved");
+      queryClient.invalidateQueries({ queryKey: npsFormSettingsQueryKey });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to save NPS form settings";
+      toast.error(message);
+    },
+  });
+}

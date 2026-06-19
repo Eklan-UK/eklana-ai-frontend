@@ -22,6 +22,21 @@ function reminderTitle(minutesBefore: number): string {
   return `Class starts in ${minutesBefore} minute${minutesBefore === 1 ? '' : 's'}`;
 }
 
+export type ClassReminderDebugEntry = {
+  sessionId: string;
+  minutesUntilStart: number;
+  reminderMinutes: number[];
+  reason:
+    | 'series_inactive'
+    | 'reminders_disabled'
+    | 'not_in_reminder_window'
+    | 'already_sent'
+    | 'no_enrollments'
+    | 'sent';
+  closestReminderMin?: number;
+  closestDiffSeconds?: number;
+};
+
 export class ClassReminderService {
   /**
    * Called every minute by the cron route.
@@ -29,16 +44,22 @@ export class ClassReminderService {
    * offset (within ±1 min of now + offset) and sends FCM + email once per
    * session/offset pair (deduped via SessionReminderDispatch).
    */
-  async runDueReminders(now: Date = new Date()): Promise<{
+  async runDueReminders(
+    now: Date = new Date(),
+    options?: { debug?: boolean },
+  ): Promise<{
     examined: number;
     sent: number;
     skipped: number;
     errors: string[];
+    debug?: ClassReminderDebugEntry[];
   }> {
     const errors: string[] = [];
+    const debug: ClassReminderDebugEntry[] = [];
     let sent = 0;
     let skipped = 0;
     let examined = 0;
+    const includeDebug = options?.debug === true;
 
     const nowMs = now.getTime();
 
@@ -58,8 +79,32 @@ export class ClassReminderService {
       examined += 1;
 
       const series = await ClassSeries.findById(session.classSeriesId).lean();
-      if (!series?.isActive) continue;
-      if (!series.remindersEnabled) continue;
+      const minutesUntilStart = Math.round(
+        (new Date(session.startUtc).getTime() - nowMs) / 60_000,
+      );
+
+      if (!series?.isActive) {
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            minutesUntilStart,
+            reminderMinutes: [],
+            reason: 'series_inactive',
+          });
+        }
+        continue;
+      }
+      if (!series.remindersEnabled) {
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            minutesUntilStart,
+            reminderMinutes: [],
+            reason: 'reminders_disabled',
+          });
+        }
+        continue;
+      }
 
       const reminderMinutes: number[] =
         Array.isArray(series.reminderMinutes) && series.reminderMinutes.length > 0
@@ -68,10 +113,12 @@ export class ClassReminderService {
 
       const msUntilStart = new Date(session.startUtc).getTime() - nowMs;
 
+      let matchedReminder = false;
       for (const m of reminderMinutes) {
         const targetMs = m * 60 * 1000;
         const diff = Math.abs(msUntilStart - targetMs);
         if (diff > TOLERANCE_MS) continue;
+        matchedReminder = true;
 
         const kind = String(m);
 
@@ -81,6 +128,15 @@ export class ClassReminderService {
         }).lean();
         if (alreadySent) {
           skipped += 1;
+          if (includeDebug) {
+            debug.push({
+              sessionId: session._id.toString(),
+              minutesUntilStart,
+              reminderMinutes,
+              closestReminderMin: m,
+              reason: 'already_sent',
+            });
+          }
           continue;
         }
 
@@ -91,6 +147,16 @@ export class ClassReminderService {
 
         const seriesTitle = series.title?.trim() || 'Your class';
         let anySent = false;
+
+        if (enrollments.length === 0 && includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            minutesUntilStart,
+            reminderMinutes,
+            closestReminderMin: m,
+            reason: 'no_enrollments',
+          });
+        }
 
         for (const enrollment of enrollments) {
           const learnerId = enrollment.learnerId.toString();
@@ -163,6 +229,16 @@ export class ClassReminderService {
           }
         }
 
+        if (includeDebug && anySent) {
+          debug.push({
+            sessionId: session._id.toString(),
+            minutesUntilStart,
+            reminderMinutes,
+            closestReminderMin: m,
+            reason: 'sent',
+          });
+        }
+
         // Record dispatch so this session/kind pair is never re-sent.
         if (enrollments.length === 0 || anySent) {
           try {
@@ -180,8 +256,32 @@ export class ClassReminderService {
           }
         }
       }
+
+      if (!matchedReminder && includeDebug) {
+        const closest = reminderMinutes.reduce(
+          (best, m) => {
+            const diff = Math.abs(msUntilStart - m * 60_000);
+            return diff < best.diff ? { m, diff } : best;
+          },
+          { m: reminderMinutes[0] ?? 0, diff: Infinity },
+        );
+        debug.push({
+          sessionId: session._id.toString(),
+          minutesUntilStart,
+          reminderMinutes,
+          closestReminderMin: closest.m,
+          closestDiffSeconds: Math.round(closest.diff / 1000),
+          reason: 'not_in_reminder_window',
+        });
+      }
     }
 
-    return { examined, sent, skipped, errors };
+    return {
+      examined,
+      sent,
+      skipped,
+      errors,
+      ...(includeDebug ? { debug } : {}),
+    };
   }
 }

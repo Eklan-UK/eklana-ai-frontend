@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev ",
+    "dev:cron": "node scripts/local-class-cron.mjs",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build --webpack",
     "build:low-mem": "NODE_OPTIONS='--max-old-space-size=4096' next build --webpack",
     "start": "next start",
