@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { dailyFocusAPI } from "@/lib/api";
 import { queryKeys } from "@/lib/react-query";
+import { celebrateBadgesFromApiResponse } from "@/lib/badges/celebrate-badge-unlock";
 
 interface DailyFocus {
   _id: string;
@@ -102,7 +103,6 @@ export default function DailyFocusPracticePage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [startTime] = useState(Date.now());
-  const [badgeUnlocked, setBadgeUnlocked] = useState<any>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -406,26 +406,14 @@ export default function DailyFocusPracticePage() {
         })),
       });
 
+      celebrateBadgesFromApiResponse(response);
+
       const result = (response as any).data || response;
 
       if (result?.streakUpdated) {
         toast.success("Daily focus completed! Your streak has been updated! 🔥");
       } else {
         toast.success("Daily focus completed!");
-      }
-
-      if (result?.badgeUnlocked) {
-        setBadgeUnlocked(result.badgeUnlocked);
-        // Show badge unlock celebration
-        confetti({
-          particleCount: 200,
-          spread: 120,
-          origin: { y: 0.5 },
-          colors: ["#fbbf24", "#f59e0b", "#d97706", "#92400e"],
-        });
-        toast.success(`🎉 Badge Unlocked: ${result.badgeUnlocked.badgeName}!`, {
-          duration: 5000,
-        });
       }
 
       void queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
@@ -804,13 +792,6 @@ export default function DailyFocusPracticePage() {
               <div className="mb-4 px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-lg">
                 <p className="text-sm text-yellow-800 font-medium">Practice Mode</p>
                 <p className="text-xs text-yellow-700">This attempt won't count toward your streak</p>
-              </div>
-            )}
-
-            {badgeUnlocked && (
-              <div className="mb-4 px-4 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-lg text-white">
-                <p className="text-lg font-bold mb-1">🎉 Badge Unlocked!</p>
-                <p className="text-sm">{badgeUnlocked.badgeName}</p>
               </div>
             )}
 

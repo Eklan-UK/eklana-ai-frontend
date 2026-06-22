@@ -703,6 +703,7 @@ export default function PronunciationDrill({
         drillType={weeklyChallengeMeta ? "Pronunciation" : "pronunciation"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
         extraContent={
           sessionTranscripts.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">

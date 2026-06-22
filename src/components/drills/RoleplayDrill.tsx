@@ -1266,6 +1266,7 @@ export default function RoleplayDrill({
         drillType={weeklyChallengeMeta ? "Role-play" : "roleplay"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
         extraContent={
           linesWithTranscript.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">

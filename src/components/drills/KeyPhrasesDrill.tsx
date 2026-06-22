@@ -462,6 +462,7 @@ export default function KeyPhrasesDrill({
         drillType={weeklyChallengeMeta ? "Key Phrases" : "key phrases"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
       />
     );
   }

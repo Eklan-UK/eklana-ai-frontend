@@ -6,6 +6,7 @@ import { RoleGuard } from "@/components/guards/RoleGuard";
 import { SubscriptionGuard } from "@/components/guards/SubscriptionGuard";
 import { StreakActivityPing } from "@/components/streak/StreakActivityPing";
 import { StudentIntlProvider } from "@/components/providers/StudentIntlProvider";
+import { BadgeUnlockProvider } from "@/components/badges/BadgeUnlockProvider";
 
 export const metadata: Metadata = {
   title: "Eklan - Create Your Future",
@@ -23,7 +24,9 @@ export default function StudentLayout({
         <OnboardingGuard>
           <SubscriptionGuard>
             <StreakActivityPing />
-            <StudentIntlProvider>{children}</StudentIntlProvider>
+            <StudentIntlProvider>
+              <BadgeUnlockProvider>{children}</BadgeUnlockProvider>
+            </StudentIntlProvider>
           </SubscriptionGuard>
         </OnboardingGuard>
       </VerificationGuard>

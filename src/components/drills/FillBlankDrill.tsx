@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDrillScoreCelebration } from "@/hooks/useDrillScoreCelebration";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -18,7 +19,6 @@ import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-c
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -46,6 +46,10 @@ export default function FillBlankDrill({
 
   const items = drill.fill_blank_items || [];
   const currentItem = items[currentIndex];
+
+  useDrillScoreCelebration(
+    submittedResults === null ? null : submittedResults.passed,
+  );
 
   // Parse sentence to extract blank positions
   const parseSentence = (sentence: string) => {
@@ -272,10 +276,8 @@ export default function FillBlankDrill({
       }
 
       if (passed) {
-        playPracticeFeedback("success");
         toast.success("Drill passed! Great job!");
       } else {
-        playPracticeFeedback("failure");
         toast.error(
           `Score: ${score}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`,
         );
@@ -298,6 +300,7 @@ export default function FillBlankDrill({
         drillType={weeklyChallengeMeta ? "Vocabulary" : "fill_blank"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
       />
     );
   }

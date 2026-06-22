@@ -627,6 +627,7 @@ export default function VocabularyDrill({
         drillType="vocabulary"
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
+        celebrate={false}
       />
     );
   }

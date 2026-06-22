@@ -5,8 +5,11 @@ import UserStreak, { type Badge } from '@/models/user-streak';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import { BadgeService } from '@/domain/badges/badge.service';
-import { BADGE_BY_ID } from '@/domain/badges/badge.definitions';
 import type { BadgeId } from '@/domain/badges/badge.types';
+import {
+  badgeIdsToCelebrations,
+  type BadgeUnlockCelebration,
+} from '@/lib/badges/badge-unlock';
 
 /** Merged row for streak math (daily focus + login/drill activity days). */
 type StreakDayRow = { dateString: string; date: Date; score?: number };
@@ -32,21 +35,17 @@ export interface StreakData {
   }>;
 }
 
-async function triggerBadgeEvaluation(userId: string): Promise<Badge | null> {
+export async function triggerBadgeEvaluation(
+  userId: string,
+): Promise<BadgeUnlockCelebration[]> {
   try {
     const newlyUnlocked = await BadgeService.evaluateAndUnlock(userId);
-    if (newlyUnlocked.length === 0) return null;
-    const firstId = newlyUnlocked[0] as BadgeId;
-    const def = BADGE_BY_ID.get(firstId);
-    return {
-      badgeId: firstId,
-      badgeName: def?.badgeName ?? firstId,
-      unlockedAt: new Date(),
-    };
+    if (newlyUnlocked.length === 0) return [];
+    return badgeIdsToCelebrations(newlyUnlocked as BadgeId[]);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('Badge evaluation failed', { userId, error: message });
-    return null;
+    return [];
   }
 }
 
@@ -94,9 +93,9 @@ export class StreakService {
     totalQuestions: number,
     timeSpent: number = 0,
     answers?: any[]
-  ): Promise<{ streakUpdated: boolean; badgeUnlocked: Badge | null }> {
+  ): Promise<{ streakUpdated: boolean; badgesUnlocked: BadgeUnlockCelebration[] }> {
     if (!this.streakFeatureEnabled()) {
-      return { streakUpdated: false, badgeUnlocked: null };
+      return { streakUpdated: false, badgesUnlocked: [] };
     }
 
     try {
@@ -124,7 +123,7 @@ export class StreakService {
           dailyFocusId,
           dateString: todayString,
         });
-        return { streakUpdated: false, badgeUnlocked: null };
+        return { streakUpdated: false, badgesUnlocked: [] };
       }
 
       // Create completion record (first completion)
@@ -151,8 +150,7 @@ export class StreakService {
         { $set: { lastDrillCompletedAt: new Date() } }
       ).exec();
 
-      // Check for badge unlock
-      const badgeUnlocked = await triggerBadgeEvaluation(userId);
+      const badgesUnlocked = await triggerBadgeEvaluation(userId);
 
       logger.info('Daily focus completion recorded', {
         userId,
@@ -160,10 +158,10 @@ export class StreakService {
         dateString: todayString,
         score,
         streakUpdated,
-        badgeUnlocked: badgeUnlocked?.badgeId || null,
+        badgesUnlocked: badgesUnlocked.map((b) => b.badgeId),
       });
 
-      return { streakUpdated, badgeUnlocked };
+      return { streakUpdated, badgesUnlocked };
     } catch (error: any) {
       logger.error('Error recording daily focus completion', {
         userId,
@@ -279,7 +277,6 @@ export class StreakService {
       ).exec();
 
       const streakUpdated = await this.recomputeStreakFromActivity(userId);
-      void triggerBadgeEvaluation(userId);
 
       const updated = await UserStreak.findOne({ userId: uid }).lean().exec();
 
@@ -447,8 +444,6 @@ export class StreakService {
         },
         { upsert: true, new: true }
       ).exec();
-
-      void triggerBadgeEvaluation(userId);
 
       return true;
     } catch (error: any) {

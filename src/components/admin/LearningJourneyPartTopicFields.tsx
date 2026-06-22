@@ -2,6 +2,7 @@
 
 import {
   LEARNING_JOURNEY_PARTS,
+  getPartLabel,
   getTopicsForPart,
   type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
@@ -29,7 +30,7 @@ export function LearningJourneyPartTopicFields({
     <div className={`grid grid-cols-1 gap-4 ${className}`}>
       <div>
         <label className="block text-xs font-bold text-gray-600 mb-1.5">
-          Learning journey part
+          Learning journey mission
           {required ? <span className="text-red-500">*</span> : null}
         </label>
         <div className="relative">
@@ -44,10 +45,10 @@ export function LearningJourneyPartTopicFields({
             }}
             className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           >
-            <option value="">Select part…</option>
+            <option value="">Select mission…</option>
             {LEARNING_JOURNEY_PARTS.map((part) => (
               <option key={part.part} value={part.part}>
-                Part {part.part}: {part.title}
+                {getPartLabel(part.part)}
               </option>
             ))}
           </select>
@@ -67,7 +68,7 @@ export function LearningJourneyPartTopicFields({
             className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-gray-50 disabled:text-gray-400"
           >
             <option value="">
-              {journeyPart ? "Select topic…" : "Select a part first"}
+              {journeyPart ? "Select topic…" : "Select a mission first"}
             </option>
             {topics.map((topic) => (
               <option key={topic.id} value={topic.id}>

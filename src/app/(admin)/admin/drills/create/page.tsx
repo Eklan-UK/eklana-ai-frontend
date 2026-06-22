@@ -1359,12 +1359,12 @@ const DrillBuilder: React.FC = () => {
     }
 
     if (!journeyPart || !journeyTopic) {
-      toast.error("Please select a learning journey part and topic");
+      toast.error("Please select a learning journey mission and topic");
       return;
     }
 
     if (!isValidPartTopicPair(journeyPart, journeyTopic)) {
-      toast.error("Selected topic does not belong to the selected part");
+      toast.error("Selected topic does not belong to the selected mission");
       return;
     }
 

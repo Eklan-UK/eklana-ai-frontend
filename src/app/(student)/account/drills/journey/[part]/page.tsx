@@ -13,6 +13,7 @@ import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
 import { isFreeTalkPlanItem } from "@/lib/learning-journey/group-journey-drills";
 import {
+  getMissionNumberLabel,
   getPartById,
   parseLearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
@@ -70,7 +71,7 @@ export default function LearningJourneyPartPage() {
             My Learning Journey
           </Link>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Part {part}
+            {getMissionNumberLabel(part)}
           </p>
           <h1 className="text-2xl font-bold text-foreground">{partDef.title}</h1>
         </div>
