@@ -10,6 +10,7 @@ import {
   NotificationType,
 } from '@/lib/fcm-trigger';
 import { sendClassReminderEmail } from '@/lib/api/email.service';
+import { buildClassEmailJoinUrl } from '@/lib/api/class-join-token';
 
 /** Maximum reminder offset supported (minutes). Sessions starting further out are ignored. */
 const MAX_REMINDER_MINUTES = 120;
@@ -206,6 +207,14 @@ export class ClassReminderService {
               (learner as { name?: string }).name ||
               'Student';
             try {
+              const emailJoinUrl =
+                session.meetingUrl?.trim()
+                  ? buildClassEmailJoinUrl({
+                      sessionId: session._id.toString(),
+                      learnerId,
+                      sessionEndUtc: new Date(session.endUtc),
+                    })
+                  : undefined;
               await sendClassReminderEmail({
                 studentEmail: learner.email as string,
                 studentName: name,
@@ -213,6 +222,7 @@ export class ClassReminderService {
                 minutesBefore: m,
                 sessionStart: new Date(session.startUtc),
                 meetingUrl: session.meetingUrl,
+                emailJoinUrl,
               });
               anySent = true;
               sent += 1;

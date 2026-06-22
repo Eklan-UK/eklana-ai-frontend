@@ -10,22 +10,40 @@ import { sendNpsFormEmail } from '@/lib/api/email.service';
 /** Look back this far for sessions that just ended (cron runs every minute). */
 const TOLERANCE_MS = 2 * 60 * 1000;
 
+export type ClassNpsDebugEntry = {
+  sessionId: string;
+  reason:
+    | 'series_inactive_or_no_nps'
+    | 'already_dispatched'
+    | 'no_nps_form'
+    | 'no_attendance'
+    | 'emails_sent';
+  attendeeCount?: number;
+  emailsSent?: number;
+};
+
 export class ClassNpsService {
   /**
    * Called every minute by the cron route.
    * Finds sessions that ended within the last 2 minutes for NPS-enabled series,
    * emails present/late attendees once per session (deduped via SessionNpsDispatch).
    */
-  async runDueNpsEmails(now: Date = new Date()): Promise<{
+  async runDueNpsEmails(
+    now: Date = new Date(),
+    options?: { debug?: boolean },
+  ): Promise<{
     examined: number;
     sent: number;
     skipped: number;
     errors: string[];
+    debug?: ClassNpsDebugEntry[];
   }> {
     const errors: string[] = [];
+    const debug: ClassNpsDebugEntry[] = [];
     let sent = 0;
     let skipped = 0;
     let examined = 0;
+    const includeDebug = options?.debug === true;
 
     const nowMs = now.getTime();
     const windowStart = new Date(nowMs - TOLERANCE_MS);
@@ -41,13 +59,27 @@ export class ClassNpsService {
       examined += 1;
 
       const series = await ClassSeries.findById(session.classSeriesId).lean();
-      if (!series?.isActive || !series.npsEnabled) continue;
+      if (!series?.isActive || !series.npsEnabled) {
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            reason: 'series_inactive_or_no_nps',
+          });
+        }
+        continue;
+      }
 
       const alreadySent = await SessionNpsDispatch.findOne({
         sessionId: session._id,
       }).lean();
       if (alreadySent) {
         skipped += 1;
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            reason: 'already_dispatched',
+          });
+        }
         continue;
       }
 
@@ -57,6 +89,12 @@ export class ClassNpsService {
       }).lean();
       if (!npsForm) {
         skipped += 1;
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            reason: 'no_nps_form',
+          });
+        }
         continue;
       }
 
@@ -68,12 +106,27 @@ export class ClassNpsService {
         .exec();
 
       const seriesTitle = series.title?.trim() || 'Your class';
+      let emailsSentForSession = 0;
+
+      if (attendances.length === 0) {
+        if (includeDebug) {
+          debug.push({
+            sessionId: session._id.toString(),
+            reason: 'no_attendance',
+            attendeeCount: 0,
+            emailsSent: 0,
+          });
+        }
+      }
 
       for (const att of attendances) {
         const learner = await User.findById(att.learnerId)
           .select('email firstName lastName name')
           .lean();
-        if (!learner?.email) continue;
+        if (!learner?.email) {
+          errors.push(`${session._id}/${att.learnerId}/email: learner has no email`);
+          continue;
+        }
 
         const name =
           `${(learner as { firstName?: string }).firstName ?? ''} ${(learner as { lastName?: string }).lastName ?? ''}`.trim() ||
@@ -89,6 +142,7 @@ export class ClassNpsService {
             formUrl: npsForm.url,
           });
           sent += 1;
+          emailsSentForSession += 1;
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`${session._id}/${att.learnerId}/email: ${msg}`);
@@ -98,6 +152,15 @@ export class ClassNpsService {
             msg,
           });
         }
+      }
+
+      if (includeDebug && attendances.length > 0) {
+        debug.push({
+          sessionId: session._id.toString(),
+          reason: 'emails_sent',
+          attendeeCount: attendances.length,
+          emailsSent: emailsSentForSession,
+        });
       }
 
       try {
@@ -113,6 +176,12 @@ export class ClassNpsService {
       }
     }
 
-    return { examined, sent, skipped, errors };
+    return {
+      examined,
+      sent,
+      skipped,
+      errors,
+      ...(includeDebug ? { debug } : {}),
+    };
   }
 }

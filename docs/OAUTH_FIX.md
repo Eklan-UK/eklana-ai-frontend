@@ -6,9 +6,9 @@ You're getting `Error 400: redirect_uri_mismatch` because the redirect URIs in G
 ## Solution
 
 ### Step 1: Check Your Current Redirect URI
-Visit this endpoint to see the exact redirect URI Better Auth is using:
+Visit this endpoint to see the exact redirect URI Better Auth is using (**local / staging only — disabled in production**):
 - **Local**: http://localhost:3000/api/v1/auth/debug-oauth
-- **Production**: https://app.eklan.ai/api/v1/auth/debug-oauth
+- **Staging**: https://staging.eklan.ai/api/v1/auth/debug-oauth (if not production)
 
 This will show you the exact redirect URI format.
 
