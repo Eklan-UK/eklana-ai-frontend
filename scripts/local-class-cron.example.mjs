@@ -1,7 +1,25 @@
 /**
- * LOCAL DEV ONLY — private copy (gitignored). Template: local-class-cron.example.mjs
+ * LOCAL DEV ONLY — copy this file to scripts/local-class-cron.mjs (gitignored).
  *
+ * Vercel runs crons automatically in production (vercel.json + CRON_SECRET).
+ * During `npm run dev` they do NOT run unless you start your private copy:
  *   node scripts/local-class-cron.mjs
+ *
+ * Setup:
+ *   cp scripts/local-class-cron.example.mjs scripts/local-class-cron.mjs
+ *   Set CLASS_REMINDER_CRON_SECRET, CLASS_NPS_CRON_SECRET, DRILL_REMINDER_CRON_SECRET
+ *   (or CRON_SECRET) in .env. Optional: CRON_DEBUG=true for verbose cron JSON.
+ *
+ * Usage:
+ *   node scripts/local-class-cron.mjs
+ *   node scripts/local-class-cron.mjs --interval 30
+ *   node scripts/local-class-cron.mjs --streak-interval 900
+ *   node scripts/local-class-cron.mjs --daily-blast-once
+ *   node scripts/local-class-cron.mjs --include-daily-blast
+ *
+ * --include-daily-blast  Fire drill-assigned-reminder at startup + hourly (broadcasts
+ *                        to ALL learners with FCM tokens — use sparingly).
+ * --daily-blast-once     Fire drill-assigned-reminder once at startup only.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -74,7 +92,8 @@ async function hitCron(baseUrl, path, secret) {
   if (!secret) {
     return { ok: false, status: 0, body: { message: 'secret not set in .env' } };
   }
-  const debugQs = process.env.CRON_DEBUG === 'true' ? '?debug=1' : '';
+  const debugQs =
+    process.env.CRON_DEBUG === 'true' ? '?debug=1' : '';
   const url = `${baseUrl}${path}${debugQs}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${secret}` },
@@ -111,21 +130,7 @@ function summarize(label, result, { debug = true } = {}) {
   }
   if (debug && data.debug?.length) {
     for (const d of data.debug) {
-      if (label === 'nps') {
-        console.log(
-          `    → ${d.sessionId?.slice(-6) ?? '?'}: ${d.reason}` +
-            (d.attendeeCount != null ? ` (${d.attendeeCount} attendees)` : '') +
-            (d.emailsSent != null ? `, ${d.emailsSent} emailed` : ''),
-        );
-      } else if (label === 'reminders') {
-        console.log(
-          `    → ${d.sessionId?.slice(-6) ?? '?'}: ${d.reason}` +
-            (d.minutesUntilStart != null ? ` (${d.minutesUntilStart} min to start)` : '') +
-            (d.closestDiffSeconds != null ? `, off by ${d.closestDiffSeconds}s` : ''),
-        );
-      } else {
-        console.log(`    → ${JSON.stringify(d)}`);
-      }
+      console.log(`    → ${JSON.stringify(d)}`);
     }
   }
 }
@@ -193,7 +198,7 @@ const {
   dailyBlastOnce,
 } = parseArgs();
 
-console.log('Local cron runner (classes + drills) — private copy');
+console.log('Local cron runner (classes + drills) — private copy, not deployed');
 console.log(`  base URL: ${baseUrl}`);
 console.log(`  classes interval: every ${formatInterval(intervalSec)}`);
 console.log(`  streak interval: every ${formatInterval(streakIntervalSec)}`);

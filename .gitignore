@@ -61,5 +61,8 @@ next-env.d.ts
 .cursor/
 .agent/
 
+# Local-only cron tester (copy from scripts/local-class-cron.example.mjs)
+scripts/local-class-cron.mjs
+
 # Sentry Config File
 .env.sentry-build-plugin

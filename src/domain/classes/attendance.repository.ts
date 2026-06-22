@@ -51,7 +51,7 @@ export class AttendanceRepository {
     const source = params.source ?? 'manual';
     const joinedAt = status === 'present' || status === 'late' ? new Date() : undefined;
 
-    await SessionAttendance.findOneAndUpdate(
+  await SessionAttendance.findOneAndUpdate(
       { sessionId: session._id, learnerId: params.learnerId },
       {
         $set: {
