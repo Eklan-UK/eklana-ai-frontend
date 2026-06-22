@@ -1,4 +1,5 @@
 import { unlockAudioContext } from "@/lib/ios-audio-utils";
+import { triggerDrillEndConfetti } from "@/lib/drill-celebration";
 
 export type PracticeFeedbackKind = "success" | "failure";
 
@@ -20,6 +21,13 @@ const TONE_SEQUENCES: Record<
     { frequency: 165, durationMs: 130, gapMs: 0 },
   ],
 };
+
+const CELEBRATION_TONE_SEQUENCE = [
+  { frequency: 523, durationMs: 90, gapMs: 25 },
+  { frequency: 659, durationMs: 90, gapMs: 25 },
+  { frequency: 784, durationMs: 90, gapMs: 25 },
+  { frequency: 1047, durationMs: 130, gapMs: 0 },
+] as const;
 
 let audioContext: AudioContext | null = null;
 
@@ -82,4 +90,47 @@ export async function playTone(kind: PracticeFeedbackKind): Promise<void> {
 export function playPracticeFeedback(kind: PracticeFeedbackKind): void {
   triggerHaptic(kind);
   void playTone(kind);
+}
+
+async function playCelebrationTone(): Promise<void> {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  await unlockAudioContext(ctx);
+
+  const now = ctx.currentTime;
+  let offset = 0;
+
+  for (const step of CELEBRATION_TONE_SEQUENCE) {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(step.frequency, now + offset);
+
+    gain.gain.setValueAtTime(0.0001, now + offset);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.01);
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      now + offset + step.durationMs / 1000
+    );
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(now + offset);
+    oscillator.stop(now + offset + step.durationMs / 1000 + 0.02);
+
+    offset += step.durationMs / 1000 + step.gapMs / 1000;
+  }
+}
+
+export function playDrillEndCelebration(): void {
+  triggerHaptic("success");
+  void playCelebrationTone();
+  triggerDrillEndConfetti();
+}
+
+export function playDrillEndFailure(): void {
+  triggerHaptic("failure");
+  void playTone("failure");
 }

@@ -1,6 +1,6 @@
 # Eklan's Learner's Journey
 
-## Part 1: Communication with Patients
+## Mission 1: Communication with Patients
 
 ### 1. Handling Emergency/Critical Situation
 
@@ -54,7 +54,7 @@
 
 ---
 
-## Part 2: Communication with Colleagues
+## Mission 2: Communication with Colleagues
 
 ### 6. Receiving an Handover
 
@@ -98,7 +98,7 @@
 
 ---
 
-## Part 3: Communication with Doctors, Families and Friends
+## Mission 3: Communication with Doctors, Families and Friends
 
 ### 10. Providing Updates to a Doctor
 
@@ -132,7 +132,7 @@
 
 ---
 
-## Part 4: Bonus Scenarios
+## Mission 4: Bonus Scenarios
 
 ### 13. Phone Communication with Colleagues
 

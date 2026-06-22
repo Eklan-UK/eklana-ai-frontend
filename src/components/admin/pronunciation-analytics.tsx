@@ -8,9 +8,21 @@ import {
 } from "lucide-react";
 import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
 
+interface StrugglingWord {
+  word: string;
+  count: number;
+}
+
 interface PhonemeProblemArea {
   phoneme: string;
   count: number;
+  words?: StrugglingWord[];
+}
+
+interface LetterProblemArea {
+  letter: string;
+  count: number;
+  words?: StrugglingWord[];
 }
 
 interface PronunciationAnalyticsComponentProps {
@@ -18,13 +30,37 @@ interface PronunciationAnalyticsComponentProps {
   learnerName?: string;
 }
 
+function StrugglingWordsList({
+  words,
+  accentClass,
+}: {
+  words: StrugglingWord[];
+  accentClass: string;
+}) {
+  if (words.length === 0) {
+    return <p className="text-xs text-gray-500 italic">No word data yet</p>;
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-1.5">Struggling with these words:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {words.map((w, wi) => (
+          <span
+            key={wi}
+            className="px-2 py-0.5 bg-white border border-orange-200 rounded text-xs text-gray-800"
+          >
+            {w.word}
+            <span className={`ml-1 ${accentClass}`}>×{w.count}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
- * Enhanced Pronunciation Analytics Component
- * Displays:
- * - Overall pronunciation statistics
- * - Phoneme difficulties
- * - Challenge areas and weak sounds
- * - Performance trends
+ * Enhanced Pronunciation Analytics component for admin/tutor learner profiles.
  */
 export function PronunciationAnalyticsComponent({
   learnerId,
@@ -35,13 +71,11 @@ export function PronunciationAnalyticsComponent({
     isLoading,
     error,
   } = useLearnerPronunciationAnalytics(learnerId);
-  // Extract data with safe defaults (must be before conditional returns)
+
   const overall = analytics?.overall || {};
   const wordStats = analytics?.wordStats || [];
   const problemAreas = analytics?.problemAreas || {};
 
-  // Memoize computed values to avoid recalculating on every render
-  // Must be called before any conditional returns
   const completedWordsCount = useMemo(
     () => wordStats.filter((w: any) => w.status === "completed").length,
     [wordStats]
@@ -60,7 +94,6 @@ export function PronunciationAnalyticsComponent({
     [wordStats.length, completedWordsCount]
   );
 
-  // Conditional returns AFTER all hooks
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -90,7 +123,6 @@ export function PronunciationAnalyticsComponent({
 
   return (
     <div className="space-y-6">
-      {/* Overall Statistics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-gray-600 mb-1 font-medium uppercase">
@@ -141,7 +173,6 @@ export function PronunciationAnalyticsComponent({
         </div>
       </div>
 
-      {/* Problem Areas Section */}
       {problemAreas.topIncorrectPhonemes?.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -159,7 +190,7 @@ export function PronunciationAnalyticsComponent({
                     key={idx}
                     className="p-3 bg-orange-50 border border-orange-100 rounded-lg"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <Volume2 className="w-3.5 h-3.5 text-orange-500" />
                       <span className="text-sm font-semibold text-orange-700">
                         /{item.phoneme}/
@@ -168,6 +199,10 @@ export function PronunciationAnalyticsComponent({
                         ×{item.count}
                       </span>
                     </div>
+                    <StrugglingWordsList
+                      words={item.words ?? []}
+                      accentClass="text-orange-500"
+                    />
                   </div>
                 ),
               )}
@@ -176,7 +211,36 @@ export function PronunciationAnalyticsComponent({
         </div>
       )}
 
-      {/* Statistics Summary */}
+      {problemAreas.topIncorrectLetters?.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            Difficult Letters
+          </h3>
+          <div className="space-y-2">
+            {problemAreas.topIncorrectLetters.map(
+              (item: LetterProblemArea, idx: number) => (
+                <div
+                  key={idx}
+                  className="p-3 bg-red-50 border border-red-100 rounded-lg"
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="font-mono font-bold text-red-700">{item.letter}</span>
+                    <span className="text-xs text-red-600 font-bold ml-auto">
+                      ×{item.count}
+                    </span>
+                  </div>
+                  <StrugglingWordsList
+                    words={item.words ?? []}
+                    accentClass="text-red-500"
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
       {wordStats.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-linear-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
@@ -213,10 +277,10 @@ export function PronunciationAnalyticsComponent({
             </div>
             <p className="text-xs text-gray-500 mt-2">
               {overall.averageScore >= 80
-                ? "🎯 Excellent performance!"
+                ? "Excellent performance!"
                 : overall.averageScore >= 70
-                  ? "✅ Good progress"
-                  : "💪 Keep practicing"}
+                  ? "Good progress"
+                  : "Keep practicing"}
             </p>
           </div>
 
@@ -232,7 +296,7 @@ export function PronunciationAnalyticsComponent({
             </div>
             <p className="text-xs text-gray-500 mt-2">
               {challengingCount === 0
-                ? "✨ No challenging words!"
+                ? "No challenging words!"
                 : `Focus on these ${challengingCount} word${challengingCount !== 1 ? "s" : ""}`}
             </p>
           </div>

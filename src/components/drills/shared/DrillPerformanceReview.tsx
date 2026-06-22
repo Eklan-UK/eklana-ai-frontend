@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useDrillScoreCelebration } from "@/hooks/useDrillScoreCelebration";
 import type { TextScore } from "@/services/speechace.service";
 import { PronunciationWordBreakdown } from "./PronunciationWordBreakdown";
 import { transcriptFromTextScore } from "./speechaceTranscript";
@@ -221,6 +222,10 @@ export function DrillPerformanceReview({
   const [expandedLineKey, setExpandedLineKey] = useState<string | null>(null);
 
   const hasData = groups.length > 0;
+
+  useDrillScoreCelebration(
+    isViewer || !hasData ? null : avgScore >= passThreshold,
+  );
 
   const openIdx =
     !hasData || expandedListIndex < 0

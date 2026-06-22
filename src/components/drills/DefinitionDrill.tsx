@@ -1,18 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, Loader2, BookOpen, Lightbulb } from "lucide-react";
-import Link from "next/link";
+import { Loader2, BookOpen, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { DrillCompletionScreen } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface DefinitionDrillProps {
@@ -21,12 +19,12 @@ interface DefinitionDrillProps {
 }
 
 export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrillProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [completionScore, setCompletionScore] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
 
@@ -110,7 +108,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       });
 
       setIsCompleted(true);
-      playPracticeFeedback("success");
+      setCompletionScore(score);
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)
@@ -128,28 +126,10 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
 
   if (isCompleted) {
     return (
-      <div className="min-h-screen bg-card pb-6">
-        <div className="h-6"></div>
-        <Header title="Drill Completed" showBack={true} />
-        <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
-          <Card className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-foreground mb-2">Great Job!</h2>
-            <p className="text-muted-foreground mb-6">You've completed the definition drill.</p>
-            <Button 
-              variant="primary" 
-              size="lg" 
-              fullWidth
-              onClick={() => {
-                router.refresh();
-                router.push("/account/drills");
-              }}
-            >
-              Continue Learning
-            </Button>
-          </Card>
-        </div>
-      </div>
+      <DrillCompletionScreen
+        drillType="definition"
+        celebrate={completionScore >= 70}
+      />
     );
   }
 

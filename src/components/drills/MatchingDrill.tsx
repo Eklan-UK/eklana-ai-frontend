@@ -1,15 +1,13 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
-import { DrillLayout } from "./shared";
+import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 
@@ -63,7 +61,6 @@ function findUnmatchedCanonicalPairIndex(
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
   const [rightItems, setRightItems] = useState<ShuffledItem[]>([]);
@@ -308,26 +305,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   };
 
   if (isCompleted) {
-    return (
-      <DrillLayout title="Drill Completed">
-        <Card className="text-center py-8">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">Great Job!</h2>
-          <p className="text-muted-foreground mb-6">You&apos;ve completed the matching drill.</p>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => {
-              router.refresh();
-              router.push("/account/drills");
-            }}
-          >
-            Continue Learning
-          </Button>
-        </Card>
-      </DrillLayout>
-    );
+    return <DrillCompletionScreen drillType="matching" celebrate />;
   }
 
   const matchedCount = matchedPairs.size;

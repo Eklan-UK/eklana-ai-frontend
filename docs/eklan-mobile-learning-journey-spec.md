@@ -19,7 +19,7 @@
 
 ## 1. Overview
 
-The **Eklan Learning Journey System** reorganizes how learners discover and track assigned drills. Instead of a single flat list with Ongoing / Completed / Bookmarked tabs on **My Plans**, drills are now grouped into four curriculum **Parts**, each containing ordered **Topics** from a hard-coded catalog. Learners browse Parts → Topics → individual drill rows, bookmark drills for quick access, and see completion progress at the Part level.
+The **Eklan Learning Journey System** reorganizes how learners discover and track assigned drills. Instead of a single flat list with Ongoing / Completed / Bookmarked tabs on **My Plans**, drills are now grouped into four curriculum **Missions**, each containing ordered **Topics** from a hard-coded catalog. Learners browse Missions → Topics → individual drill rows, bookmark drills for quick access, and see completion progress at the mission level.
 
 ### High-level user journey
 
@@ -29,10 +29,10 @@ Home                          My Plans
   ├─ Your Progress cards          ├─ Next Session Card
   ├─ Saved Drills (collapsible)   ├─ Saved Drills (collapsible)
   └─ Assigned Drills (top 4)      └─ My Learning Journey
-                                        ├─ Part 1 card ──► Part Detail
-                                        ├─ Part 2 card ──► Part Detail
-                                        ├─ Part 3 card ──► Part Detail
-                                        └─ Part 4 card ──► Part Detail
+                                        ├─ Mission 1 card ──► Mission Detail
+                                        ├─ Mission 2 card ──► Mission Detail
+                                        ├─ Mission 3 card ──► Mission Detail
+                                        └─ Mission 4 card ──► Mission Detail
                                               │
                                               └─ Topics (sections)
                                                     └─ Drill rows per topic
@@ -42,15 +42,15 @@ Home                          My Plans
 
 | Concept | Description |
 |---|---|
-| **Part** | One of four curriculum sections (1–4). Has a title and a list of topics. Progress shown as "X of Y drills completed". |
-| **Topic** | A sub-section within a Part (e.g. "Handling Emergency/Critical Situation"). Drills are grouped under topics via `learning_journey_part` + `learning_journey_topic` fields on the drill document. |
-| **Catalog** | Hard-coded list of Parts and Topics (see [§4.4](#44-learning-journey-catalog)). Always render all topics for a Part, even when no drills are assigned. |
+| **Mission** | One of four curriculum sections (1–4). Has a title and a list of topics. Progress shown as "X of Y drills completed". |
+| **Topic** | A sub-section within a Mission (e.g. "Handling Emergency/Critical Situation"). Drills are grouped under topics via `learning_journey_part` + `learning_journey_topic` fields on the drill document. |
+| **Catalog** | Hard-coded list of Missions and Topics (see [§4.4](#44-learning-journey-catalog)). Always render all topics for a Mission, even when no drills are assigned. |
 | **Saved Drills** | Drills the learner has bookmarked (`hasBookmarks === true`). Shown in a collapsible section on Home and My Plans. |
 | **Drill row** | Tappable card for a standard drill (`PlanDrillRow`) or Free Talk scenario (`PlanFreeTalkRow`). |
 
 ### Subscription gate
 
-**My Plans** (`/account/drills`) and **Part Detail** require an active Pro subscription on web. Unsubscribed users are redirected to the subscription screen. Mirror this gate on mobile before rendering these screens.
+**My Plans** (`/account/drills`) and **Mission Detail** require an active Pro subscription on web. Unsubscribed users are redirected to the subscription screen. Mirror this gate on mobile before rendering these screens.
 
 ---
 
@@ -66,7 +66,7 @@ Home                          My Plans
 | **Tab bar** | Three tabs: **Ongoing**, **Completed**, **Bookmarked** |
 | **Tab-filtered drill list** | List filtered by selected tab; Bookmarked tab showed bookmarked drills |
 
-The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live exclusively in the **Saved Drills** collapsible. All assigned drills are reachable through **My Learning Journey** Part cards.
+The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live exclusively in the **Saved Drills** collapsible. All assigned drills are reachable through **My Learning Journey** Mission cards.
 
 #### Added (top to bottom, in this order)
 
@@ -74,7 +74,7 @@ The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live 
 |---|---|---|
 | 1 | **Next Session Card** | Unchanged from prior implementation |
 | 2 | **Saved Drills** | New collapsible section (shared component) |
-| 3 | **My Learning Journey** | New heading + 4 Part cards |
+| 3 | **My Learning Journey** | New heading + 4 Mission cards |
 
 #### Unchanged
 
@@ -108,9 +108,9 @@ The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live 
 
 ---
 
-### 2.3 New screen: Part Detail (`/account/drills/journey/[1-4]`)
+### 2.3 New screen: Mission Detail (`/account/drills/journey/[1-4]`)
 
-Brand-new screen. Shows all topics for the selected Part, each with its assigned drill rows.
+Brand-new screen. Shows all topics for the selected Mission, each with its assigned drill rows.
 
 ---
 
@@ -119,7 +119,7 @@ Brand-new screen. Shows all topics for the selected Part, each with its assigned
 | Change | Detail |
 |---|---|
 | **Completion indicator** | Green `CheckCircle2` icon (`#22c55e`) shown on the trailing edge when drill/scenario is completed |
-| **Bookmark toggle** | Available on `PlanDrillRow` in Saved Drills and Part Detail contexts |
+| **Bookmark toggle** | Available on `PlanDrillRow` in Saved Drills and Mission Detail contexts |
 
 ---
 
@@ -144,17 +144,17 @@ Brand-new screen. Shows all topics for the selected Part, each with its assigned
 │  └────────────────────────────────────┘ │
 │                                         │
 │  My Learning Journey                    │
-│  ┌─ Part 1 ────────────────────── [›] ┐ │
-│  │ [1] PART 1                          │ │
+│  ┌─ Mission 1 ────────────────────── [›] ┐ │
+│  │ [1] MISSION 1                          │ │
 │  │     Communication with Patients     │ │
 │  │     2 of 8 drills completed       │ │
 │  └────────────────────────────────────┘ │
-│  ┌─ Part 2 ────────────────────── [›] ┐ │
+│  ┌─ Mission 2 ────────────────────── [›] ┐ │
 │  │ ...                                 │ │
 │  └────────────────────────────────────┘ │
-│  ┌─ Part 3 ────────────────────── [›] ┐ │
+│  ┌─ Mission 3 ────────────────────── [›] ┐ │
 │  └────────────────────────────────────┘ │
-│  ┌─ Part 4 ────────────────────── [›] ┐ │
+│  ┌─ Mission 4 ────────────────────── [›] ┐ │
 │  └────────────────────────────────────┘ │
 │                                         │
 ├─────────────────────────────────────────┤
@@ -166,7 +166,7 @@ Brand-new screen. Shows all topics for the selected Part, each with its assigned
 
 | Action | Result |
 |---|---|
-| Tap **Part N card** | Navigate to Part Detail for that part (`/account/drills/journey/N`) |
+| Tap **Mission N card** | Navigate to Mission Detail for that mission (`/account/drills/journey/N`) |
 | Tap **Saved Drills header row** | Toggle expand/collapse |
 | Tap **Achievements** (star icon) | Navigate to streak/achievements screen |
 | Tap **Streak badge** | Navigate to streak detail |
@@ -175,8 +175,8 @@ Brand-new screen. Shows all topics for the selected Part, each with its assigned
 #### Data loading
 
 - Fetch learner drills (`limit: 100`) on mount
-- Compute per-Part progress: `{ completed, total }` for each Part 1–4
-- Part cards always render all 4 parts regardless of assignment state
+- Compute per-mission progress: `{ completed, total }` for each Mission 1–4
+- Mission cards always render all 4 parts regardless of assignment state
 
 ---
 
@@ -250,14 +250,14 @@ When navigating to My Plans with deep link / hash `#saved-drills`, the section *
 
 ---
 
-### 3.3 Part Detail — full layout
+### 3.3 Mission Detail — full layout
 
 **Route:** `/account/drills/journey/{part}` where `{part}` ∈ `{1, 2, 3, 4}`
 
 ```
 ┌─────────────────────────────────────────┐
 │  [←] My Learning Journey                │  ← back link
-│  PART 1                                 │
+│  MISSION 1                                 │
 │  Communication with Patients            │  ← H1
 ├─────────────────────────────────────────┤
 │                                         │
@@ -286,12 +286,12 @@ When navigating to My Plans with deep link / hash `#saved-drills`, the section *
 | Element | Content | Style |
 |---|---|---|
 | Back control | `←` + "My Learning Journey" | Tappable; navigates to My Plans |
-| Part label | `Part {N}` | Uppercase, small, muted, semibold |
-| Title | Part title from catalog | Large bold heading (e.g. `text-2xl`) |
+| Mission label | `Mission {N}` | Uppercase, small, muted, semibold |
+| Title | Mission title from catalog | Large bold heading (e.g. `text-2xl`) |
 
 #### Body anatomy
 
-- Render **every topic** from the catalog for this Part, in catalog order
+- Render **every topic** from the catalog for this Mission, in catalog order
 - Each topic is a `<section>` with:
   1. **Topic heading** — topic title, bold, `text-base`
   2. **Drill list** or **empty state card**
@@ -308,7 +308,7 @@ When a topic has zero assigned drills:
 
 Centered muted text inside a card with padding.
 
-#### Invalid Part ID
+#### Invalid Mission ID
 
 If `{part}` is not 1, 2, 3, or 4, redirect to My Plans (`/account/drills`).
 
@@ -384,12 +384,12 @@ The Saved Drills component is **identical** to the My Plans instance (same props
      │           │
      ▼           ▼
 ┌─────────┐  ┌───────────────┐
-│ Saved   │  │ Part N card   │
+│ Saved   │  │ Mission N card   │
 │ Drills  │  └───────┬───────┘
 └────┬────┘          │
      │               ▼
      │        ┌──────────────┐
-     │        │ Part Detail  │
+     │        │ Mission Detail  │
      │        │ (topics +    │
      │        │  drill rows) │
      │        └──────┬───────┘
@@ -454,7 +454,7 @@ Shared collapsible section used on **Home** and **My Plans**.
 
 ### 4.2 `PlanDrillRow`
 
-Standard assigned drill card. Used in Saved Drills, Part Detail, and elsewhere.
+Standard assigned drill card. Used in Saved Drills, Mission Detail, and elsewhere.
 
 #### Props
 
@@ -526,7 +526,7 @@ Standard assigned drill card. Used in Saved Drills, Part Detail, and elsewhere.
 
 ### 4.3 `PlanFreeTalkRow`
 
-Free Talk scenario card. Used in Saved Drills, Part Detail, and Home Assigned Drills.
+Free Talk scenario card. Used in Saved Drills, Mission Detail, and Home Assigned Drills.
 
 #### Props
 
@@ -573,21 +573,21 @@ Not implemented on web for Free Talk rows. Omit bookmark button on `PlanFreeTalk
 
 ### 4.4 `LearningJourneyPartCard`
 
-Summary card for one Part on My Plans.
+Summary card for one Mission on My Plans.
 
 #### Props
 
 | Prop | Type | Description |
 |---|---|---|
-| `part` | `1 \| 2 \| 3 \| 4` | Part number |
-| `completedCount` | `number` | Completed drills in this Part |
-| `totalCount` | `number` | Total assigned drills in this Part |
+| `part` | `1 \| 2 \| 3 \| 4` | Mission number |
+| `completedCount` | `number` | Completed drills in this mission |
+| `totalCount` | `number` | Total assigned drills in this mission |
 
 #### Layout
 
 ```
 ┌──────┬────────────────────────────┬───┐
-│  48px│  PART 1                    │ › │
+│  48px│  MISSION 1                    │ › │
 │  [1] │  Communication with        │   │
 │ green│  Patients                  │   │
 │ grad │  2 of 8 drills completed   │   │
@@ -596,9 +596,9 @@ Summary card for one Part on My Plans.
 
 | Zone | Spec |
 |---|---|
-| **Badge** | 48×48, `rounded-xl`, gradient `emerald-100 → teal-200` (dark: `emerald-900/40 → teal-900/40`), bold part number `text-lg` emerald-800 |
-| **Part label** | `Part {N}`, uppercase, `text-xs`, semibold, muted |
-| **Title** | Part title from catalog, semibold `text-sm`, max 2 lines |
+| **Badge** | 48×48, `rounded-xl`, gradient `emerald-100 → teal-200` (dark: `emerald-900/40 → teal-900/40`), bold mission number `text-lg` emerald-800 |
+| **Mission label** | `Mission {N}`, uppercase, `text-xs`, semibold, muted |
+| **Title** | Mission title from catalog, semibold `text-sm`, max 2 lines |
 | **Progress** | If `totalCount > 0`: `"{completedCount} of {totalCount} drills completed"`; else: `"No drills assigned yet"` |
 | **Chevron** | Muted `ChevronRight` 20×20 |
 
@@ -613,7 +613,7 @@ Summary card for one Part on My Plans.
 
 **Hard-code this catalog in the mobile app** (mirror `src/domain/learning-journey/learning-journey.catalog.ts`). Do not fetch from API.
 
-#### Part 1: Communication with Patients
+#### Mission 1: Communication with Patients
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
@@ -623,7 +623,7 @@ Summary card for one Part on My Plans.
 | 4 | `admitting_patient` | Admitting a Patient | `admission` |
 | 5 | `small_talk_patient` | Small Talk with a Patient | `small_talk_patient` |
 
-#### Part 2: Communication with Colleagues
+#### Mission 2: Communication with Colleagues
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
@@ -632,7 +632,7 @@ Summary card for one Part on My Plans.
 | 3 | `declining_request` | Declining a Request and Professionally Saying No | `decline_request` |
 | 4 | `small_talk_colleagues` | Small Talk with Colleagues | `small_talk_colleague` |
 
-#### Part 3: Communication with Doctors, Families and Friends
+#### Mission 3: Communication with Doctors, Families and Friends
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
@@ -640,7 +640,7 @@ Summary card for one Part on My Plans.
 | 2 | `doctor_rounds` | Going on Rounds with Doctors | `doctor_rounds` |
 | 3 | `answering_family_questions` | Answering Families and Friend's Questions | `family_questions` |
 
-#### Part 4: Bonus Scenarios
+#### Mission 4: Bonus Scenarios
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
@@ -673,7 +673,7 @@ completed = those where isCompletedPlanItem(item) === true
 
 ---
 
-### 4.6 Part Detail topic section
+### 4.6 Mission Detail topic section
 
 Composable section, not a standalone file on web but worth naming for mobile:
 
@@ -742,7 +742,7 @@ Root Tab Navigator
 └── ...
 ```
 
-Part Detail should be a **stack push** on top of My Plans, with back returning to My Plans (not Home).
+Mission Detail should be a **stack push** on top of My Plans, with back returning to My Plans (not Home).
 
 ### 5.3 Deep linking
 
@@ -750,7 +750,7 @@ Part Detail should be a **stack push** on top of My Plans, with back returning t
 |---|---|
 | `eklan://account/drills` | Open My Plans |
 | `eklan://account/drills#saved-drills` | Open My Plans, auto-expand Saved Drills |
-| `eklan://account/drills/journey/{part}` | Open Part Detail for part N |
+| `eklan://account/drills/journey/{part}` | Open Mission Detail for part N |
 
 On web, hash `#saved-drills` triggers `useEffect` → `setExpanded(true)`. Mobile equivalent: pass a route param or query `?section=saved-drills`.
 
@@ -758,12 +758,12 @@ On web, hash `#saved-drills` triggers `useEffect` → `setExpanded(true)`. Mobil
 
 | Screen | Back target | Label |
 |---|---|---|
-| Part Detail | My Plans | "My Learning Journey" (with ← arrow) |
-| Drill session | Previous screen (Part Detail, Saved Drills, or Home) | Standard back |
+| Mission Detail | My Plans | "My Learning Journey" (with ← arrow) |
+| Drill session | Previous screen (Mission Detail, Saved Drills, or Home) | Standard back |
 
 ### 5.5 Bottom tab bar
 
-Visible on **My Plans** and **Part Detail** (matches web). Drill session screens typically hide tab bar.
+Visible on **My Plans** and **Mission Detail** (matches web). Drill session screens typically hide tab bar.
 
 ---
 
@@ -776,7 +776,7 @@ Visible on **My Plans** and **Part Detail** (matches web). Drill session screens
 | Primary green | `#22c55e` | Completion checkmarks, bookmark active, loading spinners |
 | Green hover/dark | `#16a34a` | Bookmark button pressed state |
 | Orange bookmark | `orange-600` / `orange-100` bg | Saved Drills section icon |
-| Part badge gradient | `emerald-100 → teal-200` | Part number badge |
+| Mission badge gradient | `emerald-100 → teal-200` | Mission number badge |
 | Card radius | `rounded-2xl` (16px) | All cards and collapsible headers |
 | Thumbnail radius | `rounded-xl` (12px) | Drill row thumbnails |
 | Section spacing | 32px (`space-y-8`) | Between major sections on scroll screens |
@@ -787,8 +787,8 @@ Visible on **My Plans** and **Part Detail** (matches web). Drill session screens
 | Context | Loading | Error |
 |---|---|---|
 | Saved Drills expand | Centered spinner in panel | Show empty state (no special error UI on web) |
-| Part Detail body | Full-page centered spinner | Redirect invalid part; no error card for API failure on web |
-| Part progress counts | Show zero counts while loading (drills default to `[]`) | Same |
+| Mission Detail body | Full-page centered spinner | Redirect invalid part; no error card for API failure on web |
+| Mission progress counts | Show zero counts while loading (drills default to `[]`) | Same |
 
 ### 6.3 Empty states summary
 
@@ -796,8 +796,8 @@ Visible on **My Plans** and **Part Detail** (matches web). Drill session screens
 |---|---|---|
 | Saved Drills subtitle | 0 bookmarks | "No saved drills yet" |
 | Saved Drills panel | 0 bookmarks, expanded | "Bookmark drills from your learning journey to find them here." |
-| Part card progress | 0 drills in part | "No drills assigned yet" |
-| Part Detail topic | 0 drills in topic | "No drills assigned for this topic yet." |
+| Mission card progress | 0 drills in part | "No drills assigned yet" |
+| Mission Detail topic | 0 drills in topic | "No drills assigned for this topic yet." |
 | Home Assigned Drills | 0 active drills | Existing `noDrillsYet` i18n string |
 
 ### 6.4 Bookmark behavior
@@ -805,7 +805,7 @@ Visible on **My Plans** and **Part Detail** (matches web). Drill session screens
 - Bookmarks are **per drill**, not per assignment
 - Toggling bookmark calls API then invalidates the learner drills query
 - Saved Drills list updates immediately after cache invalidation
-- A drill bookmarked from Part Detail appears in Saved Drills on both Home and My Plans
+- A drill bookmarked from Mission Detail appears in Saved Drills on both Home and My Plans
 - Removing bookmark from Saved Drills removes it from the list on collapse/expand
 
 ### 6.5 Completion indicators
@@ -827,7 +827,7 @@ Drills within a topic and within Saved Drills use `sortAssignedPlanItems`:
 | Screen / component | Gate |
 |---|---|
 | My Plans | Full page redirect if not subscribed |
-| Part Detail | Full page redirect if not subscribed |
+| Mission Detail | Full page redirect if not subscribed |
 | Home Assigned Drills | Individual rows show Pro lock chip; link to subscriptions |
 | Saved Drills | No lock on web (relies on parent page access) |
 | PlanFreeTalkRow on Home | `locked={!subscribed}` |
@@ -842,11 +842,11 @@ Drills within a topic and within Saved Drills use `sortAssignedPlanItems`:
 | `account.yourProgress` | "Your Progress" | Home section heading |
 | `account.noDrillsYet` | (existing) | Home empty assigned drills |
 
-Additional strings are **hard-coded in English** on web for the Learning Journey UI (Part progress text, empty states, bookmark toasts). Mobile should add i18n keys for all user-visible strings.
+Additional strings are **hard-coded in English** on web for the Learning Journey UI (mission progress text, empty states, bookmark toasts). Mobile should add i18n keys for all user-visible strings.
 
 ### 6.9 Analytics
 
-On drill row navigation from Part Detail / Saved Drills, fire activity tracking:
+On drill row navigation from Mission Detail / Saved Drills, fire activity tracking:
 
 ```typescript
 trackActivity("drill", drillId, "started", {
@@ -861,7 +861,7 @@ trackActivity("drill", drillId, "started", {
 | Saved Drills header | `accessibilityRole="button"`, `accessibilityState={{ expanded }}` |
 | Bookmark button | `accessibilityLabel`: "Save to bookmarks" / "Remove from bookmarks" |
 | Completed icon | `accessibilityLabel`: "Completed" |
-| Part card | `accessibilityRole="button"`, label includes part number, title, progress |
+| Mission card | `accessibilityRole="button"`, label includes mission number, title, progress |
 | Topic headings | `accessibilityRole="header"` |
 
 ### 6.11 Performance
@@ -875,7 +875,7 @@ trackActivity("drill", drillId, "started", {
 | Concern | Guidance |
 |---|---|
 | **Safe area** | Pad bottom for tab bar: `max(5.5rem, safeAreaBottom)` on scroll screens |
-| **Sticky header** | My Plans and Part Detail use sticky top header with blur — use `stickyHeaderIndices` or animated header on RN |
+| **Sticky header** | My Plans and Mission Detail use sticky top header with blur — use `stickyHeaderIndices` or animated header on RN |
 | **Haptic feedback** | Optional light haptic on bookmark toggle success |
 | **Pull to refresh** | Not on web; optional enhancement on mobile for drills list |
 | **Toast placement** | Top or bottom per existing mobile toast convention |
@@ -886,9 +886,9 @@ Use this checklist during QA:
 
 - [ ] My Plans no longer shows Assigned Drills tabs
 - [ ] My Plans shows Next Session → Saved Drills → My Learning Journey in order
-- [ ] All 4 Part cards always visible
-- [ ] Part progress counts match web for same user
-- [ ] Part Detail shows all catalog topics, even empty ones
+- [ ] All 4 Mission cards always visible
+- [ ] Mission progress counts match web for same user
+- [ ] Mission Detail shows all catalog topics, even empty ones
 - [ ] Topic sections preserve catalog order
 - [ ] Saved Drills collapsed/expanded behavior matches on Home and My Plans
 - [ ] `#saved-drills` / deep link auto-expands Saved Drills
@@ -897,8 +897,8 @@ Use this checklist during QA:
 - [ ] Home Assigned Drills still shows max 4 active drills
 - [ ] Green checkmark on completed drill rows
 - [ ] Bookmark toggle works on PlanDrillRow
-- [ ] Invalid part numbers redirect to My Plans
-- [ ] Unsubscribed users cannot access My Plans / Part Detail
+- [ ] Invalid mission numbers redirect to My Plans
+- [ ] Unsubscribed users cannot access My Plans / Mission Detail
 
 ---
 
@@ -1066,7 +1066,7 @@ type DrillItem = /* item from my-drills response */;
 
 /**
  * Groups a flat drills array by part and topic for the Learning Journey UI.
- * Returns a structure keyed by part number, then topic ID.
+ * Returns a structure keyed by mission number, then topic ID.
  */
 function groupDrillsByJourney(
   drills: DrillItem[]
@@ -1112,7 +1112,7 @@ function groupDrillsByJourney(
 }
 
 /**
- * Returns all drill items belonging to a specific Part,
+ * Returns all drill items belonging to a specific Mission,
  * grouped by topic in catalog order.
  */
 function getDrillsForPart(
@@ -1135,7 +1135,7 @@ function getDrillsForPart(
 ```
 
 **Key rules:**
-- Always render **all topics** from the catalog for a Part, even when a topic's `items` array is empty (show "No drills assigned for this topic yet.").
+- Always render **all topics** from the catalog for a Mission, even when a topic's `items` array is empty (show "No drills assigned for this topic yet.").
 - Topics must appear in `order` field sequence, not insertion order.
 - Drills whose `learning_journey_part` / `learning_journey_topic` are `null` or absent are **not** shown in the Journey view (they may still appear in Assigned Drills on Home).
 
@@ -1143,7 +1143,7 @@ function getDrillsForPart(
 
 #### 7.4 Progress Calculation (Client-Side)
 
-Compute Part-level progress after the drills array is loaded. There is no server-side progress endpoint.
+Compute mission-level progress after the drills array is loaded. There is no server-side progress endpoint.
 
 ```typescript
 type PartProgress = { completed: number; total: number };
@@ -1158,7 +1158,7 @@ function isCompleted(item: DrillItem): boolean {
 }
 
 /**
- * Returns progress for each of the 4 Parts.
+ * Returns progress for each of the 4 missions.
  */
 function computePartProgress(
   drills: DrillItem[]
@@ -1349,7 +1349,7 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
 ];
 ```
 
-> **Keep in sync:** if the backend team modifies `learning-journey.catalog.ts` (adds/renames a part or topic), the mobile app must be updated in the same release. There is no version negotiation mechanism.
+> **Keep in sync:** if the backend team modifies `learning-journey.catalog.ts` (adds/renames a mission or topic), the mobile app must be updated in the same release. There is no version negotiation mechanism.
 
 ---
 
@@ -1383,9 +1383,9 @@ The following table lists the fields on each item returned by `my-drills` that a
 | `date` | `string` (ISO date) | Drill due date (same as assignment `dueDate`). |
 | `duration_days` | `number` | Duration in days from assignment date. Used to compute `dueDate` if not present on the item. |
 | `context` | `string` | General context/instructions. Optional. |
-| `learning_journey_part` | `1 \| 2 \| 3 \| 4 \| null` | **Journey grouping field.** Which of the 4 Parts this drill belongs to. `null`/absent = not in the journey. |
+| `learning_journey_part` | `1 \| 2 \| 3 \| 4 \| null` | **Journey grouping field.** Which of the 4 missions this drill belongs to (`learning_journey_part` is the API field name). `null`/absent = not in the journey. |
 | `learning_journey_topic` | `string \| null` | **Journey grouping field.** Topic slug from the catalog (e.g. `"handling_emergency_critical"`). `null`/absent = not grouped into a topic. Always check in combination with `learning_journey_part`. |
-| `scenarioType` | `string` | Free Talk only. Matches `freeTalkScenarioType` in the catalog to resolve Part/Topic placement. |
+| `scenarioType` | `string` | Free Talk only. Matches `freeTalkScenarioType` in the catalog to resolve Mission/Topic placement. |
 | `completionDate` | `string \| null` | Free Talk only. ISO date shown as due date. |
 
 ##### `latestAttempt` sub-object fields

@@ -10,7 +10,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 
 interface ListeningDrillProps {
@@ -166,7 +165,6 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       });
 
       setIsCompleted(true);
-      playPracticeFeedback("success");
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)
@@ -182,7 +180,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="listening" />;
+    return <DrillCompletionScreen drillType="listening" celebrate />;
   }
 
   return (

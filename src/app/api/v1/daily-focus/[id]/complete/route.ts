@@ -77,7 +77,7 @@ async function postHandler(
     }
 
     // Record completion (only if first completion today)
-    const { streakUpdated, badgeUnlocked } = await StreakService.recordCompletion(
+    const { streakUpdated, badgesUnlocked } = await StreakService.recordCompletion(
       context.userId.toString(),
       id,
       validated.score,
@@ -117,18 +117,15 @@ async function postHandler(
       dailyFocusId: id,
       score: validated.score,
       streakUpdated,
-      badgeUnlocked: badgeUnlocked?.badgeId || null,
+      badgesUnlocked: badgesUnlocked.map((b) => b.badgeId),
     });
 
     return apiResponse.success({
       message: 'Daily focus completed successfully',
       score: validated.score,
       streakUpdated,
-      badgeUnlocked: badgeUnlocked ? {
-        badgeId: badgeUnlocked.badgeId,
-        badgeName: badgeUnlocked.badgeName,
-        milestone: badgeUnlocked.milestone,
-      } : null,
+      badgesUnlocked,
+      badgeUnlocked: badgesUnlocked[0] ?? null,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

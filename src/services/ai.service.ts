@@ -1,5 +1,6 @@
 import { normalizeFreeTalkScenarioStringList } from "@/lib/free-talk-scenario-lists";
 import type { FreeTalkAttemptApiRow, FreeTalkGradeResult } from "@/lib/free-talk-history";
+import type { BadgeUnlockCelebration } from "@/lib/badges/badge-unlock";
 
 const API_BASE_URL = "/api/v1";
 
@@ -299,7 +300,7 @@ export const aiService = {
     },
     audioBlob?: Blob | null,
     signal?: AbortSignal
-  ): Promise<FreeTalkAttemptApiRow> {
+  ): Promise<{ attempt: FreeTalkAttemptApiRow; badgesUnlocked: BadgeUnlockCelebration[] }> {
     const formData = new FormData();
     formData.append("payload", JSON.stringify(body));
     if (audioBlob && audioBlob.size > 0) {
@@ -328,6 +329,9 @@ export const aiService = {
     if (!data.success || !data.attempt?.id) {
       throw new Error(typeof data.message === "string" ? data.message : "Failed to save Free Talk attempt");
     }
-    return data.attempt as FreeTalkAttemptApiRow;
+    return {
+      attempt: data.attempt as FreeTalkAttemptApiRow,
+      badgesUnlocked: Array.isArray(data.badgesUnlocked) ? data.badgesUnlocked : [],
+    };
   },
 };

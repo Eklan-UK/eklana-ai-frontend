@@ -247,6 +247,7 @@ export const drillAPI = {
           timeSpent: number;
           completedAt: string;
         };
+        badgesUnlocked?: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[];
       };
     }>(`/drills/${drillId}/complete`, {
       method: 'POST',
@@ -1793,10 +1794,14 @@ export const dailyFocusAPI = {
         message: string;
         score: number;
         streakUpdated: boolean;
-        badgeUnlocked: {
+        badgesUnlocked?: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[];
+        badgeUnlocked?: {
           badgeId: string;
           badgeName: string;
-          milestone: number;
+          icon?: string;
+          afterOutcome?: string;
+          humorousLine?: string;
+          milestone?: number;
         } | null;
       };
     }>(`/daily-focus/${id}/complete`, {

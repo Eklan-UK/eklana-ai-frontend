@@ -253,9 +253,13 @@ async function handler(
 		} catch {
 			// streak must not fail drill completion
 		}
+	}
+
+	let badgesUnlocked: Awaited<ReturnType<typeof import('@/services/streak.service').triggerBadgeEvaluation>> = [];
+	if (context.userRole === 'user') {
 		try {
-			const { BadgeService } = await import('@/domain/badges/badge.service');
-			void BadgeService.evaluateAndUnlock(context.userId.toString());
+			const { triggerBadgeEvaluation } = await import('@/services/streak.service');
+			badgesUnlocked = await triggerBadgeEvaluation(context.userId.toString());
 		} catch {
 			// badges must not fail drill completion
 		}
@@ -268,6 +272,7 @@ async function handler(
 			timeSpent: result.attempt.timeSpent,
 			completedAt: result.attempt.completedAt?.toISOString(),
 		},
+		badgesUnlocked,
 	});
 }
 

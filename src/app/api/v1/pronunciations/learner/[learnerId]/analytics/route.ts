@@ -10,7 +10,10 @@ import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { resolveLearnerIdToUserIdString } from '@/lib/api/staff-learner-access';
-import { getLearnerAttemptFallbackWordStats } from '@/domain/pronunciations/pronunciation-analytics.service';
+import {
+	getLearnerAttemptFallbackWordStats,
+	getProblemAreasWithWords,
+} from '@/domain/pronunciations/pronunciation-analytics.service';
 
 async function handler(
 	req: NextRequest,
@@ -110,27 +113,8 @@ async function handler(
 				? (stats.passedCount / stats.totalAttempts) * 100
 				: 0;
 
-		// ── Problem areas ────────────────────────────────────────────────────────
-		const [topIncorrectLettersAgg, topIncorrectPhonemesAgg] = await Promise.all([
-			PronunciationAttempt.aggregate([
-				{ $match: { learnerId: learnerOid } },
-				{ $unwind: { path: '$incorrectLetters', preserveNullAndEmptyArrays: true } },
-				{ $match: { incorrectLetters: { $ne: null } } },
-				{ $group: { _id: '$incorrectLetters', count: { $sum: 1 } } },
-				{ $sort: { count: -1 } },
-				{ $limit: 10 },
-				{ $project: { _id: 0, letter: '$_id', count: 1 } },
-			]),
-			PronunciationAttempt.aggregate([
-				{ $match: { learnerId: learnerOid } },
-				{ $unwind: { path: '$incorrectPhonemes', preserveNullAndEmptyArrays: true } },
-				{ $match: { incorrectPhonemes: { $ne: null } } },
-				{ $group: { _id: '$incorrectPhonemes', count: { $sum: 1 } } },
-				{ $sort: { count: -1 } },
-				{ $limit: 10 },
-				{ $project: { _id: 0, phoneme: '$_id', count: 1 } },
-			]),
-		]);
+		// ── Problem areas (phonemes/letters with related struggling words) ─────
+		const problemAreas = await getProblemAreasWithWords(learnerOid);
 
 		// ── Accuracy trend (last 30 days) ────────────────────────────────────────
 		const thirtyDaysAgo = new Date();
@@ -316,10 +300,7 @@ async function handler(
 						averageScore: Math.round(averageScore * 100) / 100,
 						passRate: Math.round(passRate * 100) / 100,
 					},
-					problemAreas: {
-						topIncorrectLetters: topIncorrectLettersAgg,
-						topIncorrectPhonemes: topIncorrectPhonemesAgg,
-					},
+					problemAreas,
 					accuracyTrend: accuracyTrendAgg,
 					wordStats,
 					assignments,
