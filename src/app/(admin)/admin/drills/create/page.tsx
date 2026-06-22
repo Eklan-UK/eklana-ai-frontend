@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -277,7 +277,6 @@ const DrillBuilder: React.FC = () => {
   // Common fields
   const [drillTitle, setDrillTitle] = useState("");
   const [drillType, setDrillType] = useState("vocabulary");
-  const lastUploadedFile = useRef<File | null>(null);
   const [difficulty, setDifficulty] = useState("intermediate");
   const [completionDate, setCompletionDate] = useState("");
   const [durationDays, setDurationDays] = useState(7);
@@ -295,12 +294,6 @@ const DrillBuilder: React.FC = () => {
   );
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-
-  // AI generate form state
-  const [aiPart, setAiPart] = useState("");
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
 
   // Pre-generate TTS audio option
   const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
@@ -858,52 +851,12 @@ const DrillBuilder: React.FC = () => {
     setSelectedUsers(updated);
   };
 
-  const AI_PARTS = [
-    "Part 1: Communication with Patients",
-    "Part 2: Communication with Colleagues",
-    "Part 3: Communication with Doctors, Families and Friends",
-    "Part 4: Bonus Scenarios",
-  ];
-
-  const AI_TOPICS = [
-    "Handling Emergency/Critical Situation",
-    "Conducting CPR",
-    "Follow-up with Patients",
-    "Admitting a Patient",
-    "Small Talk with a Patient",
-  ];
-
-  const handleAIGenerate = async () => {
-    if (!aiPart) { toast.error("Please select a part"); return; }
-    if (!aiTopic) { toast.error("Please select a topic"); return; }
-    if (!aiPrompt.trim()) { toast.error("Please enter a prompt"); return; }
-    try {
-      setIsGeneratingDrill(true);
-      const res = await fetch("/api/v1/drills/ai-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ drillType, difficulty, context: "", prompt: aiPrompt, part: aiPart, topic: aiTopic }),
-      });
-      const json = await res.json();
-      if (!res.ok) { toast.error(json.message || "AI generation failed"); return; }
-      handleApplyParsedContent({ type: drillType as import("@/services/document-parser.service").ParsedContent["type"], confidence: 1, extractedData: { title: "", items: [], metadata: {}, ...json.data } });
-      toast.success("Drill content generated");
-    } catch {
-      toast.error("AI generation failed");
-    } finally {
-      setIsGeneratingDrill(false);
-    }
-  };
-
   // Handle file upload
   const handleFileSelect = async (file: File) => {
-    lastUploadedFile.current = file;
     try {
       setIsParsing(true);
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("drillType", drillType);
 
       const response = await fetch("/api/v1/drills/parse-document", {
         method: "POST",
@@ -934,13 +887,10 @@ const DrillBuilder: React.FC = () => {
   };
 
   // Apply parsed content to form
-  const handleApplyParsedContent = (content?: ParsedContent) => {
-    const pc = content ?? parsedContent;
-    console.log("[apply] pc:", pc, "parsedContent:", parsedContent);
-    if (!pc) return;
+  const handleApplyParsedContent = () => {
+    if (!parsedContent) return;
 
-    const { extractedData, type } = pc;
-    console.log("[apply] pc full object:", JSON.stringify(pc));
+    const { extractedData, type } = parsedContent;
     const { title, items, metadata } = extractedData;
 
     // Update form data
@@ -948,7 +898,10 @@ const DrillBuilder: React.FC = () => {
       setDrillTitle(title);
     }
 
-
+    // Set type if detected with high confidence
+    if (type !== "unknown" && parsedContent.confidence >= 0.6) {
+      setDrillType(type);
+    }
 
     // Set difficulty if detected
     if (metadata?.difficulty) {
@@ -983,22 +936,21 @@ const DrillBuilder: React.FC = () => {
             ]
         );
         break;
-      case "roleplay": {
-        const defaultScenes = [{ scene_name: "Scene 1", dialogue: [{ speaker: "ai_0", text: "", translation: "" }, { speaker: "student", text: "", translation: "" }] }];
-        const first = items[0];
-        if (first?.roleplay_scenes) {
-          // Excel import — compound object
-          setRoleplayScenes(first.roleplay_scenes.length > 0 ? first.roleplay_scenes : defaultScenes);
-          if (first.student_character_name) setStudentCharacterName(first.student_character_name);
-          if (first.ai_character_names?.length) setAiCharacterNames(first.ai_character_names);
-          if (first.drill_intro) setDrillIntro(first.drill_intro);
-          if (first.context) setContext(first.context);
-        } else {
-          // Text-based import — plain RoleplayScene[]
-          setRoleplayScenes(items.length > 0 ? items : defaultScenes);
-        }
+      case "roleplay":
+        setRoleplayScenes(
+          items.length > 0
+            ? items
+            : [
+              {
+                scene_name: "Scene 1",
+                dialogue: [
+                  { speaker: "ai_0", text: "", translation: "" },
+                  { speaker: "student", text: "", translation: "" },
+                ],
+              },
+            ]
+        );
         break;
-      }
       case "grammar":
         setGrammarItems(
           items.length > 0 ? items : [{ pattern: "", example: "", hint: "" }]
@@ -1013,47 +965,31 @@ const DrillBuilder: React.FC = () => {
         if (items.length > 0 && items[0].content) {
           setArticleContent(items[0].content);
         }
-        if (title || items[0]?.title) {
-          setArticleTitle(title || items[0].title);
+        if (title) {
+          setArticleTitle(title);
         }
         break;
       case "listening":
-        console.log("[listening import] extractedData:", extractedData, "items[0]:", items[0]);
         if (items.length > 0 && items[0].content) {
           setListeningContent(items[0].content);
         }
-        if (title || items[0]?.title) {
-          setListeningTitle(title || items[0].title);
+        if (title) {
+          setListeningTitle(title);
         }
         break;
       case "fill_blank":
         setFillBlankItems(
           items.length > 0
-            ? items.map((item: any) => ({
-              sentence: item.sentence || "",
-              translation: item.translation || "",
-              blanks: Array.isArray(item.blanks) && item.blanks.length > 0
-                ? item.blanks
-                : [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }],
-            }))
-            : [{ sentence: "", blanks: [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }], translation: "" }]
-        );
-        break;
-      case "pronunciation":
-        setPronunciationItems(
-          items.length > 0 ? items : [{ sound: "", word: "", sentence: "" }]
-        );
-        break;
-      case "key_phrases":
-        setKeyPhraseItems(
-          items.length > 0
-            ? items.map((item: any) => ({
-              respondentName: item.respondentName || "",
-              prompt: item.prompt || item.word || "",
-              options: Array.isArray(item.options) && item.options.length > 0 ? item.options : ["", ""],
-              correctAnswer: item.correctAnswer || "",
-            }))
-            : [{ respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" }]
+            ? items
+            : [
+              {
+                sentence: "",
+                blanks: [
+                  { position: 0, correctAnswer: "", options: ["", ""], hint: "" },
+                ],
+                translation: "",
+              },
+            ]
         );
         break;
     }
@@ -1512,35 +1448,6 @@ const DrillBuilder: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-8">
           {/* Upload Section */}
-          {/* AI Generate */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">AI Generate</h3>
-            <p className="text-sm text-gray-500 mb-6">Generate drill content using AI based on a part, topic, and prompt.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Part <span className="text-red-500">*</span></label>
-                <select value={aiPart} onChange={(e) => setAiPart(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="">Select a part</option>
-                  {AI_PARTS.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Topic <span className="text-red-500">*</span></label>
-                <select value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="">Select a topic</option>
-                  {AI_TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Prompt <span className="text-red-500">*</span></label>
-                <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={3} placeholder="Describe what you want to generate..." className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none text-sm" />
-              </div>
-              <button onClick={handleAIGenerate} disabled={isGeneratingDrill} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-                {isGeneratingDrill ? "Generating…" : "Generate with AI"}
-              </button>
-            </div>
-          </div>
-
           <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -2031,7 +1938,7 @@ const DrillBuilder: React.FC = () => {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                            Vocabulary Word<span className="text-red-500">*</span>
+                            Left Side<span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -2045,23 +1952,7 @@ const DrillBuilder: React.FC = () => {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                            Practice Sentence<span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={pair.right}
-                            onChange={(e) =>
-                              updateMatchingPair(idx, "right", e.target.value)
-                            }
-                            placeholder="e.g. I went to the restaurant yesterday"
-                            className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                            Word Translation (optional)
+                            Left Translation (optional)
                           </label>
                           <input
                             type="text"
@@ -2077,9 +1968,25 @@ const DrillBuilder: React.FC = () => {
                             className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
                           />
                         </div>
+                      </div>
+                      <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                            Sentence Translation (optional)
+                            Right Side<span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={pair.right}
+                            onChange={(e) =>
+                              updateMatchingPair(idx, "right", e.target.value)
+                            }
+                            placeholder="e.g. 안녕하세요"
+                            className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                            Right Translation (optional)
                           </label>
                           <input
                             type="text"
@@ -2764,12 +2671,7 @@ const DrillBuilder: React.FC = () => {
                   <div className="relative">
                     <select
                       value={drillType}
-                      onChange={(e) => {
-                        setDrillType(e.target.value);
-                        if (lastUploadedFile.current) {
-                          handleFileSelect(lastUploadedFile.current);
-                        }
-                      }}
+                      onChange={(e) => setDrillType(e.target.value)}
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     >
                       <option value="vocabulary">Vocabulary</option>
