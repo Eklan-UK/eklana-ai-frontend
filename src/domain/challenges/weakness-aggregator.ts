@@ -26,7 +26,7 @@ function extractPronunciationSignals(
 		pronAttempts.reduce((sum, a) => sum + (a.fluencyScore ?? a.textScore), 0) /
 		pronAttempts.length;
 
-	// Collect unique incorrect phonemes across all attempts
+	// Collect unique incorrect phonemes (from SpeechAce's flat incorrectPhonemes field)
 	const phonemeFreq = new Map<string, number>();
 	for (const attempt of pronAttempts) {
 		for (const p of attempt.incorrectPhonemes ?? []) {
@@ -37,6 +37,28 @@ function extractPronunciationSignals(
 		.sort((a, b) => b[1] - a[1])
 		.slice(0, 5)
 		.map(([p]) => p);
+
+	// Collect scored phonemes from wordScores[].phonemes[] for finer-grained data
+	const phonemeScoreMap = new Map<string, number[]>();
+	for (const attempt of pronAttempts) {
+		for (const ws of attempt.wordScores ?? []) {
+			for (const p of ws.phonemes ?? []) {
+				const list = phonemeScoreMap.get(p.phoneme) ?? [];
+				list.push(p.score);
+				phonemeScoreMap.set(p.phoneme, list);
+			}
+		}
+	}
+	// Only consider phonemes seen at least twice to filter out one-off noise
+	const weakScoredPhonemes = [...phonemeScoreMap.entries()]
+		.filter(([, scores]) => scores.length >= 2)
+		.map(([phoneme, scores]) => ({
+			phoneme,
+			avg: scores.reduce((s, v) => s + v, 0) / scores.length,
+		}))
+		.filter(({ avg }) => avg < 70)
+		.sort((a, b) => a.avg - b.avg)
+		.slice(0, 5);
 
 	const signals: WeaknessSignal[] = [];
 
@@ -65,6 +87,19 @@ function extractPronunciationSignals(
 			severity: severityFromScore(avgFluency),
 			evidence: [`Average fluency score: ${avgFluency.toFixed(1)}`],
 			label: 'Fluency',
+		});
+	}
+
+	// Surface consistently weak phonemes from scored data even when overall scores
+	// pass the threshold above — ensures generation always has phoneme-level evidence.
+	if (weakScoredPhonemes.length > 0 && avgTextScore >= 85) {
+		const labels = weakScoredPhonemes.map(({ phoneme, avg }) => `${phoneme} (${avg.toFixed(0)})`);
+		signals.push({
+			drillType: 'pronunciation',
+			category: 'pronunciation',
+			severity: severityFromScore(weakScoredPhonemes[0].avg),
+			evidence: [`Consistently weak phonemes: ${labels.join(', ')}`],
+			label: `Phoneme accuracy — ${weakScoredPhonemes.slice(0, 3).map((p) => p.phoneme).join(', ')}`,
 		});
 	}
 
@@ -260,10 +295,11 @@ export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
 	weekStartDate: Date
 ): Promise<WeaknessProfile> {
-	const weekEndDate = new Date(weekStartDate);
-	weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
-
-	const dateFilter = { $gte: weekStartDate, $lt: weekEndDate };
+	const now = new Date();
+	const weekStartLookback = new Date(now);
+	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 10);
+	weekStartLookback.setUTCHours(0, 0, 0, 0);
+	const dateFilter = { $gte: weekStartLookback, $lt: now };
 
 	const [drillAttempts, pronAttempts, freeTalkAttempts] = await Promise.all([
 		DrillAttempt.find({
