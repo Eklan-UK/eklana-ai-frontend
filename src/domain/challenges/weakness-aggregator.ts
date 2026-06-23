@@ -260,10 +260,11 @@ export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
 	weekStartDate: Date
 ): Promise<WeaknessProfile> {
-	const weekEndDate = new Date(weekStartDate);
-	weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
-
-	const dateFilter = { $gte: weekStartDate, $lt: weekEndDate };
+	const now = new Date();
+	const weekStartLookback = new Date(now);
+	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 6);
+	weekStartLookback.setUTCHours(0, 0, 0, 0);
+	const dateFilter = { $gte: weekStartLookback, $lt: now };
 
 	const [drillAttempts, pronAttempts, freeTalkAttempts] = await Promise.all([
 		DrillAttempt.find({
