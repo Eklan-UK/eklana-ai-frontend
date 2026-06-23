@@ -438,7 +438,7 @@ export async function aggregateWeaknesses(
 
 	// 6-day window for existing drill / free-talk signals
 	const weekStartLookback = new Date(now);
-	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 6);
+	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 10);
 	weekStartLookback.setUTCHours(0, 0, 0, 0);
 	const dateFilter = { $gte: weekStartLookback, $lt: now };
 
