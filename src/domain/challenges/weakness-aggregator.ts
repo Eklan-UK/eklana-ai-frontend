@@ -262,7 +262,7 @@ export async function aggregateWeaknesses(
 ): Promise<WeaknessProfile> {
 	const now = new Date();
 	const weekStartLookback = new Date(now);
-	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 6);
+	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 10);
 	weekStartLookback.setUTCHours(0, 0, 0, 0);
 	const dateFilter = { $gte: weekStartLookback, $lt: now };
 
