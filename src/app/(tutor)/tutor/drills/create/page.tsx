@@ -28,13 +28,12 @@ import { FileUploadZone } from "@/components/drills/FileUploadZone";
 import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
-import { type AIGenerationFormValues, type AIGenerationFormScalarField } from "@/components/drills/AIGenerationForm";
+import { type AIGenerationFormValues, type AIGenerationFormScalarField, type AIGenerationFormFieldValue } from "@/components/drills/AIGenerationForm";
 import { AIGenerationModal } from "@/components/drills/AIGenerationModal";
 import { AIGeneratedPreview } from "@/components/drills/AIGeneratedPreview";
 import { AIChatSidebar } from "@/components/drills/AIChatSidebar";
 import { ParsedContent } from "@/services/document-parser.service";
 import { normalizeAiGeneratedToParsedContent } from "@/utils/ai-drill-content";
-import { mapAiPartTopicToJourney } from "@/utils/ai-journey-map";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import {
   generateDrillAudio,
@@ -43,6 +42,8 @@ import {
 } from "@/services/drill-audio.service";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
 import {
+  getPartLabel,
+  getTopicById,
   isValidPartTopicPair,
   type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
@@ -249,8 +250,8 @@ function CreateDrillPageContent() {
   const [aiStudentIds, setAiStudentIds] = useState<string[]>([]);
   const [aiDrillType, setAiDrillType] = useState("vocabulary");
   const [aiDifficulty, setAiDifficulty] = useState("intermediate");
-  const [aiPart, setAiPart] = useState("");
-  const [aiTopic, setAiTopic] = useState("");
+  const [aiJourneyPart, setAiJourneyPart] = useState<LearningJourneyPartId | "">("");
+  const [aiJourneyTopic, setAiJourneyTopic] = useState("");
   const [aiContext, setAiContext] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
@@ -892,31 +893,34 @@ function CreateDrillPageContent() {
     studentIds: aiStudentIds,
     drillType: aiDrillType,
     difficulty: aiDifficulty,
-    part: aiPart,
-    topic: aiTopic,
+    journeyPart: aiJourneyPart,
+    journeyTopic: aiJourneyTopic,
     context: aiContext,
     prompt: aiPrompt,
   };
 
-  const handleAiFormChange = (field: AIGenerationFormScalarField, value: string) => {
+  const handleAiFormChange = (
+    field: AIGenerationFormScalarField,
+    value: AIGenerationFormFieldValue,
+  ) => {
     switch (field) {
       case "drillType":
-        setAiDrillType(value);
+        setAiDrillType(value as string);
         break;
       case "difficulty":
-        setAiDifficulty(value);
+        setAiDifficulty(value as string);
         break;
-      case "part":
-        setAiPart(value);
+      case "journeyPart":
+        setAiJourneyPart(value as LearningJourneyPartId | "");
         break;
-      case "topic":
-        setAiTopic(value);
+      case "journeyTopic":
+        setAiJourneyTopic(value as string);
         break;
       case "context":
-        setAiContext(value);
+        setAiContext(value as string);
         break;
       case "prompt":
-        setAiPrompt(value);
+        setAiPrompt(value as string);
         break;
     }
   };
@@ -926,11 +930,11 @@ function CreateDrillPageContent() {
       toast.error("Please select at least one student");
       return;
     }
-    if (!aiPart) {
-      toast.error("Please select a part");
+    if (!aiJourneyPart) {
+      toast.error("Please select a mission");
       return;
     }
-    if (!aiTopic) {
+    if (!aiJourneyTopic) {
       toast.error("Please select a topic");
       return;
     }
@@ -953,8 +957,8 @@ function CreateDrillPageContent() {
           difficulty: aiDifficulty,
           context: aiContext,
           prompt: aiPrompt,
-          part: aiPart,
-          topic: aiTopic,
+          part: getPartLabel(aiJourneyPart),
+          topic: getTopicById(aiJourneyTopic)?.title ?? "",
           studentId: aiStudentIds[0],
           studentIds: aiStudentIds,
         }),
@@ -993,12 +997,8 @@ function CreateDrillPageContent() {
     if (aiStudentIds.length > 0) {
       setSelectedUsers(new Set(aiStudentIds));
     }
-    const { journeyPart: part, journeyTopic: topic } = mapAiPartTopicToJourney(
-      aiPart,
-      aiTopic,
-    );
-    if (part) setJourneyPart(part);
-    if (topic) setJourneyTopic(topic);
+    setJourneyPart(aiJourneyPart);
+    setJourneyTopic(aiJourneyTopic);
 
     setShowAiPreview(false);
     builderRef.current?.scrollIntoView({ behavior: "smooth" });

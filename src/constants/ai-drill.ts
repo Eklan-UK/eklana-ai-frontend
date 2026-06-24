@@ -1,18 +1,3 @@
-export const AI_PARTS = [
-  "Part 1: Communication with Patients",
-  "Part 2: Communication with Colleagues",
-  "Part 3: Communication with Doctors, Families and Friends",
-  "Part 4: Bonus Scenarios",
-] as const;
-
-export const AI_TOPICS = [
-  "Handling Emergency/Critical Situation",
-  "Conducting CPR",
-  "Follow-up with Patients",
-  "Admitting a Patient",
-  "Small Talk with a Patient",
-] as const;
-
 export const AI_DRILL_TYPES = [
   { value: "vocabulary", label: "Vocabulary" },
   { value: "pronunciation", label: "Pronunciation" },

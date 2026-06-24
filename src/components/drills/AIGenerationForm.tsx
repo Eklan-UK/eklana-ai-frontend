@@ -4,12 +4,9 @@ import React, { useMemo, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
-import {
-  AI_PARTS,
-  AI_TOPICS,
-  AI_DRILL_TYPES,
-  AI_DIFFICULTIES,
-} from "@/constants/ai-drill";
+import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
+import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
+import { AI_DRILL_TYPES, AI_DIFFICULTIES } from "@/constants/ai-drill";
 
 export interface AiStudentOption {
   id: string;
@@ -21,8 +18,8 @@ export interface AIGenerationFormValues {
   studentIds: string[];
   drillType: string;
   difficulty: string;
-  part: string;
-  topic: string;
+  journeyPart: LearningJourneyPartId | "";
+  journeyTopic: string;
   context: string;
   prompt: string;
 }
@@ -32,9 +29,15 @@ export type AIGenerationFormScalarField = Exclude<
   "studentIds"
 >;
 
+export type AIGenerationFormFieldValue =
+  AIGenerationFormValues[AIGenerationFormScalarField];
+
 interface AIGenerationFormProps {
   values: AIGenerationFormValues;
-  onChange: (field: AIGenerationFormScalarField, value: string) => void;
+  onChange: (
+    field: AIGenerationFormScalarField,
+    value: AIGenerationFormFieldValue,
+  ) => void;
   onStudentIdsChange: (studentIds: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
@@ -266,43 +269,16 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         </div>
       </div>
 
-      <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
-          Part <span className="text-red-500">*</span>
-        </Label>
-        <select
-          value={values.part}
-          onChange={(e) => onChange("part", e.target.value)}
-          disabled={disabled}
-          className={selectClass}
-        >
-          <option value="">Select a part</option>
-          {AI_PARTS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
-          Topic <span className="text-red-500">*</span>
-        </Label>
-        <select
-          value={values.topic}
-          onChange={(e) => onChange("topic", e.target.value)}
-          disabled={disabled}
-          className={selectClass}
-        >
-          <option value="">Select a topic</option>
-          {AI_TOPICS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
+      <LearningJourneyPartTopicFields
+        journeyPart={values.journeyPart}
+        journeyTopic={values.journeyTopic}
+        onPartChange={(part) => {
+          onChange("journeyPart", part);
+          onChange("journeyTopic", "");
+        }}
+        onTopicChange={(topic) => onChange("journeyTopic", topic)}
+        required
+      />
 
       <div>
         <Label className="block text-xs font-bold text-gray-600 mb-1.5">

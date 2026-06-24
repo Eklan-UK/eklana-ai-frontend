@@ -7,13 +7,17 @@ import {
   type AiStudentOption,
   type AIGenerationFormValues,
   type AIGenerationFormScalarField,
+  type AIGenerationFormFieldValue,
 } from "@/components/drills/AIGenerationForm";
 
 interface AIGenerationModalProps {
   open: boolean;
   onClose: () => void;
   values: AIGenerationFormValues;
-  onChange: (field: AIGenerationFormScalarField, value: string) => void;
+  onChange: (
+    field: AIGenerationFormScalarField,
+    value: AIGenerationFormFieldValue,
+  ) => void;
   onStudentIdsChange: (studentIds: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
