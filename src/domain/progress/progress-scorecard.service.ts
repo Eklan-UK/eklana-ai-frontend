@@ -41,6 +41,24 @@ export interface ProgressScorecardMetrics {
 
 const ACCURACY_TYPES = new Set(['key_phrases', 'fill_blank']);
 
+/** Infer drill type from stored results when drillType was not persisted (legacy attempts). */
+function resolveDrillType(attempt: Record<string, unknown>): string {
+	const explicit = attempt.drillType;
+	if (typeof explicit === 'string' && explicit.length > 0) return explicit;
+	if (attempt.keyPhrasesResults) return 'key_phrases';
+	if (attempt.fillBlankResults) return 'fill_blank';
+	if (attempt.vocabularyResults) return 'vocabulary';
+	if (attempt.pronunciationResults) return 'pronunciation';
+	if (attempt.roleplayResults) return 'roleplay';
+	if (attempt.matchingResults) return 'matching';
+	if (attempt.definitionResults) return 'definition';
+	if (attempt.grammarResults) return 'grammar';
+	if (attempt.sentenceResults || attempt.sentenceWritingResults) return 'sentence';
+	if (attempt.summaryResults) return 'summary';
+	if (attempt.listeningResults) return 'listening';
+	return '';
+}
+
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
@@ -149,7 +167,7 @@ export async function computeProgressScorecard(
 
 	for (const raw of drillAttempts) {
 		const a = raw as Record<string, unknown>;
-		const drillType = (a.drillType as string | undefined) ?? '';
+		const drillType = resolveDrillType(a);
 		const completedAt = a.completedAt ? new Date(a.completedAt as Date) : null;
 		if (!completedAt) continue;
 

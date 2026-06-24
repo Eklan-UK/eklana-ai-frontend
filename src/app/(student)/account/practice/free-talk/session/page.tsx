@@ -431,6 +431,7 @@ function FreeTalkSessionInner() {
             void queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
             void queryClient.invalidateQueries({ queryKey: ["user-streak"] });
           }
+          void queryClient.invalidateQueries({ queryKey: ["progress-scorecard"] });
         } catch {
           appendFreeTalkHistoryEntry(learnerId, {
             scenarioId: scen.id,

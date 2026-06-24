@@ -4,13 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev ",
+    "dev:cron": "node scripts/local-class-cron.mjs",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build --webpack",
     "build:low-mem": "NODE_OPTIONS='--max-old-space-size=4096' next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "gemini:check": "node scripts/gemini-key-check.mjs",
     "generate-icons": "node scripts/generate-icons.js",
-    "test:gates": "node scripts/test-subscription-gates.mjs"
+    "test:gates": "node scripts/test-subscription-gates.mjs",
+    "test:notification": "node scripts/local-test-notification.mjs"
   },
   "dependencies": {
     "@amplitude/unified": "^1.1.11",

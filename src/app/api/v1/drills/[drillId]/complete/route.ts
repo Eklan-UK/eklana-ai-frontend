@@ -17,6 +17,10 @@ import { computeConfidenceMetrics } from '@/domain/confidence/confidence.service
 import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
 import { computeProgressScorecard } from '@/domain/progress/progress-scorecard.service';
 import { StreakService } from '@/services/streak.service';
+import {
+	buildDrillCompletionEffects,
+	resolveDrillPassed,
+} from '@/lib/drill/celebration-effects';
 
 const completeSchema = z.object({
 	drillAssignmentId: z.string().refine((id) => Types.ObjectId.isValid(id), {
@@ -237,42 +241,39 @@ async function handler(
 	});
 
 
-	// Fire-and-forget: recompute metrics in background
+	// Fire-and-forget: recompute metrics, streak, and badges in background
 	// Do not await — this must not block or throw to the user
+	const userId = context.userId.toString();
+	const userScore = validated.score;
 	setImmediate(() => {
-		Promise.all([
-			computeConfidenceMetrics(context.userId.toString()).catch(() => {}),
-			computePronunciationMetrics(context.userId.toString()).catch(() => {}),
-			computeProgressScorecard(context.userId.toString()).catch(() => {}),
+		void Promise.all([
+			computeConfidenceMetrics(userId).catch(() => {}),
+			computePronunciationMetrics(userId).catch(() => {}),
+			computeProgressScorecard(userId).catch(() => {}),
+			context.userRole === 'user'
+				? StreakService.recordDrillCompletion(userId, userScore).catch(() => {})
+				: Promise.resolve(),
+			context.userRole === 'user'
+				? import('@/services/streak.service')
+						.then(({ triggerBadgeEvaluation }) => triggerBadgeEvaluation(userId).catch(() => {}))
+				: Promise.resolve(),
 		]);
 	});
 
-	if (context.userRole === 'user') {
-		try {
-			await StreakService.recordDrillCompletion(context.userId.toString(), validated.score);
-		} catch {
-			// streak must not fail drill completion
-		}
-	}
-
-	let badgesUnlocked: Awaited<ReturnType<typeof import('@/services/streak.service').triggerBadgeEvaluation>> = [];
-	if (context.userRole === 'user') {
-		try {
-			const { triggerBadgeEvaluation } = await import('@/services/streak.service');
-			badgesUnlocked = await triggerBadgeEvaluation(context.userId.toString());
-		} catch {
-			// badges must not fail drill completion
-		}
-	}
+	const passed = resolveDrillPassed(validated.score, validated);
+	const effects = buildDrillCompletionEffects(passed);
 
 	return apiResponse.success({
+		drillId,
+		passed,
 		attempt: {
 			id: result.attempt._id.toString(),
 			score: result.attempt.score,
 			timeSpent: result.attempt.timeSpent,
 			completedAt: result.attempt.completedAt?.toISOString(),
 		},
-		badgesUnlocked,
+		badgesUnlocked: [],
+		...(effects ? { effects } : {}),
 	});
 }
 

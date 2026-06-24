@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,12 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
-import { DrillCompletionScreen } from "./shared";
+import { DrillCompletionScreen, CheckpointScreen } from "./shared";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface DefinitionDrillProps {
@@ -25,8 +30,39 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [completionScore, setCompletionScore] = useState(0);
+  const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      if (cp) {
+        setCurrentIndex(cp.resumeFromIndex);
+        if (cp.partialResults.answers) {
+          setAnswers(cp.partialResults.answers as Record<number, string>);
+        }
+        setCheckpointCount(cp.completedItemCount);
+      }
+      setIsLoadingCheckpoint(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id]);
 
   const items = drill.definition_items || [];
   const currentItem = items[currentIndex];
@@ -47,7 +83,21 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     }
 
     if (currentIndex < items.length - 1) {
+      const completedCount = currentIndex + 1;
       setCurrentIndex(currentIndex + 1);
+
+      if (completedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "definition",
+          resumeFromIndex: currentIndex + 1,
+          completedItemCount: completedCount,
+          partialResults: { answers: { ...answers, [currentIndex]: currentAnswer } },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(completedCount);
+        setShowCheckpoint(true);
+      }
     } else {
       const allAnswered = items.every((_: any, idx: number) => {
         const answer = answers[idx];
@@ -97,7 +147,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         hint: item.hint || "",
       }));
 
-      await completeLearnerDrill(queryClient, drill._id, {
+      const result = await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,
@@ -107,6 +157,9 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         platform: 'web',
       });
 
+      setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+
+      void clearCheckpoint(String(drill._id), assignmentId);
       setIsCompleted(true);
       setCompletionScore(score);
       toast.success("Drill completed! Great job!");
@@ -124,11 +177,38 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     }
   };
 
+  if (isLoadingCheckpoint) {
+    return (
+      <div className="min-h-screen bg-background pb-6">
+        <div className="h-6" />
+        <Header title={drill.title} showBack={true} />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={items.length}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
         drillType="definition"
         celebrate={completionScore >= 70}
+        celebrationSoundUrl={celebrationSoundUrl}
       />
     );
   }

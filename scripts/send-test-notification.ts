@@ -4,11 +4,12 @@
  * FCM Test Notification Script (TypeScript)
  * Send a test notification to all active users
  *
- * Usage:
- *   npx ts-node scripts/send-test-notification.ts <adminUserId>
+ * Prefer the local HTTP runner (no ts-node required):
+ *   cp scripts/local-test-notification.example.mjs scripts/local-test-notification.mjs
+ *   node scripts/local-test-notification.mjs
  *
- * Example:
- *   npx ts-node scripts/send-test-notification.ts 507f1f77bcf86cd799439011
+ * This file requires tsx if run directly:
+ *   npx tsx scripts/send-test-notification.ts <adminUserId>
  */
 
 import mongoose from "mongoose";

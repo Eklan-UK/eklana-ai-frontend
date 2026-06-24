@@ -20,9 +20,15 @@ import {
   DrillPerformanceReview,
   DrillLineReviewAccordion,
   RecordingPreviewBar,
+  CheckpointScreen,
   type PerformanceReviewAnalyticsRow,
   type PerformanceReviewGroup,
 } from "./shared";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 import { preloadTTSAudio } from "@/hooks/useTTS";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
@@ -68,6 +74,9 @@ export default function KeyPhrasesDrill({
   const [sessionReviewAnalytics, setSessionReviewAnalytics] = useState<
     PerformanceReviewAnalyticsRow[]
   >([]);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -101,6 +110,39 @@ export default function KeyPhrasesDrill({
       revokeRecordingPreview();
     };
   }, [revokeRecordingPreview]);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      if (cp) {
+        setCurrentIndex(cp.resumeFromIndex);
+        const partial = cp.partialResults;
+        if (partial.itemResults) {
+          setItemResults(partial.itemResults as Record<number, ItemResult>);
+        }
+        if (partial.sessionReviewAnalytics) {
+          setSessionReviewAnalytics(
+            partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+          );
+        }
+        setCheckpointCount(cp.completedItemCount);
+      }
+      setIsLoadingCheckpoint(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id]);
 
   // Pre-warm prompt TTS for every question while the drill loads / between questions
   useEffect(() => {
@@ -299,7 +341,21 @@ export default function KeyPhrasesDrill({
     setAttempts(0);
 
     if (currentIndex < items.length - 1) {
+      const completedCount = currentIndex + 1;
       setCurrentIndex(currentIndex + 1);
+
+      if (completedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "key_phrases",
+          resumeFromIndex: currentIndex + 1,
+          completedItemCount: completedCount,
+          partialResults: { itemResults, sessionReviewAnalytics },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(completedCount);
+        setShowCheckpoint(true);
+      }
     } else {
       setShowReview(true);
     }
@@ -411,6 +467,7 @@ export default function KeyPhrasesDrill({
         });
       }
 
+      if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -452,6 +509,30 @@ export default function KeyPhrasesDrill({
       attempts: match?.attempts ?? (attempts || 1),
     };
   }, [pronunciationScore, selectedOption, currentIndex, sessionReviewAnalytics, attempts]);
+
+  if (isLoadingCheckpoint) {
+    return (
+      <DrillLayout title={drill.title}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={items.length}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
 
   if (isCompleted) {
     const returnPath = weeklyChallengeMeta

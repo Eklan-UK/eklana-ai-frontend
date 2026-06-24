@@ -414,7 +414,11 @@ For PCM chunks streamed from AI (base64 PCM 16kHz), you'll need to write to a te
 
 ### Practice pass/fail feedback
 
-See [`mobile-practice-feedback.md`](mobile-practice-feedback.md) for haptics + optional sounds when learners pass or fail drill sections, free talk, and other practice surfaces. Web implementation: `src/lib/practice-feedback.ts`.
+See [`mobile-practice-feedback.md`](mobile-practice-feedback.md) for haptics + optional sounds when learners pass or fail **individual** drill items, free talk, and other practice surfaces. Web: `src/lib/practice-feedback.ts` (`playPracticeFeedback`, `playTone`).
+
+### Drill end celebration (MP3 + confetti)
+
+See [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md) when the learner **passes a full drill** — hosted celebration MP3 from `POST /drills/:id/complete` `effects`, plus confetti. Web: `playDrillEndCelebration` in `src/lib/practice-feedback.ts`.
 
 ---
 

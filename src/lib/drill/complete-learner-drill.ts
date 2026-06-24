@@ -13,10 +13,18 @@ export async function completeLearnerDrill(
 ) {
   const result = await drillAPI.complete(drillId, data);
   celebrateBadgesFromApiResponse(result);
-  await Promise.all([
+
+  // Badge evaluation runs in background on the server; check for unlocks without blocking UI
+  void fetch('/api/v1/badges/evaluate', { method: 'POST' })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((json) => celebrateBadgesFromApiResponse(json))
+    .catch(() => {});
+
+  void Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() }),
     queryClient.invalidateQueries({ queryKey: queryKeys.badges.all }),
-    queryClient.invalidateQueries({ queryKey: ["user-streak"] }),
+    queryClient.invalidateQueries({ queryKey: ['user-streak'] }),
+    queryClient.invalidateQueries({ queryKey: ['progress-scorecard'] }),
   ]);
   return result;
 }

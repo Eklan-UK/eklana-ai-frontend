@@ -28,6 +28,7 @@ export interface CreateAttemptData {
   performanceReviewSnapshot?: Record<string, unknown>;
   deviceInfo?: string;
   platform?: 'web' | 'ios' | 'android';
+  drillType?: string;
 }
 
 /**

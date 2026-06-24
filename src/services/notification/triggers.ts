@@ -181,33 +181,57 @@ export async function onDrillPracticeReminder(
   try {
     await connectToDatabase();
 
-    const fcmTokens = await FCMToken.find({
+    const notifData = { screen: "MyPlan", url: "/account/drills" };
+
+    // Step 1: unified path (Expo + modern Web Push + in-app list)
+    const unifiedResult = await sendNotification({
       userId: studentId,
-      isActive: true,
-    })
-      .select("token")
-      .lean()
-      .exec();
-
-    if (fcmTokens.length === 0) {
-      console.warn(
-        "[Notification Trigger] No active FCM tokens for student:",
-        studentId,
-      );
-      return null;
-    }
-
-    const tokens = fcmTokens.map((t) => t.token);
-
-    const result = await sendNotificationToUsers([studentId], tokens, {
       title,
       body,
-      type: NotificationType.DRILL_REMINDER,
-      data: {
-        screen: "MyPlan",
-        url: "/account/drills",
-      },
+      type: "drill_reminder",
+      data: notifData,
     });
+
+    // Step 2: FCM fallback only when user has no modern web push token
+    const hasModernWebToken = await PushToken.exists({
+      userId: studentId,
+      platform: "web",
+      isActive: true,
+    });
+
+    let fcmResult = null;
+    if (!hasModernWebToken) {
+      const fcmTokens = await FCMToken.find({
+        userId: studentId,
+        isActive: true,
+      })
+        .select("token")
+        .lean()
+        .exec();
+
+      if (fcmTokens.length > 0) {
+        fcmResult = await sendNotificationToUsers(
+          [studentId],
+          fcmTokens.map((t) => t.token),
+          {
+            title,
+            body,
+            type: NotificationType.DRILL_REMINDER,
+            data: notifData,
+          },
+        );
+      }
+    }
+
+    const anySent = unifiedResult.totalSent > 0 || fcmResult !== null;
+    const result = anySent ? { unified: unifiedResult, fcm: fcmResult } : null;
+
+    if (!result) {
+      console.warn(
+        "[Notification Trigger] No push delivery for student:",
+        studentId,
+      );
+    }
 
     console.log("[Notification Trigger] onDrillPracticeReminder result:", result);
     return result;
