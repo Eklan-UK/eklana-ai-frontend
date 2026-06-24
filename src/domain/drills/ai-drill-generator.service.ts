@@ -107,9 +107,8 @@ const tools: Record<DrillType, FunctionTool> = {
                     properties: {
                       speaker: { type: 'string' },
                       text: { type: 'string' },
-                      translation: { type: 'string' },
                     },
-                    required: ['speaker', 'text', 'translation'],
+                    required: ['speaker', 'text'],
                   },
                 },
               },
@@ -238,7 +237,7 @@ const tools: Record<DrillType, FunctionTool> = {
             items: {
               type: 'object',
               properties: {
-                sentence: { type: 'string' },
+                sentence: { type: 'string', description: "IMPORTANT: The sentence MUST contain '___' (three underscores) where the blank should appear. Never write the answer into the sentence." },
                 translation: { type: 'string' },
                 blanks: {
                   type: 'array',
@@ -321,11 +320,11 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
   const prompt = params.prompt.length > 1000 ? params.prompt.slice(0, 1000) : params.prompt;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-5.5',
     messages: [
       {
         role: 'system',
-        content: `This drill is for ${params.part}, Topic: ${params.topic}. If the drill includes translations, always translate to Korean unless the tutor explicitly specifies a different language.`,
+        content: `This drill is for ${params.part}, Topic: ${params.topic}. Only include Korean translations for vocabulary drills (drill type: vocabulary). For all other drill types, do not include any translation fields. Do NOT copy or extract words directly from the prompt or context. Use the prompt and context only to understand the scenario and learning objectives. Generate original, clinically appropriate content that a nurse would realistically use in that situation.`,
       },
       {
         role: 'user',
@@ -333,15 +332,20 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
       },
     ],
     tools: toolsArray,
-    tool_choice: { type: 'function', function: { name: tool.function.name } },
-    temperature: 0.3,
-    max_tokens: 1500,
+    tool_choice: 'required',
+    max_completion_tokens: 4000,
   });
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
-  if (!toolCall || toolCall.type !== 'function' || !toolCall.function.arguments) {
-    throw new Error(`OpenAI did not return a tool call for drill type: ${params.drillType}`);
+  if (toolCall && toolCall.type === 'function' && toolCall.function.arguments) {
+    return JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
   }
 
-  return JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+  const textContent = response.choices[0]?.message?.content;
+  if (textContent) {
+    return JSON.parse(textContent) as Record<string, unknown>;
+  }
+
+  console.log("[ai-generate debug]", JSON.stringify(response.choices[0], null, 2));
+  throw new Error(`OpenAI did not return a tool call or parseable content for drill type: ${params.drillType}`);
 }

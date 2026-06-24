@@ -1001,6 +1001,7 @@ function CreateDrillPageContent() {
     setJourneyTopic(aiJourneyTopic);
 
     setShowAiPreview(false);
+    setShowChatSidebar(false);
     builderRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 

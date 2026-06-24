@@ -31,7 +31,7 @@ Use your judgment to distinguish between questions/comments and change requests.
     logger.info("Refining drill via AI chat", { drillType });
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.5",
       messages: [
         { role: "system", content: systemPrompt },
         ...messages,
