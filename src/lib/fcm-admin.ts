@@ -4,7 +4,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { loadFirebaseServiceAccount } from "@/lib/firebase-service-account";
+import { loadFirebaseServiceAccount, getProjectIdFromServiceAccount } from "@/lib/firebase-service-account";
 
 // Initialize Firebase Admin SDK
 const initializeFirebaseAdmin = () => {
@@ -14,7 +14,7 @@ const initializeFirebaseAdmin = () => {
 
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
+        projectId: getProjectIdFromServiceAccount(serviceAccount),
       });
 
       console.log("✅ Firebase Admin SDK initialized successfully");

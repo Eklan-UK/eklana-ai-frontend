@@ -2,6 +2,25 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ServiceAccount } from 'firebase-admin';
 
+/** Firebase download JSON uses snake_case; admin types use camelCase. */
+type ServiceAccountPayload = ServiceAccount & {
+  project_id?: string;
+  private_key?: string;
+  client_email?: string;
+};
+
+export function getProjectIdFromServiceAccount(
+  account: ServiceAccountPayload,
+): string {
+  const id = account.projectId ?? account.project_id;
+  if (!id) {
+    throw new Error(
+      'Service account JSON is missing "project_id". Ensure you have the correct Firebase key.',
+    );
+  }
+  return id;
+}
+
 /**
  * Load Firebase service account credentials from env.
  *
@@ -64,12 +83,8 @@ export function loadFirebaseServiceAccount(): ServiceAccount {
     );
   }
 
-  const serviceAccount = parsed as ServiceAccount;
-  if (!serviceAccount.project_id) {
-    throw new Error(
-      'Service account JSON is missing "project_id". Ensure you have the correct Firebase key.',
-    );
-  }
+  const serviceAccount = parsed as ServiceAccountPayload;
+  getProjectIdFromServiceAccount(serviceAccount);
 
   return serviceAccount;
 }
