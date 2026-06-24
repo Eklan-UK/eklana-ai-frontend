@@ -9,7 +9,7 @@ async function handler(
 ): Promise<NextResponse> {
   try {
     const body = await req.json();
-    const { drillType, difficulty, context: drillContext, prompt, topic, part, studentId } = body;
+    const { drillType, difficulty, context: drillContext, prompt, topic, part, studentId, studentIds } = body;
 
     if (!drillType || !prompt) {
       return NextResponse.json(
@@ -29,6 +29,7 @@ async function handler(
       drillType,
       difficulty,
       studentId,
+      studentIds,
     });
 
     const generated = await generateDrill({

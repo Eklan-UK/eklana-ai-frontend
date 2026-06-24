@@ -21,7 +21,13 @@ import { FileUploadZone } from "@/components/drills/FileUploadZone";
 import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
+import { type AIGenerationFormValues, type AIGenerationFormScalarField } from "@/components/drills/AIGenerationForm";
+import { AIGenerationModal } from "@/components/drills/AIGenerationModal";
+import { AIGeneratedPreview } from "@/components/drills/AIGeneratedPreview";
+import { AIChatSidebar } from "@/components/drills/AIChatSidebar";
 import { ParsedContent } from "@/services/document-parser.service";
+import { normalizeAiGeneratedToParsedContent } from "@/utils/ai-drill-content";
+import { mapAiPartTopicToJourney } from "@/utils/ai-journey-map";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import {
   generateDrillAudio,
@@ -296,11 +302,20 @@ const DrillBuilder: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
 
-  // AI generate form state
+  // AI generate form state (independent from manual builder)
+  const [aiStudentIds, setAiStudentIds] = useState<string[]>([]);
+  const [aiDrillType, setAiDrillType] = useState("vocabulary");
+  const [aiDifficulty, setAiDifficulty] = useState("intermediate");
   const [aiPart, setAiPart] = useState("");
   const [aiTopic, setAiTopic] = useState("");
+  const [aiContext, setAiContext] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
+  const [aiGeneratedContent, setAiGeneratedContent] = useState<Record<string, unknown> | null>(null);
+  const [showAiPreview, setShowAiPreview] = useState(false);
+  const [showChatSidebar, setShowChatSidebar] = useState(false);
+  const [showAiFormModal, setShowAiFormModal] = useState(false);
+  const builderRef = useRef<HTMLDivElement>(null);
 
   // Pre-generate TTS audio option
   const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
@@ -858,42 +873,133 @@ const DrillBuilder: React.FC = () => {
     setSelectedUsers(updated);
   };
 
-  const AI_PARTS = [
-    "Part 1: Communication with Patients",
-    "Part 2: Communication with Colleagues",
-    "Part 3: Communication with Doctors, Families and Friends",
-    "Part 4: Bonus Scenarios",
-  ];
+  const aiStudentOptions = useMemo(
+    () =>
+      users.map((user) => {
+        const name =
+          `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+          user.name ||
+          user.email ||
+          "Unknown";
+        return { id: user._id.toString(), label: name, email: user.email };
+      }),
+    [users],
+  );
 
-  const AI_TOPICS = [
-    "Handling Emergency/Critical Situation",
-    "Conducting CPR",
-    "Follow-up with Patients",
-    "Admitting a Patient",
-    "Small Talk with a Patient",
-  ];
+  const aiFormValues: AIGenerationFormValues = {
+    studentIds: aiStudentIds,
+    drillType: aiDrillType,
+    difficulty: aiDifficulty,
+    part: aiPart,
+    topic: aiTopic,
+    context: aiContext,
+    prompt: aiPrompt,
+  };
+
+  const handleAiFormChange = (field: AIGenerationFormScalarField, value: string) => {
+    switch (field) {
+      case "drillType":
+        setAiDrillType(value);
+        break;
+      case "difficulty":
+        setAiDifficulty(value);
+        break;
+      case "part":
+        setAiPart(value);
+        break;
+      case "topic":
+        setAiTopic(value);
+        break;
+      case "context":
+        setAiContext(value);
+        break;
+      case "prompt":
+        setAiPrompt(value);
+        break;
+    }
+  };
 
   const handleAIGenerate = async () => {
-    if (!aiPart) { toast.error("Please select a part"); return; }
-    if (!aiTopic) { toast.error("Please select a topic"); return; }
-    if (!aiPrompt.trim()) { toast.error("Please enter a prompt"); return; }
+    if (aiStudentIds.length === 0) {
+      toast.error("Please select at least one student");
+      return;
+    }
+    if (!aiPart) {
+      toast.error("Please select a part");
+      return;
+    }
+    if (!aiTopic) {
+      toast.error("Please select a topic");
+      return;
+    }
+    if (!aiContext.trim()) {
+      toast.error("Please enter a context/scenario");
+      return;
+    }
+    if (!aiPrompt.trim()) {
+      toast.error("Please enter a prompt");
+      return;
+    }
     try {
       setIsGeneratingDrill(true);
       const res = await fetch("/api/v1/drills/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ drillType, difficulty, context: "", prompt: aiPrompt, part: aiPart, topic: aiTopic }),
+        body: JSON.stringify({
+          drillType: aiDrillType,
+          difficulty: aiDifficulty,
+          context: aiContext,
+          prompt: aiPrompt,
+          part: aiPart,
+          topic: aiTopic,
+          studentId: aiStudentIds[0],
+          studentIds: aiStudentIds,
+        }),
       });
       const json = await res.json();
-      if (!res.ok) { toast.error(json.message || "AI generation failed"); return; }
-      handleApplyParsedContent({ type: drillType as import("@/services/document-parser.service").ParsedContent["type"], confidence: 1, extractedData: { title: "", items: [], metadata: {}, ...json.data } });
-      toast.success("Drill content generated");
+      if (!res.ok) {
+        toast.error(json.message || "AI generation failed");
+        return;
+      }
+      setAiGeneratedContent(json.data);
+      setShowAiPreview(true);
+      setShowChatSidebar(true);
+      setShowAiFormModal(false);
+      toast.success("Drill generated successfully");
     } catch {
       toast.error("AI generation failed");
     } finally {
       setIsGeneratingDrill(false);
     }
+  };
+
+  const handleUseAiDrill = () => {
+    if (!aiGeneratedContent) return;
+
+    if (aiDrillType === "definition") {
+      toast.warning(
+        "Definition drills are not yet supported in the manual builder.",
+      );
+    }
+
+    const parsed = normalizeAiGeneratedToParsedContent(aiDrillType, aiGeneratedContent);
+    handleApplyParsedContent(parsed);
+
+    setDrillType(aiDrillType);
+    setDifficulty(aiDifficulty);
+    if (aiStudentIds.length > 0) {
+      setSelectedUsers(new Set(aiStudentIds));
+    }
+    const { journeyPart: part, journeyTopic: topic } = mapAiPartTopicToJourney(
+      aiPart,
+      aiTopic,
+    );
+    if (part) setJourneyPart(part);
+    if (topic) setJourneyTopic(topic);
+
+    setShowAiPreview(false);
+    builderRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   // Handle file upload
@@ -936,11 +1042,9 @@ const DrillBuilder: React.FC = () => {
   // Apply parsed content to form
   const handleApplyParsedContent = (content?: ParsedContent) => {
     const pc = content ?? parsedContent;
-    console.log("[apply] pc:", pc, "parsedContent:", parsedContent);
     if (!pc) return;
 
     const { extractedData, type } = pc;
-    console.log("[apply] pc full object:", JSON.stringify(pc));
     const { title, items, metadata } = extractedData;
 
     // Update form data
@@ -1018,7 +1122,6 @@ const DrillBuilder: React.FC = () => {
         }
         break;
       case "listening":
-        console.log("[listening import] extractedData:", extractedData, "items[0]:", items[0]);
         if (items.length > 0 && items[0].content) {
           setListeningContent(items[0].content);
         }
@@ -1511,35 +1614,13 @@ const DrillBuilder: React.FC = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-8">
-          {/* Upload Section */}
-          {/* AI Generate */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">AI Generate</h3>
-            <p className="text-sm text-gray-500 mb-6">Generate drill content using AI based on a part, topic, and prompt.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Part <span className="text-red-500">*</span></label>
-                <select value={aiPart} onChange={(e) => setAiPart(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="">Select a part</option>
-                  {AI_PARTS.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Topic <span className="text-red-500">*</span></label>
-                <select value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="">Select a topic</option>
-                  {AI_TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Prompt <span className="text-red-500">*</span></label>
-                <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} rows={3} placeholder="Describe what you want to generate..." className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none text-sm" />
-              </div>
-              <button onClick={handleAIGenerate} disabled={isGeneratingDrill} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-                {isGeneratingDrill ? "Generating…" : "Generate with AI"}
-              </button>
-            </div>
-          </div>
+          {!isEditMode && showAiPreview && aiGeneratedContent && (
+            <AIGeneratedPreview
+              drillType={aiDrillType}
+              content={aiGeneratedContent}
+              onUseDrill={handleUseAiDrill}
+            />
+          )}
 
           <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -1556,7 +1637,6 @@ const DrillBuilder: React.FC = () => {
             </div>
 
             <div className="space-y-4 mt-6">
-              {/* File Upload */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2">
                   Upload Document
@@ -1567,7 +1647,6 @@ const DrillBuilder: React.FC = () => {
                 />
               </div>
 
-              {/* Clipboard Paste */}
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2">
                   Or Paste from Clipboard
@@ -1577,6 +1656,7 @@ const DrillBuilder: React.FC = () => {
             </div>
           </div>
 
+          <div ref={builderRef} className="space-y-8">
           {/* Dynamic Form Based on Drill Type */}
           {drillType === "vocabulary" && (
             <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
@@ -2703,9 +2783,20 @@ const DrillBuilder: React.FC = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         <div className="space-y-8">
+          {!isEditMode && (
+            <button
+              type="button"
+              onClick={() => setShowAiFormModal(true)}
+              className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Generate with AI
+            </button>
+          )}
+
           {/* Drill Settings */}
           <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
             <h2 className="text-lg font-bold text-gray-900 mb-8">
@@ -3071,6 +3162,33 @@ const DrillBuilder: React.FC = () => {
             />
           </div>
         </div>
+      )}
+
+      {!isEditMode && (
+        <AIGenerationModal
+          open={showAiFormModal}
+          onClose={() => setShowAiFormModal(false)}
+          values={aiFormValues}
+          onChange={handleAiFormChange}
+          onStudentIdsChange={setAiStudentIds}
+          students={aiStudentOptions}
+          loadingStudents={loadingUsers}
+          isGenerating={isGeneratingDrill}
+          onGenerate={handleAIGenerate}
+        />
+      )}
+
+      {!isEditMode && aiGeneratedContent && (
+        <AIChatSidebar
+          open={showChatSidebar}
+          onClose={() => setShowChatSidebar(false)}
+          drillType={aiDrillType}
+          currentDrill={aiGeneratedContent}
+          onDrillUpdated={(updated) => {
+            setAiGeneratedContent(updated);
+            setShowAiPreview(true);
+          }}
+        />
       )}
     </div>
   );
