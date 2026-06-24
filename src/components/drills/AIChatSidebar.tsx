@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 export interface ChatMessage {
@@ -28,6 +28,7 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [latestDrill, setLatestDrill] = useState<Record<string, unknown>>(currentDrill);
+  const [isMinimised, setIsMinimised] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +72,7 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
       }
 
       const json = await res.json();
+      console.log("ai-chat raw response:", json);
       const updatedDrill = json.data?.drill ?? null;
       const assistantText =
         json.data?.message ??
@@ -121,22 +123,38 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
         />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[380px] bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 ${isMinimised ? "h-auto" : "h-full"} w-full sm:w-[380px] bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="text-base font-bold text-gray-900">Refine with AI</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-            aria-label="Close chat"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsMinimised((v) => !v)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+              aria-label={isMinimised ? "Expand chat" : "Minimise chat"}
+            >
+              {isMinimised ? (
+                <ChevronDown className="w-5 h-5" />
+              ) : (
+                <ChevronUp className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+              aria-label="Close chat"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
+        {!isMinimised && (
+        <>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {messages.length === 0 && !sending ? (
             <p className="text-sm text-gray-500 text-center py-8">
@@ -203,6 +221,8 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
     </>
   );

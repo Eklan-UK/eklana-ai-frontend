@@ -2,7 +2,7 @@
 
 import React from "react";
 import type { AiDrillType } from "@/constants/ai-drill";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Download } from "lucide-react";
 
 interface AIGeneratedPreviewProps {
   drillType: AiDrillType | string;
@@ -25,11 +25,116 @@ function PreviewSection({
   );
 }
 
+function buildExcelRows(drillType: string, content: Record<string, unknown>): unknown[][] {
+  switch (drillType) {
+    case "vocabulary": {
+      const items = (content.target_sentences as Record<string, string>[]) ?? [];
+      return [
+        ["Word", "Word Translation", "Sentence", "Sentence Translation"],
+        ...items.map((item) => [item.word ?? "", item.wordTranslation ?? "", item.text ?? "", item.translation ?? ""]),
+      ];
+    }
+    case "pronunciation": {
+      const items = (content.pronunciation_items as Record<string, string>[]) ?? [];
+      return [
+        ["Sound", "Word", "Sentence"],
+        ...items.map((item) => [item.sound ?? "", item.word ?? "", item.sentence ?? ""]),
+      ];
+    }
+    case "matching": {
+      const pairs = (content.matching_pairs as Record<string, string>[]) ?? [];
+      return [
+        ["Left", "Right", "Left Translation", "Right Translation"],
+        ...pairs.map((pair) => [pair.left ?? "", pair.right ?? "", pair.leftTranslation ?? "", pair.rightTranslation ?? ""]),
+      ];
+    }
+    case "roleplay": {
+      const scenes = (content.roleplay_scenes as Record<string, unknown>[]) ?? [];
+      const rows: unknown[][] = [
+        ["student_character", String(content.student_character_name ?? "Student")],
+        ["ai_character", ((content.ai_character_names as string[]) ?? []).join(", ")],
+        ["drill_intro", String(content.drill_intro ?? "")],
+      ];
+      scenes.forEach((scene) => {
+        rows.push(["context", String(scene.context ?? scene.scene_name ?? "")]);
+        rows.push(["Speaker", "Text", "Translation"]);
+        const dialogue = (scene.dialogue as Record<string, string>[]) ?? [];
+        dialogue.forEach((turn) => rows.push([turn.speaker ?? "", turn.text ?? "", turn.translation ?? ""]));
+      });
+      return rows;
+    }
+    case "definition": {
+      const items = (content.definition_items as Record<string, string>[]) ?? [];
+      return [
+        ["Word", "Hint/Definition"],
+        ...items.map((item) => [item.word ?? "", item.hint ?? ""]),
+      ];
+    }
+    case "grammar": {
+      const items = (content.grammar_items as Record<string, string>[]) ?? [];
+      return [
+        ["Pattern", "Hint", "Example"],
+        ...items.map((item) => [item.pattern ?? "", item.hint ?? "", item.example ?? ""]),
+      ];
+    }
+    case "sentence_writing": {
+      const items = (content.sentence_writing_items as Record<string, string>[]) ?? [];
+      return [
+        ["Word", "Hint"],
+        ...items.map((item) => [item.word ?? "", item.hint ?? ""]),
+      ];
+    }
+    case "key_phrases": {
+      const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
+      return [
+        ["Prompt", "Respondent Name", "Correct Answer", "Option 2", "Option 3"],
+        ...items.map((item) => {
+          const opts = (item.options as string[]) ?? [];
+          const distractors = opts.filter((o) => o !== item.correctAnswer);
+          return [String(item.prompt ?? ""), String(item.respondentName ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? ""];
+        }),
+      ];
+    }
+    case "fill_blank": {
+      const items = (content.fill_blank_items as Record<string, unknown>[]) ?? [];
+      return [
+        ["Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
+        ...items.map((item) => {
+          const opts = (item.options as string[]) ?? [];
+          const distractors = opts.filter((o) => o !== item.correctAnswer);
+          return [String(item.sentence ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? "", String(item.hint ?? "")];
+        }),
+      ];
+    }
+    case "summary":
+      return [
+        ["Article Title", "Article Content"],
+        [String(content.article_title ?? ""), String(content.article_content ?? "")],
+      ];
+    case "listening":
+      return [
+        ["Content Title", "Content"],
+        [String(content.content_title ?? content.article_title ?? ""), String(content.content ?? content.article_content ?? "")],
+      ];
+    default:
+      return [["Data"], [JSON.stringify(content)]];
+  }
+}
+
 export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
   drillType,
   content,
   onUseDrill,
 }) => {
+  const handleExport = () => {
+    import("xlsx").then((XLSX) => {
+      const rows = buildExcelRows(drillType, content);
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Drill");
+      XLSX.writeFile(workbook, `${drillType}-generated.xlsx`);
+    });
+  };
   const renderContent = () => {
     switch (drillType) {
       case "vocabulary": {
@@ -222,14 +327,24 @@ export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
 
       <div className="max-h-96 overflow-y-auto mb-6">{renderContent()}</div>
 
-      <button
-        type="button"
-        onClick={onUseDrill}
-        className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-      >
-        Use This Drill
-        <ArrowRight className="w-4 h-4" />
-      </button>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={handleExport}
+          className="py-3 px-4 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Export as Excel
+        </button>
+        <button
+          type="button"
+          onClick={onUseDrill}
+          className="flex-1 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+        >
+          Use This Drill
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };
