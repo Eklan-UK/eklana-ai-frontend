@@ -286,15 +286,15 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         </Label>
         <Textarea
           value={values.context}
-          onChange={(e) => onChange("context", e.target.value.slice(0, 500))}
+          onChange={(e) => onChange("context", e.target.value.slice(0, 1000))}
           rows={3}
-          maxLength={500}
+          maxLength={1000}
           disabled={disabled}
           placeholder="e.g. ICU nurse at Mount Sinai giving handover to incoming nurse"
           className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         />
         <p className="text-xs text-gray-400 mt-1 text-right">
-          {values.context.length}/500
+          {values.context.length}/1000
         </p>
       </div>
 
@@ -304,15 +304,15 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         </Label>
         <Textarea
           value={values.prompt}
-          onChange={(e) => onChange("prompt", e.target.value.slice(0, 1000))}
+          onChange={(e) => onChange("prompt", e.target.value.slice(0, 2000))}
           rows={4}
-          maxLength={1000}
+          maxLength={2000}
           disabled={disabled}
           placeholder="Paste your curriculum prompt here"
           className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         />
         <p className="text-xs text-gray-400 mt-1 text-right">
-          {values.prompt.length}/1000
+          {values.prompt.length}/2000
         </p>
       </div>
 
