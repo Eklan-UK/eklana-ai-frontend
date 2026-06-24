@@ -1,17 +1,20 @@
 "use client";
 
 import { Fragment, useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
-import { DrillLayout } from "./shared";
+import { DrillCompletionScreen, DrillLayout, CheckpointScreen } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 
 interface MatchingDrillProps {
   drill: any;
@@ -63,7 +66,6 @@ function findUnmatchedCanonicalPairIndex(
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
   const [rightItems, setRightItems] = useState<ShuffledItem[]>([]);
@@ -72,8 +74,12 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   const [matchedPairs, setMatchedPairs] = useState<Set<string>>(new Set());
   const [incorrectAttempts, setIncorrectAttempts] = useState<Set<string>>(new Set());
   const [isCompleted, setIsCompleted] = useState(false);
+  const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
   const matchTimingAnchorRef = useRef<number>(Date.now());
   const incorrectPairsRef = useRef<
     Array<{ left: string; right: string; attemptedMatch: string }>
@@ -94,35 +100,76 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
 
   useEffect(() => {
     const matchingPairs = drill.matching_pairs || [];
-    setPairs(matchingPairs);
 
-    const leftShuffled: ShuffledItem[] = shuffleArray(
-      matchingPairs.map((p: MatchPair, idx: number) => ({
-        id: idx,
-        text: p.left,
-        translation: p.leftTranslation,
-      }))
-    );
+    const applyPairSetup = (restoredKeys: Set<string>) => {
+      setPairs(matchingPairs);
 
-    const rightShuffled: ShuffledItem[] = shuffleArray(
-      matchingPairs.map((p: MatchPair, idx: number) => ({
-        id: idx,
-        text: p.right,
-        translation: p.rightTranslation,
-      }))
-    );
+      const leftShuffled: ShuffledItem[] = shuffleArray(
+        matchingPairs.map((p: MatchPair, idx: number) => ({
+          id: idx,
+          text: p.left,
+          translation: p.leftTranslation,
+        })),
+      );
 
-    setLeftItems(leftShuffled);
-    setRightItems(rightShuffled);
-    setMatchedPairs(new Set());
-    setIncorrectAttempts(new Set());
-    setSelectedLeftIndex(null);
-    setSelectedRightIndex(null);
-    matchTimingAnchorRef.current = Date.now();
-    incorrectPairsRef.current = [];
-    pairMatchEventsRef.current = [];
-    matchedCanonicalIndicesRef.current = new Set();
-  }, [drill.matching_pairs]);
+      const rightShuffled: ShuffledItem[] = shuffleArray(
+        matchingPairs.map((p: MatchPair, idx: number) => ({
+          id: idx,
+          text: p.right,
+          translation: p.rightTranslation,
+        })),
+      );
+
+      setLeftItems(leftShuffled);
+      setRightItems(rightShuffled);
+
+      if (restoredKeys.size > 0) {
+        setMatchedPairs(new Set(restoredKeys));
+        matchedCanonicalIndicesRef.current = new Set();
+        restoredKeys.forEach((key) => {
+          const [leftId] = key.split("-");
+          matchedCanonicalIndicesRef.current.add(Number(leftId));
+        });
+      } else {
+        setMatchedPairs(new Set());
+        matchedCanonicalIndicesRef.current = new Set();
+      }
+
+      setIncorrectAttempts(new Set());
+      setSelectedLeftIndex(null);
+      setSelectedRightIndex(null);
+      matchTimingAnchorRef.current = Date.now();
+      incorrectPairsRef.current = [];
+      pairMatchEventsRef.current = [];
+    };
+
+    if (!assignmentId) {
+      applyPairSetup(new Set());
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      const restoredKeys =
+        cp?.partialResults?.matchedPairKeys != null
+          ? new Set(cp.partialResults.matchedPairKeys as string[])
+          : new Set<string>();
+      if (cp) {
+        setCheckpointCount(cp.completedItemCount);
+      }
+      applyPairSetup(restoredKeys);
+      setIsLoadingCheckpoint(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id, drill.matching_pairs]);
 
   const isLeftMatched = (leftIndex: number): boolean => {
     const leftItem = leftItems[leftIndex];
@@ -205,7 +252,9 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       }
 
       const pairKey = `${leftItem.id}-${rightItem.id}`;
-      setMatchedPairs((prev) => new Set([...prev, pairKey]));
+      const newMatchedCount = matchedPairs.size + 1;
+      const newMatchedPairs = new Set([...matchedPairs, pairKey]);
+      setMatchedPairs(newMatchedPairs);
       setSelectedLeftIndex(null);
       setSelectedRightIndex(null);
       setIncorrectAttempts((prev) => {
@@ -217,11 +266,25 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       playPracticeFeedback("success");
       toast.success("Correct match! ✓");
 
-      const allMatched = matchedPairs.size + 1 === pairs.length;
+      const allMatched = newMatchedCount === pairs.length;
       if (allMatched) {
         setTimeout(() => {
           handleSubmit();
         }, 1000);
+        return;
+      }
+
+      if (newMatchedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "matching",
+          resumeFromIndex: newMatchedCount,
+          completedItemCount: newMatchedCount,
+          partialResults: { matchedPairKeys: [...newMatchedPairs] },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(newMatchedCount);
+        setShowCheckpoint(true);
       }
     } else {
       const rowForLeftId = pairs[leftItem.id];
@@ -277,7 +340,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       const totalPairs = pairs.length;
       const accuracy = totalPairs > 0 ? (pairsMatched / totalPairs) * 100 : 0;
 
-      await completeLearnerDrill(queryClient, drill._id, {
+      const result = await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
         score,
         timeSpent,
@@ -293,6 +356,9 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         platform: "web",
       });
 
+      setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+
+      void clearCheckpoint(String(drill._id), assignmentId);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
@@ -307,26 +373,37 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     }
   };
 
+  if (isLoadingCheckpoint) {
+    return (
+      <DrillLayout title={drill.title}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={pairs.length}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
+
   if (isCompleted) {
     return (
-      <DrillLayout title="Drill Completed">
-        <Card className="text-center py-8">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">Great Job!</h2>
-          <p className="text-muted-foreground mb-6">You&apos;ve completed the matching drill.</p>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => {
-              router.refresh();
-              router.push("/account/drills");
-            }}
-          >
-            Continue Learning
-          </Button>
-        </Card>
-      </DrillLayout>
+      <DrillCompletionScreen
+        drillType="matching"
+        celebrate
+        celebrationSoundUrl={celebrationSoundUrl}
+      />
     );
   }
 

@@ -195,9 +195,10 @@ async function postHandler(
       hasAudio: Boolean(audioUrl),
     });
 
+    let badgesUnlocked: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[] = [];
     try {
-      const { BadgeService } = await import('@/domain/badges/badge.service');
-      void BadgeService.evaluateAndUnlock(context.userId.toString());
+      const { triggerBadgeEvaluation } = await import('@/services/streak.service');
+      badgesUnlocked = await triggerBadgeEvaluation(context.userId.toString());
     } catch {
       // badges must not fail attempt save
     }
@@ -205,6 +206,7 @@ async function postHandler(
     return NextResponse.json({
       success: true,
       attempt: serializeAttempt(doc),
+      badgesUnlocked,
     });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {

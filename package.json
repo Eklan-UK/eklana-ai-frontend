@@ -11,7 +11,8 @@
     "lint": "eslint",
     "gemini:check": "node scripts/gemini-key-check.mjs",
     "generate-icons": "node scripts/generate-icons.js",
-    "test:gates": "node scripts/test-subscription-gates.mjs"
+    "test:gates": "node scripts/test-subscription-gates.mjs",
+    "test:notification": "node scripts/local-test-notification.mjs"
   },
   "dependencies": {
     "@amplitude/unified": "^1.1.11",

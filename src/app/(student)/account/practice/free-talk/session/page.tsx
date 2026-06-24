@@ -29,6 +29,9 @@ import { appendFreeTalkHistoryEntry } from "@/lib/free-talk-history";
 import { freeTalkStringListToMultiline } from "@/models/free-talk-scenario.shared";
 import { toast } from "sonner";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { celebrateBadgeUnlock } from "@/lib/badges/celebrate-badge-unlock";
+import { queryKeys } from "@/lib/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,6 +178,7 @@ function scenarioTypeLabel(scenarioType: string): string {
 function FreeTalkSessionInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const preferredScenarioId = searchParams.get("scenarioId")?.trim() || undefined;
 
   const { data: me, isLoading: meLoading } = useUserCurrent();
@@ -410,7 +414,7 @@ function FreeTalkSessionInner() {
         if (!fb.trim() && !gr) return;
 
         try {
-          await aiService.saveFreeTalkAttempt(
+          const saved = await aiService.saveFreeTalkAttempt(
             {
               scenarioId: scen.id,
               scenarioTitle: scen.title,
@@ -422,6 +426,12 @@ function FreeTalkSessionInner() {
             },
             voice?.blob ?? null
           );
+          if (saved.badgesUnlocked.length > 0) {
+            celebrateBadgeUnlock(saved.badgesUnlocked);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
+            void queryClient.invalidateQueries({ queryKey: ["user-streak"] });
+          }
+          void queryClient.invalidateQueries({ queryKey: ["progress-scorecard"] });
         } catch {
           appendFreeTalkHistoryEntry(learnerId, {
             scenarioId: scen.id,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import {
+  getMissionNumberLabel,
   getPartById,
   type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
@@ -19,7 +20,7 @@ export function LearningJourneyPartCard({
   totalCount,
 }: LearningJourneyPartCardProps) {
   const partDef = getPartById(part);
-  const title = partDef?.title ?? `Part ${part}`;
+  const title = partDef?.title ?? getMissionNumberLabel(part);
 
   return (
     <Link
@@ -33,7 +34,7 @@ export function LearningJourneyPartCard({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Part {part}
+          {getMissionNumberLabel(part)}
         </p>
         <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
           {title}

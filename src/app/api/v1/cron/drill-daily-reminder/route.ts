@@ -1,35 +1,33 @@
-// GET /api/v1/cron/drill-daily-reminder — Rolling streak reminder (every 30 min)
-// Secure with DRILL_REMINDER_CRON_SECRET: Authorization: Bearer <secret> or x-cron-secret
+// GET /api/v1/cron/drill-daily-reminder — rolling streak reminder (every 30 min)
+// Auth: CRON_SECRET (Vercel) or DRILL_REMINDER_CRON_SECRET (local)
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { DrillReminderService } from '@/domain/drills/drill-reminder.service';
+import {
+  authorizeCron,
+  isCronConfigured,
+  sanitizeCronResult,
+  shouldCronDebug,
+} from '@/lib/api/cron-auth';
 import '@/models/fcm-token';
 import '@/models/drill-assignment';
 import '@/models/profile';
 import '@/models/user-streak';
 
-function authorize(req: NextRequest): boolean {
-  const secret = process.env.DRILL_REMINDER_CRON_SECRET;
-  if (!secret) return false;
-
-  const auth = req.headers.get('authorization');
-  const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
-  const header = req.headers.get('x-cron-secret');
-  return bearer === secret || header === secret;
-}
+const ROUTE_SECRET_ENV = 'DRILL_REMINDER_CRON_SECRET';
 
 export async function GET(req: NextRequest) {
-  if (!process.env.DRILL_REMINDER_CRON_SECRET) {
+  if (!isCronConfigured(ROUTE_SECRET_ENV)) {
     return NextResponse.json(
       {
         code: 'NotConfigured',
-        message: 'DRILL_REMINDER_CRON_SECRET is not set',
+        message: 'Set CRON_SECRET (Vercel) or DRILL_REMINDER_CRON_SECRET (local)',
       },
       { status: 503 },
     );
   }
 
-  if (!authorize(req)) {
+  if (!authorizeCron(req, ROUTE_SECRET_ENV)) {
     return NextResponse.json(
       { code: 'Unauthorized', message: 'Invalid cron secret' },
       { status: 401 },
@@ -37,8 +35,12 @@ export async function GET(req: NextRequest) {
   }
 
   await connectToDatabase();
+  const verbose = shouldCronDebug(req);
   const svc = new DrillReminderService();
   const result = await svc.runRollingReminders();
 
-  return NextResponse.json({ code: 'Success', data: result });
+  return NextResponse.json({
+    code: 'Success',
+    data: sanitizeCronResult(result, verbose),
+  });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -170,7 +169,6 @@ export default function RoleplayDrill({
   weeklyChallengeMeta,
 }: RoleplayDrillProps) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [completedMessages, setCompletedMessages] = useState<CompletedMessage[]>([]);
@@ -770,22 +768,27 @@ export default function RoleplayDrill({
     setIsSavingProgress(true);
     try {
       await drillAPI.saveRoleplayProgress(progressDrillId, payload);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
+      // Invalidate in the background — don't await, we're about to hard-navigate away.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
       toast.success("Progress saved — pick up where you left off anytime.");
-      if (progressContext.source === "weekly_challenge") {
-        router.push(
-          `/account/practice/weekly-challenge/${encodeURIComponent(progressContext.weekStartDate)}`,
-        );
-      } else {
-        router.push("/account/drills");
-      }
+      // Use a hard navigation (window.location) so the React tree is fully torn
+      // down before the next page mounts.  router.push (soft nav) can throw an
+      // unhandled rejection when async state updates are still in-flight after
+      // query invalidation, which is the root cause of the runtime error here.
+      const exitHref =
+        progressContext.source === "weekly_challenge"
+          ? `/account/practice/weekly-challenge/${encodeURIComponent(progressContext.weekStartDate)}`
+          : "/account/drills";
+      window.location.href = exitHref;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       toast.error("Failed to save progress: " + message);
-    } finally {
       setIsSavingProgress(false);
     }
-  }, [sceneBreak, progressContext, progressDrillId, buildSavePayload, router, queryClient]);
+    // NOTE: no `finally` block — if save succeeds we navigate away (hard reload)
+    // so setting state on the unmounting component is unnecessary.  On error the
+    // catch block above resets the flag so the button becomes clickable again.
+  }, [sceneBreak, progressContext, progressDrillId, buildSavePayload, queryClient]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -1266,6 +1269,7 @@ export default function RoleplayDrill({
         drillType={weeklyChallengeMeta ? "Role-play" : "roleplay"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
         extraContent={
           linesWithTranscript.length > 0 ? (
             <Card className="border-border text-left p-4 shadow-none">
@@ -1635,24 +1639,28 @@ export default function RoleplayDrill({
                 <ChevronRight className="w-5 h-5 mr-2" />
                 Continue to Next Scene
               </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                fullWidth
-                onClick={() => void saveProgressAndExit()}
-                disabled={isSavingProgress}
-                className="border-border text-foreground hover:bg-muted"
-              >
-                {isSavingProgress ? (
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                ) : (
-                  <Clock className="w-5 h-5 mr-2" />
-                )}
-                Continue Later
-              </Button>
-              <p className="text-xs text-muted-foreground px-2">
-                Save your progress and return from My Plan whenever you&apos;re ready.
-              </p>
+              {progressContext && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    fullWidth
+                    onClick={() => void saveProgressAndExit()}
+                    disabled={isSavingProgress}
+                    className="border-border text-foreground hover:bg-muted"
+                  >
+                    {isSavingProgress ? (
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    ) : (
+                      <Clock className="w-5 h-5 mr-2" />
+                    )}
+                    Continue Later
+                  </Button>
+                  <p className="text-xs text-muted-foreground px-2">
+                    Save your progress and return from My Plan whenever you&apos;re ready.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}

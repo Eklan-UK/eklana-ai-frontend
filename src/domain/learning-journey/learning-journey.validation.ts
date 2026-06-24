@@ -37,7 +37,7 @@ export function refineLearningJourneyFields(
     if (part == null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Learning journey part is required when assigning a drill",
+        message: "Learning journey mission is required when assigning a drill",
         path: ["learning_journey_part"],
       });
     }
@@ -54,7 +54,7 @@ export function refineLearningJourneyFields(
     if (!isValidPartTopicPair(part, topic)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Topic does not belong to the selected part",
+        message: "Topic does not belong to the selected mission",
         path: ["learning_journey_topic"],
       });
     }
@@ -63,7 +63,7 @@ export function refineLearningJourneyFields(
   if ((part != null && !topic) || (part == null && topic)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Learning journey part and topic must both be set or both omitted",
+      message: "Learning journey mission and topic must both be set or both omitted",
       path: ["learning_journey_part"],
     });
   }

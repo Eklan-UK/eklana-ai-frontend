@@ -19,11 +19,17 @@ import {
   DrillPerformanceReview,
   DrillLineReviewAccordion,
   RecordingPreviewBar,
+  CheckpointScreen,
   type PerformanceReviewAnalyticsRow,
   type PerformanceReviewGroup,
 } from "./shared";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 
 interface VocabularyDrillProps {
   drill: any;
@@ -133,6 +139,9 @@ export default function VocabularyDrill({
   const [sessionReviewAnalytics, setSessionReviewAnalytics] = useState<
     PerformanceReviewAnalyticsRow[]
   >([]);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -170,18 +179,55 @@ export default function VocabularyDrill({
   };
 
   useEffect(() => {
-    const initialProgress: Record<number, WordProgress> = {};
-    targetSentences.forEach((_: any, index: number) => {
-      initialProgress[index] = {
-        wordPassed: false,
-        wordScore: null,
-        sentencePassed: false,
-        sentenceScore: null,
-      };
+    const createEmptyProgress = (): Record<number, WordProgress> => {
+      const initialProgress: Record<number, WordProgress> = {};
+      targetSentences.forEach((_: any, index: number) => {
+        initialProgress[index] = {
+          wordPassed: false,
+          wordScore: null,
+          sentencePassed: false,
+          sentenceScore: null,
+        };
+      });
+      return initialProgress;
+    };
+
+    if (!assignmentId) {
+      setWordProgress(createEmptyProgress());
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      if (cp) {
+        setCurrentIndex(cp.resumeFromIndex);
+        const partial = cp.partialResults;
+        if (partial.wordProgress) {
+          setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+        } else {
+          setWordProgress(createEmptyProgress());
+        }
+        if (partial.sessionReviewAnalytics) {
+          setSessionReviewAnalytics(
+            partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+          );
+        }
+        setCheckpointCount(cp.completedItemCount);
+      } else {
+        setWordProgress(createEmptyProgress());
+      }
+      setIsLoadingCheckpoint(false);
     });
-    setWordProgress(initialProgress);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when sentence count changes
-  }, [targetSentences.length]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id, targetSentences.length]);
 
   const revokeRecordingPreview = useCallback(() => {
     setRecordingPreviewUrl((prev) => {
@@ -439,10 +485,27 @@ export default function VocabularyDrill({
     }
 
     if (currentIndex < targetSentences.length - 1) {
+      const completedCount = Object.values(wordProgress).filter(
+        (p) => p.wordPassed && p.sentencePassed,
+      ).length;
+
       setCurrentIndex(currentIndex + 1);
       setCurrentScreen("word");
       setPronunciationScore(null);
       discardPendingRecording();
+
+      if (completedCount > 0 && completedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "vocabulary",
+          resumeFromIndex: currentIndex + 1,
+          completedItemCount: completedCount,
+          partialResults: { wordProgress, sessionReviewAnalytics },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(completedCount);
+        setShowCheckpoint(true);
+      }
     } else {
       discardPendingRecording();
       setPronunciationScore(null);
@@ -505,6 +568,7 @@ export default function VocabularyDrill({
         platform: "web",
       });
 
+      void clearCheckpoint(String(drill._id), assignmentId);
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -621,12 +685,37 @@ export default function VocabularyDrill({
     sessionReviewAnalytics,
   ]);
 
+  if (isLoadingCheckpoint) {
+    return (
+      <DrillLayout title={drill.title}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={targetSentences.length}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
         drillType="vocabulary"
         returnPath="/account/drills"
         returnLabel="Back to My Plan"
+        celebrate={false}
       />
     );
   }

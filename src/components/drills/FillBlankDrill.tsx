@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useDrillScoreCelebration } from "@/hooks/useDrillScoreCelebration";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
@@ -16,9 +17,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
-import { DrillCompletionScreen, DrillLayout, DrillProgress } from "./shared";
+import { DrillCompletionScreen, DrillLayout, DrillProgress, CheckpointScreen } from "./shared";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -43,9 +48,47 @@ export default function FillBlankDrill({
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      if (cp) {
+        setCurrentIndex(cp.resumeFromIndex);
+        const partial = cp.partialResults;
+        if (partial.answers) {
+          setAnswers(partial.answers as Record<number, Record<number, string>>);
+        }
+        if (typeof partial.submittedCount === "number") {
+          setSubmittedCount(partial.submittedCount as number);
+        }
+        setCheckpointCount(cp.completedItemCount);
+      }
+      setIsLoadingCheckpoint(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id]);
 
   const items = drill.fill_blank_items || [];
   const currentItem = items[currentIndex];
+
+  useDrillScoreCelebration(
+    submittedResults === null ? null : submittedResults.passed,
+  );
 
   // Parse sentence to extract blank positions
   const parseSentence = (sentence: string) => {
@@ -161,10 +204,24 @@ export default function FillBlankDrill({
       return;
     }
 
-    setSubmittedCount(prev => Math.max(prev, currentIndex + 1));
+    const newSubmittedCount = Math.max(submittedCount, currentIndex + 1);
+    setSubmittedCount(newSubmittedCount);
 
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1);
+
+      if (newSubmittedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "fill_blank",
+          resumeFromIndex: currentIndex + 1,
+          completedItemCount: newSubmittedCount,
+          partialResults: { answers, submittedCount: newSubmittedCount },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(newSubmittedCount);
+        setShowCheckpoint(true);
+      }
     }
   };
 
@@ -213,6 +270,7 @@ export default function FillBlankDrill({
   };
 
   const handleRetry = () => {
+    if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
     setSubmittedResults(null);
     setAnswers({});
     setCurrentIndex(0);
@@ -264,6 +322,7 @@ export default function FillBlankDrill({
           },
           platform: "web",
         });
+        void clearCheckpoint(String(drill._id), assignmentId!);
         trackActivity("drill", drill._id, "completed", {
           title: drill.title,
           type: drill.type,
@@ -272,10 +331,8 @@ export default function FillBlankDrill({
       }
 
       if (passed) {
-        playPracticeFeedback("success");
         toast.success("Drill passed! Great job!");
       } else {
-        playPracticeFeedback("failure");
         toast.error(
           `Score: ${score}%. You need at least ${PASS_THRESHOLD}% to pass. Try again!`,
         );
@@ -289,6 +346,30 @@ export default function FillBlankDrill({
     }
   };
 
+  if (isLoadingCheckpoint) {
+    return (
+      <DrillLayout title={drill.title} showBack={true}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={items.length}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
+
   if (isCompleted) {
     const returnPath = weeklyChallengeMeta
       ? `/account/practice/weekly-challenge/${encodeURIComponent(weeklyChallengeMeta.weekStartDate)}`
@@ -298,6 +379,7 @@ export default function FillBlankDrill({
         drillType={weeklyChallengeMeta ? "Vocabulary" : "fill_blank"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
+        celebrate={false}
       />
     );
   }

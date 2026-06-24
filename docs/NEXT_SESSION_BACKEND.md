@@ -122,7 +122,7 @@ The card shows:
 
 ## 5. Reminders — Cron Job
 
-**Route:** `GET /api/v1/cron/class-session-reminders` (secured with `CLASS_REMINDER_CRON_SECRET`)
+**Route:** `GET /api/v1/cron/class-session-reminders` (secured with `CRON_SECRET` on Vercel, or `CLASS_REMINDER_CRON_SECRET` locally)
 
 `ClassReminderService.runDueReminders()` runs on a cron schedule and:
 

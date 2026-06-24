@@ -520,6 +520,7 @@ export class DrillService {
       drillAssignmentId: new Types.ObjectId(params.drillAssignmentId),
       learnerId: new Types.ObjectId(params.learnerId),
       drillId: new Types.ObjectId(drillId),
+      drillType: drill.type,
       startedAt: new Date(Date.now() - params.timeSpent * 1000),
       completedAt: new Date(),
       timeSpent: params.timeSpent,

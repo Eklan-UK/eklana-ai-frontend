@@ -181,7 +181,11 @@ export function isKnownLearningJourneyTopicId(topicId: string): boolean {
   return ALL_TOPIC_IDS.has(topicId);
 }
 
+export function getMissionNumberLabel(part: LearningJourneyPartId): string {
+  return `Mission ${part}`;
+}
+
 export function getPartLabel(part: LearningJourneyPartId): string {
   const def = getPartById(part);
-  return def ? `Part ${part}: ${def.title}` : `Part ${part}`;
+  return def ? `${getMissionNumberLabel(part)}: ${def.title}` : getMissionNumberLabel(part);
 }

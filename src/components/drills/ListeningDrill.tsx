@@ -10,7 +10,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 
 interface ListeningDrillProps {
@@ -21,6 +20,7 @@ interface ListeningDrillProps {
 export default function ListeningDrill({ drill, assignmentId }: ListeningDrillProps) {
   const queryClient = useQueryClient();
   const [isCompleted, setIsCompleted] = useState(false);
+  const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasListened, setHasListened] = useState(false);
@@ -154,7 +154,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         return;
       }
 
-      await completeLearnerDrill(queryClient, drillId, {
+      const result = await completeLearnerDrill(queryClient, drillId, {
         drillAssignmentId: assignmentId,
         score: 100, // Listening drills are completion-based
         timeSpent,
@@ -165,8 +165,9 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         platform: 'web',
       });
 
+      setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+
       setIsCompleted(true);
-      playPracticeFeedback("success");
       toast.success("Drill completed! Great job!");
 
       // Track activity locally (no API call)
@@ -182,7 +183,13 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="listening" />;
+    return (
+      <DrillCompletionScreen
+        drillType="listening"
+        celebrate
+        celebrationSoundUrl={celebrationSoundUrl}
+      />
+    );
   }
 
   return (

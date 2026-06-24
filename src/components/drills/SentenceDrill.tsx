@@ -16,9 +16,13 @@ import {
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
-import { DrillCompletionScreen, DrillLayout } from "./shared";
+import { DrillCompletionScreen, DrillLayout, CheckpointScreen } from "./shared";
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  clearCheckpoint,
+} from "@/lib/drill/drill-checkpoint";
 import { trackActivity } from "@/utils/activity-cache";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
 
 interface SentenceDrillProps {
@@ -86,8 +90,38 @@ export default function SentenceDrill({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [startTime] = useState(Date.now());
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const [checkpointCount, setCheckpointCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollToTopAfterNextRef = useRef(false);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
+      if (cancelled) return;
+      if (cp) {
+        setCurrentIndex(cp.resumeFromIndex);
+        if (cp.partialResults.answers) {
+          setAnswers(cp.partialResults.answers as Record<number, WordAnswer>);
+        }
+        setCheckpointCount(cp.completedItemCount);
+      }
+      setIsLoadingCheckpoint(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, drill._id]);
 
   const currentWord = wordItems[currentIndex];
   const currentAnswer = answers[currentIndex] || {
@@ -150,8 +184,22 @@ export default function SentenceDrill({
     if (isLastWord) {
       await handleSubmit();
     } else {
+      const completedCount = currentIndex + 1;
       scrollToTopAfterNextRef.current = true;
       setCurrentIndex(currentIndex + 1);
+
+      if (completedCount % 5 === 0 && assignmentId) {
+        void saveCheckpoint(String(drill._id), {
+          assignmentId,
+          drillType: "sentence_writing",
+          resumeFromIndex: currentIndex + 1,
+          completedItemCount: completedCount,
+          partialResults: { answers },
+          startedAt: new Date(startTime),
+        });
+        setCheckpointCount(completedCount);
+        setShowCheckpoint(true);
+      }
     }
   };
 
@@ -211,8 +259,8 @@ export default function SentenceDrill({
         platform: "web",
       });
 
+      void clearCheckpoint(String(drill._id), assignmentId);
       setIsCompleted(true);
-      playPracticeFeedback("success");
       toast.success("Drill submitted! Your submission is pending review.");
 
       // Track activity locally (no API call)
@@ -229,12 +277,37 @@ export default function SentenceDrill({
     }
   };
 
+  if (isLoadingCheckpoint) {
+    return (
+      <DrillLayout title={drill.title}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
+  if (showCheckpoint) {
+    return (
+      <CheckpointScreen
+        completedCount={checkpointCount}
+        totalCount={totalWords}
+        drillTitle={drill.title}
+        onContinue={() => setShowCheckpoint(false)}
+        onExit={() => {
+          window.location.href = "/account/drills";
+        }}
+      />
+    );
+  }
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
         title="Drill Submitted"
         message="Your submission has been sent for review. You'll be notified when your sentences have been reviewed."
         drillType="sentence"
+        celebrate={false}
       />
     );
   }

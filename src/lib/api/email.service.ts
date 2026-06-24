@@ -499,11 +499,14 @@ export const sendClassReminderEmail = async (data: {
   minutesBefore: number;
   sessionStart: Date;
   meetingUrl?: string;
+  /** Tracked link that records attendance before redirecting to Meet */
+  emailJoinUrl?: string;
 }): Promise<void> => {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const label = formatReminderLabel(data.minutesBefore);
     const subject = `Your class starts in ${label}`;
+    const joinHref = data.emailJoinUrl || data.meetingUrl;
 
     const formattedTime = data.sessionStart.toLocaleString('en-US', {
       weekday: 'long',
@@ -546,8 +549,8 @@ export const sendClassReminderEmail = async (data: {
           ${data.minutesBefore <= 15 ? `<div style="margin-top: 10px; font-size: 13px; color: #166534; font-weight: 600;">Starting in ${label} — get ready!</div>` : ''}
         </div>
         <div style="text-align: center; margin: 30px 0;">
-          ${data.meetingUrl
-            ? `<a href="${data.meetingUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34,197,94,0.4);">Join Class →</a>`
+          ${joinHref
+            ? `<a href="${joinHref}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34,197,94,0.4);">Join Class →</a>`
             : `<a href="${appUrl}/account/classes" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34,197,94,0.4);">View My Classes →</a>`
           }
         </div>
@@ -569,7 +572,7 @@ Hi ${data.studentName},
 Your class "${data.classTitle}" starts in ${label}.
 
 When: ${formattedTime}
-${data.meetingUrl ? `\nJoin here: ${data.meetingUrl}` : `\nView your classes: ${appUrl}/account/classes`}
+${joinHref ? `\nJoin here: ${joinHref}` : `\nView your classes: ${appUrl}/account/classes`}
 
 Good luck! 🌟
 
@@ -672,6 +675,6 @@ This is an automated notification from Eklan.
       error: msg,
       studentEmail: data.studentEmail,
     });
-    // Don't throw - email failure should not block the cron run
+    throw error;
   }
 };

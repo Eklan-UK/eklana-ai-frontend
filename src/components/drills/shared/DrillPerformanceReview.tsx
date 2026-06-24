@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useDrillScoreCelebration } from "@/hooks/useDrillScoreCelebration";
 import type { TextScore } from "@/services/speechace.service";
 import { PronunciationWordBreakdown } from "./PronunciationWordBreakdown";
 import { transcriptFromTextScore } from "./speechaceTranscript";
@@ -222,6 +223,10 @@ export function DrillPerformanceReview({
 
   const hasData = groups.length > 0;
 
+  useDrillScoreCelebration(
+    isViewer || !hasData ? null : avgScore >= passThreshold,
+  );
+
   const openIdx =
     !hasData || expandedListIndex < 0
       ? -1
@@ -234,6 +239,16 @@ export function DrillPerformanceReview({
 
   return (
     <>
+      {isSubmitting && !isViewer ? (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-sm"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-foreground">Saving your results…</p>
+        </div>
+      ) : null}
       <div className={`${isViewer ? "pb-6" : "pb-40"} ${widthClass}`}>
         {hasData ? (
           <OverallScoreDonut score={avgScore} statsLine={statsLine} />

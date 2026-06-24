@@ -140,6 +140,47 @@ export const drillAPI = {
     });
   },
 
+  getCheckpoint: (drillId: string, assignmentId: string) => {
+    return apiRequest<{
+      code?: string;
+      data?: { checkpoint: Record<string, unknown> | null };
+    }>(`/drills/${drillId}/checkpoint`, {
+      method: 'GET',
+      params: { assignmentId },
+      cache: false,
+    });
+  },
+
+  saveCheckpoint: (
+    drillId: string,
+    data: {
+      assignmentId: string;
+      drillType: string;
+      resumeFromIndex: number;
+      completedItemCount: number;
+      partialResults: Record<string, unknown>;
+      startedAt?: string | Date;
+    },
+  ) => {
+    return apiRequest<{
+      code?: string;
+      data?: { checkpoint: Record<string, unknown> };
+    }>(`/drills/${drillId}/checkpoint`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  clearCheckpoint: (drillId: string, assignmentId: string) => {
+    return apiRequest<{
+      code?: string;
+      data?: { deleted: boolean };
+    }>(`/drills/${drillId}/checkpoint`, {
+      method: 'DELETE',
+      params: { assignmentId },
+    });
+  },
+
   getRoleplayProgress: (
     drillId: string,
     params:
@@ -241,12 +282,16 @@ export const drillAPI = {
       code: string;
       message: string;
       data: {
+        drillId: string;
+        passed: boolean;
         attempt: {
           id: string;
           score: number;
           timeSpent: number;
           completedAt: string;
         };
+        badgesUnlocked?: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[];
+        effects?: { soundUrl: string; triggerConfetti: boolean };
       };
     }>(`/drills/${drillId}/complete`, {
       method: 'POST',
@@ -1793,10 +1838,14 @@ export const dailyFocusAPI = {
         message: string;
         score: number;
         streakUpdated: boolean;
-        badgeUnlocked: {
+        badgesUnlocked?: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[];
+        badgeUnlocked?: {
           badgeId: string;
           badgeName: string;
-          milestone: number;
+          icon?: string;
+          afterOutcome?: string;
+          humorousLine?: string;
+          milestone?: number;
         } | null;
       };
     }>(`/daily-focus/${id}/complete`, {

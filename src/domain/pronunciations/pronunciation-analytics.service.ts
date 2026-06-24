@@ -122,6 +122,28 @@ function buildOverallMatch(days?: number, learnerIds?: string[]): Record<string,
 	};
 }
 
+const wordPhonemePairsField = {
+	$reduce: {
+		input: { $ifNull: ['$wordScores', []] },
+		initialValue: [],
+		in: {
+			$concatArrays: [
+				'$$value',
+				{
+					$map: {
+						input: { $ifNull: ['$$this.phonemes', []] },
+						as: 'p',
+						in: {
+							word: '$$this.word',
+							phoneme: '$$p.phoneme',
+						},
+					},
+				},
+			],
+		},
+	},
+};
+
 async function aggregateSoundProblems(
 	match: Record<string, unknown>,
 	field: 'incorrectPhonemes' | 'incorrectLetters',
@@ -129,17 +151,56 @@ async function aggregateSoundProblems(
 ): Promise<PhonemeProblemArea[] | LetterProblemArea[]> {
 	const results = await PronunciationAttempt.aggregate([
 		{ $match: match },
+		...wordLookupStages,
 		{ $unwind: `$${field}` },
 		{ $match: { [field]: { $nin: [null, ''] } } },
-		...wordLookupStages,
-		// Do NOT filter by struggledWord here — drill-based attempts may have no wordId/
-		// pronunciationId and empty wordScores, so struggledWord would be null for them.
+		{
+			$addFields: {
+				resolvedWord: {
+					$cond: [
+						outputKey === 'phoneme',
+						{
+							$let: {
+								vars: {
+									matched: {
+										$arrayElemAt: [
+											{
+												$filter: {
+													input: wordPhonemePairsField,
+													cond: { $eq: ['$$this.phoneme', `$${field}`] },
+												},
+											},
+											0,
+										],
+									},
+								},
+								in: {
+									$cond: [
+										{
+											$and: [
+												{ $ne: ['$$matched.word', null] },
+												{ $ne: ['$$matched.word', ''] },
+											],
+										},
+										'$$matched.word',
+										'$struggledWord',
+									],
+								},
+							},
+						},
+						'$struggledWord',
+					],
+				},
+			},
+		},
+		// Do NOT filter by resolvedWord — drill-based attempts may have no wordId/
+		// pronunciationId and empty wordScores, so resolvedWord would be null for them.
 		// We still count every phoneme/letter error; the words list just omits null entries.
 		{
 			$group: {
 				_id: {
 					sound: `$${field}`,
-					word: '$struggledWord',
+					word: '$resolvedWord',
 				},
 				count: { $sum: 1 },
 			},

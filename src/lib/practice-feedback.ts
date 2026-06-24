@@ -1,4 +1,6 @@
 import { unlockAudioContext } from "@/lib/ios-audio-utils";
+import { triggerDrillEndConfetti } from "@/lib/drill-celebration";
+import { getClientCelebrationSoundUrl } from "@/lib/drill/celebration-sound-url";
 
 export type PracticeFeedbackKind = "success" | "failure";
 
@@ -22,6 +24,7 @@ const TONE_SEQUENCES: Record<
 };
 
 let audioContext: AudioContext | null = null;
+let celebrationAudio: HTMLAudioElement | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -82,4 +85,34 @@ export async function playTone(kind: PracticeFeedbackKind): Promise<void> {
 export function playPracticeFeedback(kind: PracticeFeedbackKind): void {
   triggerHaptic(kind);
   void playTone(kind);
+}
+
+async function playCelebrationSound(soundUrl?: string): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const url = soundUrl?.trim() || getClientCelebrationSoundUrl();
+  try {
+    if (celebrationAudio) {
+      celebrationAudio.pause();
+      celebrationAudio.src = "";
+      celebrationAudio = null;
+    }
+    const audio = new Audio(url);
+    celebrationAudio = audio;
+    await audio.play();
+  } catch {
+    /* CDN / autoplay policy — haptics + confetti still run */
+  }
+}
+
+/** End-of-drill pass: celebration MP3, haptics, and confetti. */
+export function playDrillEndCelebration(soundUrl?: string): void {
+  triggerHaptic("success");
+  void playCelebrationSound(soundUrl);
+  triggerDrillEndConfetti();
+}
+
+export function playDrillEndFailure(): void {
+  triggerHaptic("failure");
+  void playTone("failure");
 }

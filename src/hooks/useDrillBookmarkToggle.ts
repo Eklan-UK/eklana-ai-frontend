@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/react-query";
+import { celebrateBadgesFromApiResponse } from "@/lib/badges/celebrate-badge-unlock";
 
 export function useDrillBookmarkToggle() {
   const queryClient = useQueryClient();
@@ -35,6 +36,9 @@ export function useDrillBookmarkToggle() {
             toast.info("Already bookmarked");
           } else {
             toast.success("Added to bookmarks!");
+            celebrateBadgesFromApiResponse(data);
+            await queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
+            await queryClient.invalidateQueries({ queryKey: ["user-streak"] });
           }
         }
 

@@ -23,6 +23,7 @@ export async function completeWeeklyChallengeItem(
 	await queryClient.refetchQueries({
 		queryKey: queryKeys.weeklyChallenge.all,
 	});
+	await queryClient.invalidateQueries({ queryKey: ['progress-scorecard'] });
 
 	return response;
 }
