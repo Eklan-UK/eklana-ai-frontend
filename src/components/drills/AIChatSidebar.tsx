@@ -27,6 +27,7 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [latestDrill, setLatestDrill] = useState<Record<string, unknown>>(currentDrill);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
         credentials: "include",
         body: JSON.stringify({
           drillType,
-          currentDrill,
+          currentDrill: latestDrill,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -70,21 +71,31 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
       }
 
       const json = await res.json();
-      const updatedDrill = json.data?.drill ?? json.data;
+      const updatedDrill = json.data?.drill ?? null;
       const assistantText =
         json.data?.message ??
         json.message ??
         "Drill content updated.";
 
-      if (updatedDrill && typeof updatedDrill === "object") {
+      if (
+        updatedDrill &&
+        typeof updatedDrill === "object" &&
+        Object.keys(updatedDrill).some((k) => (updatedDrill as Record<string, unknown>)[k] !== null && (updatedDrill as Record<string, unknown>)[k] !== undefined && (updatedDrill as Record<string, unknown>)[k] !== "")
+      ) {
+        setLatestDrill(updatedDrill as Record<string, unknown>);
         onDrillUpdated(updatedDrill as Record<string, unknown>);
       }
+
+      const drillWasUpdated =
+        updatedDrill &&
+        typeof updatedDrill === "object" &&
+        Object.keys(updatedDrill).some((k) => (updatedDrill as Record<string, unknown>)[k] !== null && (updatedDrill as Record<string, unknown>)[k] !== undefined && (updatedDrill as Record<string, unknown>)[k] !== "");
 
       setMessages([
         ...nextMessages,
         { role: "assistant", content: assistantText },
       ]);
-      toast.success("Drill updated");
+      if (drillWasUpdated) toast.success("Drill updated");
     } catch {
       toast.error("Refine with AI is not available yet");
       setMessages(messages);
@@ -127,7 +138,7 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {messages.length === 0 ? (
+          {messages.length === 0 && !sending ? (
             <p className="text-sm text-gray-500 text-center py-8">
               Ask AI to refine the generated drill content. For example: &quot;Make
               Scene 2 more clinical&quot;
@@ -152,6 +163,16 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
                 </div>
               </div>
             ))
+          )}
+          {sending && (
+            <div className="flex flex-col items-start">
+              <span className="text-xs font-bold text-gray-400 mb-1">AI</span>
+              <div className="bg-gray-100 rounded-2xl px-4 py-3 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" />
+              </div>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
