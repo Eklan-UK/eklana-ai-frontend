@@ -91,6 +91,7 @@ export default function DrillPracticeInterface({
     const drillType = resolveDrillPracticeType(drill);
     const drillForUi =
       drillType && drillType !== drill?.type ? { ...drill, type: drillType } : drill;
+    const drillSessionKey = `${drill._id}-${assignmentId ?? "pending"}`;
     const commonProps = {
       drill: drillForUi,
       assignmentId: assignmentId || undefined,
@@ -99,28 +100,28 @@ export default function DrillPracticeInterface({
 
     switch (drillType) {
       case "vocabulary":
-        return <VocabularyDrill {...commonProps} />;
+        return <VocabularyDrill key={drillSessionKey} {...commonProps} />;
       case "pronunciation":
-        return <PronunciationDrill {...commonProps} />;
+        return <PronunciationDrill key={drillSessionKey} {...commonProps} />;
       case "roleplay":
-        return <RoleplayDrill {...commonProps} />;
+        return <RoleplayDrill key={drillSessionKey} {...commonProps} />;
       case "matching":
-        return <MatchingDrill {...commonProps} />;
+        return <MatchingDrill key={drillSessionKey} {...commonProps} />;
       case "definition":
-        return <DefinitionDrill {...commonProps} />;
+        return <DefinitionDrill key={drillSessionKey} {...commonProps} />;
       case "summary":
-        return <SummaryDrill {...commonProps} />;
+        return <SummaryDrill key={drillSessionKey} {...commonProps} />;
       case "grammar":
-        return <GrammarDrill {...commonProps} />;
+        return <GrammarDrill key={drillSessionKey} {...commonProps} />;
       case "sentence_writing":
       case "sentence":
-        return <SentenceDrill {...commonProps} />;
+        return <SentenceDrill key={drillSessionKey} {...commonProps} />;
       case "listening":
-        return <ListeningDrill {...commonProps} />;
+        return <ListeningDrill key={drillSessionKey} {...commonProps} />;
       case "fill_blank":
-        return <FillBlankDrill {...commonProps} />;
+        return <FillBlankDrill key={drillSessionKey} {...commonProps} />;
       case "key_phrases":
-        return <KeyPhrasesDrill {...commonProps} />;
+        return <KeyPhrasesDrill key={drillSessionKey} {...commonProps} />;
       default:
         return (
           <div className="min-h-screen bg-background pb-6">

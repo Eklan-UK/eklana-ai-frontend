@@ -6,6 +6,17 @@ import { StreakService } from '@/services/streak.service';
 import { onDrillPracticeReminder, onStreakReminder } from '@/services/notification/triggers';
 import { logger } from '@/lib/api/logger';
 
+export type DrillReminderVariant = 'daily' | 'streak';
+
+export type SendForLearnerResult = {
+  sent: boolean;
+  skipped: boolean;
+  reason?: string;
+  pendingCount?: number;
+  streakDays?: number;
+  delivery?: unknown;
+};
+
 export class DrillReminderService {
   /**
    * Send a daily practice reminder to every learner who has active FCM tokens.
@@ -185,5 +196,94 @@ export class DrillReminderService {
     });
 
     return { examined, sent, skipped, errors };
+  }
+
+  /**
+   * Send a single reminder to one learner (dev/test — no cron window or dedupe).
+   */
+  async sendForLearner(
+    learnerId: string,
+    variant: DrillReminderVariant,
+  ): Promise<SendForLearnerResult> {
+    const profile = await Profile.findOne({ userId: learnerId })
+      .select('notificationPreferences')
+      .lean();
+
+    if (profile?.notificationPreferences?.learningReminders === false) {
+      return {
+        sent: false,
+        skipped: true,
+        reason: 'learning_reminders_disabled',
+      };
+    }
+
+    if (variant === 'daily') {
+      const pendingCount = await DrillAssignment.countDocuments({
+        learnerId,
+        status: { $in: ['pending', 'in-progress'] },
+      });
+
+      let streakDays = 0;
+      try {
+        const streakData = await StreakService.getStreakData(learnerId);
+        streakDays = streakData.currentStreak;
+      } catch {
+        // streak is non-critical — proceed with 0
+      }
+
+      const result = await onDrillPracticeReminder(
+        learnerId,
+        pendingCount,
+        streakDays,
+      );
+
+      if (!result) {
+        return {
+          sent: false,
+          skipped: true,
+          reason: 'no_push_tokens',
+          pendingCount,
+          streakDays,
+        };
+      }
+
+      return {
+        sent: true,
+        skipped: false,
+        pendingCount,
+        streakDays,
+        delivery: result,
+      };
+    }
+
+    const streakData = await StreakService.getStreakData(learnerId);
+    const streakDays = streakData.currentStreak;
+
+    if (streakDays <= 0) {
+      return {
+        sent: false,
+        skipped: true,
+        reason: 'streak_zero',
+        streakDays,
+      };
+    }
+
+    const result = await onStreakReminder(learnerId, streakDays);
+
+    if (!result) {
+      return {
+        sent: false,
+        skipped: true,
+        reason: 'no_push_tokens',
+        streakDays,
+      };
+    }
+
+    return {
+      sent: true,
+      skipped: false,
+      streakDays,
+      delivery: result,
+    };
   }
 }

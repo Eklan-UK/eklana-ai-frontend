@@ -32,9 +32,23 @@ Each card shows:
 | Status badge | Ready / Generating / Failed |
 | Drill summary | "2 drills · 12 min" — count of `drillSequence` items + `totalEstimatedMinutes` |
 
-Clicking a card navigates to `/account/practice/weekly-challenge/[weekStartDate]` where `weekStartDate` is the ISO date string from the document. This is the week view page — already built by dev, no changes needed.
+Clicking a card navigates to `/account/practice/weekly-challenge/[weekStartDate]` where `weekStartDate` is the ISO date string from the document.
 
 Sort: newest first (the API already returns them sorted).
+
+---
+
+## 3. Week view (`/account/practice/weekly-challenge/[weekStartDate]`)
+
+**Hook:** `useWeeklyChallenge(weekStartDate)` → `{ challenge, isLoading, isError, refetch }`
+
+If `status === 'generating'`, poll every 3 s until ready (same pattern as the existing `useWeeklyChallenge` hook).
+
+Render each `ChallengeDrillItem` as a card:
+- Index number + drill type label
+- `item.instructions`
+- Estimated minutes
+- **Start** button → launches `DrillPracticeInterface` with the adapted drill props
 
 ---
 

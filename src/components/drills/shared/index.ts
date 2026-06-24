@@ -12,4 +12,5 @@ export {
   type PerformanceReviewGroup,
 } from './DrillPerformanceReview';
 export { RecordingPreviewBar } from './RecordingPreviewBar';
+export { CheckpointScreen } from './CheckpointScreen';
 

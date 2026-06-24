@@ -4,34 +4,16 @@
  */
 
 import * as admin from "firebase-admin";
+import { loadFirebaseServiceAccount } from "@/lib/firebase-service-account";
 
 // Initialize Firebase Admin SDK
 const initializeFirebaseAdmin = () => {
   if (admin.apps.length === 0) {
     try {
-      const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-      if (!serviceAccountJson) {
-        throw new Error(
-          "FIREBASE_SERVICE_ACCOUNT environment variable is not set. " +
-            "Please add your Firebase service account JSON to .env.local. " +
-            "See FIREBASE_ADMIN_SETUP.md for instructions.",
-        );
-      }
-
-      const serviceAccount = JSON.parse(serviceAccountJson);
-
-      if (!serviceAccount.project_id) {
-        throw new Error(
-          'Service account JSON is missing "project_id" field. ' +
-            "Ensure you have the correct Firebase service account key.",
-        );
-      }
+      const serviceAccount = loadFirebaseServiceAccount();
 
       admin.initializeApp({
-        credential: admin.credential.cert(
-          serviceAccount as admin.ServiceAccount,
-        ),
+        credential: admin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id,
       });
 

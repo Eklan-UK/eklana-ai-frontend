@@ -113,10 +113,22 @@ describe("practice-feedback", () => {
   });
 
   it("playDrillEndCelebration triggers success haptic", async () => {
+    const playMock = mock.fn(async () => undefined);
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
     const { playDrillEndCelebration } = await import("./practice-feedback");
     assert.doesNotThrow(() => playDrillEndCelebration());
     assert.equal(vibrateMock.mock.callCount(), 1);
     assert.deepEqual(vibrateMock.mock.calls[0]?.arguments, [[40, 30, 40]]);
+    assert.equal(playMock.mock.callCount(), 1);
   });
 
   it("playDrillEndFailure triggers failure haptic", async () => {

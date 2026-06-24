@@ -7,6 +7,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { apiResponse } from '@/lib/api/response';
+import { ensureRoleplayProgressIndexes } from '@/lib/drill/ensure-roleplay-progress-indexes';
 
 const turnProgressSchema = z.record(
   z.string(),
@@ -197,26 +198,73 @@ async function postHandler(
       await assignmentRepo.updateStatus(validated.assignmentId, 'in-progress');
     }
 
+    const unsetFields: Record<string, 1> = {};
+
     if (validated.source === 'weekly_challenge') {
       filter.challengeId = new Types.ObjectId(validated.challengeId!);
       filter.challengeItemIndex = validated.challengeItemIndex;
       update.challengeId = new Types.ObjectId(validated.challengeId!);
       update.challengeItemIndex = validated.challengeItemIndex;
       update.weekStartDate = validated.weekStartDate ?? null;
+      unsetFields.drillAssignmentId = 1;
+    } else {
+      // Assignment docs must not carry challenge fields — null values collide on the
+      // weekly_challenge unique index (userId + null + null).
+      unsetFields.challengeId = 1;
+      unsetFields.challengeItemIndex = 1;
+      unsetFields.weekStartDate = 1;
     }
 
     const startedAt = validated.startedAt ? new Date(validated.startedAt) : new Date();
 
-    const progress = await RoleplayDrillProgress.findOneAndUpdate(
-      filter,
-      {
-        $set: update,
-        $setOnInsert: { startedAt },
-      },
-      { upsert: true, new: true },
-    )
-      .lean()
-      .exec();
+    await ensureRoleplayProgressIndexes();
+
+    const collection = RoleplayDrillProgress.collection;
+    const unsetPayload = Object.fromEntries(
+      Object.keys(unsetFields).map((key) => [key, '']),
+    );
+
+    if (validated.source === 'assignment') {
+      await collection.updateMany(
+        {
+          userId: context.userId,
+          source: { $ne: 'weekly_challenge' },
+        },
+        { $unset: { challengeId: '', challengeItemIndex: '', weekStartDate: '' } },
+      );
+    }
+
+    const upsertDoc = async () =>
+      collection.findOneAndUpdate(
+        filter,
+        {
+          $set: update,
+          ...(Object.keys(unsetPayload).length > 0 ? { $unset: unsetPayload } : {}),
+          $setOnInsert: { startedAt },
+        },
+        { upsert: true, returnDocument: 'after' },
+      );
+
+    let progress;
+    try {
+      progress = await upsertDoc();
+    } catch (upsertError: unknown) {
+      const isDupKey =
+        upsertError &&
+        typeof upsertError === 'object' &&
+        'code' in upsertError &&
+        (upsertError as { code?: number }).code === 11000;
+
+      if (!isDupKey || validated.source !== 'assignment') throw upsertError;
+
+      await ensureRoleplayProgressIndexes();
+      await collection.updateMany(
+        { userId: context.userId },
+        { $unset: { challengeId: '', challengeItemIndex: '', weekStartDate: '' } },
+      );
+
+      progress = await upsertDoc();
+    }
 
     return apiResponse.success({ progress });
   } catch (error: unknown) {

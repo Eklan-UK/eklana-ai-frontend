@@ -20,6 +20,7 @@ interface ListeningDrillProps {
 export default function ListeningDrill({ drill, assignmentId }: ListeningDrillProps) {
   const queryClient = useQueryClient();
   const [isCompleted, setIsCompleted] = useState(false);
+  const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasListened, setHasListened] = useState(false);
@@ -153,7 +154,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         return;
       }
 
-      await completeLearnerDrill(queryClient, drillId, {
+      const result = await completeLearnerDrill(queryClient, drillId, {
         drillAssignmentId: assignmentId,
         score: 100, // Listening drills are completion-based
         timeSpent,
@@ -163,6 +164,8 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         },
         platform: 'web',
       });
+
+      setCelebrationSoundUrl(result.data?.effects?.soundUrl);
 
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -180,7 +183,13 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   };
 
   if (isCompleted) {
-    return <DrillCompletionScreen drillType="listening" celebrate />;
+    return (
+      <DrillCompletionScreen
+        drillType="listening"
+        celebrate
+        celebrationSoundUrl={celebrationSoundUrl}
+      />
+    );
   }
 
   return (

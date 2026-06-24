@@ -195,6 +195,22 @@ describe('computeProgressScorecard', () => {
 			const result = await computeProgressScorecard(LEARNER_ID);
 			expect(result.accuracy).toBe(0);
 		});
+
+		it('infers key_phrases type from results when drillType is missing (legacy attempts)', async () => {
+			const attempts = [
+				{
+					drillAssignmentId: 'asgn-1',
+					completedAt: THIS_WEEK,
+					keyPhrasesResults: { score: 85 },
+				},
+			];
+			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
+			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+
+			const result = await computeProgressScorecard(LEARNER_ID);
+			expect(result.accuracy).toBe(85);
+			expect(result.sampleCounts.accuracyDrills).toBe(1);
+		});
 	});
 
 	describe('Fluency', () => {

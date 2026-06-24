@@ -7,9 +7,11 @@
 
 ## 1. Feature overview
 
-When a learner **passes** a practice section (correct answer, pronunciation pass, drill pass, free-talk grade pass), the app should play a short **success** cue and trigger **success haptics**. When they **fail**, play a **failure** cue and trigger **error haptics**.
+When a learner **passes** a practice section (correct answer, pronunciation pass, etc.), the app should play a short **success** cue and trigger **success haptics**. When they **fail**, play a **failure** cue and trigger **error haptics**.
 
-The web app uses synthesized Web Audio tones plus `navigator.vibrate()`. On native mobile, **haptics are the primary feedback**; optional short sounds can be added with `expo-av` if product wants parity with web audio.
+The web app uses synthesized Web Audio tones plus `navigator.vibrate()` for **in-drill** feedback. On native mobile, **haptics are the primary feedback**; optional short sounds can be added with `expo-av` if product wants parity with web audio.
+
+> **End-of-drill celebration (MP3 + confetti)** is a separate flow. When the learner passes a full drill, web plays a hosted celebration MP3 — not synthesized tones. Mirror that using [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md).
 
 ---
 
@@ -82,6 +84,8 @@ Mirror these trigger points when implementing the equivalent mobile drill runner
 | `src/components/drills/SentenceDrill.tsx` | On successful completion submit |
 | `src/components/drills/SummaryDrill.tsx` | On successful summary submit |
 | `src/components/drills/ListeningDrill.tsx` | On successful completion submit |
+| `src/hooks/useDrillScoreCelebration.ts` | **End-of-drill pass** on score review (MP3 — see [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md)) |
+| `src/components/drills/shared/DrillCompletionScreen.tsx` | **End-of-drill pass** on completion screen (matching, listening, definition) |
 | `src/app/(student)/account/practice/free-talk/session/page.tsx` | When grade result arrives (`phase === 'result'`) |
 | `src/app/(student)/account/daily-focus/[id]/page.tsx` | On each answer submit |
 | `src/app/(student)/account/pronunciations/[pronunciationId]/page.tsx` | After assignment attempt result |
@@ -111,3 +115,4 @@ Mirror these trigger points when implementing the equivalent mobile drill runner
 - [ ] Daily Focus: correct and incorrect answer
 - [ ] Pronunciation assignment: pass and fail attempt
 - [ ] Verify haptics do not fire twice for the same Free Talk grade (use a ref guard like web)
+- [ ] End-of-drill MP3 + confetti — see [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md) checklist

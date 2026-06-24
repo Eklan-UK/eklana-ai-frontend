@@ -155,12 +155,24 @@ const roleplayDrillProgressSchema = new Schema<IRoleplayDrillProgress>(
 
 roleplayDrillProgressSchema.index(
   { userId: 1, drillAssignmentId: 1 },
-  { unique: true, sparse: true },
+  {
+    unique: true,
+    partialFilterExpression: {
+      source: 'assignment',
+      drillAssignmentId: { $type: 'objectId' },
+    },
+  },
 );
 
 roleplayDrillProgressSchema.index(
   { userId: 1, challengeId: 1, challengeItemIndex: 1 },
-  { unique: true, sparse: true },
+  {
+    unique: true,
+    partialFilterExpression: {
+      source: 'weekly_challenge',
+      challengeId: { $type: 'objectId' },
+    },
+  },
 );
 
 const RoleplayDrillProgressModel =
