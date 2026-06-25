@@ -3,6 +3,7 @@ import Drill from '@/models/drill';
 import User from '@/models/user';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
+import { ValidationError } from '@/lib/api/response';
 import type { DrillAssignment as AssignmentType, CreateAssignmentData, AssignmentFilters } from './assignment.types';
 
 /**
@@ -98,7 +99,11 @@ export class AssignmentRepository {
   }
 
   /**
-   * Create multiple assignments (bulk insert)
+   * Create multiple assignments (bulk insert).
+   *
+   * Prod verification (no live DB required in CI): for an affected drillId, compare
+   * `db.drills.assigned_to` vs `db.drill_assignments.find({ drillId })` and check logs
+   * for "Bulk assignment insert had write errors".
    */
   async createBulk(assignments: CreateAssignmentData[]): Promise<AssignmentType[]> {
     if (assignments.length === 0) {
@@ -107,18 +112,36 @@ export class AssignmentRepository {
 
     try {
       const created = await DrillAssignment.insertMany(assignments, {
-        ordered: false, // Continue even if some fail
+        ordered: false,
       });
       return created.map(a => a.toObject());
     } catch (error: any) {
-      // Handle partial failures
-      if (error.writeErrors) {
-        const successful = error.insertedDocs || [];
-        logger.warn('Some assignments failed', {
-          successful: successful.length,
+      if (error.writeErrors?.length > 0) {
+        const failedLearnerIds = error.writeErrors
+          .map((we: { op?: { learnerId?: Types.ObjectId } }) =>
+            we.op?.learnerId?.toString()
+          )
+          .filter((id: string | undefined): id is string => Boolean(id));
+
+        logger.error('Bulk assignment insert had write errors', {
+          requested: assignments.length,
           failed: error.writeErrors.length,
+          failedLearnerIds,
         });
-        return successful.map((doc: any) => doc.toObject());
+
+        throw new ValidationError(
+          `Failed to assign drill to ${error.writeErrors.length} student(s)`,
+          {
+            failedLearnerIds,
+            writeErrors: error.writeErrors.map(
+              (we: { code?: number; errmsg?: string; op?: { learnerId?: Types.ObjectId } }) => ({
+                code: we.code,
+                message: we.errmsg,
+                learnerId: we.op?.learnerId?.toString(),
+              })
+            ),
+          }
+        );
       }
       logger.error('Error creating assignments in bulk', { error: error.message });
       throw error;
@@ -230,7 +253,7 @@ export class AssignmentRepository {
         })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         .sort({ assignedAt: 1 })
-        .limit(filters?.limit || 20)
+        .limit(filters?.limit || 100)
         .skip(filters?.offset || 0)
         .lean()
         .exec();

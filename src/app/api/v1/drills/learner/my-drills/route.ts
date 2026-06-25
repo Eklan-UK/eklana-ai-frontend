@@ -12,10 +12,12 @@ async function getHandler(
   context: { userId: Types.ObjectId; userRole: string }
 ) {
   const queryParams = parseQueryParams(req);
+  const drillId = new URL(req.url).searchParams.get('drillId') || undefined;
   const payload = await getLearnerMyDrillsPayload(context.userId, {
     status: queryParams.status,
     limit: queryParams.limit,
     offset: queryParams.offset,
+    drillId,
   });
 
   return apiResponse.success(payload);

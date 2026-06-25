@@ -86,21 +86,34 @@ export type LearnerFreeTalkPlanRow = LearnerMyDrillRow & {
  */
 export async function getLearnerMyDrillsPayload(
   learnerId: Types.ObjectId,
-  params: { status?: string; limit?: number; offset?: number }
+  params: { status?: string; limit?: number; offset?: number; drillId?: string }
 ): Promise<LearnerMyDrillsPayload> {
   await connectToDatabase();
 
   const assignmentRepo = new AssignmentRepository();
   const attemptRepo = new AttemptRepository();
 
-  const limit = params.limit ?? 20;
+  const limit = params.limit ?? 100;
   const offset = params.offset ?? 0;
 
-  const result = await assignmentRepo.findByLearnerId(learnerId.toString(), {
-    status: params.status,
-    limit,
-    offset,
-  });
+  const result = params.drillId
+    ? {
+        assignments: await assignmentRepo.findMany({
+          learnerId: learnerId.toString(),
+          drillId: params.drillId,
+          status: params.status,
+          limit: 1,
+        }),
+        total: await assignmentRepo.count({
+          learnerId: new Types.ObjectId(learnerId.toString()),
+          drillId: new Types.ObjectId(params.drillId),
+        }),
+      }
+    : await assignmentRepo.findByLearnerId(learnerId.toString(), {
+        status: params.status,
+        limit,
+        offset,
+      });
 
   const assignmentIds = result.assignments.map((a: { _id: Types.ObjectId }) =>
     a._id.toString()
@@ -179,68 +192,71 @@ export async function getLearnerMyDrillsPayload(
 
   await purgeExpiredFreeTalkScenarios();
 
-  const scenarioRows = await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(learnerId))
-    .sort({ createdAt: -1 })
-    .select({ title: 1, scenarioType: 1, createdAt: 1, completionDate: 1 })
-    .lean()
-    .exec();
+  let freeTalkDrills: LearnerFreeTalkPlanRow[] = [];
+  if (!params.drillId) {
+    const scenarioRows = await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(learnerId))
+      .sort({ createdAt: -1 })
+      .select({ title: 1, scenarioType: 1, createdAt: 1, completionDate: 1 })
+      .lean()
+      .exec();
 
-  const scenarioIds = scenarioRows.map((doc) => String(doc._id));
-  const attemptRows =
-    scenarioIds.length > 0
-      ? await FreeTalkAttempt.find({
-          learnerId,
-          scenarioId: { $in: scenarioIds },
-        })
-          .select({ scenarioId: 1, createdAt: 1 })
-          .sort({ createdAt: -1 })
-          .lean()
-          .exec()
-      : [];
+    const scenarioIds = scenarioRows.map((doc) => String(doc._id));
+    const attemptRows =
+      scenarioIds.length > 0
+        ? await FreeTalkAttempt.find({
+            learnerId,
+            scenarioId: { $in: scenarioIds },
+          })
+            .select({ scenarioId: 1, createdAt: 1 })
+            .sort({ createdAt: -1 })
+            .lean()
+            .exec()
+        : [];
 
-  const latestAttemptByScenario = new Map<string, Date>();
-  for (const row of attemptRows) {
-    const sid = String(row.scenarioId);
-    if (!latestAttemptByScenario.has(sid)) {
-      latestAttemptByScenario.set(
-        sid,
-        row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
-      );
+    const latestAttemptByScenario = new Map<string, Date>();
+    for (const row of attemptRows) {
+      const sid = String(row.scenarioId);
+      if (!latestAttemptByScenario.has(sid)) {
+        latestAttemptByScenario.set(
+          sid,
+          row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+        );
+      }
     }
-  }
 
-  const freeTalkDrills: LearnerFreeTalkPlanRow[] = scenarioRows.map((doc) => {
-    const createdAt = doc.createdAt instanceof Date ? doc.createdAt : new Date(doc.createdAt);
-    const id = doc._id as Types.ObjectId;
-    const idStr = String(id);
-    const completionDate =
-      doc.completionDate instanceof Date
-        ? doc.completionDate
-        : doc.completionDate
-          ? new Date(doc.completionDate as string)
-          : null;
-    const completedAt = latestAttemptByScenario.get(idStr) ?? null;
-    const dueDate = completionDate ?? createdAt;
-    return {
-      itemType: FREE_TALK_PLAN_ITEM_TYPE,
-      assignmentId: id,
-      drill: {
-        _id: id,
-        title: doc.title,
-        type: 'eklan_free_talk',
-        scenarioType: doc.scenarioType,
-        date: dueDate,
-        completionDate: completionDate?.toISOString() ?? null,
-      },
-      assignedBy: null,
-      assignedAt: createdAt,
-      dueDate,
-      status: completedAt ? 'completed' : 'pending',
-      completedAt,
-      latestAttempt: null,
-      hasBookmarks: bookmarkedDrillIds.has(idStr),
-    };
-  });
+    freeTalkDrills = scenarioRows.map((doc) => {
+      const createdAt = doc.createdAt instanceof Date ? doc.createdAt : new Date(doc.createdAt);
+      const id = doc._id as Types.ObjectId;
+      const idStr = String(id);
+      const completionDate =
+        doc.completionDate instanceof Date
+          ? doc.completionDate
+          : doc.completionDate
+            ? new Date(doc.completionDate as string)
+            : null;
+      const completedAt = latestAttemptByScenario.get(idStr) ?? null;
+      const dueDate = completionDate ?? createdAt;
+      return {
+        itemType: FREE_TALK_PLAN_ITEM_TYPE,
+        assignmentId: id,
+        drill: {
+          _id: id,
+          title: doc.title,
+          type: 'eklan_free_talk',
+          scenarioType: doc.scenarioType,
+          date: dueDate,
+          completionDate: completionDate?.toISOString() ?? null,
+        },
+        assignedBy: null,
+        assignedAt: createdAt,
+        dueDate,
+        status: completedAt ? 'completed' : 'pending',
+        completedAt,
+        latestAttempt: null,
+        hasBookmarks: bookmarkedDrillIds.has(idStr),
+      };
+    });
+  }
 
   return {
     drills: [...drills, ...freeTalkDrills],

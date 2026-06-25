@@ -1,4 +1,8 @@
 import type { IUser } from "@/models/user";
+import {
+  isStripeStatusEntitled,
+  STRIPE_NON_ENTITLED_STATUSES,
+} from "@/lib/api/stripe-subscription-apply";
 
 type SubscriptionUser = Pick<IUser, "subscriptionPlan" | "subscriptionExpiresAt"> & {
   stripeSubscriptionStatus?: string | null;
@@ -37,6 +41,25 @@ function isAppleSubscriptionActive(user: SubscriptionUser): boolean {
   return false;
 }
 
+function isStripeSubscriptionActive(user: SubscriptionUser): boolean {
+  const status = user.stripeSubscriptionStatus;
+
+  if (status && STRIPE_NON_ENTITLED_STATUSES.has(status)) {
+    return false;
+  }
+
+  if (isStripeStatusEntitled(status)) {
+    return expiresAtInFuture(user.subscriptionExpiresAt);
+  }
+
+  const stripeLinked = user.subscriptionPaymentMethod === "stripe";
+  if (stripeLinked) {
+    return expiresAtInFuture(user.subscriptionExpiresAt);
+  }
+
+  return false;
+}
+
 export function isUserSubscribed(
   user: SubscriptionUser | null | undefined
 ): boolean {
@@ -47,8 +70,17 @@ export function isUserSubscribed(
     return true;
   }
 
-  const stripeStatus = user.stripeSubscriptionStatus;
-  if (stripeStatus === "active" || stripeStatus === "trialing") return true;
+  const hasStripeSignal =
+    user.subscriptionPaymentMethod === "stripe" ||
+    user.stripeSubscriptionStatus != null;
+
+  if (hasStripeSignal) {
+    return isStripeSubscriptionActive(user);
+  }
+
+  if (user.subscriptionPaymentMethod === "manual") {
+    return expiresAtInFuture(user.subscriptionExpiresAt);
+  }
 
   return expiresAtInFuture(user.subscriptionExpiresAt);
 }

@@ -5,7 +5,7 @@ import { AssignmentRepository } from '../assignments/assignment.repository';
 import { AttemptRepository, CreateAttemptData } from '../attempts/attempt.repository';
 import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/api/response';
-import { onDrillCompleted } from '@/services/notification/triggers';
+import { onDrillCompleted, onDrillAssigned } from '@/services/notification/triggers';
 import Bookmark from '@/models/bookmark';
 import WordAnalytics from '@/models/word-analytics';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
@@ -22,6 +22,51 @@ export class DrillService {
     private assignmentRepo: AssignmentRepository,
     private attemptRepo: AttemptRepository
   ) {}
+
+  private assertBulkAssignmentCount(
+    created: Array<{ learnerId: Types.ObjectId }>,
+    expected: CreateAssignmentData[],
+    context: string
+  ): void {
+    if (created.length === expected.length) {
+      return;
+    }
+
+    const createdIds = new Set(created.map((a) => a.learnerId.toString()));
+    const failedLearnerIds = expected
+      .map((a) => a.learnerId.toString())
+      .filter((id) => !createdIds.has(id));
+
+    throw new ValidationError(
+      `${context}: expected ${expected.length} assignments but created ${created.length}`,
+      { failedLearnerIds }
+    );
+  }
+
+  private notifyDrillAssigned(
+    assignments: Array<{ learnerId: Types.ObjectId }>,
+    drill: { _id: Types.ObjectId | string; title: string; type: string },
+    assigner: { firstName?: string; lastName?: string; name?: string }
+  ): void {
+    const drillId = drill._id.toString();
+    for (const assignment of assignments) {
+      onDrillAssigned(
+        assignment.learnerId.toString(),
+        { _id: drillId, title: drill.title, type: drill.type },
+        {
+          firstName: assigner.firstName,
+          lastName: assigner.lastName,
+          name: assigner.name,
+        }
+      ).catch((err) => {
+        logger.error('Failed to send drill assignment notification', {
+          error: err.message,
+          learnerId: assignment.learnerId.toString(),
+          drillId,
+        });
+      });
+    }
+  }
 
   /** 
    * Assign drill to multiple users
@@ -175,7 +220,13 @@ export class DrillService {
     drillData: CreateDrillData;
     creatorId: string;
     assignedUserIds: string[];
-  }): Promise<{ drill: DrillType; assignmentCount: number }> {
+  }): Promise<{
+    drill: DrillType;
+    assignmentCount: number;
+    assignmentsRequested: number;
+    assignmentsCreated: number;
+    failedLearnerIds: string[];
+  }> {
     // 1. Validate creator exists
     const creator = await userService.findById(
       params.creatorId,
@@ -225,10 +276,25 @@ export class DrillService {
 
       if (newAssignmentsData.length > 0) {
         const createdAssignments = await this.assignmentRepo.createBulk(newAssignmentsData);
+        this.assertBulkAssignmentCount(
+          createdAssignments,
+          newAssignmentsData,
+          'createDrill'
+        );
         assignmentCount = createdAssignments.length;
+
+        const assignedLearnerIds = createdAssignments.map((a) =>
+          a.learnerId.toString()
+        );
+        await this.drillRepo.update(drill._id.toString(), {
+          assigned_to: assignedLearnerIds,
+        });
+        drill.assigned_to = assignedLearnerIds;
 
         // Update drill assignment count
         await this.drillRepo.incrementAssignments(drill._id.toString(), assignmentCount);
+
+        this.notifyDrillAssigned(createdAssignments, drill, creator);
       }
     }
 
@@ -238,7 +304,13 @@ export class DrillService {
       assignmentsCreated: assignmentCount,
     });
 
-    return { drill, assignmentCount };
+    return {
+      drill,
+      assignmentCount,
+      assignmentsRequested: params.assignedUserIds.length,
+      assignmentsCreated: assignmentCount,
+      failedLearnerIds: [],
+    };
   }
 
   /**
@@ -360,7 +432,13 @@ export class DrillService {
     userId: string,
     userRole: 'admin' | 'user' | 'tutor',
     data: Partial<CreateDrillData>
-  ): Promise<{ drill: DrillType; newAssignmentsCreated: number }> {
+  ): Promise<{
+    drill: DrillType;
+    newAssignmentsCreated: number;
+    assignmentsRequested: number;
+    assignmentsCreated: number;
+    failedLearnerIds: string[];
+  }> {
     // Validate drill ID
     if (!Types.ObjectId.isValid(drillId)) {
       throw new ValidationError('Invalid drill ID format');
@@ -383,21 +461,8 @@ export class DrillService {
       (drill.totalAssignments ?? 0) > 0 ||
       (await this.assignmentRepo.count({ drillId: new Types.ObjectId(drillId) })) > 0;
 
-    // Reassignment path: wipe learner data before updating
-    if (isReassignment && hasExistingLearnerData) {
-      await this.cascadeDeleteLearnerData(drillId);
-      await this.drillRepo.setTotalAssignments(drillId, 0);
-    }
-
-    // Update drill
-    const updatedDrill = await this.drillRepo.update(drillId, data);
-
-    if (!updatedDrill) {
-      throw new NotFoundError('Drill');
-    }
-
-    // Create assignments for all selected users when assigned_to is provided
-    let newAssignmentsCount = 0;
+    // Validate users and prepare assignment docs before destructive cascade delete
+    let assignmentsData: CreateAssignmentData[] = [];
     if (isReassignment) {
       const assignedUsers = await userService.findMultipleWithRole(
         data.assigned_to!,
@@ -406,7 +471,7 @@ export class DrillService {
       );
 
       const dueDate = data.date || drill.date || new Date();
-      const assignmentsData: CreateAssignmentData[] = assignedUsers.map((learner) => ({
+      assignmentsData = assignedUsers.map((learner) => ({
         drillId: new Types.ObjectId(drillId),
         learnerId: learner._id,
         assignedBy: new Types.ObjectId(userId),
@@ -414,21 +479,59 @@ export class DrillService {
         dueDate: dueDate,
         status: 'pending' as const,
       }));
-
-      if (assignmentsData.length > 0) {
-        const created = await this.assignmentRepo.createBulk(assignmentsData);
-        newAssignmentsCount = created.length;
-
-        await this.drillRepo.setTotalAssignments(drillId, newAssignmentsCount);
-
-        if (newAssignmentsCount > 0) {
-          updatedDrill.is_active = true;
-          updatedDrill.totalAssignments = newAssignmentsCount;
-        }
-      }
     }
 
-    return { drill: updatedDrill, newAssignmentsCreated: newAssignmentsCount };
+    // Reassignment path: wipe learner data only after validation passes
+    if (isReassignment && hasExistingLearnerData) {
+      await this.cascadeDeleteLearnerData(drillId);
+      await this.drillRepo.setTotalAssignments(drillId, 0);
+    }
+
+    // Update drill; assigned_to is set after successful bulk insert
+    const { assigned_to: _requestedAssignees, ...drillFields } = data;
+    const updatePayload = isReassignment ? drillFields : data;
+    const updatedDrill = await this.drillRepo.update(drillId, updatePayload);
+
+    if (!updatedDrill) {
+      throw new NotFoundError('Drill');
+    }
+
+    // Create assignments for all selected users when assigned_to is provided
+    let newAssignmentsCount = 0;
+    if (isReassignment && assignmentsData.length > 0) {
+      const created = await this.assignmentRepo.createBulk(assignmentsData);
+      this.assertBulkAssignmentCount(created, assignmentsData, 'updateDrill');
+      newAssignmentsCount = created.length;
+
+      const assignedLearnerIds = created.map((a) => a.learnerId.toString());
+      const drillWithAssignees = await this.drillRepo.update(drillId, {
+        assigned_to: assignedLearnerIds,
+      });
+      if (drillWithAssignees) {
+        updatedDrill.assigned_to = drillWithAssignees.assigned_to;
+      }
+
+      await this.drillRepo.setTotalAssignments(drillId, newAssignmentsCount);
+
+      if (newAssignmentsCount > 0) {
+        updatedDrill.is_active = true;
+        updatedDrill.totalAssignments = newAssignmentsCount;
+      }
+
+      const assigner = await userService.findById(
+        userId,
+        'email role firstName lastName name'
+      );
+      this.notifyDrillAssigned(created, updatedDrill, assigner);
+    }
+
+    return {
+      drill: updatedDrill,
+      newAssignmentsCreated: newAssignmentsCount,
+      assignmentsRequested: data.assigned_to?.length ?? 0,
+      assignmentsCreated: newAssignmentsCount,
+      failedLearnerIds: [],
+    };
   }
 
   /**

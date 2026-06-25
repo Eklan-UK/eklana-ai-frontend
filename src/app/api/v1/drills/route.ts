@@ -313,7 +313,9 @@ async function postHandler(
 	return apiResponse.success(
 		{
 			drill: result.drill,
-			assignmentsCreated: result.assignmentCount,
+			assignmentsCreated: result.assignmentsCreated,
+			assignmentsRequested: result.assignmentsRequested,
+			failedLearnerIds: result.failedLearnerIds,
 		},
 		201
 	);

@@ -306,6 +306,11 @@ export default function LoginPage() {
             </Link>
           </div>
 
+          <p className="text-xs text-muted-foreground -mt-2">
+            Signed up with Google or Apple? Use Forgot password to add email
+            sign-in. You can still use social login.
+          </p>
+
           <Button
             type="submit"
             variant="primary"

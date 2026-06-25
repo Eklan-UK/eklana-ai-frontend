@@ -83,6 +83,50 @@ export const authService = {
   },
 
   /**
+   * Check whether the current user has a password set
+   * Custom endpoint: GET /api/v1/auth/password/status
+   */
+  getPasswordStatus: async (): Promise<{ hasPassword: boolean }> => {
+    const response = await fetch(`${AUTH_BASE_URL}/password/status`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to check password status" }));
+      throw new Error(error.message || "Failed to check password status");
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Set an initial password (for OAuth / social-login accounts)
+   * Custom endpoint: POST /api/v1/auth/password/change
+   */
+  setPassword: async (newPassword: string) => {
+    const response = await fetch(`${AUTH_BASE_URL}/password/change`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ newPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response
+        .json()
+        .catch(() => ({ message: "Failed to set password" }));
+      throw new Error(error.message || "Failed to set password");
+    }
+
+    return await response.json();
+  },
+
+  /**
    * Change password (requires current password)
    * Better Auth endpoint: POST /api/v1/auth/password/change
    */
@@ -139,7 +183,10 @@ export const authService = {
    * Reset password with token
    * Better Auth endpoint: POST /api/v1/auth/password/reset-password
    */
-  resetPassword: async (token: string, newPassword: string) => {
+  resetPassword: async (
+    token: string,
+    newPassword: string,
+  ): Promise<{ isInitialSetup?: boolean; message?: string }> => {
     const response = await fetch(
       `${AUTH_BASE_URL}/password/reset-password`,
       {

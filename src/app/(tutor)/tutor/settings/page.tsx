@@ -16,6 +16,7 @@ import {
   CalendarSync,
   Link as LinkIcon,
   Unlink,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -106,6 +107,12 @@ export default function TutorSettingsPage() {
           label: "Profile Settings",
           href: "/tutor/settings/profile",
           description: "Update your personal information",
+        },
+        {
+          icon: Lock,
+          label: "Password",
+          href: "/tutor/settings/password",
+          description: "Set or update your account password",
         },
       ],
     },

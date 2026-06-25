@@ -125,6 +125,7 @@ export const drillAPI = {
     status?: 'pending' | 'in_progress' | 'completed';
     limit?: number;
     offset?: number;
+    drillId?: string;
   }) => {
     return apiRequest<{
       code?: string;

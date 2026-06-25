@@ -17,6 +17,8 @@ Drills support 12 types: `vocabulary`, `pronunciation`, `roleplay`, `matching`, 
 
 See [KEY_PHRASES_DRILL.md](./KEY_PHRASES_DRILL.md) for the full Key Phrases runner spec.
 
+See [`MOBILE_MATCHING_DRILL.md`](./MOBILE_MATCHING_DRILL.md) for the full **Matching** drill runner spec (tap-to-match, manual submit, checkpoints, Pattern B celebration). **Supersedes** the outdated matching examples in §5 and §8 of this doc.
+
 ---
 
 ## 2. Web Routes → Mobile Screens

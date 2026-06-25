@@ -48,6 +48,11 @@ export function computeWordScore(scores: number[]): number {
   return best * 0.4 + last * 0.4 + mean * 0.2;
 }
 
+/** Normalize accuracy stored as 0–1 or 0–100 into a 0–100 score. */
+function normalizeAccuracyToPercent(accuracy: number): number {
+  return accuracy <= 1 ? accuracy * 100 : accuracy;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Extract a normalised 0-100 quality score from a drill attempt
 // ─────────────────────────────────────────────────────────────
@@ -83,7 +88,7 @@ export function extractDrillQualityScore(attempt: any): number | null {
   // ── Matching ────────────────────────────────────────────────
   if (type === 'matching' && attempt.matchingResults) {
     return attempt.matchingResults.accuracy != null
-      ? attempt.matchingResults.accuracy * 100
+      ? normalizeAccuracyToPercent(attempt.matchingResults.accuracy)
       : attempt.score ?? null;
   }
 
@@ -131,7 +136,7 @@ export function extractDrillQualityScore(attempt: any): number | null {
   // ── Definition / reading ────────────────────────────────────
   if (type === 'definition' && attempt.definitionResults) {
     return typeof attempt.definitionResults.accuracy === 'number'
-      ? attempt.definitionResults.accuracy * 100
+      ? normalizeAccuracyToPercent(attempt.definitionResults.accuracy)
       : attempt.score ?? null;
   }
 

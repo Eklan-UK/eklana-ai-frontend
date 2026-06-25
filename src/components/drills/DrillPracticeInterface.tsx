@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
+import { Loader2 } from "lucide-react";
 import VocabularyDrill from "./VocabularyDrill";
 import PronunciationDrill from "./PronunciationDrill";
 import RoleplayDrill from "./RoleplayDrill";
@@ -36,6 +37,10 @@ export default function DrillPracticeInterface({
     propAssignmentId || null
   );
   const [assignment, setAssignment] = useState<any>(null);
+  const [assignmentFetchDone, setAssignmentFetchDone] = useState(
+    Boolean(propAssignmentId || weeklyChallengeMeta)
+  );
+  const drillSessionKeyRef = useRef(`${drill._id}-session`);
 
   // Fetch assignment ID and track recent activity
   useEffect(() => {
@@ -48,12 +53,14 @@ export default function DrillPracticeInterface({
         // If assignmentId is provided as prop, use it
         if (propAssignmentId) {
           setAssignmentId(propAssignmentId);
-          // Optionally fetch assignment details if needed
           return;
         }
 
-        // Otherwise, get learner drills to find the assignment
-        const response = await drillAPI.getLearnerDrills();
+        // Otherwise, look up this drill's assignment directly (avoids default limit trap)
+        const response = await drillAPI.getLearnerDrills({
+          drillId: drill._id?.toString?.() ?? String(drill._id),
+          limit: 1,
+        });
         if (response.data?.drills) {
           const foundAssignment = response.data.drills.find(
             (item: any) => item.drill?._id === drill._id || item.drill?._id?.toString() === drill._id?.toString()
@@ -73,10 +80,18 @@ export default function DrillPracticeInterface({
         }
       } catch (error) {
         console.error("Failed to fetch assignment:", error);
+      } finally {
+        if (!weeklyChallengeMeta) {
+          setAssignmentFetchDone(true);
+        }
       }
     };
 
-    fetchAssignment();
+    if (propAssignmentId || weeklyChallengeMeta) {
+      setAssignmentFetchDone(true);
+    } else {
+      void fetchAssignment();
+    }
 
     // Track activity locally (no API call)
     trackActivity("drill", drill._id, "viewed", {
@@ -86,12 +101,20 @@ export default function DrillPracticeInterface({
     });
   }, [drill._id, drill.title, drill.type, drill.difficulty, propAssignmentId, weeklyChallengeMeta]);
 
+  if (!assignmentFetchDone && !weeklyChallengeMeta) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   // Render the appropriate drill interface based on type
   const renderDrill = () => {
     const drillType = resolveDrillPracticeType(drill);
     const drillForUi =
       drillType && drillType !== drill?.type ? { ...drill, type: drillType } : drill;
-    const drillSessionKey = `${drill._id}-${assignmentId ?? "pending"}`;
+    const drillSessionKey = drillSessionKeyRef.current;
     const commonProps = {
       drill: drillForUi,
       assignmentId: assignmentId || undefined,

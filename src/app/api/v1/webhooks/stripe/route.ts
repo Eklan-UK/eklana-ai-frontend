@@ -20,6 +20,11 @@ import {
   extendSubscriptionExpiresAt,
   shouldSkipStripeDowngrade,
 } from '@/lib/api/subscription-reconciliation';
+import {
+  applyStripePaymentFailureDowngrade,
+  downgradeUserFromStripe,
+} from '@/lib/api/stripe-subscription-apply';
+import { findUserByStripeCustomer } from '@/lib/api/stripe-webhook-user';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -46,11 +51,6 @@ function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date | nul
   return typeof ts === 'number' ? fromUnix(ts) : null;
 }
 
-/** Find user by stripeCustomerId. */
-async function findUserByCustomer(customerId: string) {
-  return User.findOne({ stripeCustomerId: customerId }).exec();
-}
-
 // ── Event handlers ────────────────────────────────────────────────────────────
 
 async function handleCheckoutSessionCompleted(
@@ -73,7 +73,7 @@ async function handleCheckoutSessionCompleted(
       limit: 10,
     });
     const pick = subs.data.find((s) =>
-      ['active', 'trialing', 'past_due'].includes(s.status)
+      ['active', 'trialing'].includes(s.status)
     );
     subscriptionId = pick?.id ?? null;
   }
@@ -95,7 +95,7 @@ async function handleCheckoutSessionCompleted(
   const status = subscription.status;
 
   await connectToDatabase();
-  const user = await findUserByCustomer(customerId);
+  const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
     logger.warn('[Stripe Webhook] checkout.session.completed — user not found for customer', { customerId });
     return;
@@ -118,6 +118,7 @@ async function handleCheckoutSessionCompleted(
   user.subscriptionActivatedAt = user.subscriptionActivatedAt ?? new Date();
   user.subscriptionExpiresAt = periodEnd;
   user.subscriptionPaymentMethod = 'stripe';
+  user.subscriptionProvider = 'stripe';
   await user.save();
 
   logger.info('[Stripe Webhook] checkout.session.completed — subscription activated', {
@@ -138,7 +139,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
   const status = expandedSub.status;
 
   await connectToDatabase();
-  const user = await findUserByCustomer(customerId);
+  const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
     logger.warn('[Stripe Webhook] subscription.updated — user not found', { customerId });
     return;
@@ -155,16 +156,21 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
     if (!shouldSkipStripeDowngrade(user)) {
       user.subscriptionPlan = 'premium';
       user.subscriptionPaymentMethod = 'stripe';
+      user.subscriptionProvider = 'stripe';
     }
-  } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
+  } else if (
+    status === 'past_due' ||
+    status === 'canceled' ||
+    status === 'unpaid' ||
+    status === 'incomplete_expired'
+  ) {
     if (shouldSkipStripeDowngrade(user)) {
       logger.info(
         '[Stripe Webhook] subscription.updated — skipped downgrade; Apple/manual still active',
         { userId: String(user._id), status }
       );
     } else {
-      user.subscriptionPlan = 'free';
-      user.subscriptionExpiresAt = null;
+      downgradeUserFromStripe(user);
     }
   }
 
@@ -177,11 +183,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
   });
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
+async function handleSubscriptionDeleted(
+  subscription: Stripe.Subscription,
+  stripe: Stripe
+): Promise<void> {
   const customerId = String(subscription.customer);
 
   await connectToDatabase();
-  const user = await findUserByCustomer(customerId);
+  const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
     logger.warn('[Stripe Webhook] subscription.deleted — user not found', { customerId });
     return;
@@ -199,12 +208,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
     return;
   }
 
-  user.subscriptionPlan = 'free';
-  user.subscriptionExpiresAt = null;
-  user.subscriptionActivatedAt = null;
-  if (user.subscriptionPaymentMethod === 'stripe') {
-    user.subscriptionPaymentMethod = undefined;
-  }
+  downgradeUserFromStripe(user);
   await user.save();
 
   logger.info('[Stripe Webhook] subscription.deleted — downgraded to free', {
@@ -236,7 +240,7 @@ function invoiceIsForSubscription(invoice: Stripe.Invoice): boolean {
   return false;
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
+async function handleInvoicePaid(invoice: Stripe.Invoice, stripe: Stripe): Promise<void> {
   if (!invoice.customer || !invoiceIsForSubscription(invoice)) return;
 
   const customerId = String(invoice.customer);
@@ -247,7 +251,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   if (!periodEnd) return;
 
   await connectToDatabase();
-  const user = await findUserByCustomer(customerId);
+  const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
     logger.warn('[Stripe Webhook] invoice.paid — user not found', { customerId });
     return;
@@ -257,6 +261,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   if (!shouldSkipStripeDowngrade(user)) {
     user.subscriptionPlan = 'premium';
     user.subscriptionPaymentMethod = 'stripe';
+    user.subscriptionProvider = 'stripe';
+    user.stripeSubscriptionStatus = 'active';
   }
   await user.save();
 
@@ -266,20 +272,21 @@ async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   });
 }
 
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, stripe: Stripe): Promise<void> {
   if (!invoice.customer) return;
 
   const customerId = String(invoice.customer);
 
   await connectToDatabase();
-  const user = await findUserByCustomer(customerId);
+  const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) return;
 
-  user.stripeSubscriptionStatus = 'past_due';
+  const downgraded = applyStripePaymentFailureDowngrade(user, 'past_due');
   await user.save();
 
-  logger.warn('[Stripe Webhook] invoice.payment_failed — marked past_due', {
+  logger.warn('[Stripe Webhook] invoice.payment_failed — access revoked per policy', {
     userId: String(user._id),
+    downgraded,
   });
 }
 
@@ -340,15 +347,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         break;
 
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription, stripe);
         break;
 
       case 'invoice.paid':
-        await handleInvoicePaid(event.data.object as Stripe.Invoice);
+        await handleInvoicePaid(event.data.object as Stripe.Invoice, stripe);
         break;
 
       case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, stripe);
         break;
 
       default:

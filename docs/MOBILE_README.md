@@ -420,6 +420,8 @@ See [`mobile-practice-feedback.md`](mobile-practice-feedback.md) for haptics + o
 
 See [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md) when the learner **passes a full drill** — hosted celebration MP3 from `POST /drills/:id/complete` `effects`, plus confetti. Web: `playDrillEndCelebration` in `src/lib/practice-feedback.ts`.
 
+See [`MOBILE_MATCHING_DRILL.md`](MOBILE_MATCHING_DRILL.md) for the **matching** drill end-to-end spec (per-pair feedback, checkpoints, manual submit, `matchingResults` payload).
+
 ---
 
 ## Internationalization

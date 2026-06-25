@@ -114,25 +114,12 @@ Admin-only fields (`subscriptionMonthsPaidFor`, `subscriptionAmountPaid`, `subsc
 
 The single source of truth for "is this user subscribed" lives in `src/lib/api/user-subscription.ts`:
 
-```typescript
-export function isUserSubscribed(user): boolean {
-  if (!user) return false;
-  if (user.subscriptionPlan !== "premium") return false;
-
-  // Trust Stripe's live status if available (handles webhook delays)
-  const stripeStatus = user.stripeSubscriptionStatus;
-  if (stripeStatus === "active" || stripeStatus === "trialing") return true;
-
-  // Fallback: check our stored expiry date
-  if (!user.subscriptionExpiresAt) return false;
-  return new Date(user.subscriptionExpiresAt).getTime() > Date.now();
-}
-```
-
 **Rule summary:**
 1. `subscriptionPlan` must be `"premium"`.
-2. If `stripeSubscriptionStatus` is `"active"` or `"trialing"` → subscribed (even if `subscriptionExpiresAt` is not yet set).
-3. Otherwise, `subscriptionExpiresAt` must be in the future.
+2. Apple-paid users: active / billing_grace / billing_retry, or future `subscriptionExpiresAt` when linked via Apple.
+3. Stripe-paid users: `past_due`, `unpaid`, `canceled`, and `incomplete_expired` **never** grant access (immediate revocation on payment failure).
+4. Stripe `active` / `trialing` requires **future** `subscriptionExpiresAt` (prevents stale status retaining access after period end).
+5. Manual grants use future `subscriptionExpiresAt` only.
 
 The API endpoint `GET /api/v1/users/current` runs this function and adds `isSubscribed: true/false` to the response so the client does not need to reimplement the logic.
 
@@ -275,12 +262,12 @@ See [Section 7](#7-webhook-events-handled) for events.
 | Stripe Event | What the backend does |
 |---|---|
 | `checkout.session.completed` | Sets `subscriptionPlan = "premium"`, records `stripeSubscriptionId`, `stripeSubscriptionStatus`, `subscriptionActivatedAt`, `subscriptionExpiresAt` (current period end), `subscriptionPaymentMethod = "stripe"` |
-| `customer.subscription.updated` | Updates `stripeSubscriptionStatus` and `subscriptionExpiresAt`. If status becomes `canceled`, `unpaid`, or `incomplete_expired` → downgrades to `"free"` |
+| `customer.subscription.updated` | Updates `stripeSubscriptionStatus` and `subscriptionExpiresAt`. If status becomes `past_due`, `canceled`, `unpaid`, or `incomplete_expired` → downgrades to `"free"` (unless Apple/manual reconciliation retains access) |
 | `customer.subscription.deleted` | Sets `subscriptionPlan = "free"`, clears `stripeSubscriptionId`, sets `stripeSubscriptionStatus = "canceled"`, clears expiry and activation dates |
 | `invoice.paid` | Extends `subscriptionExpiresAt` to the new period end (idempotent — only advances, never moves back) |
-| `invoice.payment_failed` | Sets `stripeSubscriptionStatus = "past_due"` (user keeps access during grace period) |
+| `invoice.payment_failed` | Sets `stripeSubscriptionStatus = "past_due"` and **immediately downgrades** to `"free"` (no grace period) |
 
-**Note on `past_due`:** When a payment fails, `stripeSubscriptionStatus` is set to `"past_due"` but `subscriptionPlan` stays `"premium"`. The `isUserSubscribed()` function does **not** treat `past_due` as active via the `stripeStatus` shortcut, but if `subscriptionExpiresAt` is still in the future the user keeps access. When Stripe eventually cancels the subscription, `customer.subscription.updated` or `customer.subscription.deleted` fires and the plan is downgraded.
+**Note on payment failure:** Access is revoked as soon as `invoice.payment_failed` or `customer.subscription.updated` with `past_due` is processed. `isUserSubscribed()` treats `past_due` as not subscribed even if `subscriptionExpiresAt` is still in the future. Admin recovery: `POST /api/v1/admin/users/stripe-sync` downgrades when Stripe has no active/trialing subscription.
 
 ---
 

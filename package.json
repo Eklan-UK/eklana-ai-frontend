@@ -12,6 +12,8 @@
     "gemini:check": "node scripts/gemini-key-check.mjs",
     "generate-icons": "node scripts/generate-icons.js",
     "test:gates": "node scripts/test-subscription-gates.mjs",
+    "test:subscription": "node --import tsx --test src/lib/api/user-subscription.test.ts",
+    "diagnose:subscription": "tsx scripts/diagnose-subscription.ts",
     "test:notification": "node scripts/local-test-notification.mjs"
   },
   "dependencies": {

@@ -282,6 +282,9 @@ async function putHandler(
 	return apiResponse.success({
 		drill: result.drill,
 		newAssignmentsCreated: result.newAssignmentsCreated,
+		assignmentsCreated: result.assignmentsCreated,
+		assignmentsRequested: result.assignmentsRequested,
+		failedLearnerIds: result.failedLearnerIds,
 	});
 }
 

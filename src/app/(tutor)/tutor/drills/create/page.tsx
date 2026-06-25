@@ -214,6 +214,57 @@ function getDefaultTutorDrillDraft(): TutorDrillDraft {
   };
 }
 
+type DrillAssignmentApiResult = {
+  assignmentsRequested?: number;
+  assignmentsCreated?: number;
+  newAssignmentsCreated?: number;
+  failedLearnerIds?: string[];
+};
+
+function getAssignmentCounts(
+  apiData: DrillAssignmentApiResult | undefined,
+  fallbackRequested: number
+) {
+  return {
+    requested: apiData?.assignmentsRequested ?? fallbackRequested,
+    created:
+      apiData?.assignmentsCreated ??
+      apiData?.newAssignmentsCreated ??
+      0,
+    failedLearnerIds: apiData?.failedLearnerIds ?? [],
+  };
+}
+
+function toastAssignmentResult(
+  counts: ReturnType<typeof getAssignmentCounts>,
+  options: { isReassign?: boolean } = {}
+) {
+  const { requested, created, failedLearnerIds } = counts;
+  if (created >= requested) {
+    if (options.isReassign) {
+      toast.success(
+        `Drill updated and reassigned to ${created} student${created !== 1 ? "s" : ""}. All previous progress has been reset.`
+      );
+    } else if (requested > 0) {
+      toast.success(
+        `Drill assigned to ${created} student${created !== 1 ? "s" : ""}!`
+      );
+    } else {
+      toast.success("Drill created successfully!");
+    }
+    return;
+  }
+  if (created > 0) {
+    toast.warning(
+      `Only ${created} of ${requested} students were assigned.${failedLearnerIds.length > 0 ? ` ${failedLearnerIds.length} failed.` : ""}`
+    );
+    return;
+  }
+  toast.error(
+    `Failed to assign drill to any of the ${requested} selected students.${failedLearnerIds.length > 0 ? ` ${failedLearnerIds.length} failed.` : ""}`
+  );
+}
+
 function CreateDrillPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -326,6 +377,7 @@ function CreateDrillPageContent() {
   useEffect(() => {
     if (preselectedStudentId && !isEditMode) {
       setAiStudentIds([preselectedStudentId]);
+      setSelectedUsers(new Set([preselectedStudentId]));
     }
   }, [preselectedStudentId, isEditMode]);
 
@@ -1506,22 +1558,21 @@ function CreateDrillPageContent() {
 
       // If editing, use update API
       if (isEditMode && drillId) {
-        await drillAPI.update(drillId, drillData);
+        const response: any = await drillAPI.update(drillId, drillData);
         clearDraft();
-        if (isAssignedDrill) {
-          toast.success(
-            `Drill updated and reassigned to ${selectedUsers.size} student${selectedUsers.size !== 1 ? "s" : ""}. All previous progress has been reset.`
-          );
-        } else {
-          toast.success(
-            `Drill assigned to ${selectedUsers.size} student${selectedUsers.size !== 1 ? "s" : ""}!`
-          );
-        }
+        const apiData = response?.data ?? response;
+        toastAssignmentResult(
+          getAssignmentCounts(apiData, assignedTo.length),
+          { isReassign: isAssignedDrill }
+        );
         router.push("/tutor/drills");
       } else {
-        await drillAPI.create(drillData);
+        const response: any = await drillAPI.create(drillData);
         clearDraft();
-        toast.success("Drill created successfully!");
+        const apiData = response?.data ?? response;
+        toastAssignmentResult(
+          getAssignmentCounts(apiData, assignedTo.length)
+        );
         router.push("/tutor/drills");
       }
     } catch (error: any) {
