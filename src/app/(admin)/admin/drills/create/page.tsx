@@ -1218,13 +1218,18 @@ const DrillBuilder: React.FC = () => {
   };
 
   const validateDrillContent = (): boolean => {
-    if (!drillTitle.trim()) {
-      toast.error("Please enter a drill title");
+    if (!completionDate) {
+      toast.error("Please select a completion date");
       return false;
     }
 
-    if (!completionDate) {
-      toast.error("Please select a completion date");
+    if (!journeyPart || !journeyTopic) {
+      toast.error("Please select a learning journey mission and topic");
+      return false;
+    }
+
+    if (!isValidPartTopicPair(journeyPart, journeyTopic)) {
+      toast.error("Selected topic does not belong to the selected mission");
       return false;
     }
 
@@ -1342,7 +1347,7 @@ const DrillBuilder: React.FC = () => {
     omitAssignment?: boolean;
   }): Record<string, unknown> => {
     const payload: Record<string, unknown> = {
-      title: drillTitle,
+      title: drillTitle.trim(),
       type: drillType,
       difficulty: difficulty.toLowerCase(),
       date: new Date(completionDate).toISOString(),
@@ -1351,10 +1356,8 @@ const DrillBuilder: React.FC = () => {
       audio_example_url: audioExampleUrl || undefined,
     };
 
-    if (journeyPart && journeyTopic) {
-      payload.learning_journey_part = journeyPart;
-      payload.learning_journey_topic = journeyTopic;
-    }
+    payload.learning_journey_part = journeyPart;
+    payload.learning_journey_topic = journeyTopic;
 
     if (!options?.omitAssignment) {
       if (options?.assignedTo !== undefined) {
@@ -1572,16 +1575,6 @@ const DrillBuilder: React.FC = () => {
 
     if (selectedUsers.size === 0) {
       toast.error("Please select at least one user");
-      return;
-    }
-
-    if (!journeyPart || !journeyTopic) {
-      toast.error("Please select a learning journey mission and topic");
-      return;
-    }
-
-    if (!isValidPartTopicPair(journeyPart, journeyTopic)) {
-      toast.error("Selected topic does not belong to the selected mission");
       return;
     }
 
@@ -2857,7 +2850,7 @@ const DrillBuilder: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1.5">
-                    Drill title<span className="text-red-500">*</span>
+                    Drill title (optional)
                   </label>
                   <input
                     type="text"
@@ -2951,7 +2944,7 @@ const DrillBuilder: React.FC = () => {
                 journeyTopic={journeyTopic}
                 onPartChange={setJourneyPart}
                 onTopicChange={setJourneyTopic}
-                required={selectedUsers.size > 0}
+                required
               />
 
               {drillType !== "roleplay" && (

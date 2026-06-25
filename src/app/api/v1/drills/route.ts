@@ -121,7 +121,7 @@ const keyPhraseItemSchema = z.object({
 });
 
 const createDrillSchema = z.object({
-	title: z.string().min(1).max(200),
+	title: z.string().max(200).default(""),
 	type: z.enum(['vocabulary', 'pronunciation', 'roleplay', 'matching', 'definition', 'summary', 'grammar', 'sentence_writing', 'sentence', 'listening', 'fill_blank', 'key_phrases']),
 	difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
 	date: z.string().datetime(),
@@ -157,7 +157,7 @@ const createDrillSchema = z.object({
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
 }).superRefine((data, ctx) => {
-	refineLearningJourneyFields(data, ctx);
+	refineLearningJourneyFields(data, ctx, { requireAlways: true });
 	if (data.type === 'vocabulary') {
 		if (!data.target_sentences || data.target_sentences.length < 1) {
 			ctx.addIssue({
