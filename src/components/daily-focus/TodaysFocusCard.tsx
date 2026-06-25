@@ -10,7 +10,7 @@ import { useWeeklyChallenge } from "@/hooks/useWeeklyChallenge";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { ContinuePracticeCard } from "@/components/practice/ContinuePracticeCard";
 import { WeeklyChallengeCard } from "@/components/weekly-challenge/WeeklyChallengeCard";
-import { isSundayUtc } from "@/lib/challenges/utc-week-challenge";
+import { isWeeklyChallengeDayUtc } from "@/lib/challenges/utc-week-challenge";
 import {
   isActiveAssignedPlanItem,
   isInProgressPlanItem,
@@ -48,7 +48,7 @@ export function TodaysFocusCard() {
   const subscriptionActivatedAt = me?.user?.subscriptionActivatedAt
     ? new Date(me.user.subscriptionActivatedAt)
     : undefined;
-  const isSunday = isSundayUtc(new Date(), subscriptionActivatedAt);
+  const isSunday = isWeeklyChallengeDayUtc(new Date(), subscriptionActivatedAt);
   const { data: weeklyChallenge } = useWeeklyChallenge(undefined, { enabled: isSunday });
   const { data: drillsData, isLoading: drillsLoading } = useLearnerDrills();
 

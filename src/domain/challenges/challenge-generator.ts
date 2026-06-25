@@ -45,6 +45,11 @@ function buildPrompt(profile: WeaknessProfile): string {
 		label: w.label,
 	}));
 
+	const masteredNote =
+		profile.masteredPhonemes && profile.masteredPhonemes.length > 0
+			? `\nDo NOT generate pronunciation content targeting these phonemes as the student has recently mastered them: ${profile.masteredPhonemes.join(', ')}\n`
+			: '';
+
 	return `
 The learner has the following top weaknesses (up to 4), ranked by severity (1 = worst):
 
@@ -79,7 +84,7 @@ Use these exact instructions per drill type:
 - vocabulary: "Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage."
 - roleplay: "Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift."
 - key_phrases: "Practice responding in these clinical situations using the correct key phrases."
-
+${masteredNote}
 Return a JSON object with this exact shape:
 
 {
@@ -109,6 +114,7 @@ Per-type generatedContent schemas:
     { "word": "<single medical word>", "sentence": "<clinical sentence using the word>", "sound": "<IPA phoneme e.g. /θ/>" }
   ]
 }
+CONSTRAINT: pronunciation_items must contain 10–15 items. Each item needs word, sound, and sentence.
 
 "vocabulary" → {
   "vocabulary_items": [
@@ -124,6 +130,7 @@ Per-type generatedContent schemas:
     }
   ]
 }
+CONSTRAINT: vocabulary_items must contain 10–15 items.
 CONSTRAINT: Use words/phrases from the student's evidence field.
 CONSTRAINT: correctAnswer must exactly match one of the options.
 
@@ -137,6 +144,7 @@ CONSTRAINT: correctAnswer must exactly match one of the options.
     }
   ]
 }
+CONSTRAINT: key_phrase_items must contain 10–15 items.
 CONSTRAINT: correctAnswer must be a string that exactly matches one element of options[].
 CONSTRAINT: This is a professional nursing exam. ALL 4 options must be things a qualified nurse might genuinely say in that situation. Options like 'Hey, what's up?', 'See ya later', 'How's it going?' are unacceptable — they are too casual for a clinical setting. Wrong answers must be professional but subtly incorrect — for example, using the wrong clinical term, giving information in the wrong order, or being technically accurate but inappropriate for the situation. A senior nurse reviewing the options should not be able to immediately eliminate 3 of the 4 as obviously wrong.
 
@@ -167,7 +175,7 @@ export async function generateWeeklyChallenge(
 		systemInstruction: SYSTEM_INSTRUCTION,
 		messages: [{ role: 'user', content: buildPrompt(profile) }],
 		temperature: 0.7,
-		maxTokens: 6000,
+		maxTokens: 10000,
 	});
 
 	const match = responseText.match(/\{[\s\S]*\}/);
@@ -180,6 +188,27 @@ export async function generateWeeklyChallenge(
 		raw = JSON.parse(match[0]);
 	} catch (e: any) {
 		throw new Error('Gemini returned malformed JSON: ' + e.message);
+	}
+
+	// Sanitize evidence[]: Gemini occasionally returns objects instead of strings
+	try {
+		const sequence = (raw as any)?.drillSequence;
+		if (Array.isArray(sequence)) {
+			for (const item of sequence) {
+				const evidence = item?.targetWeakness?.evidence;
+				if (!Array.isArray(evidence)) continue;
+				item.targetWeakness.evidence = evidence.map((e: unknown) => {
+					if (typeof e === 'string') return e;
+					if (e && typeof e === 'object') {
+						const obj = e as Record<string, unknown>;
+						return String(obj.text ?? obj.description ?? obj.label ?? JSON.stringify(e));
+					}
+					return String(e);
+				});
+			}
+		}
+	} catch {
+		// non-fatal — let Zod validation surface any remaining shape issues
 	}
 
 	const validation = contentSchema.safeParse(raw);

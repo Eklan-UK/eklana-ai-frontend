@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
+import Bookmark from '@/models/bookmark';
 import type { IDrillAttempt } from '@/models/drill-attempt';
 import type { IPronunciationAttempt } from '@/models/pronunciation-attempt';
 import type { IFreeTalkAttempt } from '@/models/free-talk-attempt';
@@ -256,38 +257,218 @@ function extractGrammarSignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 	];
 }
 
+function buildPronunciationFrequencySignal(
+	attempts: IPronunciationAttempt[]
+): WeaknessSignal | null {
+	if (attempts.length === 0) return null;
+
+	const phonemeFreq = new Map<string, number>();
+	const wordFreq = new Map<string, number>();
+
+	for (const attempt of attempts) {
+		for (const p of attempt.incorrectPhonemes ?? []) {
+			if (p) phonemeFreq.set(p, (phonemeFreq.get(p) ?? 0) + 1);
+		}
+		for (const ws of attempt.wordScores ?? []) {
+			if (ws.score < 70 && ws.word) {
+				wordFreq.set(ws.word, (wordFreq.get(ws.word) ?? 0) + 1);
+			}
+		}
+	}
+
+	if (phonemeFreq.size === 0 && wordFreq.size === 0) return null;
+
+	const topPhonemes = [...phonemeFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+	const topWords = [...wordFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+	const topCount = topPhonemes[0]?.[1] ?? topWords[0]?.[1] ?? 0;
+	const severity = clamp(topCount / 8);
+
+	const evidence: string[] = [];
+	if (topPhonemes.length > 0) {
+		evidence.push(`Frequent phoneme errors: ${topPhonemes.map(([p]) => p).join(', ')}`);
+	}
+	if (topWords.length > 0) {
+		evidence.push(`Low-scoring words: ${topWords.map(([w]) => w).join(', ')}`);
+	}
+
+	const label =
+		topPhonemes.length > 0
+			? `Pronunciation — recurring phonemes: ${topPhonemes.slice(0, 3).map(([p]) => p).join(', ')}`
+			: `Pronunciation — low-scoring words: ${topWords.slice(0, 3).map(([w]) => w).join(', ')}`;
+
+	return { drillType: 'pronunciation', category: 'pronunciation', severity, evidence, label };
+}
+
+function buildBookmarkSignal(
+	bookmarks: Array<{ content: string }>
+): WeaknessSignal | null {
+	if (bookmarks.length === 0) return null;
+
+	const contentFreq = new Map<string, number>();
+	for (const bm of bookmarks) {
+		if (bm.content) contentFreq.set(bm.content, (contentFreq.get(bm.content) ?? 0) + 1);
+	}
+	if (contentFreq.size === 0) return null;
+
+	const topContents = [...contentFreq.entries()]
+		.sort((a, b) => b[1] - a[1])
+		.slice(0, 5)
+		.map(([content]) => content);
+
+	const severity = clamp(contentFreq.size / 10);
+
+	return {
+		drillType: 'vocabulary',
+		category: 'vocabulary',
+		severity,
+		evidence: topContents,
+		label: `Bookmarked vocabulary (${contentFreq.size} item${contentFreq.size !== 1 ? 's' : ''})`,
+	};
+}
+
+async function computeAllTimePhonemeAnalysis(
+	learnerId: Types.ObjectId,
+	tenDaysAgo: Date
+): Promise<{ signal: WeaknessSignal | null; masteredPhonemes: string[] }> {
+	const [allTimePhonemes, recentPhonemeScores] = await Promise.all([
+		PronunciationAttemptModel.aggregate([
+			{ $match: { learnerId } },
+			{ $unwind: '$incorrectPhonemes' },
+			{ $match: { incorrectPhonemes: { $nin: [null, ''] } } },
+			{ $group: { _id: '$incorrectPhonemes', count: { $sum: 1 } } },
+			{ $sort: { count: -1 } },
+			{ $limit: 10 },
+		]),
+		PronunciationAttemptModel.aggregate([
+			{ $match: { learnerId, createdAt: { $gte: tenDaysAgo } } },
+			{ $unwind: '$incorrectPhonemes' },
+			{ $match: { incorrectPhonemes: { $nin: [null, ''] } } },
+			{ $group: { _id: '$incorrectPhonemes', avgScore: { $avg: '$textScore' } } },
+		]),
+	]);
+
+	if ((allTimePhonemes as unknown[]).length === 0) return { signal: null, masteredPhonemes: [] };
+
+	const recentScoreMap = new Map<string, number>(
+		(recentPhonemeScores as Array<{ _id: string; avgScore: number }>).map((r) => [r._id, r.avgScore])
+	);
+
+	const masteredPhonemes: string[] = [];
+	const difficultPhonemes: Array<{ phoneme: string; count: number }> = [];
+
+	for (const { _id: phoneme, count } of allTimePhonemes as Array<{ _id: string; count: number }>) {
+		const recentAvg = recentScoreMap.get(phoneme);
+		if (recentAvg != null && recentAvg >= 80) {
+			masteredPhonemes.push(phoneme);
+		} else {
+			difficultPhonemes.push({ phoneme, count });
+		}
+	}
+
+	if (difficultPhonemes.length === 0) return { signal: null, masteredPhonemes };
+
+	const severity = clamp(difficultPhonemes[0].count / 30);
+
+	return {
+		signal: {
+			drillType: 'pronunciation',
+			category: 'pronunciation',
+			severity,
+			evidence: [
+				`All-time difficult phonemes: ${difficultPhonemes.map((d) => d.phoneme).join(', ')}`,
+			],
+			label: `Pronunciation — persistent phonemes: ${difficultPhonemes.slice(0, 3).map((d) => d.phoneme).join(', ')}`,
+		},
+		masteredPhonemes,
+	};
+}
+
+function deduplicateByDrillType(signals: WeaknessSignal[]): WeaknessSignal[] {
+	const byDrillType = new Map<string, WeaknessSignal>();
+	for (const signal of signals) {
+		const existing = byDrillType.get(signal.drillType);
+		if (!existing) {
+			byDrillType.set(signal.drillType, { ...signal, evidence: [...signal.evidence] });
+		} else {
+			if (signal.severity > existing.severity) existing.label = signal.label;
+			existing.severity = Math.max(existing.severity, signal.severity);
+			const seen = new Set(existing.evidence);
+			for (const e of signal.evidence) {
+				if (!seen.has(e)) {
+					existing.evidence.push(e);
+					seen.add(e);
+				}
+			}
+		}
+	}
+	return [...byDrillType.values()];
+}
+
+function pickTopFour(signals: WeaknessSignal[]): WeaknessSignal[] {
+	const sorted = [...signals].sort((a, b) => b.severity - a.severity);
+	const preferred = ['pronunciation', 'vocabulary', 'roleplay', 'key_phrases'];
+	const picked: WeaknessSignal[] = [];
+	const usedTypes = new Set<string>();
+
+	for (const dt of preferred) {
+		const signal = sorted.find((s) => s.drillType === dt);
+		if (signal) {
+			picked.push(signal);
+			usedTypes.add(dt);
+		}
+		if (picked.length === 4) break;
+	}
+
+	for (const signal of sorted) {
+		if (picked.length >= 4) break;
+		if (!usedTypes.has(signal.drillType)) {
+			picked.push(signal);
+			usedTypes.add(signal.drillType);
+		}
+	}
+
+	return picked.sort((a, b) => b.severity - a.severity);
+}
+
 export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
 	weekStartDate: Date
 ): Promise<WeaknessProfile> {
 	const now = new Date();
+
+	// 6-day window for existing drill / free-talk signals
 	const weekStartLookback = new Date(now);
 	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 6);
 	weekStartLookback.setUTCHours(0, 0, 0, 0);
 	const dateFilter = { $gte: weekStartLookback, $lt: now };
 
-	const [drillAttempts, pronAttempts, freeTalkAttempts] = await Promise.all([
-		DrillAttempt.find({
-			learnerId,
-			completedAt: dateFilter,
-		}).lean() as Promise<IDrillAttempt[]>,
-		PronunciationAttemptModel.find({
-			learnerId,
-			createdAt: dateFilter,
-		}).lean() as Promise<IPronunciationAttempt[]>,
-		FreeTalkAttempt.find({
-			learnerId,
-			createdAt: dateFilter,
-		}).lean() as Promise<IFreeTalkAttempt[]>,
+	// 10-day window for new pronunciation-frequency and bookmark signals
+	const tenDaysAgo = new Date(now);
+	tenDaysAgo.setUTCDate(tenDaysAgo.getUTCDate() - 10);
+
+	const [
+		drillAttempts,
+		pronAttempts,
+		freeTalkAttempts,
+		recentPronAttempts,
+		recentBookmarks,
+		allTimeAnalysis,
+	] = await Promise.all([
+		DrillAttempt.find({ learnerId, completedAt: dateFilter }).lean() as Promise<IDrillAttempt[]>,
+		PronunciationAttemptModel.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IPronunciationAttempt[]>,
+		FreeTalkAttempt.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IFreeTalkAttempt[]>,
+		PronunciationAttemptModel.find({ learnerId, createdAt: { $gte: tenDaysAgo } }).lean() as Promise<IPronunciationAttempt[]>,
+		Bookmark.find({
+			userId: learnerId,
+			createdAt: { $gte: tenDaysAgo },
+			type: { $in: ['word', 'sentence'] },
+		}).lean(),
+		computeAllTimePhonemeAnalysis(learnerId, tenDaysAgo),
 	]);
 
 	// Group drill attempts by type
 	const byType = new Map<string, IDrillAttempt[]>();
 	for (const attempt of drillAttempts) {
-		// IDrill.type is not directly on IDrillAttempt; resolve via drillId lookup is
-		// deferred — using performanceReviewSnapshot or the attempt's own result keys
-		// to infer type instead.
-		// TODO: if drillId population is needed, populate drill.type here
 		const type = inferDrillType(attempt);
 		if (!type) continue;
 		const bucket = byType.get(type) ?? [];
@@ -295,7 +476,10 @@ export async function aggregateWeaknesses(
 		byType.set(type, bucket);
 	}
 
-	const signals: WeaknessSignal[] = [
+	const freqSignal = buildPronunciationFrequencySignal(recentPronAttempts);
+	const bmSignal = buildBookmarkSignal(recentBookmarks as Array<{ content: string }>);
+
+	const allSignals: WeaknessSignal[] = [
 		...extractPronunciationSignals(pronAttempts),
 		...extractVocabularySignals(byType.get('vocabulary') ?? [], 'vocabulary'),
 		...extractVocabularySignals(byType.get('key_phrases') ?? [], 'key_phrases'),
@@ -306,16 +490,22 @@ export async function aggregateWeaknesses(
 		...extractGrammarSignals(byType.get('grammar') ?? []),
 		...extractFreeTalkSignals(freeTalkAttempts),
 		// sentence, summary, listening: skipped — no reliable automated weakness signal
+		...(freqSignal ? [freqSignal] : []),
+		...(bmSignal ? [bmSignal] : []),
+		...(allTimeAnalysis.signal ? [allTimeAnalysis.signal] : []),
 	];
 
-	signals.sort((a, b) => b.severity - a.severity);
-	const meaningfulSignals = signals.filter((s) => s.severity > 0);
+	const meaningful = allSignals.filter((s) => s.severity > 0);
+	const deduplicated = deduplicateByDrillType(meaningful);
+	deduplicated.sort((a, b) => b.severity - a.severity);
+	const topFour = pickTopFour(deduplicated);
 
 	return {
 		learnerId,
 		weekStartDate,
-		weaknesses: signals,
-		topWeaknesses: meaningfulSignals.slice(0, 3),
+		weaknesses: deduplicated,
+		topWeaknesses: topFour,
+		masteredPhonemes: allTimeAnalysis.masteredPhonemes.length > 0 ? allTimeAnalysis.masteredPhonemes : undefined,
 		generatedAt: new Date(),
 	};
 }

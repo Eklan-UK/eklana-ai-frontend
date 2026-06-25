@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import UserModel from '@/models/user';

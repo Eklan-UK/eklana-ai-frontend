@@ -1,7 +1,7 @@
 // Run once. Safe to re-run — only touches documents where drillType is missing.
 // npx ts-node -r tsconfig-paths/register src/scripts/backfill-drill-type.ts
 
-import 'dotenv/config';
+import './load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import DrillAttempt from '@/models/drill-attempt';

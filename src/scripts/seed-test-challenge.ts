@@ -1,7 +1,7 @@
 // Run once for demo purposes. Safe to re-run — uses insertMany.
 // npx ts-node -r tsconfig-paths/register src/scripts/seed-test-challenge.ts
 
-import 'dotenv/config';
+import './load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import DrillAttemptModel from '@/models/drill-attempt';

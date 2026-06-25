@@ -1,6 +1,6 @@
 import { utcMondayStartOfWeekContaining } from '@/lib/classes/utc-week';
 
-export function isSundayUtc(now: Date = new Date(), subscriptionActivatedAt?: Date): boolean {
+export function isWeeklyChallengeDayUtc(now: Date = new Date(), subscriptionActivatedAt?: Date): boolean {
 	if (!subscriptionActivatedAt) {
 		return now.getUTCDay() === 0;
 	}

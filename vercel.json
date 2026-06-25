@@ -16,6 +16,10 @@
     {
       "path": "/api/v1/cron/drill-assigned-reminder",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/v1/cron/weekly-challenge",
+      "schedule": "0 6 * * *"
     }
   ]
 }
