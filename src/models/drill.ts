@@ -501,8 +501,8 @@ const drillSchema = new Schema<IDrill>(
     // Basic Information
     title: {
       type: String,
-      required: [true, "Title is required"],
       trim: true,
+      default: "",
       description: "Title of the drill",
     },
 

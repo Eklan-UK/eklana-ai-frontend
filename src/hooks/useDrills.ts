@@ -8,70 +8,74 @@ import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 
+function normalizeLearnerDrillItem(item: any): any {
+  if (item.itemType === "free_talk_scenario") {
+    return item;
+  }
+  if (item.drill && typeof item.drill === "object") {
+    const drill = item.drill;
+    if (drill._id != null && drill.type) {
+      return {
+        ...item,
+        drill: {
+          ...drill,
+          _id: String(drill._id),
+        },
+      };
+    }
+  }
+  if (item._id && item.type) {
+    return {
+      assignmentId: item.assignmentId || item._id,
+      drill: {
+        ...item,
+        _id: String(item._id),
+      },
+      assignedBy: item.assignedBy,
+      assignedAt: item.assignedAt || item.created_date,
+      dueDate:
+        item.dueDate ||
+        new Date(
+          new Date(item.date).getTime() +
+            (item.duration_days || 1) * 24 * 60 * 60 * 1000
+        ).toISOString(),
+      status: item.status || "pending",
+      completedAt: item.completedAt,
+      latestAttempt: item.latestAttempt,
+      hasBookmarks: item.hasBookmarks === true,
+    };
+  }
+  return item;
+}
+
+function isLearnerDrillRow(item: any): boolean {
+  if (item.itemType === "free_talk_scenario") return true;
+  const drill = item.drill;
+  return drill && typeof drill === "object" && drill._id != null && !!drill.type;
+}
+
+async function fetchLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {
+  const response: any = await drillAPI.getLearnerDrills(filters || { limit: 100 });
+
+  let drillsData: any[] = [];
+  if (response.data?.drills) {
+    drillsData = response.data.drills;
+  } else if (response.drills) {
+    drillsData = response.drills;
+  } else if (Array.isArray(response)) {
+    drillsData = response;
+  }
+
+  return drillsData
+    .map(normalizeLearnerDrillItem)
+    .filter(isLearnerDrillRow);
+}
+
 // Get learner drills
 export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {
   return useQuery({
     queryKey: queryKeys.drills.learner.list(filters),
-    queryFn: async () => {
-      const response: any = await drillAPI.getLearnerDrills(filters || { limit: 100 });
-      
-      // Handle different response structures
-      let drillsData: any[] = [];
-      if (response.data?.drills) {
-        drillsData = response.data.drills;
-      } else if (response.drills) {
-        drillsData = response.drills;
-      } else if (Array.isArray(response)) {
-        drillsData = response;
-      }
-
-      // Normalize drill data structure (preserve free_talk_scenario rows from API)
-      return drillsData
-        .map((item: any) => {
-          if (item.itemType === "free_talk_scenario") {
-            return item;
-          }
-          if (item.drill && typeof item.drill === "object") {
-            const drill = item.drill;
-            if (drill.title && drill.type) {
-              return {
-                ...item,
-                drill: {
-                  ...drill,
-                  _id: drill._id != null ? String(drill._id) : drill._id,
-                },
-              };
-            }
-          }
-          if (item._id && item.title && item.type) {
-            return {
-              assignmentId: item.assignmentId || item._id,
-              drill: {
-                ...item,
-                _id: String(item._id),
-              },
-              assignedBy: item.assignedBy,
-              assignedAt: item.assignedAt || item.created_date,
-              dueDate:
-                item.dueDate ||
-                new Date(
-                  new Date(item.date).getTime() +
-                    (item.duration_days || 1) * 24 * 60 * 60 * 1000
-                ).toISOString(),
-              status: item.status || "pending",
-              completedAt: item.completedAt,
-              latestAttempt: item.latestAttempt,
-              hasBookmarks: item.hasBookmarks === true,
-            };
-          }
-          return item;
-        })
-        .filter((item: any) => {
-          if (item.itemType === "free_talk_scenario") return true;
-          const drill = item.drill;
-          return drill && typeof drill === "object" && drill.title && drill.type;
-        });
-    },
+    queryFn: () => fetchLearnerDrills(filters),
     staleTime: 1000 * 60 * 2, // 2 minutes for learner drills
     refetchOnMount: true, // Override global false: refetch when stale/invalidated on mount (e.g. after drill completion)
   });
@@ -195,61 +199,7 @@ export function usePrefetchLearnerDrills() {
   return (filters?: { limit?: number }) => {
     queryClient.prefetchQuery({
       queryKey: queryKeys.drills.learner.list(filters),
-      queryFn: async () => {
-        const response: any = await drillAPI.getLearnerDrills(filters || { limit: 100 });
-        let drillsData: any[] = [];
-        if (response.data?.drills) {
-          drillsData = response.data.drills;
-        } else if (response.drills) {
-          drillsData = response.drills;
-        } else if (Array.isArray(response)) {
-          drillsData = response;
-        }
-        return drillsData
-          .map((item: any) => {
-            if (item.itemType === "free_talk_scenario") {
-              return item;
-            }
-            if (item.drill && typeof item.drill === "object") {
-              const drill = item.drill;
-              if (drill.title && drill.type) {
-                return {
-                  ...item,
-                  drill: {
-                    ...drill,
-                    _id: drill._id != null ? String(drill._id) : drill._id,
-                  },
-                };
-              }
-            }
-            if (item._id && item.title && item.type) {
-              return {
-                assignmentId: item.assignmentId || item._id,
-                drill: {
-                  ...item,
-                  _id: String(item._id),
-                },
-                assignedBy: item.assignedBy,
-                assignedAt: item.assignedAt || item.created_date,
-                dueDate:
-                  item.dueDate ||
-                  new Date(
-                    new Date(item.date).getTime() +
-                      (item.duration_days || 1) * 24 * 60 * 60 * 1000
-                  ).toISOString(),
-                status: item.status || "pending",
-                completedAt: item.completedAt,
-                latestAttempt: item.latestAttempt,
-              };
-            }
-            return item;
-          })
-          .filter((item: any) => {
-            if (item.itemType === "free_talk_scenario") return true;
-            const drill = item.drill;
-            return drill && typeof drill === "object" && drill.title && drill.type;
-          });
-      },
+      queryFn: () => fetchLearnerDrills(filters),
       staleTime: 1000 * 60 * 2, // 2 minutes
     });
   };

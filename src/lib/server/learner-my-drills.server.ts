@@ -53,13 +53,9 @@ const LEARNER_DRILL_SELECT =
 function isPopulatedDrillDoc(
   value: unknown,
 ): value is Record<string, unknown> & { _id?: Types.ObjectId; title?: string; type?: string } {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    'title' in value &&
-    typeof (value as { title?: unknown }).title === 'string' &&
-    (value as { title: string }).title.length > 0
-  );
+  if (value == null || typeof value !== 'object') return false;
+  const doc = value as { _id?: unknown; type?: unknown };
+  return doc._id != null && typeof doc.type === 'string' && doc.type.length > 0;
 }
 
 function drillRefId(value: unknown): string | null {

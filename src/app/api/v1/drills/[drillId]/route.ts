@@ -21,7 +21,7 @@ import {
 
 // Update drill schema
 const updateDrillSchema = z.object({
-	title: z.string().min(1).max(200).optional(),
+	title: z.string().max(200).optional(),
 	type: z.enum([
 		"vocabulary",
 		"pronunciation",

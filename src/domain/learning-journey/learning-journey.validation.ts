@@ -26,25 +26,26 @@ export function refineLearningJourneyFields(
     assigned_to?: string[];
   },
   ctx: z.RefinementCtx,
-  options?: { requireWhenAssigned?: boolean },
+  options?: { requireWhenAssigned?: boolean; requireAlways?: boolean },
 ): void {
   const requireWhenAssigned = options?.requireWhenAssigned ?? true;
+  const requireAlways = options?.requireAlways ?? false;
   const isAssigning = (data.assigned_to?.length ?? 0) > 0;
   const part = data.learning_journey_part;
   const topic = data.learning_journey_topic;
 
-  if (requireWhenAssigned && isAssigning) {
+  if (requireAlways || (requireWhenAssigned && isAssigning)) {
     if (part == null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Learning journey mission is required when assigning a drill",
+        message: "Learning journey mission is required",
         path: ["learning_journey_part"],
       });
     }
     if (!topic) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Learning journey topic is required when assigning a drill",
+        message: "Learning journey topic is required",
         path: ["learning_journey_topic"],
       });
     }
