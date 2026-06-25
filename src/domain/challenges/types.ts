@@ -63,7 +63,8 @@ export interface WeaknessProfile {
 	learnerId: Types.ObjectId;
 	weekStartDate: Date;
 	weaknesses: WeaknessSignal[];
-	topWeaknesses: WeaknessSignal[]; // top 3
+	topWeaknesses: WeaknessSignal[]; // top 4
+	masteredPhonemes?: string[];
 	generatedAt: Date;
 }
 

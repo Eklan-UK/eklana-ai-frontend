@@ -1,7 +1,7 @@
 // run with:
 // npx tsx src/domain/challenges/test-generator.ts
 
-import 'dotenv/config';
+import '@/scripts/load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import { aggregateWeaknesses } from './weakness-aggregator';

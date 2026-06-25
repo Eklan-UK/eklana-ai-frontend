@@ -43,10 +43,10 @@ export default function WeeklyChallengeHistoryPage() {
 			<div className="max-w-md mx-auto px-4 py-4 md:max-w-2xl">
 				{visibleChallenges.length > 0 ? (
 					<div className="space-y-3">
-						{visibleChallenges.map((challenge, i) => (
+						{visibleChallenges.map((challenge) => (
 							<WeeklyChallengeWeekCard
 								key={challenge.weekStartDate}
-								challenge={{ ...challenge, weekNumber: i + 1 }}
+								challenge={challenge}
 							/>
 						))}
 					</div>

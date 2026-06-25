@@ -4,7 +4,7 @@ import { aggregateWeaknesses } from './weakness-aggregator';
 import { generateWeeklyChallenge } from './challenge-generator';
 import { ChallengeRepository } from './challenge.repository';
 import { ChallengeService } from './challenge.service';
-import { currentWeekStartUtc, isSundayUtc } from '@/lib/challenges/utc-week-challenge';
+import { currentWeekStartUtc, isWeeklyChallengeDayUtc } from '@/lib/challenges/utc-week-challenge';
 import type { ChallengeDrillItem } from './types';
 
 const challengeService = new ChallengeService(new ChallengeRepository());
@@ -61,7 +61,7 @@ export function toListResponse(
 	now: Date,
 	options?: { weekStartDate?: Date; weekNumber?: number },
 ): WeeklyChallengeListResponse {
-	const isSunday = isSundayUtc(now);
+	const isSunday = isWeeklyChallengeDayUtc(now);
 	const fallbackWeekStart = options?.weekStartDate ?? currentWeekStartUtc(now);
 
 	if (!doc) {
@@ -248,7 +248,7 @@ export async function getOrCreateWeeklyChallenge(
 		return toListResponse(doc, now);
 	}
 
-	if (!isSundayUtc(now)) {
+	if (!isWeeklyChallengeDayUtc(now)) {
 		return toListResponse(doc, now);
 	}
 
@@ -325,7 +325,7 @@ async function ensureCurrentWeekChallenge(
 	} catch {
 		// Generation may fail; history should still return existing weeks
 	}
-	if (isSundayUtc(now)) {
+	if (isWeeklyChallengeDayUtc(now)) {
 		await getOrCreateWeeklyChallenge(learnerId, now);
 	}
 }

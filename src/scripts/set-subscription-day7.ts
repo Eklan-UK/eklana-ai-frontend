@@ -1,7 +1,7 @@
 // Sets subscriptionActivatedAt to 6 days ago so today (day 7) triggers the weekly challenge.
 // npx ts-node -r tsconfig-paths/register src/scripts/set-subscription-day7.ts
 
-import 'dotenv/config';
+import './load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import User from '@/models/user';

@@ -1,7 +1,7 @@
 // run with:
 // npx ts-node -r tsconfig-paths/register src/domain/challenges/test-aggregator.ts
 
-import 'dotenv/config';
+import '@/scripts/load-env';
 import { Types } from 'mongoose';
 import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import DrillAttempt from '@/models/drill-attempt';
