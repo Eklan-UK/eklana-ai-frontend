@@ -5,6 +5,12 @@ import { connectToDatabase } from "@/lib/api/db";
 import { getAuth } from "@/lib/api/better-auth";
 import User from "@/models/user";
 
+/** Shape used from Better Auth internalAdapter.findAccounts (credential row). */
+type AuthCredentialAccount = {
+  providerId: string;
+  password?: string | null;
+};
+
 function isBcryptHash(storedHash: string): boolean {
   return storedHash.startsWith("$2");
 }
@@ -48,7 +54,9 @@ export async function getCredentialPasswordHash(
   const ctx = await auth.$context;
   const authUserId = await resolveAuthUserId(userId);
 
-  const accounts = await ctx.internalAdapter.findAccounts(authUserId);
+  const accounts = (await ctx.internalAdapter.findAccounts(
+    authUserId,
+  )) as AuthCredentialAccount[];
   const credential = accounts.find((account) => account.providerId === "credential");
   const password = credential?.password;
   return typeof password === "string" && password.length > 0 ? password : null;
@@ -74,7 +82,9 @@ export async function applyPasswordUpdate(
   const authUserId = await resolveAuthUserId(userId);
   const hashedPassword = await ctx.password.hash(plainPassword);
 
-  const accounts = await ctx.internalAdapter.findAccounts(authUserId);
+  const accounts = (await ctx.internalAdapter.findAccounts(
+    authUserId,
+  )) as AuthCredentialAccount[];
   const hasCredential = accounts.some(
     (account) => account.providerId === "credential",
   );
