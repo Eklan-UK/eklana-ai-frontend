@@ -72,9 +72,12 @@ export const userService = {
     role: 'user' | 'admin' | 'tutor',
     select?: string
   ) => {
+    const roleFilter =
+      role === 'user' ? { $in: ['user', 'learner'] as const } : role;
+
     const users = await User.find({
       _id: { $in: userIds.map(id => new Types.ObjectId(id)) },
-      role,
+      role: roleFilter,
     })
       .select(select || 'email firstName lastName')
       .lean()

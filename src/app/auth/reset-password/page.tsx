@@ -15,18 +15,25 @@ function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<"form" | "success" | "error">("form");
+  const [isInitialSetup, setIsInitialSetup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [errors, setErrors] = useState<{
     newPassword?: string;
     confirmPassword?: string;
   }>({});
+
+  const pageTitle = isInitialSetup ? "Set Password" : "Reset Password";
+  const formTitle = isInitialSetup ? "Set Your Password" : "Create New Password";
+  const formDescription = isInitialSetup
+    ? "Add a password so you can sign in with your email. Google and Apple sign-in will still work."
+    : "Enter your new password below.";
 
   useEffect(() => {
     if (!token) {
@@ -69,23 +76,29 @@ function ResetPasswordContent() {
 
     setIsSubmitting(true);
     try {
-      await authService.resetPassword(token, newPassword);
+      const result = await authService.resetPassword(token, newPassword);
+      setIsInitialSetup(result.isInitialSetup === true);
       setStatus("success");
-      toast.success("Password reset successfully!");
-      
-      // Redirect to login after a short delay
+      toast.success(
+        result.isInitialSetup
+          ? "Password set successfully!"
+          : "Password reset successfully!",
+      );
+
       setTimeout(() => {
         router.push("/auth/login");
       }, 3000);
-    } catch (error: any) {
-      if (error.message?.includes("expired")) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to reset password";
+      if (message.includes("expired")) {
         setStatus("error");
         setErrorMessage("This reset link has expired. Please request a new password reset.");
-      } else if (error.message?.includes("invalid") || error.message?.includes("Invalid")) {
+      } else if (message.includes("invalid") || message.includes("Invalid")) {
         setStatus("error");
         setErrorMessage("Invalid reset link. Please request a new password reset.");
       } else {
-        toast.error(error.message || "Failed to reset password. Please try again.");
+        toast.error(message || "Failed to reset password. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -96,7 +109,7 @@ function ResetPasswordContent() {
     return (
       <div className="min-h-screen bg-white">
         <div className="h-6"></div>
-        <Header title="Password Reset" />
+        <Header title={pageTitle} />
 
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
           <Card className="p-8">
@@ -105,10 +118,12 @@ function ResetPasswordContent() {
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Password Reset!
+                {isInitialSetup ? "Password Set!" : "Password Reset!"}
               </h2>
               <p className="text-sm text-gray-600 mb-6">
-                Your password has been reset successfully. You will be redirected to the login page...
+                {isInitialSetup
+                  ? "Your password has been set. You can now sign in with your email and password, or continue using Google or Apple. Redirecting to login..."
+                  : "Your password has been reset successfully. You will be redirected to the login page..."}
               </p>
               <Link href="/auth/login">
                 <Button variant="primary" size="lg" fullWidth>
@@ -126,7 +141,7 @@ function ResetPasswordContent() {
     return (
       <div className="min-h-screen bg-white">
         <div className="h-6"></div>
-        <Header title="Password Reset" />
+        <Header title="Password" />
 
         <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
           <Card className="p-8">
@@ -143,7 +158,7 @@ function ResetPasswordContent() {
               <div className="space-y-3">
                 <Link href="/auth/forgot-password">
                   <Button variant="primary" size="lg" fullWidth>
-                    Request New Reset Link
+                    Request New Link
                   </Button>
                 </Link>
                 <Link href="/auth/login">
@@ -162,7 +177,7 @@ function ResetPasswordContent() {
   return (
     <div className="min-h-screen bg-white">
       <div className="h-6"></div>
-      <Header showBack title="Reset Password" />
+      <Header showBack title="Create or Reset Password" />
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-lg md:px-8">
         <Card className="p-6">
@@ -171,10 +186,10 @@ function ResetPasswordContent() {
               <Lock className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Create New Password
+              {formTitle}
             </h2>
             <p className="text-sm text-gray-600">
-              Enter your new password below.
+              {formDescription}
             </p>
           </div>
 
@@ -263,10 +278,10 @@ function ResetPasswordContent() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Resetting...
+                  Saving...
                 </>
               ) : (
-                "Reset Password"
+                "Save Password"
               )}
             </Button>
           </form>

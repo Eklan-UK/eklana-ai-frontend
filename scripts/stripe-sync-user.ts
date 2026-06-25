@@ -11,6 +11,8 @@ import Stripe from "stripe";
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "../src/lib/api/db";
 import User from "../src/models/user";
+import { shouldSkipStripeDowngrade } from "../src/lib/api/subscription-reconciliation";
+import { downgradeUserFromStripe } from "../src/lib/api/stripe-subscription-apply";
 
 function fromUnix(ts: number): Date {
   return new Date(ts * 1000);
@@ -131,22 +133,32 @@ async function main() {
     if (latest) {
       user.stripeSubscriptionId = latest.id;
       user.stripeSubscriptionStatus = latest.status;
-      await user.save();
     }
+
+    const downgraded = !shouldSkipStripeDowngrade(user);
+    if (downgraded) {
+      downgradeUserFromStripe(user);
+    }
+    await user.save();
+
     console.error(
       JSON.stringify(
         {
           ok: false,
-          message: "No active/trialing subscription in Stripe for this customer.",
+          downgraded,
+          message: downgraded
+            ? "No active/trialing subscription — user downgraded to free."
+            : "No active/trialing subscription — premium retained (Apple/manual).",
           stripeCustomerId,
           latestSubscriptionId: latest?.id ?? null,
           latestSubscriptionStatus: latest?.status ?? null,
+          subscriptionPlan: user.subscriptionPlan,
         },
         null,
         2
       )
     );
-    process.exitCode = 1;
+    process.exitCode = downgraded ? 0 : 1;
   }
 
   await mongoose.disconnect();

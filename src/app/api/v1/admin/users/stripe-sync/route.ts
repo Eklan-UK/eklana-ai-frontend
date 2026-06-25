@@ -19,6 +19,7 @@ import {
   extendSubscriptionExpiresAt,
   shouldSkipStripeDowngrade,
 } from '@/lib/api/subscription-reconciliation';
+import { downgradeUserFromStripe } from '@/lib/api/stripe-subscription-apply';
 import { billingPeriodFromStripePriceId } from '@/lib/api/stripe-billing-period';
 
 const inputSchema = z
@@ -192,24 +193,41 @@ async function handler(
     });
   }
 
-  // No active subscription — check the most recent one for context
+  // No active subscription — sync status and downgrade unless Apple/manual retains access
   const latestSub = subscriptions.data[0];
   if (latestSub) {
     user.stripeSubscriptionId = latestSub.id;
     user.stripeSubscriptionStatus = latestSub.status;
-    await user.save();
   }
+
+  const downgraded = !shouldSkipStripeDowngrade(user);
+  if (downgraded) {
+    downgradeUserFromStripe(user);
+  }
+
+  await user.save();
 
   return NextResponse.json(
     {
-      code: 'NoActiveSubscription',
-      message: `No active or trialing Stripe subscription found for this customer. Latest status: ${latestSub?.status ?? 'none'}.`,
+      code: downgraded ? 'Downgraded' : 'NoActiveSubscription',
+      message: downgraded
+        ? `No active Stripe subscription. Student downgraded to free (latest status: ${latestSub?.status ?? 'none'}).`
+        : `No active Stripe subscription but premium retained via Apple/manual expiry (latest: ${latestSub?.status ?? 'none'}).`,
       userId: String(user._id),
       stripeCustomerId,
       latestSubscriptionId: latestSub?.id ?? null,
       latestSubscriptionStatus: latestSub?.status ?? null,
+      before,
+      after: {
+        subscriptionPlan: user.subscriptionPlan,
+        stripeCustomerId: user.stripeCustomerId,
+        stripeSubscriptionId: user.stripeSubscriptionId,
+        stripeSubscriptionStatus: user.stripeSubscriptionStatus,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        subscriptionPaymentMethod: user.subscriptionPaymentMethod,
+      },
     },
-    { status: 422 }
+    { status: downgraded ? 200 : 422 }
   );
 }
 

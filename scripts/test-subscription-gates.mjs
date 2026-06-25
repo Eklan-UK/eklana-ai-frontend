@@ -15,6 +15,9 @@
  * Usage:
  *   node scripts/test-subscription-gates.mjs
  *   node scripts/test-subscription-gates.mjs --base-url https://staging.eklan.ai
+ *
+ * Past-due / payment-failure policy is covered by:
+ *   npm run test:subscription
  */
 
 import { readFileSync } from 'node:fs';

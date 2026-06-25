@@ -5,7 +5,10 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import {
+  applyPasswordUpdate,
+  userHasPassword,
+} from '@/lib/api/password-account';
 
 // Get or create PasswordOTP model
 function getPasswordOTPModel() {
@@ -117,39 +120,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Hash and update the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    
-    await User.findByIdAndUpdate(otpRecord.userId, {
-      $set: { password: hashedPassword },
-    }).exec();
+    const isInitialSetup = !(await userHasPassword(
+      otpRecord.userId,
+      user.password,
+    ));
 
-    // Also update in Better Auth's accounts collection if it exists
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        // Better Auth stores credentials in 'accounts' collection
-        await db.collection('accounts').updateOne(
-          { userId: otpRecord.userId.toString(), providerId: 'credential' },
-          { $set: { password: hashedPassword } }
-        );
-      }
-    } catch (accountError) {
-      // Non-critical - Better Auth account update failed, but User model password was updated
-      logger.warn('Failed to update Better Auth account password', { error: accountError });
-    }
+    await applyPasswordUpdate(otpRecord.userId, newPassword);
 
     // Delete the OTP record
     await PasswordOTP.deleteOne({ _id: otpRecord._id });
 
-    logger.info('Password reset successfully with OTP', {
-      userId: otpRecord.userId.toString(),
-    });
+    logger.info(
+      isInitialSetup
+        ? 'Password set successfully with OTP'
+        : 'Password reset successfully with OTP',
+      {
+        userId: otpRecord.userId.toString(),
+      },
+    );
 
     return NextResponse.json(
       {
         code: 'Success',
-        message: 'Password has been reset successfully. You can now sign in with your new password.',
+        isInitialSetup,
+        message: isInitialSetup
+          ? 'Password set successfully. You can now sign in with your email and password.'
+          : 'Password has been reset successfully. You can now sign in with your new password.',
       },
       { status: 200 }
     );

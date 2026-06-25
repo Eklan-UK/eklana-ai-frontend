@@ -15,6 +15,10 @@ import {
   resolveAppleSubscription,
 } from '@/services/apple-app-store.service';
 import {
+  downgradeUserFromStripe,
+} from '@/lib/api/stripe-subscription-apply';
+import { shouldSkipStripeDowngrade } from '@/lib/api/subscription-reconciliation';
+import {
   hasAppleBillingLink,
   hasStripeBillingLink,
 } from '@/domain/subscriptions/subscription.types';
@@ -84,6 +88,11 @@ export async function syncStripeSubscriptionForUser(
         user.stripeSubscriptionId = latestSub.id;
         user.stripeSubscriptionStatus = latestSub.status;
       }
+
+      if (!shouldSkipStripeDowngrade(user)) {
+        downgradeUserFromStripe(user);
+      }
+
       return {
         userId,
         source: 'stripe',
@@ -230,13 +239,7 @@ export async function syncAllPremiumSubscriptionsFromProviders(): Promise<{
     }
 
     const result = await syncUserSubscriptionFromProvider(user, stripe);
-    if (result.synced) {
-      await user.save();
-    } else if (
-      result.source === 'stripe' &&
-      user.isModified() &&
-      (user.stripeCustomerId || user.stripeSubscriptionId)
-    ) {
+    if (result.synced || user.isModified()) {
       await user.save();
     }
     return result;

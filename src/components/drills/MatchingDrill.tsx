@@ -64,6 +64,49 @@ function findUnmatchedCanonicalPairIndex(
   return candidates[0];
 }
 
+function restoreMatchedCanonicalIndices(
+  pairs: MatchPair[],
+  restoredKeys: Set<string>,
+  leftItems: ShuffledItem[],
+  rightItems: ShuffledItem[],
+): Set<number> {
+  const matched = new Set<number>();
+  restoredKeys.forEach((key) => {
+    const [leftIdStr, rightIdStr] = key.split("-");
+    const leftId = Number(leftIdStr);
+    const rightId = Number(rightIdStr);
+
+    if (leftId === rightId) {
+      matched.add(leftId);
+      return;
+    }
+
+    const leftItem = leftItems.find((item) => item.id === leftId);
+    const rightItem = rightItems.find((item) => item.id === rightId);
+    if (leftItem && rightItem) {
+      const canonicalIndex = findUnmatchedCanonicalPairIndex(
+        pairs,
+        leftItem,
+        rightItem,
+        matched,
+      );
+      if (canonicalIndex !== -1) {
+        matched.add(canonicalIndex);
+      }
+    }
+  });
+  return matched;
+}
+
+function computeMatchingScore(
+  pairsMatched: number,
+  incorrectCount: number,
+): number {
+  const totalAttempts = pairsMatched + incorrectCount;
+  if (totalAttempts === 0) return 0;
+  return Math.round((pairsMatched / totalAttempts) * 100);
+}
+
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
   const queryClient = useQueryClient();
   const [pairs, setPairs] = useState<MatchPair[]>([]);
@@ -81,6 +124,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   const [checkpointCount, setCheckpointCount] = useState(0);
   const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
   const matchTimingAnchorRef = useRef<number>(Date.now());
+  const isSubmittingRef = useRef(false);
   const incorrectPairsRef = useRef<
     Array<{ left: string; right: string; attemptedMatch: string }>
   >([]);
@@ -125,11 +169,12 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
 
       if (restoredKeys.size > 0) {
         setMatchedPairs(new Set(restoredKeys));
-        matchedCanonicalIndicesRef.current = new Set();
-        restoredKeys.forEach((key) => {
-          const [leftId] = key.split("-");
-          matchedCanonicalIndicesRef.current.add(Number(leftId));
-        });
+        matchedCanonicalIndicesRef.current = restoreMatchedCanonicalIndices(
+          matchingPairs,
+          restoredKeys,
+          leftShuffled,
+          rightShuffled,
+        );
       } else {
         setMatchedPairs(new Set());
         matchedCanonicalIndicesRef.current = new Set();
@@ -264,15 +309,14 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       });
 
       playPracticeFeedback("success");
-      toast.success("Correct match! ✓");
 
-      const allMatched = newMatchedCount === pairs.length;
+      const allMatched = newMatchedCount === pairs.length && pairs.length > 0;
       if (allMatched) {
-        setTimeout(() => {
-          handleSubmit();
-        }, 1000);
+        toast.success("All pairs matched! Press Submit to finish.");
         return;
       }
+
+      toast.success("Correct match! ✓");
 
       if (newMatchedCount % 5 === 0 && assignmentId) {
         void saveCheckpoint(String(drill._id), {
@@ -320,25 +364,33 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   };
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
+
     if (!assignmentId) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
       return;
     }
 
-    const allMatched = matchedPairs.size === pairs.length;
-    if (!allMatched) {
+    if (pairs.length === 0) {
+      toast.error("This drill has no matching pairs.");
+      return;
+    }
+
+    if (matchedPairs.size !== pairs.length) {
       toast.error("Please match all pairs before submitting");
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
+    let succeeded = false;
     try {
-      const score = 100;
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-
       const pairsMatched = matchedPairs.size;
       const totalPairs = pairs.length;
-      const accuracy = totalPairs > 0 ? (pairsMatched / totalPairs) * 100 : 0;
+      const incorrectCount = incorrectPairsRef.current.length;
+      const accuracy = computeMatchingScore(pairsMatched, incorrectCount);
+      const score = accuracy;
 
       const result = await completeLearnerDrill(queryClient, drill._id, {
         drillAssignmentId: assignmentId,
@@ -359,6 +411,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
 
       void clearCheckpoint(String(drill._id), assignmentId);
+      succeeded = true;
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
@@ -369,7 +422,11 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
-      setIsSubmitting(false);
+    } finally {
+      isSubmittingRef.current = false;
+      if (!succeeded) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -408,7 +465,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   }
 
   const matchedCount = matchedPairs.size;
-  const allMatched = matchedCount === pairs.length;
+  const allMatched = pairs.length > 0 && matchedCount === pairs.length;
 
   const tileClasses = (
     isMatched: boolean,

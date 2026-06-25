@@ -8,6 +8,7 @@ import {
   getPublicBaseUrlFallback,
   resolvePublicBaseUrlFromHeaders,
 } from '@/lib/public-base-url';
+import { userHasPassword } from '@/lib/api/password-account';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
@@ -64,8 +65,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     await connectToDatabase();
 
-    // Find user by email
-    const user = await User.findOne({ email: email.toLowerCase() }).lean().exec();
+    // Find user by email (include password to detect social-login accounts)
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+password')
+      .lean()
+      .exec();
     
     // Don't reveal if user exists - return success either way for security
     if (!user) {
@@ -114,13 +118,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       resolvePublicBaseUrlFromHeaders(req.headers) ?? getPublicBaseUrlFallback()
     ).replace(/\/$/, '');
     const resetUrl = `${origin}/auth/reset-password?token=${token}`;
-    
-    // Send reset email
+    const displayName = user.name || user.firstName || 'User';
+    const hasPassword = await userHasPassword(user._id, user.password);
+
     const { sendEmail } = await import('@/lib/api/email.service');
-    await sendEmail({
-      to: user.email,
-      subject: 'Reset Your Password',
-      html: `
+
+    if (hasPassword) {
+      await sendEmail({
+        to: user.email,
+        subject: 'Reset Your Password',
+        html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -142,7 +149,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               </div>
               
               <div style="padding: 30px;">
-                <p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${user.name || user.firstName || 'User'}</strong>,</p>
+                <p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${displayName}</strong>,</p>
                 <p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">We received a request to reset your password. Click the button below to create a new password:</p>
                 
                 <div style="text-align: center; margin: 30px 0;">
@@ -161,8 +168,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         </body>
         </html>
       `,
-      text: `
-Hi ${user.name || user.firstName || 'User'},
+        text: `
+Hi ${displayName},
 
 We received a request to reset your password.
 
@@ -173,7 +180,66 @@ This link will expire in 1 hour.
 
 If you didn't request this, you can safely ignore this email.
       `,
-    });
+      });
+    } else {
+      await sendEmail({
+        to: user.email,
+        subject: 'Set Up Your Password',
+        html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Set Up Your Password</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <img src="${origin}/logo2.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+              <div style="font-size: 24px; font-weight: bold; color: #22c55e;">eklan</div>
+            </div>
+            
+            <div style="background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+              <div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🔐</div>
+                <h1 style="margin: 0; font-size: 24px; font-weight: 600;">Set Up Your Password</h1>
+              </div>
+              
+              <div style="padding: 30px;">
+                <p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${displayName}</strong>,</p>
+                <p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You signed up with Google or Apple. Click the button below to add a password so you can also sign in with your email and password. You can still use Google or Apple sign-in anytime.</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);">Set Password</a>
+                </div>
+                
+                <p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280;">This link will expire in <strong>1 hour</strong>.</p>
+                <p style="margin: 10px 0 0 0; font-size: 14px; color: #6b7280;">If you didn't request this, you can safely ignore this email.</p>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">This is an automated notification from Eklan.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+        text: `
+Hi ${displayName},
+
+You signed up with Google or Apple. Use the link below to add a password so you can also sign in with your email and password. You can still use Google or Apple sign-in anytime.
+
+Click this link to set your password:
+${resetUrl}
+
+This link will expire in 1 hour.
+
+If you didn't request this, you can safely ignore this email.
+      `,
+      });
+    }
 
     logger.info('Password reset email sent', {
       userId: user._id.toString(),

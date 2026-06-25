@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { Mail, CheckCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Mail, CheckCircle, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { authService } from "@/services/auth.service";
 import { toast } from "sonner";
@@ -27,11 +27,11 @@ export default function ForgotPasswordPage() {
     try {
       await authService.forgotPassword(email);
       setIsSent(true);
-      toast.success("Password reset email sent!");
-    } catch (error: any) {
+      toast.success("If an account exists, a link has been sent.");
+    } catch {
       // Don't reveal if email exists or not for security
       setIsSent(true);
-      toast.success("If an account exists, a reset link has been sent.");
+      toast.success("If an account exists, a link has been sent.");
     } finally {
       setIsSending(false);
     }
@@ -39,7 +39,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Status Bar Space */}
       <div className="h-6"></div>
 
       <Header showBack title="Forgot Password" />
@@ -56,9 +55,26 @@ export default function ForgotPasswordPage() {
                   Forgot Your Password?
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Enter your email address and we'll send you a link to reset your password.
+                  Enter your email address and we&apos;ll send you a link to
+                  reset or set up your password.
                 </p>
               </div>
+
+              <Card className="bg-blue-50 border-blue-200 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-900 mb-1">
+                      Signed up with Google or Apple?
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Enter the email on your account to receive a link and set
+                      a password. You&apos;ll be able to sign in with email and
+                      password or continue using Google or Apple.
+                    </p>
+                  </div>
+                </div>
+              </Card>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
@@ -85,7 +101,7 @@ export default function ForgotPasswordPage() {
                       Sending...
                     </>
                   ) : (
-                    "Send Reset Link"
+                    "Send Link"
                   )}
                 </Button>
               </form>
@@ -99,9 +115,12 @@ export default function ForgotPasswordPage() {
                 Check Your Email
               </h2>
               <p className="text-sm text-gray-600 mb-6">
-                If an account exists with <strong>{email}</strong>, we've sent a password reset link. Please check your inbox and spam folder.
+                If an account exists with <strong>{email}</strong>, we&apos;ve
+                sent a link to reset or set your password. Social-login users
+                can use this link to add email sign-in. Please check your inbox
+                and spam folder.
               </p>
-              
+
               <div className="space-y-3">
                 <Button
                   variant="outline"
@@ -114,7 +133,7 @@ export default function ForgotPasswordPage() {
                 >
                   Try Another Email
                 </Button>
-                
+
                 <Link href="/auth/login">
                   <Button variant="primary" size="lg" fullWidth>
                     <ArrowLeft className="w-4 h-4 mr-2" />
