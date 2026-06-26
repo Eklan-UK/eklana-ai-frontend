@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { generateConversationResponse } from '@/services/gemini.service';
-import type { WeaknessProfile, WeeklyChallenge, ChallengeDrillItem } from './types';
+import type { WeaknessProfile, WeeklyChallenge } from './types';
 
 const drillItemSchema = z.object({
 	drillType: z.string(),
@@ -116,7 +116,7 @@ Per-type generatedContent schemas:
     { "word": "<single medical word>", "sentence": "<clinical sentence using the word>", "sound": "<IPA phoneme e.g. /θ/>" }
   ]
 }
-CONSTRAINT: pronunciation_items must contain 10–15 items. Each item needs word, sound, and sentence.
+CONSTRAINT: pronunciation_items must contain 15–20 items. Each item needs word, sound, and sentence.
 
 "vocabulary" → {
   "vocabulary_items": [
@@ -132,7 +132,7 @@ CONSTRAINT: pronunciation_items must contain 10–15 items. Each item needs word
     }
   ]
 }
-CONSTRAINT: vocabulary_items must contain 10–15 items.
+CONSTRAINT: vocabulary_items must contain 15-20 items.
 CONSTRAINT: Use words/phrases from the student's evidence field.
 CONSTRAINT: correctAnswer must exactly match one of the options.
 
@@ -146,7 +146,7 @@ CONSTRAINT: correctAnswer must exactly match one of the options.
     }
   ]
 }
-CONSTRAINT: key_phrase_items must contain 10–15 items.
+CONSTRAINT: key_phrase_items must contain 15–20 items.
 CONSTRAINT: correctAnswer must be a string that exactly matches one element of options[].
 CONSTRAINT: This is a professional nursing exam. ALL 4 options must be things a qualified nurse might genuinely say in that situation. Options like 'Hey, what's up?', 'See ya later', 'How's it going?' are unacceptable — they are too casual for a clinical setting. Wrong answers must be professional but subtly incorrect — for example, using the wrong clinical term, giving information in the wrong order, or being technically accurate but inappropriate for the situation. A senior nurse reviewing the options should not be able to immediately eliminate 3 of the 4 as obviously wrong.
 
@@ -192,7 +192,7 @@ export async function generateWeeklyChallenge(
 		throw new Error('Gemini returned malformed JSON: ' + e.message);
 	}
 
-	// Sanitize evidence[]: Gemini occasionally returns objects instead of strings
+	// Sanitize evidence[]: model occasionally returns objects instead of strings
 	try {
 		const sequence = (raw as any)?.drillSequence;
 		if (Array.isArray(sequence)) {
