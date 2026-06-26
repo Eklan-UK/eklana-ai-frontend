@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
+import { weeklyChallengeAPI } from "@/lib/api";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import type { TextScore } from "@/services/speechace.service";
 import { speechaceService } from "@/services/speechace.service";
@@ -76,7 +77,7 @@ export default function KeyPhrasesDrill({
   >([]);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -112,7 +113,7 @@ export default function KeyPhrasesDrill({
   }, [revokeRecordingPreview]);
 
   useEffect(() => {
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       setIsLoadingCheckpoint(false);
       return;
     }
@@ -121,28 +122,52 @@ export default function KeyPhrasesDrill({
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
 
-    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
-      if (cancelled) return;
-      if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        const partial = cp.partialResults;
-        if (partial.itemResults) {
-          setItemResults(partial.itemResults as Record<number, ItemResult>);
+    if (weeklyChallengeMeta) {
+      weeklyChallengeAPI
+        .getCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex)
+        .then((res) => {
+          if (cancelled) return;
+          const cp = res.data?.checkpoint as Record<string, unknown> | null;
+          if (cp) {
+            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
+            const partial = cp.partialResults as Record<string, unknown> | undefined;
+            if (partial?.itemResults) {
+              setItemResults(partial.itemResults as Record<number, ItemResult>);
+            }
+            if (partial?.sessionReviewAnalytics) {
+              setSessionReviewAnalytics(
+                partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+              );
+            }
+            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+          }
+          setIsLoadingCheckpoint(false);
+        })
+        .catch(() => { if (!cancelled) setIsLoadingCheckpoint(false); });
+    } else {
+      loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
+        if (cancelled) return;
+        if (cp) {
+          setCurrentIndex(cp.resumeFromIndex);
+          const partial = cp.partialResults;
+          if (partial.itemResults) {
+            setItemResults(partial.itemResults as Record<number, ItemResult>);
+          }
+          if (partial.sessionReviewAnalytics) {
+            setSessionReviewAnalytics(
+              partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+            );
+          }
+          setCheckpointCount(cp.completedItemCount);
         }
-        if (partial.sessionReviewAnalytics) {
-          setSessionReviewAnalytics(
-            partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-          );
-        }
-        setCheckpointCount(cp.completedItemCount);
-      }
-      setIsLoadingCheckpoint(false);
-    });
+        setIsLoadingCheckpoint(false);
+      });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id]);
+  }, [assignmentId, drill._id, weeklyChallengeMeta]);
 
   // Pre-warm prompt TTS for every question while the drill loads / between questions
   useEffect(() => {
@@ -344,17 +369,32 @@ export default function KeyPhrasesDrill({
       const completedCount = currentIndex + 1;
       setCurrentIndex(currentIndex + 1);
 
-      if (completedCount % 5 === 0 && assignmentId) {
-        void saveCheckpoint(String(drill._id), {
-          assignmentId,
-          drillType: "key_phrases",
-          resumeFromIndex: currentIndex + 1,
-          completedItemCount: completedCount,
-          partialResults: { itemResults, sessionReviewAnalytics },
-          startedAt: new Date(startTime),
-        });
-        setCheckpointCount(completedCount);
-        setShowCheckpoint(true);
+      if (completedCount % 5 === 0) {
+        if (assignmentId) {
+          void saveCheckpoint(String(drill._id), {
+            assignmentId,
+            drillType: "key_phrases",
+            resumeFromIndex: currentIndex + 1,
+            completedItemCount: completedCount,
+            partialResults: { itemResults, sessionReviewAnalytics },
+            startedAt: new Date(startTime),
+          });
+          setCheckpointCount(completedCount);
+          setShowCheckpoint(true);
+        } else if (weeklyChallengeMeta) {
+          void weeklyChallengeAPI.saveCheckpoint(
+            weeklyChallengeMeta.weekStartDate,
+            weeklyChallengeMeta.itemIndex,
+            {
+              drillType: "key_phrases",
+              resumeFromIndex: currentIndex + 1,
+              completedCount,
+              partialResults: { itemResults, sessionReviewAnalytics },
+            },
+          );
+          setCheckpointCount(completedCount);
+          setShowCheckpoint(true);
+        }
       }
     } else {
       setShowReview(true);
@@ -468,6 +508,7 @@ export default function KeyPhrasesDrill({
       }
 
       if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
+      else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -528,7 +569,9 @@ export default function KeyPhrasesDrill({
         drillTitle={drill.title}
         onContinue={() => setShowCheckpoint(false)}
         onExit={() => {
-          window.location.href = "/account/drills";
+          window.location.href = weeklyChallengeMeta
+            ? `/account/practice/weekly-challenge/${weeklyChallengeMeta.weekStartDate}`
+            : "/account/drills";
         }}
       />
     );

@@ -1,6 +1,6 @@
 # Weekly Challenge — Weakness Detection and Challenge Generation
 
-This document describes the weekly challenge feature: how the system analyses a learner's recent drill history to detect weaknesses, generates a personalised challenge set via Gemini, persists it to MongoDB, and serves it through a REST API.
+This document describes the weekly challenge feature: how the system analyses a learner's recent drill history to detect weaknesses, generates a personalised challenge set via GPT-5.5 (OpenAI), persists it to MongoDB, and serves it through a REST API.
 
 ---
 
@@ -11,7 +11,7 @@ Once a week the system looks back at everything a learner has practised over the
 Both stages are complete and the API is live at `GET /api/v1/learner/weekly-challenge`.
 
 1. **Weakness aggregation** (complete) — reads `DrillAttempt`, `PronunciationAttempt`, and `FreeTalkAttempt` documents, extracts signals per drill type, and returns a `WeaknessProfile`.
-2. **Challenge generation** (complete) — passes the `WeaknessProfile` to Gemini, which produces structured drill content for each weakness, persists the result to MongoDB, and returns a cached document on subsequent requests.
+2. **Challenge generation** (complete) — passes the `WeaknessProfile` to GPT-5.5 (OpenAI), which produces exactly 4 structured drill items, persists the result to MongoDB, and returns a cached document on subsequent requests.
 
 ---
 
@@ -19,15 +19,16 @@ Both stages are complete and the API is live at `GET /api/v1/learner/weekly-chal
 
 ```
 MongoDB
-  ├── DrillAttempt         (completedAt within 7-day window)
-  ├── PronunciationAttempt (createdAt within 7-day window)
-  └── FreeTalkAttempt      (createdAt within 7-day window)
+  ├── PronunciationAttempt (createdAt within 10-day window)
+  ├── BookmarkedItem       (createdAt within 10-day window)
+  └── DrillAttempt / FreeTalkAttempt (all-time analytics)
           │
           ▼
   aggregateWeaknesses()          [weakness-aggregator.ts]
           │
           │  groups DrillAttempts by drill type
           │  runs per-type signal extractors
+          │  filters mastered phonemes from pronunciation signals
           │  sorts all signals by severity desc
           │  filters severity > 0 → topWeaknesses
           │
@@ -37,14 +38,14 @@ MongoDB
     └── topWeaknesses[]    top 3 signals with severity > 0
           │
           ▼
-  Gemini challenge generation
+  GPT-5.5 (OpenAI) challenge generation
           │
           ▼
   WeeklyChallenge
-    └── content.drillSequence[]   one ChallengeDrillItem per weakness
+    └── content.drillSequence[]   exactly 4 ChallengeDrillItems
 ```
 
-The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller supplies `weekStartDate`; `aggregateWeaknesses` derives `weekEndDate` internally.
+Pronunciation and bookmark sources use a 10-day lookback window. Mastered phonemes (those where the learner consistently scores well) are filtered from pronunciation weakness signals before generation.
 
 ---
 
@@ -54,18 +55,20 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 |------|---------|
 | `src/domain/challenges/types.ts` | TypeScript interfaces: `WeaknessSignal`, `WeaknessProfile`, `ChallengeDrillItem`, `WeeklyChallenge`; plus `PronunciationGeneratedContent`, `FillBlankGeneratedContent`, `KeyPhrasesGeneratedContent`, `RoleplayGeneratedContent` — `generatedContent` is a discriminated union of these four |
 | `src/domain/challenges/weakness-aggregator.ts` | `aggregateWeaknesses(learnerId, weekStartDate)` — queries `DrillAttempt`, `PronunciationAttempt`, and `FreeTalkAttempt` in parallel, extracts per-type signals, returns `WeaknessProfile` |
-| `src/domain/challenges/challenge-generator.ts` | `generateWeeklyChallenge(profile)` — calls Gemini with per-type `generatedContent` schemas and hard constraints enforced in the prompt |
+| `src/domain/challenges/challenge-generator.ts` | `generateWeeklyChallenge(profile)` — calls GPT-5.5 via `openai.service.ts`; always generates exactly 4 drills; roleplay constrained to 2–3 scenes; 10–15 items per drill type |
+| `src/services/openai.service.ts` | `generateChallengeCompletion(options)` — thin wrapper around the OpenAI chat completions API; uses `max_completion_tokens` and `response_format: json_object`; no `temperature` (not supported by GPT-5.5); model overridable via `OPENAI_CHALLENGE_MODEL` env var |
 | `src/models/weekly-challenge.ts` | Mongoose schema for `WeeklyChallenge`; compound unique index on `(learnerId, weekStartDate)` — one document per learner per week |
 | `src/domain/challenges/challenge.repository.ts` | `ChallengeRepository` — `findByLearnerAndWeek`, `upsert`, `updateStatus` |
 | `src/domain/challenges/challenge.service.ts` | `ChallengeService.getOrGenerateChallenge` — orchestrates aggregator + generator + repository; returns cached document immediately if `status === 'ready'` |
 | `src/app/api/v1/learner/weekly-challenge/route.ts` | `GET /api/v1/learner/weekly-challenge` — Zod-validated `weekStartDate` query param; defaults to most recent Monday |
 | `src/domain/challenges/test-aggregator.ts` | Dev script for running the aggregator against the live database and inspecting raw output |
-| `src/domain/challenges/test-generator.ts` | Dev script for testing end-to-end: aggregation → Gemini generation |
+| `src/domain/challenges/test-generator.ts` | Dev script for testing end-to-end: aggregation → GPT-5.5 generation |
 | `src/domain/challenges/test-service.ts` | Dev script for testing the full service layer (aggregation → generation → persistence) without HTTP |
 | `src/app/api/v1/learner/weekly-challenge/history/route.ts` | `GET /api/v1/learner/weekly-challenge/history` — returns all challenges for the learner, sorted newest first |
 | `src/hooks/useWeeklyChallengeHistory.ts` | React Query hook for fetching the challenge history list |
 | `src/app/api/v1/learner/weekly-challenge/items/[index]/route.ts` | `GET /api/v1/learner/weekly-challenge/items/[index]` — fetch a single drill item by index, including its `generatedContent` |
 | `src/app/api/v1/learner/weekly-challenge/items/[index]/complete/route.ts` | `POST /api/v1/learner/weekly-challenge/items/[index]/complete` — mark item complete via `$addToSet` on `completedItemIndexes` |
+| `src/app/api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint/route.ts` | `GET / POST / DELETE` — load, save, and clear per-item checkpoints stored in the `WeeklyChallenge` document's `checkpoints` Map field, keyed by item index |
 | `src/scripts/seed-test-challenge.ts` | Dev script to seed fake drill data for a test learner |
 | `docs/weekly-challenge-ui-spec.md` | UI implementation spec for the dev |
 
@@ -77,7 +80,7 @@ The 7-day window is `[weekStartDate, weekStartDate + 7 days)`. The caller suppli
 
 Get or generate the current week's challenge. Defaults to the most recent Monday as `weekStartDate`. Accepts an optional `weekStartDate` ISO datetime query param to fetch a specific week.
 
-Upserts the document as `generating`, runs weakness aggregation + Gemini generation, then returns `status: 'ready'`. Returns the cached document immediately if `status === 'ready'` already.
+Upserts the document as `generating`, runs weakness aggregation + GPT-5.5 generation, then returns `status: 'ready'`. Returns the cached document immediately if `status === 'ready'` already.
 
 Response shape:
 ```json
@@ -144,6 +147,18 @@ Response shape:
 ```
 
 All four endpoints require the `user` role (`withRole(['user'])`).
+
+### `GET /api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint`
+
+Load a saved checkpoint for a specific drill item. Returns `{ checkpoint }` — `null` if none exists. Used on mount to resume an in-progress drill.
+
+### `POST /api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint`
+
+Save a checkpoint. Body: `{ drillType, resumeFromIndex, completedCount, partialResults }`. Stored in the `WeeklyChallenge.checkpoints` Map field keyed by item index (string). A `savedAt` timestamp is appended server-side.
+
+### `DELETE /api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint`
+
+Clear a saved checkpoint. Called on full drill completion or explicit retry. Uses `$unset` on the Map key.
 
 ---
 
@@ -242,7 +257,7 @@ interface ChallengeDrillItem {
 
 | Field | Notes |
 |-------|-------|
-| `drillType` | One of the 4 supported challenge drill types; Gemini picks based on `targetWeakness.category` (see section 9) |
+| `drillType` | One of the 4 supported challenge drill types; GPT-5.5 picks based on `targetWeakness.category` (see section 9) |
 | `targetWeakness` | The signal this item is designed to address |
 | `instructions` | Gemini-generated description of what the learner should focus on |
 | `generatedContent` | Discriminated union of 4 typed interfaces — shape depends on `drillType` (see section 9) |
@@ -287,7 +302,7 @@ weekEndDate       : <ISO date>
 
 ## 6. generatedContent schemas and constraints
 
-`ChallengeDrillItem.generatedContent` is a discriminated union typed to the drill type. Gemini is instructed to use these exact shapes; the hard constraints are enforced in the prompt.
+`ChallengeDrillItem.generatedContent` is a discriminated union typed to the drill type. GPT-5.5 is instructed to use these exact shapes; the hard constraints are enforced in the prompt.
 
 ### `pronunciation`
 
@@ -396,7 +411,11 @@ A `FreeTalkAttempt` where every graded behaviour is `'full'` produces a signal w
 
 **Only 4 drill types supported for challenge generation**
 
-`generateWeeklyChallenge` only produces content for `pronunciation`, `fill_blank`, `key_phrases`, and `roleplay`. Weaknesses from other drill types (e.g. `grammar`, `vocabulary`, `matching`) will be detected and included in `WeaknessProfile` but Gemini is not yet instructed on how to generate content for them.
+`generateWeeklyChallenge` only produces content for `pronunciation`, `fill_blank`, `key_phrases`, and `roleplay`. Weaknesses from other drill types (e.g. `grammar`, `matching`) will be detected and included in `WeaknessProfile` but the challenge generator is not yet instructed on how to generate content for them.
+
+**Roleplay drills currently generate only 1 scene**
+
+The prompt instructs GPT-5.5 to generate 2–3 scenes per roleplay item, but current output consistently contains only 1 scene. The multi-scene constraint is preserved in the prompt for forward compatibility — per-scene `CheckpointScreen` saves in `RoleplayDrill` will activate automatically once multi-scene output is returned.
 
 **`weekStartDate` window uses UTC**
 

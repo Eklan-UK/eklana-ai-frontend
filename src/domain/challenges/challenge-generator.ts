@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { generateConversationResponse } from '@/services/gemini.service';
+import { generateChallengeCompletion } from '@/services/openai.service';
 import type { WeaknessProfile, WeeklyChallenge } from './types';
 
 const drillItemSchema = z.object({
@@ -134,6 +134,8 @@ CONSTRAINT: pronunciation_items must contain 15–20 items. Each item needs word
 }
 CONSTRAINT: vocabulary_items must contain 15-20 items.
 CONSTRAINT: Use words/phrases from the student's evidence field.
+CONSTRAINT: Do not repeat the same correct answer across multiple questions. Each vocabulary_item must test a DIFFERENT word.
+CONSTRAINT: If the student's evidence contains only a few weak words, supplement with other relevant vocabulary that a nurse at this level should know — words related to patient assessment, medication, handover, and clinical procedures. The weak words from evidence should appear first, but the remaining items should introduce varied clinical vocabulary, not repeat the same words.
 CONSTRAINT: correctAnswer must exactly match one of the options.
 
 "key_phrases" → {
@@ -168,9 +170,9 @@ CONSTRAINT: ai_character_names must use real, concrete names that match the char
 
 Examples:
 - Nurse handover scenario → ai_character_names: ['Nurse Sarah Chen']
-- Doctor escalation → ai_character_names: ['Dr. James Okafor']
+- Doctor escalation → ai_character_names: ['Dr. James']
 - Patient interaction → ai_character_names: ['Mr. David Thompson']
-- Multi-character → ai_character_names: ['Nurse Sarah Chen', 'Dr. James Okafor']
+- Multi-character → ai_character_names: ['Nurse Sarah Chen', 'Dr. James']
 
 The name must be culturally appropriate and feel like a real person. Never name a nurse character 'Patient' or a doctor character 'Nurse'.
 CONSTRAINT: NEVER use placeholder text in any form. This includes [your name], [nurse name], [patient name], [colleague name], [doctor name], or any text in square brackets. All names must be concrete and fully written. The student character's name comes from student_character_name. AI character names come from ai_character_names[]. Every single dialogue line must be complete and ready to speak aloud with no blanks or placeholders of any kind. If you are tempted to write a placeholder, write an actual name instead. NEVER use underscores (___) or dashes (---) as placeholders in dialogue. Every word in every dialogue line must be a real word. The sentence "I recommend we ______ the dosage" is WRONG. The sentence "I recommend we increase the dosage" is CORRECT. Write complete, natural sentences only.
@@ -182,11 +184,10 @@ Return ONLY valid JSON with this exact shape, no markdown, no preamble.
 export async function generateWeeklyChallenge(
 	profile: WeaknessProfile
 ): Promise<WeeklyChallenge['content']> {
-	const responseText = await generateConversationResponse({
+	const responseText = await generateChallengeCompletion({
 		systemInstruction: SYSTEM_INSTRUCTION,
-		messages: [{ role: 'user', content: buildPrompt(profile) }],
-		temperature: 0.7,
-		maxTokens: 10000,
+		prompt: buildPrompt(profile),
+		maxCompletionTokens: 10000,
 	});
 
 	const match = responseText.match(/\{[\s\S]*\}/);
