@@ -13,6 +13,7 @@ import {
   Search,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
 import { drillAPI } from "@/lib/api";
 import { adminService } from "@/services/admin.service";
 import { toast } from "sonner";
@@ -263,6 +264,11 @@ const DrillBuilder: React.FC = () => {
   const searchParams = useSearchParams();
   const drillId = searchParams.get("drillId") || searchParams.get("id");
   const isEditMode = !!drillId;
+  const drillListReturnPath = useMemo(
+    () => sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill",
+    [searchParams]
+  );
+  const returnToParam = searchParams.get("returnTo");
 
   // Vocabulary
   const [vocabularyItems, setVocabularyItems] = useState<VocabularyItem[]>([
@@ -1477,7 +1483,7 @@ const DrillBuilder: React.FC = () => {
         }
       }
 
-      router.push("/admin/drill");
+      router.push(drillListReturnPath);
     } catch (error: any) {
       toast.error(
         "Failed to save drill: " + (error.message || "Unknown error")
@@ -1550,7 +1556,7 @@ const DrillBuilder: React.FC = () => {
           getAssignmentCounts(apiData, assignedTo.length),
           { isReassign: isAssignedDrill }
         );
-        router.push("/admin/drill");
+        router.push(drillListReturnPath);
       } else {
         const response: any = await drillAPI.create(drillData);
         clearDraft();
@@ -1611,7 +1617,13 @@ const DrillBuilder: React.FC = () => {
       toast.success(
         "Drill copied. Select students and a completion date, then assign."
       );
-      router.push(`/admin/drills/create?drillId=${newDrillId}`);
+      const copyUrl = returnToParam
+        ? appendReturnTo(
+            `/admin/drills/create?drillId=${newDrillId}`,
+            returnToParam
+          )
+        : `/admin/drills/create?drillId=${newDrillId}`;
+      router.push(copyUrl);
     } catch (error: any) {
       toast.error(
         "Failed to copy drill: " + (error.message || "Unknown error")

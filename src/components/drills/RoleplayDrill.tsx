@@ -386,7 +386,7 @@ export default function RoleplayDrill({
   );
 
   const clearCheckpoint = useCallback(async () => {
-    if (!progressContext || !progressDrillId) return;
+    if (!progressContext || !progressDrillId || weeklyChallengeMeta) return;
     try {
       if (progressContext.source === "assignment") {
         await drillAPI.clearRoleplayProgress(progressDrillId, {
@@ -409,7 +409,7 @@ export default function RoleplayDrill({
     let cancelled = false;
 
     async function loadSavedProgress() {
-      if (!progressContext || !progressDrillId) {
+      if (!progressContext || !progressDrillId || weeklyChallengeMeta) {
         setIsLoadingProgress(false);
         return;
       }
@@ -767,10 +767,11 @@ export default function RoleplayDrill({
 
     setIsSavingProgress(true);
     try {
-      await drillAPI.saveRoleplayProgress(progressDrillId, payload);
-      // Invalidate in the background — don't await, we're about to hard-navigate away.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
-      toast.success("Progress saved — pick up where you left off anytime.");
+      if (!weeklyChallengeMeta) {
+        await drillAPI.saveRoleplayProgress(progressDrillId, payload);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.drills.learner.all() });
+        toast.success("Progress saved — pick up where you left off anytime.");
+      }
       // Use a hard navigation (window.location) so the React tree is fully torn
       // down before the next page mounts.  router.push (soft nav) can throw an
       // unhandled rejection when async state updates are still in-flight after
