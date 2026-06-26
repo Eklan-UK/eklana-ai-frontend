@@ -184,29 +184,11 @@ export async function generateWeeklyChallenge(
 		throw new Error('Gemini returned malformed JSON: ' + e.message);
 	}
 
-	// Sanitize evidence[] — Gemini occasionally returns objects instead of strings
-	if (raw && typeof raw === 'object' && Array.isArray((raw as any).drillSequence)) {
-		for (const item of (raw as any).drillSequence) {
-			const evidence = item?.targetWeakness?.evidence;
-			if (Array.isArray(evidence)) {
-				item.targetWeakness.evidence = evidence.map((e: unknown) => {
-					if (typeof e === 'string') return e;
-					if (e && typeof e === 'object') {
-						const obj = e as Record<string, unknown>;
-						const picked = obj.text ?? obj.description ?? obj.value ?? obj.label;
-						return typeof picked === 'string' ? picked : JSON.stringify(e);
-					}
-					return JSON.stringify(e);
-				});
-			}
-		}
-	}
-
 	const validation = contentSchema.safeParse(raw);
 	if (!validation.success) {
 		throw new Error(
 			'Gemini returned invalid content shape: ' +
-				JSON.stringify(validation.error.issues.map((i) => ({ path: i.path, message: i.message })))
+				(validation.error.issues[0]?.message ?? 'unknown')
 		);
 	}
 
