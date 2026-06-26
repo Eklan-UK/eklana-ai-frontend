@@ -164,6 +164,15 @@ CONSTRAINT: This is a professional nursing exam. ALL 4 options must be things a 
   ]
 }
 CONSTRAINT: speaker must be "student" or "ai_<n>" where n is a 0-based index into ai_character_names[]. Never use the character's name as the speaker value.
+CONSTRAINT: ai_character_names must use real, concrete names that match the characters' roles in the scenario. Never use placeholders like [Name] or [Nurse Name].
+
+Examples:
+- Nurse handover scenario → ai_character_names: ['Nurse Sarah Chen']
+- Doctor escalation → ai_character_names: ['Dr. James Okafor']
+- Patient interaction → ai_character_names: ['Mr. David Thompson']
+- Multi-character → ai_character_names: ['Nurse Sarah Chen', 'Dr. James Okafor']
+
+The name must be culturally appropriate and feel like a real person. Never name a nurse character 'Patient' or a doctor character 'Nurse'.
 CONSTRAINT: NEVER use placeholder text in any form. This includes [your name], [nurse name], [patient name], [colleague name], [doctor name], or any text in square brackets. All names must be concrete and fully written. The student character's name comes from student_character_name. AI character names come from ai_character_names[]. Every single dialogue line must be complete and ready to speak aloud with no blanks or placeholders of any kind. If you are tempted to write a placeholder, write an actual name instead. NEVER use underscores (___) or dashes (---) as placeholders in dialogue. Every word in every dialogue line must be a real word. The sentence "I recommend we ______ the dosage" is WRONG. The sentence "I recommend we increase the dosage" is CORRECT. Write complete, natural sentences only.
 
 Return ONLY valid JSON with this exact shape, no markdown, no preamble.
