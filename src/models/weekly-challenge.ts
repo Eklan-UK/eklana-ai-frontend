@@ -12,6 +12,7 @@ export interface IWeeklyChallenge extends Document {
 	status: 'pending' | 'generating' | 'ready' | 'failed';
 	generatedAt?: Date;
 	completedItemIndexes: number[];
+	checkpoints?: Map<string, unknown>;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -49,6 +50,11 @@ const weeklyChallengeSchema = new Schema<IWeeklyChallenge>(
 		completedItemIndexes: {
 			type: [Number],
 			default: [],
+		},
+		checkpoints: {
+			type: Map,
+			of: Schema.Types.Mixed,
+			default: {},
 		},
 	},
 	{

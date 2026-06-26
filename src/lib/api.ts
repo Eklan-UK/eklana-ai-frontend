@@ -1954,6 +1954,39 @@ export const weeklyChallengeAPI = {
 			params: weekStartDate ? { weekStartDate } : undefined,
 		});
 	},
+
+	getCheckpoint: (weekStartDate: string, index: number) => {
+		return apiRequest<{
+			code?: string;
+			data?: { checkpoint: Record<string, unknown> | null };
+		}>(`/learner/weekly-challenge/${encodeURIComponent(weekStartDate)}/items/${index}/checkpoint`, {
+			method: 'GET',
+			cache: false,
+		});
+	},
+
+	saveCheckpoint: (
+		weekStartDate: string,
+		index: number,
+		data: { drillType: string; resumeFromIndex: number; completedCount: number; partialResults: unknown },
+	) => {
+		return apiRequest<{
+			code?: string;
+			data?: { saved: boolean };
+		}>(`/learner/weekly-challenge/${encodeURIComponent(weekStartDate)}/items/${index}/checkpoint`, {
+			method: 'POST',
+			data,
+		});
+	},
+
+	clearCheckpoint: (weekStartDate: string, index: number) => {
+		return apiRequest<{
+			code?: string;
+			data?: { cleared: boolean };
+		}>(`/learner/weekly-challenge/${encodeURIComponent(weekStartDate)}/items/${index}/checkpoint`, {
+			method: 'DELETE',
+		});
+	},
 };
 
 // Streak API

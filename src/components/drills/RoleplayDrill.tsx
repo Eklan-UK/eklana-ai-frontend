@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
-import { drillAPI, pronunciationAPI } from "@/lib/api";
+import { drillAPI, pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
@@ -35,6 +35,7 @@ import { useTTS } from "@/hooks/useTTS";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
 import {
+  CheckpointScreen,
   DrillCompletionScreen,
   DrillLayout,
   DrillProgress,
@@ -179,6 +180,7 @@ export default function RoleplayDrill({
   const [sceneBreak, setSceneBreak] = useState<SceneBreak | null>(null);
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
 
   // Track if we're on review screen vs completion screen
   const [showReview, setShowReview] = useState(false);
@@ -409,8 +411,28 @@ export default function RoleplayDrill({
     let cancelled = false;
 
     async function loadSavedProgress() {
-      if (!progressContext || !progressDrillId || weeklyChallengeMeta) {
+      if (!progressContext || !progressDrillId) {
         setIsLoadingProgress(false);
+        return;
+      }
+      if (weeklyChallengeMeta) {
+        try {
+          const res = await weeklyChallengeAPI.getCheckpoint(
+            weeklyChallengeMeta.weekStartDate,
+            weeklyChallengeMeta.itemIndex,
+          );
+          if (cancelled) return;
+          const cp = res.data?.checkpoint as Record<string, unknown> | null;
+          if (cp && typeof cp.resumeFromIndex === 'number' && cp.resumeFromIndex > 0) {
+            setCurrentSceneIndex(cp.resumeFromIndex);
+            const sceneName =
+              scenes[cp.resumeFromIndex]?.scene_name || `Scene ${cp.resumeFromIndex + 1}`;
+            toast.success(`Welcome back — continuing from ${sceneName}.`);
+          }
+        } catch {
+          // Non-blocking
+        }
+        if (!cancelled) setIsLoadingProgress(false);
         return;
       }
 
@@ -740,6 +762,21 @@ export default function RoleplayDrill({
       });
     }
   }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview, sceneBreak, stopTTSAudio]);
+
+  useEffect(() => {
+    if (!sceneBreak || !weeklyChallengeMeta) return;
+    void weeklyChallengeAPI.saveCheckpoint(
+      weeklyChallengeMeta.weekStartDate,
+      weeklyChallengeMeta.itemIndex,
+      {
+        drillType: 'roleplay',
+        resumeFromIndex: sceneBreak.nextSceneIndex,
+        completedCount: sceneBreak.nextSceneIndex,
+        partialResults: {},
+      },
+    );
+    setShowCheckpoint(true);
+  }, [sceneBreak, weeklyChallengeMeta]);
 
   const advanceToNextScene = useCallback(() => {
     if (!sceneBreak) return;
@@ -1179,6 +1216,7 @@ export default function RoleplayDrill({
       }
 
       await clearCheckpoint();
+      if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
 
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -1257,6 +1295,23 @@ export default function RoleplayDrill({
       ? scenes[sceneBreak.nextSceneIndex]?.scene_name ||
         `Scene ${sceneBreak.nextSceneIndex + 1}`
       : "";
+
+  if (showCheckpoint && weeklyChallengeMeta && sceneBreak) {
+    return (
+      <CheckpointScreen
+        completedCount={sceneBreak.nextSceneIndex}
+        totalCount={scenes.length}
+        drillTitle={drill.title}
+        onContinue={() => {
+          setShowCheckpoint(false);
+          advanceToNextScene();
+        }}
+        onExit={() => {
+          window.location.href = `/account/practice/weekly-challenge/${weeklyChallengeMeta.weekStartDate}`;
+        }}
+      />
+    );
+  }
 
   if (isCompleted) {
     const linesWithTranscript = completedMessages.filter((m) =>

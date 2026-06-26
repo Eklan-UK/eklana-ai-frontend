@@ -96,10 +96,10 @@
       "generatingHint": "We're analyzing your practice from this week.",
       "failed": "We couldn't generate your challenge. Pull to refresh or try again later.",
       "emptyTitle": "No challenge yet",
-      "emptyDescription": "Complete drills Monday through Saturday to unlock your personalized challenge on Sunday.",
-      "emptySunday": "Keep practicing this week — your personalized challenge will be ready next Sunday.",
+      "emptyDescription": "Complete drills during the week to unlock your personalized challenge on your next challenge day.",
+      "emptySunday": "Complete drills during the week to unlock your personalized challenge on your next challenge day.",
       "historyEmptyTitle": "No weekly challenges yet",
-      "historyEmptyDescription": "Your personalized weekly challenges will appear here after your first Sunday unlock.",
+      "historyEmptyDescription": "Your personalized weekly challenges will appear here after your first challenge is unlocked.",
       "summaryFallback": "Your personalized weekly challenge",
       "completed": "Completed",
       "backToAccount": "Back to account"
