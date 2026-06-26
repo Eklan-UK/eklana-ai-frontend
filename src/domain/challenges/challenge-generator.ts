@@ -55,6 +55,8 @@ The learner has the following top weaknesses (up to 4), ranked by severity (1 = 
 
 ${JSON.stringify(weaknesses, null, 2)}
 
+If the weaknesses array is empty or has fewer than 4 items, generate content based on common nursing English challenges: clinical handover vocabulary, medical terminology pronunciation, professional communication key phrases, and SBAR roleplay scenarios. Use realistic nursing contexts from ICU, general ward, and patient communication settings.
+
 IMPORTANT: The evidence[] field for each weakness contains the specific words, phrases, and phonemes the student actually struggled with during their drills this week. You MUST use these exact items as the basis for generated content:
 - For pronunciation: use the weak phonemes listed in evidence to select words that target those specific sounds
 - For vocabulary: use the exact words listed in 'Struggled with:' from the evidence field
