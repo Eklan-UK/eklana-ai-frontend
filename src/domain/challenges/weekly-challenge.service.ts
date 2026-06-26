@@ -119,6 +119,29 @@ async function runGeneration(
 ): Promise<IWeeklyChallenge> {
 	const profile = await aggregateWeaknesses(learnerId, weekStartDate);
 
+	if (profile.topWeaknesses.length === 0) {
+		const readyDoc = await WeeklyChallengeModel.findOneAndUpdate(
+			{ learnerId, weekStartDate, status: 'generating' },
+			{
+				$set: {
+					status: 'ready',
+					weaknessProfile: profile,
+					content: {
+						drillSequence: [],
+						totalEstimatedMinutes: 0,
+						summaryMessage: EMPTY_SUMMARY,
+					},
+					generatedAt: new Date(),
+				},
+			},
+			{ new: true },
+		);
+		if (!readyDoc) {
+			throw new Error('Weekly challenge generation lock lost');
+		}
+		return readyDoc;
+	}
+
 	try {
 		const generatedContent = await generateWeeklyChallenge(profile);
 		
