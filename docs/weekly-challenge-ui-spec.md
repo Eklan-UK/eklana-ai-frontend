@@ -7,6 +7,7 @@
 | `/account/practice` | Practice page — entry point |
 | `/account/practice/weekly-challenge` | History list — all challenges, newest first |
 | `/account/practice/weekly-challenge/[weekStartDate]` | Week view — drill items for one week |
+| `/api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint` | API — checkpoint save / load / clear (not a UI page; drills call this via `weeklyChallengeAPI`) |
 
 ---
 
@@ -28,9 +29,11 @@ Each card shows:
 
 | Field | Example |
 |-------|---------|
+| Title | "Week 23 Challenge" — derived from `weekNumber` |
 | Week label | "Week of Jun 2, 2026" — format `weekStartDate` |
-| Status badge | Ready / Generating / Failed |
-| Drill summary | "2 drills · 12 min" — count of `drillSequence` items + `totalEstimatedMinutes` |
+| Status badge | Ready / Ongoing / Completed / Generating / Failed — Ready = `status:'ready'` with 0 completions; Ongoing = some completed; Completed = all completed |
+| Drill summary | "4 drills · 25 min" — count of `drillSequence` items + `totalEstimatedMinutes` |
+| Generated date | "Generated Jun 4" — formatted `generatedAt` (shown when `status === 'ready'`) |
 
 Clicking a card navigates to `/account/practice/weekly-challenge/[weekStartDate]` where `weekStartDate` is the ISO date string from the document.
 
@@ -60,6 +63,7 @@ Map `ChallengeDrillItem` → `DrillPracticeInterface` props based on `drillType`
 |-------------|------------------------|---------------|
 | `pronunciation` | `pronunciation_items` | Pass items directly; `sound` is an IPA string |
 | `fill_blank` | `fill_blank_items` | Each `sentence` contains `___` per blank in `blanks[]` |
+| `vocabulary` | `vocabulary_items` | Adapted as `fill_blank`; adapter remaps `vocabulary_items` → `fill_blank_items` |
 | `key_phrases` | `key_phrase_items` | `correctAnswer` must exactly match one entry in `options[]` |
 | `roleplay` | `roleplay_scenes` | See speaker constraint below |
 
@@ -69,7 +73,37 @@ Map `ChallengeDrillItem` → `DrillPracticeInterface` props based on `drillType`
 
 ---
 
-## 5. Category → drill type mapping (reference)
+## 5. Checkpoint system
+
+Drills running inside a weekly challenge save progress server-side via a dedicated checkpoint route, separate from the standard drill checkpoint API (weekly challenge drills use synthetic `_id` values that fail MongoDB ObjectId validation in the regular route).
+
+**API:** `GET / POST / DELETE /api/v1/learner/weekly-challenge/[weekStartDate]/items/[index]/checkpoint`
+
+Checkpoints are stored in a `checkpoints` Map field on the `WeeklyChallenge` document, keyed by item index (string). The client uses `weeklyChallengeAPI.getCheckpoint`, `.saveCheckpoint`, `.clearCheckpoint` from `src/lib/api.ts`.
+
+| Drill type | Checkpoint trigger | State saved in `partialResults` |
+|------------|--------------------|--------------------------------|
+| `fill_blank` | Every 5 items answered | `answers`, `submittedCount` |
+| `pronunciation` | Every 5 fully-passed items (word + sentence both pass) | `wordProgress`, `sessionReviewAnalytics` |
+| `key_phrases` | Every 5 items answered | `itemResults`, `sessionReviewAnalytics` |
+| `roleplay` | After each scene completes (multi-scene drills only) | `{}` — scene index alone is sufficient |
+
+After a checkpoint is saved the drill shows `CheckpointScreen` (Continue / Exit & Resume Later). Exit navigates to `/account/practice/weekly-challenge/[weekStartDate]`.
+
+On mount, the drill calls `getCheckpoint()` and hydrates `currentIndex` from `cp.resumeFromIndex`. The checkpoint is cleared automatically on full completion.
+
+---
+
+## 6. Completion
+
+- All drill types navigate back to `/account/practice/weekly-challenge/[weekStartDate]` when the learner taps the return button on the completion screen.
+- `FillBlankDrill` shows a `DrillPerformanceReview` screen before marking the item complete.
+- Item completion is recorded via `POST /api/v1/learner/weekly-challenge/items/[index]/complete` (`$addToSet` on `completedItemIndexes` — safe to call multiple times).
+- The item's checkpoint is cleared on completion.
+
+---
+
+## 7. Category → drill type mapping (reference)
 
 | Weakness category | Drill type |
 |-------------------|------------|
@@ -78,4 +112,4 @@ Map `ChallengeDrillItem` → `DrillPracticeInterface` props based on `drillType`
 | `vocabulary` | `fill_blank` or `key_phrases` |
 | `grammar` | `fill_blank` |
 
-This is determined by Gemini at generation time. The UI does not need to compute it.
+This is determined by GPT-5.5 at generation time. The UI does not need to compute it.
