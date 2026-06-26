@@ -121,6 +121,11 @@ export function useDrill(drillId: string) {
   });
 }
 
+function invalidateDrillListQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.drills.tutor.all() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.drills.all });
+}
+
 // Delete drill mutation
 export function useDeleteDrill() {
   const queryClient = useQueryClient();
@@ -130,12 +135,46 @@ export function useDeleteDrill() {
       return await drillAPI.delete(drillId);
     },
     onSuccess: () => {
-      // Invalidate and refetch drills
-      queryClient.invalidateQueries({ queryKey: queryKeys.drills.tutor.all() });
+      invalidateDrillListQueries(queryClient);
       toast.success("Drill deleted successfully");
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to delete drill");
+    },
+  });
+}
+
+// Bulk delete drills mutation
+export function useDeleteDrills() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (drillIds: string[]) => {
+      const failures: string[] = [];
+      for (const drillId of drillIds) {
+        try {
+          await drillAPI.delete(drillId);
+        } catch {
+          failures.push(drillId);
+        }
+      }
+      return { deletedCount: drillIds.length - failures.length, failures };
+    },
+    onSuccess: ({ deletedCount, failures }) => {
+      invalidateDrillListQueries(queryClient);
+      if (deletedCount > 0) {
+        toast.success(
+          `Deleted ${deletedCount} drill${deletedCount !== 1 ? "s" : ""}`
+        );
+      }
+      if (failures.length > 0) {
+        toast.error(
+          `Failed to delete ${failures.length} drill${failures.length !== 1 ? "s" : ""}`
+        );
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to delete drills");
     },
   });
 }

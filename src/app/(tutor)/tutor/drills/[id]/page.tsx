@@ -1,16 +1,8 @@
 // Server Component - Drill Detail Page
+import { Suspense } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import {
-  ArrowLeft,
-  Edit,
-  Trash2,
-  Users,
-  Clock,
-  BookOpen,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { getDrillById } from "./get-drill";
 import { DrillDetailClient } from "./drill-detail-client";
@@ -39,5 +31,15 @@ export default async function DrillDetailPage({
     );
   }
 
-  return <DrillDetailClient drill={drill} drillId={id} />;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      }
+    >
+      <DrillDetailClient drill={drill} drillId={id} />
+    </Suspense>
+  );
 }
