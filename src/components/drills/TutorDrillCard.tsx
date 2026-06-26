@@ -10,6 +10,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Users, Clock, Edit, Trash2, ChevronRight, Loader2 } from "lucide-react";
 import { getDrillIcon } from "@/utils/drill";
+import { Checkbox } from "@/components/ui/Checkbox";
+
+import {
+  appendReturnTo,
+} from "@/lib/drill-list-filters";
 
 export interface TutorDrillCardProps {
   drill: {
@@ -27,6 +32,10 @@ export interface TutorDrillCardProps {
   onDelete?: (drillId: string) => void;
   isDeleting?: boolean;
   className?: string;
+  returnToParam?: string;
+  selectable?: boolean;
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
 function TutorDrillCardComponent({
@@ -34,8 +43,19 @@ function TutorDrillCardComponent({
   onDelete,
   isDeleting = false,
   className = "",
+  returnToParam,
+  selectable = false,
+  checked = false,
+  onCheckedChange,
 }: TutorDrillCardProps) {
   const drillId = drill._id || drill.id || "";
+
+  const editHref = returnToParam
+    ? appendReturnTo(`/tutor/drills/${drillId}/edit`, returnToParam)
+    : `/tutor/drills/${drillId}/edit`;
+  const viewHref = returnToParam
+    ? appendReturnTo(`/tutor/drills/${drillId}`, returnToParam)
+    : `/tutor/drills/${drillId}`;
   
   // Memoize computed values
   const assignedCount = useMemo(() => {
@@ -81,6 +101,14 @@ function TutorDrillCardComponent({
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
+            {selectable && (
+              <Checkbox
+                checked={checked}
+                onChange={(e) => onCheckedChange?.(e.target.checked)}
+                aria-label={`Select ${drill.title}`}
+                className="rounded border-gray-300 shrink-0"
+              />
+            )}
             <span className="text-2xl">{getDrillIcon(drill.type)}</span>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-foreground">
@@ -129,7 +157,7 @@ function TutorDrillCardComponent({
         </div>
 
         <div className="flex items-center gap-2 ml-4">
-          <Link href={`/tutor/drills/${drillId}/edit`}>
+          <Link href={editHref}>
             <button className="p-2 hover:bg-muted rounded-lg transition">
               <Edit className="w-5 h-5 text-muted-foreground" />
             </button>
@@ -147,7 +175,7 @@ function TutorDrillCardComponent({
               )}
             </button>
           )}
-          <Link href={`/tutor/drills/${drillId}`}>
+          <Link href={viewHref}>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </Link>
         </div>

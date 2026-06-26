@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -271,6 +272,11 @@ function CreateDrillPageContent() {
   const drillId = searchParams.get("drillId") || searchParams.get("id");
   const preselectedStudentId = searchParams.get("student") || "";
   const isEditMode = !!drillId;
+  const drillListReturnPath = useMemo(
+    () => sanitizeReturnTo(searchParams.get("returnTo")) ?? "/tutor/drills",
+    [searchParams]
+  );
+  const returnToParam = searchParams.get("returnTo");
 
   // Vocabulary
   const [vocabularyItems, setVocabularyItems] = useState<VocabularyItem[]>([
@@ -1496,7 +1502,7 @@ function CreateDrillPageContent() {
         }
       }
 
-      router.push("/tutor/drills");
+      router.push(drillListReturnPath);
     } catch (error: any) {
       toast.error(
         "Failed to save drill: " + (error.message || "Unknown error")
@@ -1569,7 +1575,7 @@ function CreateDrillPageContent() {
           getAssignmentCounts(apiData, assignedTo.length),
           { isReassign: isAssignedDrill }
         );
-        router.push("/tutor/drills");
+        router.push(drillListReturnPath);
       } else {
         const response: any = await drillAPI.create(drillData);
         clearDraft();
@@ -1577,7 +1583,7 @@ function CreateDrillPageContent() {
         toastAssignmentResult(
           getAssignmentCounts(apiData, assignedTo.length)
         );
-        router.push("/tutor/drills");
+        router.push(drillListReturnPath);
       }
     } catch (error: any) {
       toast.error(
@@ -1630,7 +1636,13 @@ function CreateDrillPageContent() {
       toast.success(
         "Drill copied. Select students and a completion date, then assign."
       );
-      router.push(`/tutor/drills/create?drillId=${newDrillId}`);
+      const copyUrl = returnToParam
+        ? appendReturnTo(
+            `/tutor/drills/create?drillId=${newDrillId}`,
+            returnToParam
+          )
+        : `/tutor/drills/create?drillId=${newDrillId}`;
+      router.push(copyUrl);
     } catch (error: any) {
       toast.error(
         "Failed to copy drill: " + (error.message || "Unknown error")
