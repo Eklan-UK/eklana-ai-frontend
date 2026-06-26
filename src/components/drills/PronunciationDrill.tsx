@@ -7,7 +7,7 @@ import { TTSButton } from "@/components/ui/TTSButton";
 import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { pronunciationAPI } from "@/lib/api";
+import { pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
@@ -154,7 +154,7 @@ export default function PronunciationDrill({
   >([]);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -228,7 +228,7 @@ export default function PronunciationDrill({
       return initialProgress;
     };
 
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       setWordProgress(createEmptyProgress());
       setIsLoadingCheckpoint(false);
       return;
@@ -238,32 +238,65 @@ export default function PronunciationDrill({
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
 
-    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
-      if (cancelled) return;
-      if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        const partial = cp.partialResults;
-        if (partial.wordProgress) {
-          setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+    if (weeklyChallengeMeta) {
+      weeklyChallengeAPI
+        .getCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex)
+        .then((res) => {
+          if (cancelled) return;
+          const cp = res.data?.checkpoint as Record<string, unknown> | null;
+          if (cp) {
+            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
+            const partial = cp.partialResults as Record<string, unknown> | undefined;
+            if (partial?.wordProgress) {
+              setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+            } else {
+              setWordProgress(createEmptyProgress());
+            }
+            if (partial?.sessionReviewAnalytics) {
+              setSessionReviewAnalytics(
+                partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+              );
+            }
+            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+          } else {
+            setWordProgress(createEmptyProgress());
+          }
+          setIsLoadingCheckpoint(false);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setWordProgress(createEmptyProgress());
+            setIsLoadingCheckpoint(false);
+          }
+        });
+    } else {
+      loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
+        if (cancelled) return;
+        if (cp) {
+          setCurrentIndex(cp.resumeFromIndex);
+          const partial = cp.partialResults;
+          if (partial.wordProgress) {
+            setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+          } else {
+            setWordProgress(createEmptyProgress());
+          }
+          if (partial.sessionReviewAnalytics) {
+            setSessionReviewAnalytics(
+              partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+            );
+          }
+          setCheckpointCount(cp.completedItemCount);
         } else {
           setWordProgress(createEmptyProgress());
         }
-        if (partial.sessionReviewAnalytics) {
-          setSessionReviewAnalytics(
-            partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-          );
-        }
-        setCheckpointCount(cp.completedItemCount);
-      } else {
-        setWordProgress(createEmptyProgress());
-      }
-      setIsLoadingCheckpoint(false);
-    });
+        setIsLoadingCheckpoint(false);
+      });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, items.length]);
+  }, [assignmentId, drill._id, items.length, weeklyChallengeMeta]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -538,17 +571,32 @@ export default function PronunciationDrill({
       setShowMic(true);
       scrollContainerRef.current?.scrollTo({ top: 0 });
 
-      if (completedCount > 0 && completedCount % 5 === 0 && assignmentId) {
-        void saveCheckpoint(String(drill._id), {
-          assignmentId,
-          drillType: "pronunciation",
-          resumeFromIndex: currentIndex + 1,
-          completedItemCount: completedCount,
-          partialResults: { wordProgress, sessionReviewAnalytics },
-          startedAt: new Date(startTime),
-        });
-        setCheckpointCount(completedCount);
-        setShowCheckpoint(true);
+      if (completedCount > 0 && completedCount % 5 === 0) {
+        if (assignmentId) {
+          void saveCheckpoint(String(drill._id), {
+            assignmentId,
+            drillType: "pronunciation",
+            resumeFromIndex: currentIndex + 1,
+            completedItemCount: completedCount,
+            partialResults: { wordProgress, sessionReviewAnalytics },
+            startedAt: new Date(startTime),
+          });
+          setCheckpointCount(completedCount);
+          setShowCheckpoint(true);
+        } else if (weeklyChallengeMeta) {
+          void weeklyChallengeAPI.saveCheckpoint(
+            weeklyChallengeMeta.weekStartDate,
+            weeklyChallengeMeta.itemIndex,
+            {
+              drillType: "pronunciation",
+              resumeFromIndex: currentIndex + 1,
+              completedCount,
+              partialResults: { wordProgress, sessionReviewAnalytics },
+            },
+          );
+          setCheckpointCount(completedCount);
+          setShowCheckpoint(true);
+        }
       }
     } else {
       discardPendingRecording();
@@ -620,6 +668,7 @@ export default function PronunciationDrill({
       }
 
       if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
+      else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -757,7 +806,9 @@ export default function PronunciationDrill({
         drillTitle={drill.title}
         onContinue={() => setShowCheckpoint(false)}
         onExit={() => {
-          window.location.href = "/account/drills";
+          window.location.href = weeklyChallengeMeta
+            ? `/account/practice/weekly-challenge/${weeklyChallengeMeta.weekStartDate}`
+            : "/account/drills";
         }}
       />
     );

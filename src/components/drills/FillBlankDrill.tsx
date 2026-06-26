@@ -23,6 +23,7 @@ import {
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 interface FillBlankDrillProps {
   drill: any;
@@ -50,10 +51,10 @@ export default function FillBlankDrill({
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
 
   useEffect(() => {
-    if (!assignmentId) {
+    if (!assignmentId && !weeklyChallengeMeta) {
       setIsLoadingCheckpoint(false);
       return;
     }
@@ -62,26 +63,48 @@ export default function FillBlankDrill({
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
 
-    loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
-      if (cancelled) return;
-      if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        const partial = cp.partialResults;
-        if (partial.answers) {
-          setAnswers(partial.answers as Record<number, Record<number, string>>);
+    if (weeklyChallengeMeta) {
+      weeklyChallengeAPI
+        .getCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex)
+        .then((res) => {
+          if (cancelled) return;
+          const cp = res.data?.checkpoint as Record<string, unknown> | null;
+          if (cp) {
+            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
+            const partial = cp.partialResults as Record<string, unknown> | undefined;
+            if (partial?.answers) {
+              setAnswers(partial.answers as Record<number, Record<number, string>>);
+            }
+            if (typeof partial?.submittedCount === "number") {
+              setSubmittedCount(partial.submittedCount as number);
+            }
+            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+          }
+          setIsLoadingCheckpoint(false);
+        })
+        .catch(() => { if (!cancelled) setIsLoadingCheckpoint(false); });
+    } else {
+      loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
+        if (cancelled) return;
+        if (cp) {
+          setCurrentIndex(cp.resumeFromIndex);
+          const partial = cp.partialResults;
+          if (partial.answers) {
+            setAnswers(partial.answers as Record<number, Record<number, string>>);
+          }
+          if (typeof partial.submittedCount === "number") {
+            setSubmittedCount(partial.submittedCount as number);
+          }
+          setCheckpointCount(cp.completedItemCount);
         }
-        if (typeof partial.submittedCount === "number") {
-          setSubmittedCount(partial.submittedCount as number);
-        }
-        setCheckpointCount(cp.completedItemCount);
-      }
-      setIsLoadingCheckpoint(false);
-    });
+        setIsLoadingCheckpoint(false);
+      });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id]);
+  }, [assignmentId, drill._id, weeklyChallengeMeta]);
 
   const items = drill.fill_blank_items || [];
   const currentItem = items[currentIndex];
@@ -210,17 +233,32 @@ export default function FillBlankDrill({
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1);
 
-      if (newSubmittedCount % 5 === 0 && assignmentId) {
-        void saveCheckpoint(String(drill._id), {
-          assignmentId,
-          drillType: "fill_blank",
-          resumeFromIndex: currentIndex + 1,
-          completedItemCount: newSubmittedCount,
-          partialResults: { answers, submittedCount: newSubmittedCount },
-          startedAt: new Date(startTime),
-        });
-        setCheckpointCount(newSubmittedCount);
-        setShowCheckpoint(true);
+      if (newSubmittedCount % 5 === 0) {
+        if (assignmentId) {
+          void saveCheckpoint(String(drill._id), {
+            assignmentId,
+            drillType: "fill_blank",
+            resumeFromIndex: currentIndex + 1,
+            completedItemCount: newSubmittedCount,
+            partialResults: { answers, submittedCount: newSubmittedCount },
+            startedAt: new Date(startTime),
+          });
+          setCheckpointCount(newSubmittedCount);
+          setShowCheckpoint(true);
+        } else if (weeklyChallengeMeta) {
+          void weeklyChallengeAPI.saveCheckpoint(
+            weeklyChallengeMeta.weekStartDate,
+            weeklyChallengeMeta.itemIndex,
+            {
+              drillType: "fill_blank",
+              resumeFromIndex: currentIndex + 1,
+              completedCount: newSubmittedCount,
+              partialResults: { answers, submittedCount: newSubmittedCount },
+            },
+          );
+          setCheckpointCount(newSubmittedCount);
+          setShowCheckpoint(true);
+        }
       }
     }
   };
@@ -271,6 +309,7 @@ export default function FillBlankDrill({
 
   const handleRetry = () => {
     if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
+    else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
     setSubmittedResults(null);
     setAnswers({});
     setCurrentIndex(0);
@@ -304,6 +343,7 @@ export default function FillBlankDrill({
             weekStartDate: weeklyChallengeMeta.weekStartDate,
           },
         );
+        void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
         trackActivity("drill", drill._id, "completed", {
           title: drill.title,
           type: drill.type,
@@ -364,7 +404,9 @@ export default function FillBlankDrill({
         drillTitle={drill.title}
         onContinue={() => setShowCheckpoint(false)}
         onExit={() => {
-          window.location.href = "/account/drills";
+          window.location.href = weeklyChallengeMeta
+            ? `/account/practice/weekly-challenge/${weeklyChallengeMeta.weekStartDate}`
+            : "/account/drills";
         }}
       />
     );

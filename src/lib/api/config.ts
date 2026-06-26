@@ -150,6 +150,8 @@ export const config = {
 	APPLE_APP_STORE_ENVIRONMENT: process.env.APPLE_APP_STORE_ENVIRONMENT || 'sandbox',
 	/** Required by SignedDataVerifier in Production only (numeric App Store app id). */
 	APPLE_APP_APPLE_ID: process.env.APPLE_APP_APPLE_ID,
+	// OpenAI
+	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
 		process.env.SPEECHACE_API_KEY ||
