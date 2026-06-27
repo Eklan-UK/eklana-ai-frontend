@@ -422,6 +422,8 @@ See [`MOBILE_DRILL_CELEBRATION.md`](MOBILE_DRILL_CELEBRATION.md) when the learne
 
 See [`MOBILE_MATCHING_DRILL.md`](MOBILE_MATCHING_DRILL.md) for the **matching** drill end-to-end spec (per-pair feedback, checkpoints, manual submit, `matchingResults` payload).
 
+See [`MOBILE_DRILL_BUILDER_LIST.md`](MOBILE_DRILL_BUILDER_LIST.md) for **tutor/admin drill list** checkbox selection, safe bulk delete, and the Mission 4 **Grammar** topic in the Drill Builder catalog.
+
 ---
 
 ## Internationalization
