@@ -129,6 +129,11 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         order: 3,
         freeTalkScenarioType: "phone_family",
       },
+      {
+        id: "grammar",
+        title: "Grammar",
+        order: 4,
+      },
     ],
   },
 ];
