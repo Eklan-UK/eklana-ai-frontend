@@ -25,6 +25,11 @@ import {
   downgradeUserFromStripe,
 } from '@/lib/api/stripe-subscription-apply';
 import { findUserByStripeCustomer } from '@/lib/api/stripe-webhook-user';
+import {
+  applyEntitledStripeSubscription,
+  findEntitledStripeSubscription,
+  getInvoiceSubscriptionId,
+} from '@/lib/api/stripe-customer-subscriptions';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -170,7 +175,20 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
         { userId: String(user._id), status }
       );
     } else {
-      downgradeUserFromStripe(user);
+      const otherSub = await findEntitledStripeSubscription(
+        stripe,
+        customerId,
+        subscription.id
+      );
+      if (otherSub) {
+        applyEntitledStripeSubscription(user, otherSub);
+        logger.info(
+          '[Stripe Webhook] subscription.updated — retained premium via another active subscription',
+          { userId: String(user._id), failedSubId: subscription.id, activeSubId: otherSub.id }
+        );
+      } else {
+        downgradeUserFromStripe(user);
+      }
     }
   }
 
@@ -204,6 +222,21 @@ async function handleSubscriptionDeleted(
     logger.info(
       '[Stripe Webhook] subscription.deleted — Stripe cleared; Apple/manual expiry retained',
       { userId: String(user._id) }
+    );
+    return;
+  }
+
+  const otherSub = await findEntitledStripeSubscription(
+    stripe,
+    customerId,
+    subscription.id
+  );
+  if (otherSub) {
+    applyEntitledStripeSubscription(user, otherSub);
+    await user.save();
+    logger.info(
+      '[Stripe Webhook] subscription.deleted — retained premium via another active subscription',
+      { userId: String(user._id), deletedSubId: subscription.id, activeSubId: otherSub.id }
     );
     return;
   }
@@ -276,10 +309,31 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, stripe: Strip
   if (!invoice.customer) return;
 
   const customerId = String(invoice.customer);
+  const failingSubId = getInvoiceSubscriptionId(invoice);
 
   await connectToDatabase();
   const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) return;
+
+  const otherSub = await findEntitledStripeSubscription(
+    stripe,
+    customerId,
+    failingSubId
+  );
+  if (otherSub) {
+    applyEntitledStripeSubscription(user, otherSub);
+    await user.save();
+    logger.info(
+      '[Stripe Webhook] invoice.payment_failed — retained premium via another active subscription',
+      {
+        userId: String(user._id),
+        failingSubId,
+        activeSubId: otherSub.id,
+        invoiceId: invoice.id,
+      }
+    );
+    return;
+  }
 
   const downgraded = applyStripePaymentFailureDowngrade(user, 'past_due');
   await user.save();
