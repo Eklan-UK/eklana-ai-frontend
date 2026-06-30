@@ -21,6 +21,10 @@ interface GenerateDrillParams {
   prompt: string;
   topic: string;
   part: string;
+  studentContext?: object;
+  drillWeaknesses?: object[];
+  templatePrompt?: string;
+  drillHistory?: object[];
 }
 
 type FunctionTool = Extract<OpenAI.Chat.Completions.ChatCompletionTool, { type: 'function' }>;
@@ -328,7 +332,21 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
       },
       {
         role: 'user',
-        content: `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,
+        content: [
+          params.templatePrompt ?? null,
+          `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,
+          params.studentContext
+            ? `Student Context: ${JSON.stringify(params.studentContext)}`
+            : null,
+          params.drillWeaknesses?.length
+            ? `Student Weaknesses to target: ${JSON.stringify(params.drillWeaknesses)}`
+            : null,
+          params.drillHistory?.length
+            ? `Previous drills created for this student (avoid repeating content): ${JSON.stringify(params.drillHistory)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
       },
     ],
     tools: toolsArray,

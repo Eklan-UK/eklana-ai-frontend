@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
+import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
 import { generateDrill } from "@/domain/drills/ai-drill-generator.service";
+import { aggregateWeaknesses } from "@/domain/challenges/weakness-aggregator";
+import StudentContext from "@/models/studentContext";
+import User from "@/models/user";
+import PromptTemplate from "@/models/promptTemplate";
+import DrillAssignment from "@/models/drill-assignment";
+import Drill from "@/models/drill";
+import { Types } from "mongoose";
 
 async function handler(
   req: NextRequest,
@@ -32,6 +40,104 @@ async function handler(
       studentIds,
     });
 
+    let studentContext: object | undefined;
+    let drillWeaknesses: object[] | undefined;
+
+    if (studentId && Types.ObjectId.isValid(studentId)) {
+      try {
+        await connectToDatabase();
+        const learnerObjectId = new Types.ObjectId(studentId);
+
+        const [contextDoc, user] = await Promise.all([
+          StudentContext.findOne({ studentId: learnerObjectId }).lean(),
+          User.findById(learnerObjectId).lean(),
+        ]);
+
+        if (contextDoc) {
+          studentContext = contextDoc;
+        }
+
+        if (user) {
+          const weekStartDate =
+            (user as any).subscriptionActivatedAt ??
+            new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          const profile = await aggregateWeaknesses(learnerObjectId, weekStartDate);
+          if (profile.topWeaknesses.length > 0) {
+            drillWeaknesses = profile.topWeaknesses;
+          }
+        }
+      } catch (enrichErr: any) {
+        logger.warn("Failed to enrich drill with student context/weaknesses", {
+          studentId,
+          error: enrichErr.message,
+        });
+      }
+    }
+
+    let templatePrompt: string | undefined;
+
+    if (topic && part) {
+      try {
+        await connectToDatabase();
+        const templateDoc = await PromptTemplate.findOne({ drillType, topic, part }).lean();
+        if (templateDoc) {
+          templatePrompt = templateDoc.template
+            .replace(/\{\{difficulty\}\}/g, difficulty ?? "intermediate")
+            .replace(/\{\{context\}\}/g, drillContext ?? "")
+            .replace(/\{\{topic\}\}/g, topic)
+            .replace(/\{\{part\}\}/g, part);
+        }
+      } catch (templateErr: any) {
+        logger.warn("Failed to fetch prompt template", {
+          drillType,
+          topic,
+          part,
+          error: templateErr.message,
+        });
+      }
+    }
+
+    let drillHistory: object[] | undefined;
+
+    if (studentId && Types.ObjectId.isValid(studentId)) {
+      try {
+        await connectToDatabase();
+        const learnerObjectId = new Types.ObjectId(studentId);
+
+        const assignments = await DrillAssignment.find(
+          { learnerId: learnerObjectId },
+          { drillId: 1, _id: 0 },
+        ).lean();
+
+        const drillIds = assignments.map((a) => a.drillId);
+
+        if (drillIds.length > 0) {
+          const drills = await Drill.find(
+            { _id: { $in: drillIds } },
+            { type: 1, title: 1, difficulty: 1, learning_journey_topic: 1, learning_journey_part: 1 },
+          )
+            .sort({ created_date: -1 })
+            .limit(10)
+            .lean();
+
+          if (drills.length > 0) {
+            drillHistory = drills.map((d) => ({
+              type: d.type,
+              title: d.title,
+              difficulty: d.difficulty,
+              learning_journey_topic: d.learning_journey_topic,
+              learning_journey_part: d.learning_journey_part,
+            }));
+          }
+        }
+      } catch (historyErr: any) {
+        logger.warn("Failed to fetch drill history for student", {
+          studentId,
+          error: historyErr.message,
+        });
+      }
+    }
+
     const generated = await generateDrill({
       drillType,
       difficulty: difficulty ?? "intermediate",
@@ -39,6 +145,10 @@ async function handler(
       prompt,
       topic,
       part,
+      studentContext,
+      drillWeaknesses,
+      templatePrompt,
+      drillHistory,
     });
 
     return NextResponse.json(
