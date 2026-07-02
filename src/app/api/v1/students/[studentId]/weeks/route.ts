@@ -38,8 +38,16 @@ async function handler(
     const anchor: Date =
       (user as any).subscriptionActivatedAt ?? (user as any).createdAt;
 
+    const currentWeek = Math.max(
+      1,
+      Math.ceil((Date.now() - anchor.getTime()) / WEEK_MS),
+    );
+
     const assignments = await DrillAssignment.find({ learnerId: learnerObjectId })
-      .populate("drillId", "title type difficulty learning_journey_topic learning_journey_part is_active")
+      .populate(
+        "drillId",
+        "title type difficulty learning_journey_topic learning_journey_part is_active",
+      )
       .lean();
 
     const weekMap = new Map<number, object[]>();
@@ -54,10 +62,11 @@ async function handler(
       const drill = (assignment as any).drillId as any;
 
       const entry = {
+        type: "drill_assignment" as const,
         assignmentId: (assignment as any)._id,
         drillId: drill?._id ?? null,
         title: drill?.title ?? null,
-        type: drill?.type ?? null,
+        drillType: drill?.type ?? null,
         difficulty: drill?.difficulty ?? null,
         topic: drill?.learning_journey_topic ?? null,
         part: drill?.learning_journey_part ?? null,
@@ -75,20 +84,49 @@ async function handler(
       }
     }
 
-    const weeks = Array.from(weekMap.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([weekNumber, drills]) => ({ weekNumber, drills }));
+    const weeks = [];
+    for (let weekNumber = 1; weekNumber <= currentWeek; weekNumber++) {
+      const weekStartDate = new Date(
+        anchor.getTime() + (weekNumber - 1) * WEEK_MS,
+      );
+      const weekEndDate = new Date(
+        anchor.getTime() + weekNumber * WEEK_MS - 1,
+      );
+      const items = weekMap.get(weekNumber) ?? [];
+      weeks.push({
+        weekNumber,
+        weekStartDate: weekStartDate.toISOString(),
+        weekEndDate: weekEndDate.toISOString(),
+        drills: items,
+        items,
+      });
+    }
 
-    logger.info("Fetched student weekly drill breakdown", { studentId, weekCount: weeks.length });
+    logger.info("Fetched student weekly drill breakdown", {
+      studentId,
+      weekCount: weeks.length,
+      currentWeek,
+    });
 
     return NextResponse.json(
-      { code: "Success", data: { weeks } },
+      {
+        code: "Success",
+        data: {
+          anchorDate: anchor.toISOString(),
+          currentWeek,
+          weeks,
+        },
+      },
       { status: 200 },
     );
   } catch (error: any) {
     logger.error("Error fetching student weeks", { error: error.message });
     return NextResponse.json(
-      { code: "ServerError", message: "Failed to fetch student weeks", error: error.message },
+      {
+        code: "ServerError",
+        message: "Failed to fetch student weeks",
+        error: error.message,
+      },
       { status: 500 },
     );
   }

@@ -46,6 +46,8 @@ interface AIGenerationFormProps {
   disabled?: boolean;
   /** page = standalone card; modal = fields only (used inside AIGenerationModal) */
   variant?: "page" | "modal";
+  /** When set, student multi-select is locked to these IDs */
+  lockedStudentIds?: string[];
 }
 
 const selectClass =
@@ -216,20 +218,46 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
   onGenerate,
   disabled = false,
   variant = "page",
+  lockedStudentIds,
 }) => {
+  const isStudentLocked = !!lockedStudentIds?.length;
+  const effectiveStudentIds = isStudentLocked
+    ? lockedStudentIds!
+    : values.studentIds;
+
   const fields = (
     <div className="space-y-4">
       <div>
         <Label className="block text-xs font-bold text-gray-600 mb-1.5">
           Students <span className="text-red-500">*</span>
         </Label>
-        <AiStudentMultiSelect
-          students={students}
-          selectedIds={values.studentIds}
-          onChange={onStudentIdsChange}
-          loading={loadingStudents}
-          disabled={disabled || isGenerating}
-        />
+        {isStudentLocked ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
+            <div className="flex flex-wrap gap-2">
+              {students
+                .filter((s) => lockedStudentIds!.includes(s.id))
+                .map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200"
+                  >
+                    {s.label}
+                  </span>
+                ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Student is locked for this week&apos;s drill creation.
+            </p>
+          </div>
+        ) : (
+          <AiStudentMultiSelect
+            students={students}
+            selectedIds={effectiveStudentIds}
+            onChange={onStudentIdsChange}
+            loading={loadingStudents}
+            disabled={disabled || isGenerating}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
