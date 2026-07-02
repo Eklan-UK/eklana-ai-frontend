@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock, Sparkles } from "lucide-react";
 
 export function TutorNav() {
   const pathname = usePathname();
@@ -29,6 +29,12 @@ export function TutorNav() {
       icon: BookOpen,
     },
     {
+      href: "/tutor/ai-user-builder",
+      label: "AI User Builder",
+      mobileLabel: "AI Builder",
+      icon: Sparkles,
+    },
+    {
       href: "/tutor/students",
       label: "Students",
       icon: Users,
@@ -42,8 +48,8 @@ export function TutorNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:relative md:h-screen md:w-64 md:border-r md:border-t-0 md:border-border">
-      {/* Mobile: 6-column grid — Dashboard, Classes, Hours, Drills, Students, Settings */}
-      <div className="grid grid-cols-6 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
+      {/* Mobile: 4-column grid with wrapping; desktop sidebar */}
+      <div className="grid grid-cols-4 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname?.startsWith(item.href);
@@ -59,7 +65,14 @@ export function TutorNav() {
             >
               <Icon className="h-5 w-5 shrink-0 md:h-5 md:w-5" />
               <span className="max-w-full truncate text-center text-[9px] font-medium leading-tight sm:text-[10px] md:text-sm">
-                {item.label}
+                {"mobileLabel" in item && item.mobileLabel
+                  ? (
+                    <>
+                      <span className="md:hidden">{item.mobileLabel}</span>
+                      <span className="hidden md:inline">{item.label}</span>
+                    </>
+                  )
+                  : item.label}
               </span>
             </Link>
           );

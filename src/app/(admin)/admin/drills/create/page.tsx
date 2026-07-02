@@ -22,12 +22,16 @@ import { FileUploadZone } from "@/components/drills/FileUploadZone";
 import { ContentPreview } from "@/components/drills/ContentPreview";
 import { TemplateDownload } from "@/components/drills/TemplateDownload";
 import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
-import { type AIGenerationFormValues, type AIGenerationFormScalarField, type AIGenerationFormFieldValue } from "@/components/drills/AIGenerationForm";
-import { AIGenerationModal } from "@/components/drills/AIGenerationModal";
+import { AIDrillCreationShell } from "@/components/drills/AIDrillCreationShell";
 import { AIGeneratedPreview } from "@/components/drills/AIGeneratedPreview";
-import { AIChatSidebar } from "@/components/drills/AIChatSidebar";
+import {
+  clearPendingAiDrillApply,
+  readPendingAiDrillApply,
+  useAIDrillCreationWorkflow,
+} from "@/hooks/useAIDrillCreationWorkflow";
+import { studentWeeksQueryKey } from "@/hooks/useStudentWeeks";
+import { useQueryClient } from "@tanstack/react-query";
 import { ParsedContent } from "@/services/document-parser.service";
-import { normalizeAiGeneratedToParsedContent } from "@/utils/ai-drill-content";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import {
   generateDrillAudio,
@@ -36,8 +40,6 @@ import {
 } from "@/services/drill-audio.service";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
 import {
-  getPartLabel,
-  getTopicById,
   isValidPartTopicPair,
   type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
@@ -263,6 +265,8 @@ const DrillBuilder: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const drillId = searchParams.get("drillId") || searchParams.get("id");
+  const preselectedStudentId = searchParams.get("student") || "";
+  const preselectedWeek = searchParams.get("week") || "";
   const isEditMode = !!drillId;
   const drillListReturnPath = useMemo(
     () => sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill",
@@ -360,20 +364,19 @@ const DrillBuilder: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
 
-  // AI generate form state (independent from manual builder)
-  const [aiStudentIds, setAiStudentIds] = useState<string[]>([]);
-  const [aiDrillType, setAiDrillType] = useState("vocabulary");
-  const [aiDifficulty, setAiDifficulty] = useState("intermediate");
-  const [aiJourneyPart, setAiJourneyPart] = useState<LearningJourneyPartId | "">("");
-  const [aiJourneyTopic, setAiJourneyTopic] = useState("");
-  const [aiContext, setAiContext] = useState("");
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
-  const [aiGeneratedContent, setAiGeneratedContent] = useState<Record<string, unknown> | null>(null);
-  const [showAiPreview, setShowAiPreview] = useState(false);
-  const [showChatSidebar, setShowChatSidebar] = useState(false);
-  const [showAiFormModal, setShowAiFormModal] = useState(false);
+  // AI generate form — orchestrated via shared workflow hook (see below)
+  const onApplyParsedRef = useRef<(content: ParsedContent) => void>(() => {});
   const builderRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const initialAiContext = useMemo(() => {
+    if (!preselectedStudentId) return undefined;
+    const weekNum = preselectedWeek ? parseInt(preselectedWeek, 10) : undefined;
+    return {
+      studentId: preselectedStudentId,
+      weekNumber: Number.isFinite(weekNum) ? weekNum : undefined,
+    };
+  }, [preselectedStudentId, preselectedWeek]);
 
   // Pre-generate TTS audio option
   const [generateTTSAudio, setGenerateTTSAudio] = useState(true);
@@ -944,121 +947,46 @@ const DrillBuilder: React.FC = () => {
     [users],
   );
 
-  const aiFormValues: AIGenerationFormValues = {
-    studentIds: aiStudentIds,
-    drillType: aiDrillType,
-    difficulty: aiDifficulty,
-    journeyPart: aiJourneyPart,
-    journeyTopic: aiJourneyTopic,
-    context: aiContext,
-    prompt: aiPrompt,
-  };
-
-  const handleAiFormChange = (
-    field: AIGenerationFormScalarField,
-    value: AIGenerationFormFieldValue,
-  ) => {
-    switch (field) {
-      case "drillType":
-        setAiDrillType(value as string);
-        break;
-      case "difficulty":
-        setAiDifficulty(value as string);
-        break;
-      case "journeyPart":
-        setAiJourneyPart(value as LearningJourneyPartId | "");
-        break;
-      case "journeyTopic":
-        setAiJourneyTopic(value as string);
-        break;
-      case "context":
-        setAiContext(value as string);
-        break;
-      case "prompt":
-        setAiPrompt(value as string);
-        break;
-    }
-  };
-
-  const handleAIGenerate = async () => {
-    if (aiStudentIds.length === 0) {
-      toast.error("Please select at least one student");
-      return;
-    }
-    if (!aiJourneyPart) {
-      toast.error("Please select a mission");
-      return;
-    }
-    if (!aiJourneyTopic) {
-      toast.error("Please select a topic");
-      return;
-    }
-    if (!aiContext.trim()) {
-      toast.error("Please enter a context/scenario");
-      return;
-    }
-    if (!aiPrompt.trim()) {
-      toast.error("Please enter a prompt");
-      return;
-    }
-    try {
-      setIsGeneratingDrill(true);
-      const res = await fetch("/api/v1/drills/ai-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          drillType: aiDrillType,
-          difficulty: aiDifficulty,
-          context: aiContext,
-          prompt: aiPrompt,
-          part: getPartLabel(aiJourneyPart),
-          topic: getTopicById(aiJourneyTopic)?.title ?? "",
-          studentId: aiStudentIds[0],
-          studentIds: aiStudentIds,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.message || "AI generation failed");
-        return;
+  const aiWorkflow = useAIDrillCreationWorkflow({
+    students: aiStudentOptions,
+    initialContext: initialAiContext,
+    onApplyParsedContent: (content) => onApplyParsedRef.current(content),
+    onUseDrillExtras: (meta) => {
+      setDrillType(meta.drillType);
+      setDifficulty(meta.difficulty);
+      if (meta.studentIds.length > 0) {
+        setSelectedUsers(new Set(meta.studentIds));
       }
-      setAiGeneratedContent(json.data);
-      setShowAiPreview(true);
-      setShowChatSidebar(true);
-      setShowAiFormModal(false);
-      toast.success("Drill generated successfully");
-    } catch {
-      toast.error("AI generation failed");
-    } finally {
-      setIsGeneratingDrill(false);
+      setJourneyPart(meta.journeyPart);
+      setJourneyTopic(meta.journeyTopic);
+      if (meta.completionDate) {
+        setCompletionDate(meta.completionDate);
+      }
+      builderRef.current?.scrollIntoView({ behavior: "smooth" });
+    },
+  });
+
+  useEffect(() => {
+    if (preselectedStudentId && !isEditMode) {
+      setSelectedUsers(new Set([preselectedStudentId]));
     }
-  };
+  }, [preselectedStudentId, isEditMode]);
 
-  const handleUseAiDrill = () => {
-    if (!aiGeneratedContent) return;
-
-    if (aiDrillType === "definition") {
-      toast.warning(
-        "Definition drills are not yet supported in the manual builder.",
-      );
-    }
-
-    const parsed = normalizeAiGeneratedToParsedContent(aiDrillType, aiGeneratedContent);
-    handleApplyParsedContent(parsed);
-
-    setDrillType(aiDrillType);
-    setDifficulty(aiDifficulty);
-    if (aiStudentIds.length > 0) {
-      setSelectedUsers(new Set(aiStudentIds));
-    }
-    setJourneyPart(aiJourneyPart);
-    setJourneyTopic(aiJourneyTopic);
-
-    setShowAiPreview(false);
-    setShowChatSidebar(false);
-    builderRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const aiFormValues = aiWorkflow.aiFormValues;
+  const handleAiFormChange = aiWorkflow.handleAiFormChange;
+  const setAiStudentIds = aiWorkflow.setAiStudentIds;
+  const isGeneratingDrill = aiWorkflow.isGeneratingDrill;
+  const aiGeneratedContent = aiWorkflow.aiGeneratedContent;
+  const showAiPreview = aiWorkflow.showAiPreview;
+  const showChatSidebar = aiWorkflow.showChatSidebar;
+  const showAiFormModal = aiWorkflow.showAiFormModal;
+  const setShowAiFormModal = aiWorkflow.setShowAiFormModal;
+  const aiDrillType = aiWorkflow.aiDrillType;
+  const handleAIGenerate = aiWorkflow.handleAIGenerate;
+  const handleUseAiDrill = aiWorkflow.handleUseAiDrill;
+  const setAiGeneratedContent = aiWorkflow.setAiGeneratedContent;
+  const setShowAiPreview = aiWorkflow.setShowAiPreview;
+  const setShowChatSidebar = aiWorkflow.setShowChatSidebar;
 
   // Handle file upload
   const handleFileSelect = async (file: File) => {
@@ -1223,6 +1151,27 @@ const DrillBuilder: React.FC = () => {
     setParsedContent(null);
     toast.success("Form populated with parsed data");
   };
+
+  onApplyParsedRef.current = handleApplyParsedContent;
+
+  useEffect(() => {
+    const pending = readPendingAiDrillApply();
+    if (!pending || isEditMode) return;
+    handleApplyParsedContent(pending.parsed);
+    setDrillType(pending.drillType);
+    setDifficulty(pending.difficulty);
+    if (pending.studentIds.length > 0) {
+      setSelectedUsers(new Set(pending.studentIds));
+    }
+    setJourneyPart(pending.journeyPart);
+    setJourneyTopic(pending.journeyTopic);
+    if (pending.completionDate) {
+      setCompletionDate(pending.completionDate);
+    }
+    clearPendingAiDrillApply();
+    builderRef.current?.scrollIntoView({ behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode]);
 
   const validateDrillContent = (): boolean => {
     if (!completionDate) {
@@ -1564,7 +1513,14 @@ const DrillBuilder: React.FC = () => {
         toastAssignmentResult(
           getAssignmentCounts(apiData, assignedTo.length)
         );
-        router.push("/admin/drills/assignment");
+        for (const learnerId of assignedTo) {
+          void queryClient.invalidateQueries({
+            queryKey: studentWeeksQueryKey(learnerId),
+          });
+        }
+        router.push(
+          returnToParam ? drillListReturnPath : "/admin/drills/assignment",
+        );
       }
     } catch (error: any) {
       toast.error(
@@ -3221,29 +3177,28 @@ const DrillBuilder: React.FC = () => {
       )}
 
       {!isEditMode && (
-        <AIGenerationModal
-          open={showAiFormModal}
-          onClose={() => setShowAiFormModal(false)}
-          values={aiFormValues}
-          onChange={handleAiFormChange}
-          onStudentIdsChange={setAiStudentIds}
+        <AIDrillCreationShell
+          isEditMode={isEditMode}
+          showAiFormModal={showAiFormModal}
+          setShowAiFormModal={setShowAiFormModal}
+          aiFormValues={aiFormValues}
+          handleAiFormChange={handleAiFormChange}
+          setAiStudentIds={setAiStudentIds}
           students={aiStudentOptions}
           loadingStudents={loadingUsers}
-          isGenerating={isGeneratingDrill}
-          onGenerate={handleAIGenerate}
-        />
-      )}
-
-      {!isEditMode && aiGeneratedContent && (
-        <AIChatSidebar
-          open={showChatSidebar}
-          onClose={() => setShowChatSidebar(false)}
-          drillType={aiDrillType}
-          currentDrill={aiGeneratedContent}
-          onDrillUpdated={(updated) => {
-            setAiGeneratedContent(updated);
-            setShowAiPreview(true);
-          }}
+          isGeneratingDrill={isGeneratingDrill}
+          handleAIGenerate={handleAIGenerate}
+          lockedStudentIds={
+            preselectedStudentId ? [preselectedStudentId] : undefined
+          }
+          showAiPreview={false}
+          aiDrillType={aiDrillType}
+          aiGeneratedContent={aiGeneratedContent}
+          handleUseAiDrill={handleUseAiDrill}
+          showChatSidebar={showChatSidebar}
+          setShowChatSidebar={setShowChatSidebar}
+          setAiGeneratedContent={setAiGeneratedContent}
+          setShowAiPreview={setShowAiPreview}
         />
       )}
     </div>
