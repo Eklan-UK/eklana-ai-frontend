@@ -66,7 +66,7 @@ export function StudentListPage({ variant }: StudentListPageProps) {
             createdAt: s.createdAt as string | null,
           };
         })
-        .filter((s): s is StudentCard => s !== null);
+        .filter((s): s is NonNullable<typeof s> => s !== null);
     }
     return (adminData?.learners ?? [])
       .map((s) => {
@@ -82,7 +82,7 @@ export function StudentListPage({ variant }: StudentListPageProps) {
           createdAt: s.createdAt,
         };
       })
-      .filter((s): s is StudentCard => s !== null);
+      .filter((s): s is NonNullable<typeof s> => s !== null);
   }, [isTutor, tutorData, adminData]);
 
   const filteredStudents = students.filter((student) => {
