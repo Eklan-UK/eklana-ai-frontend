@@ -2033,6 +2033,7 @@ export interface StudentWeekData {
   weekStartDate: string;
   weekEndDate: string;
   drills: StudentWeekDrill[];
+  items?: StudentWeekDrill[];
 }
 
 export const studentAPI = {

@@ -17,11 +17,17 @@ async function handler(
 ): Promise<NextResponse> {
   try {
     const body = await req.json();
-    const { drillType, difficulty, context: drillContext, prompt, topic, part, studentId, studentIds } = body;
+    const { drillType, drillTypes: drillTypesRaw, difficulty, context: drillContext, prompt, topic, part, studentId, studentIds } = body;
 
-    if (!drillType || !prompt) {
+    const drillTypes: string[] = Array.isArray(drillTypesRaw)
+      ? drillTypesRaw
+      : drillType
+        ? [drillType]
+        : [];
+
+    if (drillTypes.length === 0 || !prompt) {
       return NextResponse.json(
-        { code: "ValidationError", message: "drillType and prompt are required" },
+        { code: "ValidationError", message: "drillTypes (non-empty array) and prompt are required" },
         { status: 400 }
       );
     }
@@ -34,7 +40,7 @@ async function handler(
     }
 
     logger.info("Generating AI drill content", {
-      drillType,
+      drillTypes,
       difficulty,
       studentId,
       studentIds,
@@ -74,27 +80,34 @@ async function handler(
       }
     }
 
-    let templatePrompt: string | undefined;
+    const templatePromptByDrillType = new Map<string, string>();
 
     if (topic && part) {
-      try {
-        await connectToDatabase();
-        const templateDoc = await PromptTemplate.findOne({ drillType, topic, part }).lean();
-        if (templateDoc) {
-          templatePrompt = templateDoc.template
-            .replace(/\{\{difficulty\}\}/g, difficulty ?? "intermediate")
-            .replace(/\{\{context\}\}/g, drillContext ?? "")
-            .replace(/\{\{topic\}\}/g, topic)
-            .replace(/\{\{part\}\}/g, part);
-        }
-      } catch (templateErr: any) {
-        logger.warn("Failed to fetch prompt template", {
-          drillType,
-          topic,
-          part,
-          error: templateErr.message,
-        });
-      }
+      await Promise.all(
+        drillTypes.map(async (dt) => {
+          try {
+            await connectToDatabase();
+            const templateDoc = await PromptTemplate.findOne({ drillType: dt, topic, part }).lean();
+            if (templateDoc) {
+              templatePromptByDrillType.set(
+                dt,
+                templateDoc.template
+                  .replace(/\{\{difficulty\}\}/g, difficulty ?? "intermediate")
+                  .replace(/\{\{context\}\}/g, drillContext ?? "")
+                  .replace(/\{\{topic\}\}/g, topic)
+                  .replace(/\{\{part\}\}/g, part)
+              );
+            }
+          } catch (templateErr: any) {
+            logger.warn("Failed to fetch prompt template", {
+              drillType: dt,
+              topic,
+              part,
+              error: templateErr.message,
+            });
+          }
+        })
+      );
     }
 
     let drillHistory: object[] | undefined;
@@ -138,18 +151,23 @@ async function handler(
       }
     }
 
-    const generated = await generateDrill({
-      drillType,
-      difficulty: difficulty ?? "intermediate",
-      context: drillContext ?? "",
-      prompt,
-      topic,
-      part,
-      studentContext,
-      drillWeaknesses,
-      templatePrompt,
-      drillHistory,
-    });
+    const generated = await Promise.all(
+      drillTypes.map(async (dt) => {
+        const content = await generateDrill({
+          drillType: dt as any,
+          difficulty: difficulty ?? "intermediate",
+          context: drillContext ?? "",
+          prompt,
+          topic,
+          part,
+          studentContext,
+          drillWeaknesses,
+          templatePrompt: templatePromptByDrillType.get(dt),
+          drillHistory,
+        });
+        return { drillType: dt, content };
+      })
+    );
 
     return NextResponse.json(
       {

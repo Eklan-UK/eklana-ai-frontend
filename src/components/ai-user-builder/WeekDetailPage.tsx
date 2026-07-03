@@ -96,7 +96,7 @@ export function WeekDetailPage({
             email: user.email as string | undefined,
           };
         })
-        .filter((o): o is AiStudentOption => o !== null);
+        .filter((o): o is NonNullable<typeof o> => o !== null);
     }
     return (adminData?.learners ?? [])
       .map((user) => {
@@ -108,7 +108,7 @@ export function WeekDetailPage({
           email: user.email,
         };
       })
-      .filter((o): o is AiStudentOption => o !== null);
+      .filter((o): o is NonNullable<typeof o> => o !== null);
   }, [variant, tutorData, adminData]);
 
   const week = useMemo(() => {
