@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
 import {
   Plus,
   X,
@@ -25,7 +25,9 @@ import type {
 
 export interface DrillFormBodyProps {
   draft: DrillDraft;
-  onDraftChange: (draft: DrillDraft) => void;
+  /** Accepts a full new draft OR a functional updater — mirrors React's setState signature so
+   *  multiple synchronous patchDraft calls compose correctly rather than last-write-wins. */
+  onDraftChange: Dispatch<SetStateAction<DrillDraft>>;
   users: Array<{ _id: { toString(): string }; firstName?: string; lastName?: string; name?: string; email?: string }>;
   loadingUsers?: boolean;
   variant: "tutor" | "admin";
@@ -55,9 +57,13 @@ export function DrillFormBody({
   sidebarLeadingContent,
   onDrillTypeChange,
 }: DrillFormBodyProps) {
+  // Use the functional-update form so multiple synchronous patchDraft calls (e.g. from
+  // LearningJourneyPartTopicFields firing onPartChange then onTopicChange in the same handler)
+  // compose against the running prev state rather than all spreading the same stale snapshot.
   const patchDraft = useCallback(
-    (partial: Partial<DrillDraft>) => onDraftChange({ ...draft, ...partial }),
-    [draft, onDraftChange],
+    (partial: Partial<DrillDraft>) =>
+      onDraftChange((prev) => ({ ...prev, ...partial })),
+    [onDraftChange],
   );
 
   const addVocabularyItem = () => {
