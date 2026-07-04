@@ -252,7 +252,11 @@ export class AssignmentRepository {
             'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic',
         })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
-        .sort({ assignedAt: 1 })
+        // Descending so a hit `limit` keeps the most recent (most actionable)
+        // assignments rather than silently dropping newly-assigned drills once a
+        // learner passes the limit. Callers that need a specific display order
+        // (e.g. "My Plans") re-sort client-side via sortAssignedPlanItems.
+        .sort({ assignedAt: -1 })
         .limit(filters?.limit || 100)
         .skip(filters?.offset || 0)
         .lean()

@@ -51,8 +51,8 @@ function TutorDrillCardComponent({
   const drillId = drill._id || drill.id || "";
 
   const editHref = returnToParam
-    ? appendReturnTo(`/tutor/drills/${drillId}/edit`, returnToParam)
-    : `/tutor/drills/${drillId}/edit`;
+    ? appendReturnTo(`/tutor/drills/create?drillId=${drillId}`, returnToParam)
+    : `/tutor/drills/create?drillId=${drillId}`;
   const viewHref = returnToParam
     ? appendReturnTo(`/tutor/drills/${drillId}`, returnToParam)
     : `/tutor/drills/${drillId}`;

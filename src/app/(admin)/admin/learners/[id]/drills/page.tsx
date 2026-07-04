@@ -23,11 +23,13 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useEffect } from 'react';
+import { appendReturnTo } from '@/lib/drill-list-filters';
 
 export default function StudentDrillsPage() {
   const params = useParams();
   const router = useRouter();
   const studentId = params.id as string;
+  const returnTo = `/admin/learners/${studentId}/drills`;
 
   // Use React Query hooks
   const { data: student, isLoading: studentLoading, error: studentError } = useLearnerById(studentId);
@@ -206,7 +208,10 @@ export default function StudentDrillsPage() {
                   return (
                     <Link
                       key={assignment._id}
-                      href={`/admin/drills/${drill._id || assignment.drillId}`}
+                      href={appendReturnTo(
+                        `/admin/drills/${drill._id || assignment.drillId}`,
+                        returnTo,
+                      )}
                       className="block"
                     >
                       <div className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">

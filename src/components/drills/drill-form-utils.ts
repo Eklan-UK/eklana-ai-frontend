@@ -2,8 +2,6 @@ import { toast } from "sonner";
 import type { ParsedContent } from "@/services/document-parser.service";
 import {
   isValidPartTopicPair,
-  getPartLabel,
-  getTopicById,
 } from "@/domain/learning-journey/learning-journey.catalog";
 import { normalizeFillBlankItems, validateFillBlankItems } from "@/utils/drill";
 import type { DrillDraft } from "@/components/drills/drill-draft.types";
@@ -453,15 +451,22 @@ export function getMissingCompletionDateLabels(drafts: DrillDraft[]): string[] {
     .map((d) => getDrillTypeLabel(d.drillType));
 }
 
+// One drill+assignment is created per selected student, so a draft with multiple
+// selected students must expand into multiple payload entries here — otherwise
+// only the first selected student (`selectedUsers[0]`) would ever get assigned.
 export function buildBulkAssignPayload(drafts: DrillDraft[]) {
-  return drafts.map((draft) => ({
-    drillType: draft.drillType,
-    title: draft.drillTitle.trim() || undefined,
-    content: buildBulkContentFromDraft(draft),
-    studentId: draft.selectedUsers[0],
-    completionDate: draft.completionDate,
-    difficulty: draft.difficulty.toLowerCase(),
-    topic: getTopicById(draft.journeyTopic)?.title ?? "",
-    part: draft.journeyPart ? getPartLabel(draft.journeyPart) : undefined,
-  }));
+  return drafts.flatMap((draft) => {
+    const content = buildBulkContentFromDraft(draft);
+
+    return draft.selectedUsers.map((studentId) => ({
+      drillType: draft.drillType,
+      title: draft.drillTitle.trim() || undefined,
+      content,
+      studentId,
+      completionDate: draft.completionDate,
+      difficulty: draft.difficulty.toLowerCase(),
+      topic: draft.journeyTopic || undefined,
+      part: draft.journeyPart ?? undefined,
+    }));
+  });
 }
