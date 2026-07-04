@@ -71,6 +71,9 @@ async function handler(
         topic: drill?.learning_journey_topic ?? null,
         part: drill?.learning_journey_part ?? null,
         status: (assignment as any).status,
+        // A drill saved with `is_active: false` still needs a tutor/admin to
+        // select users and update/assign it before learners can act on it.
+        isActive: drill?.is_active ?? true,
         assignedAt: (assignment as any).assignedAt,
         dueDate: (assignment as any).dueDate ?? null,
         completedAt: (assignment as any).completedAt ?? null,

@@ -52,8 +52,11 @@ export async function getUserProgress(): Promise<UserProgress> {
       return getDefaultProgress();
     }
 
+    // Progress must be computed from the learner's FULL assignment history, not
+    // a recent-window page — otherwise counts silently drift once a learner
+    // passes 100 total assignments. See assignment.repository.ts.
     const { drills: allRows } = await getLearnerMyDrillsPayload(userId, {
-      limit: 100,
+      limit: 1000,
       offset: 0,
     });
     const drills = allRows.filter(

@@ -9,6 +9,7 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
+  Edit,
   FileCheck,
   Loader2,
   Mail,
@@ -19,6 +20,7 @@ import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
+import { appendReturnTo } from "@/lib/drill-list-filters";
 
 interface Student {
   id: string;
@@ -55,7 +57,15 @@ interface DrillData {
 }
 
 // Drill card component
-function DrillCard({ drill, showReviewButton }: { drill: DrillData; showReviewButton?: boolean }) {
+function DrillCard({
+  drill,
+  showReviewButton,
+  returnTo,
+}: {
+  drill: DrillData;
+  showReviewButton?: boolean;
+  returnTo?: string;
+}) {
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
@@ -118,13 +128,29 @@ function DrillCard({ drill, showReviewButton }: { drill: DrillData; showReviewBu
             )}
           </div>
         </div>
-        {showReviewButton && drill.drillId && (
-          <Link href={`/tutor/drills/${drill.drillId}/review?assignmentId=${drill.id}`}>
-            <Button variant="outline" size="sm">
-              <FileCheck className="w-4 h-4 mr-1" />
-              Review
-            </Button>
-          </Link>
+        {drill.drillId && (
+          <div className="flex items-center gap-2 shrink-0">
+            {showReviewButton && (
+              <Link href={`/tutor/drills/${drill.drillId}/review?assignmentId=${drill.id}`}>
+                <Button variant="outline" size="sm">
+                  <FileCheck className="w-4 h-4 mr-1" />
+                  Review
+                </Button>
+              </Link>
+            )}
+            <Link
+              href={
+                returnTo
+                  ? appendReturnTo(`/tutor/drills/${drill.drillId}`, returnTo)
+                  : `/tutor/drills/${drill.drillId}`
+              }
+            >
+              <Button variant="outline" size="sm">
+                <Edit className="w-4 h-4 mr-1" />
+                View / Edit
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
     </Card>
@@ -134,6 +160,7 @@ function DrillCard({ drill, showReviewButton }: { drill: DrillData; showReviewBu
 export default function StudentDetailPage() {
   const params = useParams();
   const studentId = params.id as string;
+  const drillReturnTo = `/tutor/students/${studentId}`;
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -403,7 +430,7 @@ export default function StudentDetailPage() {
             </h2>
             <div className="space-y-3">
               {student.assignedDrills.map((drill) => (
-                <DrillCard key={drill.id} drill={drill} />
+                <DrillCard key={drill.id} drill={drill} returnTo={drillReturnTo} />
               ))}
             </div>
           </div>
@@ -418,7 +445,12 @@ export default function StudentDetailPage() {
             </h2>
             <div className="space-y-3">
               {student.submittedDrills.map((drill) => (
-                <DrillCard key={drill.id} drill={drill} showReviewButton />
+                <DrillCard
+                  key={drill.id}
+                  drill={drill}
+                  showReviewButton
+                  returnTo={drillReturnTo}
+                />
               ))}
             </div>
           </div>
@@ -433,7 +465,7 @@ export default function StudentDetailPage() {
             </h2>
             <div className="space-y-3">
               {student.reviewedDrills.slice(0, 5).map((drill) => (
-                <DrillCard key={drill.id} drill={drill} />
+                <DrillCard key={drill.id} drill={drill} returnTo={drillReturnTo} />
               ))}
               {student.reviewedDrills.length > 5 && (
                 <p className="text-sm text-gray-500 text-center py-2">

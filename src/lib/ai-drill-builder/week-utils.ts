@@ -71,6 +71,12 @@ export interface WeekDrillItem {
   topic?: string | null;
   part?: string | null;
   status?: string;
+  /**
+   * Whether the underlying drill is active. `false` means the drill was
+   * saved (e.g. via "Save Drill") but still needs a tutor/admin to select
+   * users and update/assign it.
+   */
+  isActive?: boolean;
   assignedAt?: string;
   dueDate?: string | null;
   completedAt?: string | null;
