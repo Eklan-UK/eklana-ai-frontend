@@ -25,6 +25,44 @@ interface BulkDrillInput {
   // journeyFieldsSchema before ever being written to a Drill document.
   topic?: unknown;
   part?: unknown;
+  mission?: unknown;
+}
+
+// Builds a map from character name to its normalized speaker key
+function buildSpeakerKeyMap(
+  studentCharacterName: string,
+  aiCharacterNames: string[]
+): Record<string, string> {
+  const map: Record<string, string> = { [studentCharacterName]: "student" };
+  aiCharacterNames.forEach((name, index) => {
+    map[name] = `ai_${index}`;
+  });
+  return map;
+}
+
+// Replaces each dialogue turn's speaker with its normalized key (student/ai_0/ai_1/...)
+function normalizeRoleplayScenes(
+  scenes: any[],
+  studentCharacterName: string,
+  aiCharacterNames: string[]
+): any[] {
+  const speakerKeyMap = buildSpeakerKeyMap(studentCharacterName, aiCharacterNames);
+
+  return scenes.map((scene) => ({
+    ...scene,
+    dialogue: (scene.dialogue ?? []).map((turn: any) => {
+      const normalizedSpeaker = speakerKeyMap[turn.speaker];
+      if (normalizedSpeaker === undefined) {
+        logger.warn("Roleplay dialogue speaker not found in character map", {
+          speaker: turn.speaker,
+          studentCharacterName,
+          aiCharacterNames,
+        });
+        return turn;
+      }
+      return { ...turn, speaker: normalizedSpeaker };
+    }),
+  }));
 }
 
 // Mirrors the validation the manual create route (`/api/v1/drills`) applies to
@@ -47,13 +85,20 @@ function mapContentFields(drillType: string, content: Record<string, any>): Reco
       return { target_sentences: content.target_sentences ?? [] };
     case "pronunciation":
       return { pronunciation_items: content.pronunciation_items ?? [] };
-    case "roleplay":
+    case "roleplay": {
+      const studentCharacterName = content.student_character_name ?? "Student";
+      const aiCharacterNames = content.ai_character_names ?? [];
       return {
-        roleplay_scenes: content.roleplay_scenes ?? [],
-        student_character_name: content.student_character_name ?? "Student",
-        ai_character_names: content.ai_character_names ?? [],
+        roleplay_scenes: normalizeRoleplayScenes(
+          content.roleplay_scenes ?? [],
+          studentCharacterName,
+          aiCharacterNames
+        ),
+        student_character_name: studentCharacterName,
+        ai_character_names: aiCharacterNames,
         drill_intro: content.drill_intro ?? "",
       };
+    }
     case "matching":
       return { matching_pairs: content.matching_pairs ?? [] };
     case "definition":
@@ -104,7 +149,8 @@ async function handler(
     const results = await Promise.all(
       drills.map(async (item) => {
         try {
-          const { drillType, title, content, studentId, completionDate, difficulty, topic, part } = item;
+          const { drillType, title, content, studentId, completionDate, difficulty, topic, part, mission } = item;
+          const rawPart = part ?? mission;
 
           if (!drillType || !content || !studentId || !completionDate || !difficulty) {
             throw new Error(
@@ -122,7 +168,7 @@ async function handler(
           }
 
           const journeyValidation = journeyFieldsSchema.safeParse({
-            learning_journey_part: part,
+            learning_journey_part: rawPart,
             learning_journey_topic: topic,
           });
           if (!journeyValidation.success) {
@@ -142,7 +188,7 @@ async function handler(
             date: dueDate,
             duration_days: 1,
             assigned_to: [studentId],
-            context: "",
+            context: content.context ?? "",
             is_active: true,
             created_by: (creator as any).email,
             createdById: context.userId,

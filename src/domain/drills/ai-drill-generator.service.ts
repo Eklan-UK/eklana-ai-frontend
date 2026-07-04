@@ -87,7 +87,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_roleplay',
-      description: 'Generate roleplay drill content',
+      description: 'Generate roleplay drill content. Every character that speaks in the dialogue must be listed in ai_character_names. No character should appear as a speaker in the dialogue unless they are declared in student_character_name or ai_character_names.',
       parameters: {
         type: 'object',
         properties: {
@@ -97,6 +97,7 @@ const tools: Record<DrillType, FunctionTool> = {
             items: { type: 'string' },
           },
           drill_intro: { type: 'string' },
+          context: { type: 'string' },
           roleplay_scenes: {
             type: 'array',
             items: {
@@ -120,7 +121,7 @@ const tools: Record<DrillType, FunctionTool> = {
             },
           },
         },
-        required: ['student_character_name', 'ai_character_names', 'drill_intro', 'roleplay_scenes'],
+        required: ['student_character_name', 'ai_character_names', 'drill_intro', 'context', 'roleplay_scenes'],
       },
     },
   },
