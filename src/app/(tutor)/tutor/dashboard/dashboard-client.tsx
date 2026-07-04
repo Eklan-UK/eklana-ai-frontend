@@ -20,7 +20,7 @@ export function TutorDashboardClient({ recentDrills, recentStudents }: TutorDash
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">Recent Drills</h2>
           <Link
-            href="/tutor/drills"
+            href="/tutor/drills/all"
             className="text-sm text-green-600 flex items-center gap-1"
           >
             View All

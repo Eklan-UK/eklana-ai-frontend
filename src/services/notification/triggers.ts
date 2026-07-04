@@ -5,16 +5,13 @@
 
 // FCM-based notification imports
 import {
-  sendNotificationToUser,
   sendNotificationToUsers,
   NotificationType,
 } from "@/lib/fcm-trigger";
 import { connectToDatabase } from "@/lib/api/db";
 import FCMToken from "@/models/fcm-token";
-import User from "@/models/user";
 import { StreakService } from "@/services/streak.service";
-import { sendNotification } from "@/services/notification";
-import { PushToken } from "@/models/push-token.model";
+import { sendUnifiedWithFcmFallback } from "@/services/notification/delivery";
 
 /**
  * Trigger when a drill is assigned to a student
@@ -183,52 +180,24 @@ export async function onDrillPracticeReminder(
 
     const notifData = { screen: "MyPlan", url: "/account/drills" };
 
-    // Step 1: unified path (Expo + modern Web Push + in-app list)
-    const unifiedResult = await sendNotification({
+    const delivery = await sendUnifiedWithFcmFallback({
       userId: studentId,
       title,
       body,
       type: "drill_reminder",
       data: notifData,
+      fcmType: NotificationType.DRILL_REMINDER,
+      fcmData: notifData,
+      actionUrl: "/account/drills",
     });
 
-    // Step 2: FCM fallback only when user has no modern web push token
-    const hasModernWebToken = await PushToken.exists({
-      userId: studentId,
-      platform: "web",
-      isActive: true,
-    });
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
 
-    let fcmResult = null;
-    if (!hasModernWebToken) {
-      const fcmTokens = await FCMToken.find({
-        userId: studentId,
-        isActive: true,
-      })
-        .select("token")
-        .lean()
-        .exec();
-
-      if (fcmTokens.length > 0) {
-        fcmResult = await sendNotificationToUsers(
-          [studentId],
-          fcmTokens.map((t) => t.token),
-          {
-            title,
-            body,
-            type: NotificationType.DRILL_REMINDER,
-            data: notifData,
-          },
-        );
-      }
-    }
-
-    const anySent = unifiedResult.totalSent > 0 || fcmResult !== null;
-    const result = anySent ? { unified: unifiedResult, fcm: fcmResult } : null;
-
-    if (!result) {
+    if (!delivery.pushDelivered) {
       console.warn(
-        "[Notification Trigger] No push delivery for student:",
+        "[Notification Trigger] No push delivery for student (in-app may still exist):",
         studentId,
       );
     }
@@ -559,54 +528,152 @@ export async function onStreakReminder(studentId: string, streakDays: number) {
     const body = `You have a ${resolvedStreakDays}-day streak. Complete a drill today to keep it going!`;
     const notifData = { screen: "Home", url: "/account" };
 
-    // Step 1: Always fire unified path (Expo mobile + modern Web Push)
-    const unifiedResult = await sendNotification({
+    const delivery = await sendUnifiedWithFcmFallback({
       userId: studentId,
       title,
       body,
       type: "drill_reminder",
       data: notifData,
+      fcmType: NotificationType.LESSON_REMINDER,
+      fcmData: notifData,
+      actionUrl: "/account",
     });
 
-    // Step 2: Lightweight check for a modern web push token
-    const hasModernWebToken = await PushToken.exists({
-      userId: studentId,
-      platform: "web",
-      isActive: true,
-    });
-
-    // Step 3: FCM fallback only when user has no modern web token
-    let fcmResult = null;
-    if (!hasModernWebToken) {
-      const fcmTokens = await FCMToken.find({
-        userId: studentId,
-        isActive: true,
-      })
-        .select("token")
-        .lean()
-        .exec();
-
-      if (fcmTokens.length > 0) {
-        fcmResult = await sendNotificationToUsers(
-          [studentId],
-          fcmTokens.map((t) => t.token),
-          {
-            title,
-            body,
-            type: NotificationType.LESSON_REMINDER,
-            data: { screen: "Home", url: "/account" },
-          },
-        );
-      }
-    }
-
-    const anySent = unifiedResult.totalSent > 0 || fcmResult !== null;
-    const result = anySent ? { unified: unifiedResult, fcm: fcmResult } : null;
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
 
     console.log("[Notification Trigger] onStreakReminder result:", result);
     return result;
   } catch (error) {
     console.error("[Notification Trigger] onStreakReminder error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Class session reminder — in-app + push alongside email cron.
+ *
+ * Mobile payload contract:
+ *   data.screen = 'Classes'
+ *   data.resourceId = sessionId
+ *   data.url = '/account/classes'
+ */
+export async function onClassSessionReminder(
+  studentId: string,
+  params: {
+    sessionId: string;
+    seriesTitle: string;
+    minutesBefore: number;
+    joinUrl?: string;
+  },
+) {
+  const { sessionId, seriesTitle, minutesBefore } = params;
+  const title =
+    minutesBefore === 60
+      ? 'Class starts in 1 hour'
+      : `Class starts in ${minutesBefore} minute${minutesBefore === 1 ? '' : 's'}`;
+  const body = `${seriesTitle} — tap to open your schedule.`;
+  const notifData = {
+    screen: 'Classes',
+    resourceId: sessionId,
+    url: '/account/classes',
+  };
+
+  console.log('[Notification Trigger] onClassSessionReminder called:', {
+    studentId,
+    sessionId,
+    minutesBefore,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const delivery = await sendUnifiedWithFcmFallback({
+      userId: studentId,
+      title,
+      body,
+      type: 'class_session_reminder',
+      data: notifData,
+      fcmType: NotificationType.CLASS_SESSION_REMINDER,
+      fcmData: {
+        screen: 'Classes',
+        resourceId: sessionId,
+        url: '/account/classes',
+        sessionId,
+        reminderKind: String(minutesBefore),
+      },
+      actionUrl: '/account/classes',
+    });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    console.log('[Notification Trigger] onClassSessionReminder result:', result);
+    return result;
+  } catch (error) {
+    console.error('[Notification Trigger] onClassSessionReminder error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Post-class NPS form — in-app + push alongside email cron.
+ *
+ * Mobile payload contract:
+ *   data.screen = 'NpsForm'
+ *   data.url = formUrl (web deep link)
+ */
+export async function onClassNpsForm(
+  studentId: string,
+  params: {
+    formUrl: string;
+    classTitle: string;
+    sessionId?: string;
+  },
+) {
+  const { formUrl, classTitle, sessionId } = params;
+  const title = 'How was your class?';
+  const body = `Share your feedback on "${classTitle}".`;
+  const notifData = {
+    screen: 'NpsForm',
+    url: formUrl,
+    ...(sessionId ? { resourceId: sessionId } : {}),
+  };
+
+  console.log('[Notification Trigger] onClassNpsForm called:', {
+    studentId,
+    sessionId,
+    formUrl,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const delivery = await sendUnifiedWithFcmFallback({
+      userId: studentId,
+      title,
+      body,
+      type: 'class_nps_form',
+      data: notifData,
+      fcmType: NotificationType.CLASS_NPS_FORM,
+      fcmData: {
+        screen: 'NpsForm',
+        url: formUrl,
+        ...(sessionId ? { sessionId, resourceId: sessionId } : {}),
+      },
+      actionUrl: formUrl,
+    });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    console.log('[Notification Trigger] onClassNpsForm result:', result);
+    return result;
+  } catch (error) {
+    console.error('[Notification Trigger] onClassNpsForm error:', error);
     throw error;
   }
 }

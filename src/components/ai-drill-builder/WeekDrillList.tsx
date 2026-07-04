@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { WeekDrillItem } from "@/lib/ai-user-builder/week-utils";
+import type { WeekDrillItem } from "@/lib/ai-drill-builder/week-utils";
 
 const STATUS_STYLES: Record<string, string> = {
   completed: "bg-green-50 text-green-700 border-green-200",

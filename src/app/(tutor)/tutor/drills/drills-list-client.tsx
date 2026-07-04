@@ -23,7 +23,7 @@ interface DrillsListClientProps {
   initialDrills: any[];
 }
 
-const TUTOR_DRILL_LIST_PATH = "/tutor/drills";
+const TUTOR_DRILL_LIST_PATH = "/tutor/drills/all";
 
 function DrillsListClientContent({ initialDrills }: DrillsListClientProps) {
   const router = useRouter();

@@ -1,4 +1,4 @@
-import FCMToken from '@/models/fcm-token';
+import User from '@/models/user';
 import DrillAssignment from '@/models/drill-assignment';
 import Profile from '@/models/profile';
 import UserStreak from '@/models/user-streak';
@@ -19,7 +19,7 @@ export type SendForLearnerResult = {
 
 export class DrillReminderService {
   /**
-   * Send a daily practice reminder to every learner who has active FCM tokens.
+   * Send a daily practice reminder to every active student learner.
    *
    * Two messages:
    *  - pending drills exist  → "Time to practise" with count
@@ -38,19 +38,22 @@ export class DrillReminderService {
     let skipped = 0;
     const errors: string[] = [];
 
-    // Collect unique learner IDs that have at least one active FCM token
-    const learnerIds = (await FCMToken.distinct('userId', { isActive: true })).map((id) =>
-      String(id),
-    );
+    const learners = await User.find({
+      role: { $in: ['user', 'learner'] },
+      isDeleted: { $ne: true },
+    })
+      .select('_id')
+      .lean();
+
+    const learnerIds = learners.map((u) => String(u._id));
 
     logger.info('[DrillReminderService] runDailyReminders start', {
-      learnersWithTokens: learnerIds.length,
+      activeLearners: learnerIds.length,
     });
 
     for (const learnerId of learnerIds) {
       examined += 1;
       try {
-        // Respect notification preference
         const profile = await Profile.findOne({ userId: learnerId })
           .select('notificationPreferences')
           .lean();
@@ -60,13 +63,11 @@ export class DrillReminderService {
           continue;
         }
 
-        // Count incomplete drills
         const pendingCount = await DrillAssignment.countDocuments({
           learnerId,
           status: { $in: ['pending', 'in-progress'] },
         });
 
-        // Get current streak (falls back to 0 on error or disabled)
         let streakDays = 0;
         try {
           const streakData = await StreakService.getStreakData(learnerId);
@@ -86,8 +87,8 @@ export class DrillReminderService {
         } else {
           skipped += 1;
         }
-      } catch (err: any) {
-        const msg = err?.message ?? String(err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${learnerId}: ${msg}`);
         logger.error('[DrillReminderService] error for learner', { learnerId, error: msg });
       }
@@ -149,7 +150,6 @@ export class DrillReminderService {
       examined += 1;
 
       try {
-        // Respect notification preference
         const profile = await Profile.findOne({ userId: learnerId })
           .select('notificationPreferences')
           .lean();
@@ -178,8 +178,8 @@ export class DrillReminderService {
         } else {
           skipped += 1;
         }
-      } catch (err: any) {
-        const msg = err?.message ?? String(err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${learnerId}: ${msg}`);
         logger.error('[DrillReminderService] runRollingReminders error for learner', {
           learnerId,
@@ -241,7 +241,7 @@ export class DrillReminderService {
         return {
           sent: false,
           skipped: true,
-          reason: 'no_push_tokens',
+          reason: 'delivery_failed',
           pendingCount,
           streakDays,
         };
@@ -274,7 +274,7 @@ export class DrillReminderService {
       return {
         sent: false,
         skipped: true,
-        reason: 'no_push_tokens',
+        reason: 'delivery_failed',
         streakDays,
       };
     }

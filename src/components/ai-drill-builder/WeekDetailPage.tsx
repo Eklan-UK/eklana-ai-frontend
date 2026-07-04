@@ -4,23 +4,20 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { WeekDrillList } from "@/components/ai-user-builder/WeekDrillList";
+import { WeekDrillList } from "@/components/ai-drill-builder/WeekDrillList";
 import { AIGeneratedPreview } from "@/components/drills/AIGeneratedPreview";
 import { AIDrillCreationShell } from "@/components/drills/AIDrillCreationShell";
-import {
-  useAIDrillCreationWorkflow,
-  storePendingAiDrillApply,
-} from "@/hooks/useAIDrillCreationWorkflow";
+import { useAIDrillCreationWorkflow } from "@/hooks/useAIDrillCreationWorkflow";
 import { useStudentContext } from "@/hooks/useStudentContext";
 import { useStudentWeeks } from "@/hooks/useStudentWeeks";
 import { useTutorStudents } from "@/hooks/useTutor";
-import { useAiUserBuilderLearners } from "@/hooks/useAiUserBuilderLearners";
-import { formatWeekDateRange } from "@/lib/ai-user-builder/week-utils";
+import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
+import { formatWeekDateRange } from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
   getLearnerId,
-} from "@/lib/ai-user-builder/learner-utils";
-import { LearnerAvatar } from "@/components/ai-user-builder/LearnerAvatar";
+} from "@/lib/ai-drill-builder/learner-utils";
+import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 import type { AiStudentOption } from "@/components/drills/AIGenerationForm";
 
 interface WeekDetailPageProps {
@@ -36,7 +33,7 @@ export function WeekDetailPage({
 }: WeekDetailPageProps) {
   const router = useRouter();
   const basePath =
-    variant === "tutor" ? "/tutor/ai-user-builder" : "/admin/ai-user-builder";
+    variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
   const builderPath =
     variant === "tutor" ? "/tutor/drills/create" : "/admin/drills/create";
   const drillDetailBasePath =
@@ -51,7 +48,7 @@ export function WeekDetailPage({
     { enabled: variant === "tutor" },
   );
   const { data: adminData, isLoading: adminStudentsLoading } =
-    useAiUserBuilderLearners(variant === "admin");
+    useAiDrillBuilderLearners(variant === "admin");
 
   const loadingStudents =
     variant === "tutor" ? tutorStudentsLoading : adminStudentsLoading;
@@ -130,19 +127,21 @@ export function WeekDetailPage({
 
   const lockedStudentIds = useMemo(() => [studentId], [studentId]);
 
+  const navigateToBuilder = () => {
+    const params = new URLSearchParams({
+      student: studentId,
+      week: String(weekNumber),
+      returnTo,
+    });
+    router.push(`${builderPath}?${params.toString()}`);
+  };
+
   const aiWorkflow = useAIDrillCreationWorkflow({
     students: aiStudentOptions,
     initialContext,
     lockedStudentIds,
-    onApplyParsedContent: () => {},
-    onNavigateToBuilder: (pending) => {
-      storePendingAiDrillApply(pending);
-      const params = new URLSearchParams({
-        student: studentId,
-        week: String(weekNumber),
-        returnTo,
-      });
-      router.push(`${builderPath}?${params.toString()}`);
+    onBulkReady: () => {
+      navigateToBuilder();
     },
   });
 
@@ -177,13 +176,14 @@ export function WeekDetailPage({
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-6">
-          {aiWorkflow.showAiPreview && aiWorkflow.aiGeneratedContent && (
-            <AIGeneratedPreview
-              drillType={aiWorkflow.aiDrillType}
-              content={aiWorkflow.aiGeneratedContent}
-              onUseDrill={aiWorkflow.handleUseAiDrill}
-            />
-          )}
+          {aiWorkflow.showAiPreview &&
+            aiWorkflow.aiGeneratedResults &&
+            aiWorkflow.aiGeneratedResults.length > 0 && (
+              <AIGeneratedPreview
+                results={aiWorkflow.aiGeneratedResults}
+                onUseDrills={aiWorkflow.handleUseTheseDrills}
+              />
+            )}
 
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -195,13 +195,22 @@ export function WeekDetailPage({
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => aiWorkflow.setShowAiFormModal(true)}
-            className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-            Create Drill
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={() => aiWorkflow.setShowAiFormModal(true)}
+              className="flex-1 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Create Drill
+            </button>
+            <button
+              type="button"
+              onClick={navigateToBuilder}
+              className="flex-1 py-3 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Create Drill Manually
+            </button>
+          </div>
         </div>
       </div>
 
@@ -211,18 +220,18 @@ export function WeekDetailPage({
         aiFormValues={aiWorkflow.aiFormValues}
         handleAiFormChange={aiWorkflow.handleAiFormChange}
         setAiStudentIds={aiWorkflow.setAiStudentIds}
+        setAiDrillTypes={aiWorkflow.setAiDrillTypes}
         students={aiWorkflow.students}
         loadingStudents={loadingStudents}
         isGeneratingDrill={aiWorkflow.isGeneratingDrill}
         handleAIGenerate={aiWorkflow.handleAIGenerate}
         lockedStudentIds={aiWorkflow.lockedStudentIds}
         showAiPreview={false}
-        aiDrillType={aiWorkflow.aiDrillType}
-        aiGeneratedContent={aiWorkflow.aiGeneratedContent}
-        handleUseAiDrill={aiWorkflow.handleUseAiDrill}
+        aiGeneratedResults={aiWorkflow.aiGeneratedResults}
+        handleUseTheseDrills={aiWorkflow.handleUseTheseDrills}
         showChatSidebar={aiWorkflow.showChatSidebar}
         setShowChatSidebar={aiWorkflow.setShowChatSidebar}
-        setAiGeneratedContent={aiWorkflow.setAiGeneratedContent}
+        updateAiGeneratedResult={aiWorkflow.updateAiGeneratedResult}
         setShowAiPreview={aiWorkflow.setShowAiPreview}
       />
     </div>

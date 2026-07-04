@@ -6,6 +6,7 @@ import NpsForm, { NPS_FORM_SINGLETON_KEY } from '@/models/nps-form';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { sendNpsFormEmail } from '@/lib/api/email.service';
+import { onClassNpsForm } from '@/services/notification/triggers';
 
 /** Look back this far for sessions that just ended (cron runs every minute). */
 const TOLERANCE_MS = 2 * 60 * 1000;
@@ -26,7 +27,7 @@ export class ClassNpsService {
   /**
    * Called every minute by the cron route.
    * Finds sessions that ended within the last 2 minutes for NPS-enabled series,
-   * emails present/late attendees once per session (deduped via SessionNpsDispatch).
+   * emails present/late attendees + in-app/push once per session (deduped via SessionNpsDispatch).
    */
   async runDueNpsEmails(
     now: Date = new Date(),
@@ -107,6 +108,7 @@ export class ClassNpsService {
 
       const seriesTitle = series.title?.trim() || 'Your class';
       let emailsSentForSession = 0;
+      let anyChannelSucceeded = false;
 
       if (attendances.length === 0) {
         if (includeDebug) {
@@ -120,33 +122,56 @@ export class ClassNpsService {
       }
 
       for (const att of attendances) {
+        const learnerId = att.learnerId.toString();
         const learner = await User.findById(att.learnerId)
           .select('email firstName lastName name')
           .lean();
-        if (!learner?.email) {
-          errors.push(`${session._id}/${att.learnerId}/email: learner has no email`);
-          continue;
-        }
 
         const name =
           `${(learner as { firstName?: string }).firstName ?? ''} ${(learner as { lastName?: string }).lastName ?? ''}`.trim() ||
           (learner as { name?: string }).name ||
           'Student';
 
+        if (learner?.email) {
+          try {
+            await sendNpsFormEmail({
+              studentEmail: learner.email as string,
+              studentName: name,
+              classTitle: seriesTitle,
+              formName: npsForm.name,
+              formUrl: npsForm.url,
+            });
+            sent += 1;
+            emailsSentForSession += 1;
+            anyChannelSucceeded = true;
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            errors.push(`${session._id}/${att.learnerId}/email: ${msg}`);
+            logger.warn('NPS form email failed', {
+              sessionId: session._id,
+              learnerId: att.learnerId,
+              msg,
+            });
+          }
+        } else {
+          errors.push(`${session._id}/${att.learnerId}/email: learner has no email`);
+        }
+
         try {
-          await sendNpsFormEmail({
-            studentEmail: learner.email as string,
-            studentName: name,
-            classTitle: seriesTitle,
-            formName: npsForm.name,
+          const pushResult = await onClassNpsForm(learnerId, {
             formUrl: npsForm.url,
+            classTitle: seriesTitle,
+            sessionId: session._id.toString(),
           });
-          sent += 1;
-          emailsSentForSession += 1;
+
+          if (pushResult) {
+            sent += 1;
+            anyChannelSucceeded = true;
+          }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`${session._id}/${att.learnerId}/email: ${msg}`);
-          logger.warn('NPS form email failed', {
+          errors.push(`${session._id}/${att.learnerId}/push: ${msg}`);
+          logger.warn('NPS form push failed', {
             sessionId: session._id,
             learnerId: att.learnerId,
             msg,
@@ -163,15 +188,17 @@ export class ClassNpsService {
         });
       }
 
-      try {
-        await SessionNpsDispatch.create({
-          sessionId: session._id,
-          sentAt: new Date(),
-        });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes('duplicate key') && !msg.includes('E11000')) {
-          logger.warn('SessionNpsDispatch.create failed', { msg });
+      if (anyChannelSucceeded) {
+        try {
+          await SessionNpsDispatch.create({
+            sessionId: session._id,
+            sentAt: new Date(),
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!msg.includes('duplicate key') && !msg.includes('E11000')) {
+            logger.warn('SessionNpsDispatch.create failed', { msg });
+          }
         }
       }
     }

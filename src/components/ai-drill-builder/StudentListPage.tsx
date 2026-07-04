@@ -6,13 +6,13 @@ import { Search, ChevronRight, Mail, Loader2, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useTutorStudents } from "@/hooks/useTutor";
-import { useAiUserBuilderLearners } from "@/hooks/useAiUserBuilderLearners";
-import { computeCurrentWeek } from "@/lib/ai-user-builder/week-utils";
+import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
+import { computeCurrentWeek } from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
   getLearnerId,
-} from "@/lib/ai-user-builder/learner-utils";
-import { LearnerAvatar } from "@/components/ai-user-builder/LearnerAvatar";
+} from "@/lib/ai-drill-builder/learner-utils";
+import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 
 interface StudentListPageProps {
   variant: "tutor" | "admin";
@@ -31,7 +31,7 @@ interface StudentCard {
 export function StudentListPage({ variant }: StudentListPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const basePath =
-    variant === "tutor" ? "/tutor/ai-user-builder" : "/admin/ai-user-builder";
+    variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
 
   const { data: tutorData, isLoading: tutorLoading } = useTutorStudents(
     { limit: 1000 },
@@ -43,7 +43,7 @@ export function StudentListPage({ variant }: StudentListPageProps) {
     isError: adminError,
     error: adminErrorDetail,
     refetch: refetchAdminLearners,
-  } = useAiUserBuilderLearners(variant === "admin");
+  } = useAiDrillBuilderLearners(variant === "admin");
 
   const isLoading = variant === "tutor" ? tutorLoading : adminLoading;
   const isTutor = variant === "tutor";

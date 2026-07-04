@@ -1,43 +1,70 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X, Send, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { AI_DRILL_TYPES } from "@/constants/ai-drill";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
+export interface AIChatSidebarResult {
+  drillType: string;
+  content: Record<string, unknown>;
+}
+
 interface AIChatSidebarProps {
   open: boolean;
   onClose: () => void;
-  drillType: string;
-  currentDrill: Record<string, unknown>;
-  onDrillUpdated: (updated: Record<string, unknown>) => void;
+  results: AIChatSidebarResult[];
+  onDrillUpdated: (drillType: string, updated: Record<string, unknown>) => void;
+}
+
+function getDrillTypeLabel(drillType: string): string {
+  return AI_DRILL_TYPES.find((t) => t.value === drillType)?.label ?? drillType;
 }
 
 export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
   open,
   onClose,
-  drillType,
-  currentDrill,
+  results,
   onDrillUpdated,
 }) => {
+  const [selectedDrillType, setSelectedDrillType] = useState<string>(
+    results[0]?.drillType ?? "",
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [latestDrill, setLatestDrill] = useState<Record<string, unknown>>(currentDrill);
   const [isMinimised, setIsMinimised] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (results.length === 0) {
+      setSelectedDrillType("");
+      return;
+    }
+    if (!results.some((r) => r.drillType === selectedDrillType)) {
+      setSelectedDrillType(results[0].drillType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results]);
+
+  useEffect(() => {
+    setMessages([]);
+  }, [selectedDrillType]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const currentResult = results.find((r) => r.drillType === selectedDrillType);
+
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sending || !currentResult) return;
 
     const userMessage: ChatMessage = { role: "user", content: trimmed };
     const nextMessages = [...messages, userMessage];
@@ -51,8 +78,8 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          drillType,
-          currentDrill: latestDrill,
+          drillType: currentResult.drillType,
+          currentDrill: currentResult.content,
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -72,26 +99,25 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
       }
 
       const json = await res.json();
-      console.log("ai-chat raw response:", json);
       const updatedDrill = json.data?.drill ?? null;
       const assistantText =
         json.data?.message ??
         json.message ??
         "Drill content updated.";
 
-      if (
-        updatedDrill &&
-        typeof updatedDrill === "object" &&
-        Object.keys(updatedDrill).some((k) => (updatedDrill as Record<string, unknown>)[k] !== null && (updatedDrill as Record<string, unknown>)[k] !== undefined && (updatedDrill as Record<string, unknown>)[k] !== "")
-      ) {
-        setLatestDrill(updatedDrill as Record<string, unknown>);
-        onDrillUpdated(updatedDrill as Record<string, unknown>);
-      }
-
       const drillWasUpdated =
         updatedDrill &&
         typeof updatedDrill === "object" &&
-        Object.keys(updatedDrill).some((k) => (updatedDrill as Record<string, unknown>)[k] !== null && (updatedDrill as Record<string, unknown>)[k] !== undefined && (updatedDrill as Record<string, unknown>)[k] !== "");
+        Object.keys(updatedDrill).some(
+          (k) =>
+            (updatedDrill as Record<string, unknown>)[k] !== null &&
+            (updatedDrill as Record<string, unknown>)[k] !== undefined &&
+            (updatedDrill as Record<string, unknown>)[k] !== "",
+        );
+
+      if (drillWasUpdated) {
+        onDrillUpdated(currentResult.drillType, updatedDrill as Record<string, unknown>);
+      }
 
       setMessages([
         ...nextMessages,
@@ -155,11 +181,30 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
 
         {!isMinimised && (
         <>
+        {results.length > 1 && (
+          <div className="px-5 py-3 border-b border-gray-100">
+            <label className="block text-xs font-bold text-gray-600 mb-1.5">
+              Drill type to refine
+            </label>
+            <select
+              value={selectedDrillType}
+              onChange={(e) => setSelectedDrillType(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              {results.map((r) => (
+                <option key={r.drillType} value={r.drillType}>
+                  {getDrillTypeLabel(r.drillType)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {messages.length === 0 && !sending ? (
             <p className="text-sm text-gray-500 text-center py-8">
-              Ask AI to refine the generated drill content. For example: &quot;Make
-              Scene 2 more clinical&quot;
+              Ask AI to refine the generated{" "}
+              {currentResult ? getDrillTypeLabel(currentResult.drillType) : "drill"}{" "}
+              content. For example: &quot;Make Scene 2 more clinical&quot;
             </p>
           ) : (
             messages.map((msg, i) => (
@@ -203,13 +248,13 @@ export const AIChatSidebar: React.FC<AIChatSidebarProps> = ({
               onKeyDown={handleKeyDown}
               rows={2}
               placeholder="Describe changes…"
-              disabled={sending}
+              disabled={sending || !currentResult}
               className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={sending || !input.trim()}
+              disabled={sending || !input.trim() || !currentResult}
               className="self-end p-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Send message"
             >
