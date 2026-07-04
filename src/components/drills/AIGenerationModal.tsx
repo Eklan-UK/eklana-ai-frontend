@@ -19,10 +19,12 @@ interface AIGenerationModalProps {
     value: AIGenerationFormFieldValue,
   ) => void;
   onStudentIdsChange: (studentIds: string[]) => void;
+  onDrillTypesChange: (drillTypes: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
   isGenerating?: boolean;
   onGenerate: () => void;
+  lockedStudentIds?: string[];
 }
 
 export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
@@ -31,10 +33,12 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
   values,
   onChange,
   onStudentIdsChange,
+  onDrillTypesChange,
   students,
   loadingStudents = false,
   isGenerating = false,
   onGenerate,
+  lockedStudentIds,
 }) => {
   if (!open) return null;
 
@@ -73,10 +77,12 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
             values={values}
             onChange={onChange}
             onStudentIdsChange={onStudentIdsChange}
+            onDrillTypesChange={onDrillTypesChange}
             students={students}
             loadingStudents={loadingStudents}
             isGenerating={isGenerating}
             onGenerate={onGenerate}
+            lockedStudentIds={lockedStudentIds}
           />
         </div>
       </div>

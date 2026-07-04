@@ -10,11 +10,11 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/v1/cron/drill-daily-reminder",
+      "path": "/api/v1/cron/drill-streak-reminder",
       "schedule": "*/30 * * * *"
     },
     {
-      "path": "/api/v1/cron/drill-assigned-reminder",
+      "path": "/api/v1/cron/drill-daily-practice-reminder",
       "schedule": "0 18 * * *"
     },
     {

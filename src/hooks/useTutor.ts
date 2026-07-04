@@ -6,7 +6,10 @@ import { tutorAPI } from "@/lib/api";
 import { queryKeys } from "@/lib/react-query";
 
 // Get tutor's students
-export function useTutorStudents(params?: { limit?: number; offset?: number }) {
+export function useTutorStudents(
+  params?: { limit?: number; offset?: number },
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: [...queryKeys.students.all, "tutor", "list", params],
     queryFn: async () => {
@@ -16,7 +19,8 @@ export function useTutorStudents(params?: { limit?: number; offset?: number }) {
         total: response.total || 0,
       };
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
+    enabled: options?.enabled !== false,
   });
 }
 

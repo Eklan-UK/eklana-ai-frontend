@@ -1989,6 +1989,80 @@ export const weeklyChallengeAPI = {
 	},
 };
 
+// Student context & weeks (AI User Builder)
+export interface StudentContextData {
+  _id?: string;
+  studentId: string;
+  nativeLanguage: string;
+  professionalRole: string;
+  hospitalUnit: string;
+  country: string;
+  proficiencyLevel: 'beginner' | 'intermediate' | 'advanced';
+  goals: string;
+  simulationWeaknesses?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpsertStudentContextInput {
+  nativeLanguage: string;
+  professionalRole: string;
+  hospitalUnit: string;
+  country: string;
+  proficiencyLevel: 'beginner' | 'intermediate' | 'advanced';
+  goals: string;
+  simulationWeaknesses?: string;
+}
+
+export interface StudentWeekDrill {
+  assignmentId: string;
+  drillId: string | null;
+  title: string | null;
+  type: string | null;
+  difficulty: string | null;
+  topic: string | null;
+  part: string | null;
+  status: string;
+  assignedAt: string;
+  dueDate: string | null;
+  completedAt: string | null;
+}
+
+export interface StudentWeekData {
+  weekNumber: number;
+  weekStartDate: string;
+  weekEndDate: string;
+  drills: StudentWeekDrill[];
+  items?: StudentWeekDrill[];
+}
+
+export const studentAPI = {
+  getStudentContext: (studentId: string) => {
+    return apiRequest<{ code: string; data: StudentContextData }>(
+      `/students/${studentId}/context`,
+      { cache: false },
+    );
+  },
+
+  upsertStudentContext: (studentId: string, data: UpsertStudentContextInput) => {
+    return apiRequest<{ code: string; data: StudentContextData }>(
+      `/students/${studentId}/context`,
+      { method: 'POST', data },
+    );
+  },
+
+  getStudentWeeks: (studentId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        anchorDate: string;
+        currentWeek: number;
+        weeks: StudentWeekData[];
+      };
+    }>(`/students/${studentId}/weeks`, { cache: false });
+  },
+};
+
 // Streak API
 export const streakAPI = {
   // Get user's streak data

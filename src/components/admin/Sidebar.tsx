@@ -23,6 +23,8 @@ import {
   CreditCard,
   UserPlus,
   Video,
+  MessageSquare,
+  List,
 } from "lucide-react";
 
 const STORAGE_KEY = "admin-sidebar-collapsed";
@@ -61,7 +63,9 @@ const Sidebar: React.FC = () => {
     { name: "Learners", icon: Users, path: "/admin/Learners" },
     { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
     { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
-    { name: "Drill Builder", icon: Hammer, path: "/admin/drill" },
+    { name: "Drill Builder", icon: Hammer, path: "/admin/drills" },
+    { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/drill/free-talk" },
+    { name: "Old Drill Builder", icon: List, path: "/admin/drill" },
     { name: "Classes", icon: Video, path: "/admin/classes" },
     { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
     { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
