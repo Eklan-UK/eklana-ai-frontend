@@ -19,6 +19,7 @@ interface AIGenerationModalProps {
     value: AIGenerationFormFieldValue,
   ) => void;
   onStudentIdsChange: (studentIds: string[]) => void;
+  onDrillTypesChange: (drillTypes: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
   isGenerating?: boolean;
@@ -32,6 +33,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
   values,
   onChange,
   onStudentIdsChange,
+  onDrillTypesChange,
   students,
   loadingStudents = false,
   isGenerating = false,
@@ -75,6 +77,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
             values={values}
             onChange={onChange}
             onStudentIdsChange={onStudentIdsChange}
+            onDrillTypesChange={onDrillTypesChange}
             students={students}
             loadingStudents={loadingStudents}
             isGenerating={isGenerating}

@@ -16,6 +16,8 @@ const notificationStyles: Record<string, { icon: string; bgColor: string; textCo
   achievement: { icon: '🏆', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' },
   message: { icon: '💬', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600' },
   tutor_update: { icon: '👨‍🏫', bgColor: 'bg-pink-100', textColor: 'text-pink-600' },
+  class_session_reminder: { icon: '📅', bgColor: 'bg-violet-100', textColor: 'text-violet-600' },
+  class_nps_form: { icon: '⭐', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
   system: { icon: '📢', bgColor: 'bg-gray-100', textColor: 'text-gray-600' },
 };
 

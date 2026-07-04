@@ -21,6 +21,8 @@ const notificationStyles: Record<string, { icon: string; bgColor: string }> = {
   achievement: { icon: '🏆', bgColor: 'bg-yellow-100' },
   message: { icon: '💬', bgColor: 'bg-cyan-100' },
   tutor_update: { icon: '👨‍🏫', bgColor: 'bg-pink-100' },
+  class_session_reminder: { icon: '📅', bgColor: 'bg-violet-100' },
+  class_nps_form: { icon: '⭐', bgColor: 'bg-orange-100' },
   system: { icon: '📢', bgColor: 'bg-gray-100' },
 };
 

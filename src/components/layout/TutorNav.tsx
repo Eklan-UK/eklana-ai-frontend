@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock, Sparkles } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock } from "lucide-react";
 
 export function TutorNav() {
   const pathname = usePathname();
@@ -25,14 +25,8 @@ export function TutorNav() {
     },
     {
       href: "/tutor/drills",
-      label: "Drills",
+      label: "Drill Builder",
       icon: BookOpen,
-    },
-    {
-      href: "/tutor/ai-user-builder",
-      label: "AI User Builder",
-      mobileLabel: "AI Builder",
-      icon: Sparkles,
     },
     {
       href: "/tutor/students",
@@ -65,14 +59,7 @@ export function TutorNav() {
             >
               <Icon className="h-5 w-5 shrink-0 md:h-5 md:w-5" />
               <span className="max-w-full truncate text-center text-[9px] font-medium leading-tight sm:text-[10px] md:text-sm">
-                {"mobileLabel" in item && item.mobileLabel
-                  ? (
-                    <>
-                      <span className="md:hidden">{item.mobileLabel}</span>
-                      <span className="hidden md:inline">{item.label}</span>
-                    </>
-                  )
-                  : item.label}
+                {item.label}
               </span>
             </Link>
           );

@@ -16,7 +16,11 @@ export const DEFAULT_DRILL_LIST_FILTERS: DrillListFilters = {
   offset: 0,
 };
 
-const ALLOWED_RETURN_PREFIXES = ["/admin/drill", "/tutor/drills"] as const;
+const ALLOWED_RETURN_PREFIXES = [
+  "/admin/drill",
+  "/tutor/drills",
+  "/tutor/drills/all",
+] as const;
 
 function parseOffset(value: string | null): number {
   if (!value) return 0;

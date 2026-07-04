@@ -10,6 +10,7 @@ import type {
   AIGenerationFormScalarField,
   AIGenerationFormValues,
 } from "@/components/drills/AIGenerationForm";
+import type { AIGeneratedResult } from "@/hooks/useAIDrillCreationWorkflow";
 
 interface AIDrillCreationShellProps {
   isEditMode?: boolean;
@@ -21,18 +22,21 @@ interface AIDrillCreationShellProps {
     value: AIGenerationFormFieldValue,
   ) => void;
   setAiStudentIds: (ids: string[]) => void;
+  setAiDrillTypes: (types: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
   isGeneratingDrill: boolean;
   handleAIGenerate: () => void;
   lockedStudentIds?: string[];
   showAiPreview: boolean;
-  aiDrillType: string;
-  aiGeneratedContent: Record<string, unknown> | null;
-  handleUseAiDrill: () => void;
+  aiGeneratedResults: AIGeneratedResult[] | null;
+  handleUseTheseDrills: () => void;
   showChatSidebar: boolean;
   setShowChatSidebar: (open: boolean) => void;
-  setAiGeneratedContent: (content: Record<string, unknown>) => void;
+  updateAiGeneratedResult: (
+    drillType: string,
+    updatedContent: Record<string, unknown>,
+  ) => void;
   setShowAiPreview: (show: boolean) => void;
   /** Optional slot for inline preview placement (e.g. week page layout) */
   previewPlacement?: "inline" | "portal";
@@ -47,28 +51,27 @@ export function AIDrillCreationShell({
   aiFormValues,
   handleAiFormChange,
   setAiStudentIds,
+  setAiDrillTypes,
   students,
   loadingStudents = false,
   isGeneratingDrill,
   handleAIGenerate,
   lockedStudentIds,
   showAiPreview,
-  aiDrillType,
-  aiGeneratedContent,
-  handleUseAiDrill,
+  aiGeneratedResults,
+  handleUseTheseDrills,
   showChatSidebar,
   setShowChatSidebar,
-  setAiGeneratedContent,
+  updateAiGeneratedResult,
   setShowAiPreview,
   renderInlinePreview = false,
   children,
 }: AIDrillCreationShellProps) {
   const preview =
-    !isEditMode && showAiPreview && aiGeneratedContent ? (
+    !isEditMode && showAiPreview && aiGeneratedResults && aiGeneratedResults.length > 0 ? (
       <AIGeneratedPreview
-        drillType={aiDrillType}
-        content={aiGeneratedContent}
-        onUseDrill={handleUseAiDrill}
+        results={aiGeneratedResults}
+        onUseDrills={handleUseTheseDrills}
       />
     ) : null;
 
@@ -84,6 +87,7 @@ export function AIDrillCreationShell({
           values={aiFormValues}
           onChange={handleAiFormChange}
           onStudentIdsChange={setAiStudentIds}
+          onDrillTypesChange={setAiDrillTypes}
           students={students}
           loadingStudents={loadingStudents}
           isGenerating={isGeneratingDrill}
@@ -94,14 +98,13 @@ export function AIDrillCreationShell({
 
       {!isEditMode && !renderInlinePreview && preview}
 
-      {!isEditMode && aiGeneratedContent && (
+      {!isEditMode && aiGeneratedResults && aiGeneratedResults.length > 0 && (
         <AIChatSidebar
           open={showChatSidebar}
           onClose={() => setShowChatSidebar(false)}
-          drillType={aiDrillType}
-          currentDrill={aiGeneratedContent}
-          onDrillUpdated={(updated) => {
-            setAiGeneratedContent(updated);
+          results={aiGeneratedResults}
+          onDrillUpdated={(drillType, updated) => {
+            updateAiGeneratedResult(drillType, updated);
             setShowAiPreview(true);
           }}
         />

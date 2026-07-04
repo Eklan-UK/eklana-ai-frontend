@@ -3,23 +3,30 @@
  *
  * Vercel runs crons automatically in production (vercel.json + CRON_SECRET).
  * During `npm run dev` they do NOT run unless you start your private copy:
- *   node scripts/local-class-cron.mjs
+ *   npm run dev:cron
  *
  * Setup:
  *   cp scripts/local-class-cron.example.mjs scripts/local-class-cron.mjs
  *   Set CLASS_REMINDER_CRON_SECRET, CLASS_NPS_CRON_SECRET, DRILL_REMINDER_CRON_SECRET
  *   (or CRON_SECRET) in .env. Optional: CRON_DEBUG=true for verbose cron JSON.
  *
+ * Crons exercised (matches vercel.json):
+ *   class-session-reminders  — class reminder email + in-app + push (every minute)
+ *   class-session-nps        — post-class NPS email + in-app + push (every minute)
+ *   drill-streak-reminder    — streak rolling nudge (every 30 min in prod)
+ *   drill-daily-practice-reminder — daily drill nudge at 18:00 UTC (6 PM UTC)
+ *
  * Usage:
- *   node scripts/local-class-cron.mjs
+ *   npm run dev:cron
  *   node scripts/local-class-cron.mjs --interval 30
  *   node scripts/local-class-cron.mjs --streak-interval 900
  *   node scripts/local-class-cron.mjs --daily-blast-once
  *   node scripts/local-class-cron.mjs --include-daily-blast
+ *   node scripts/local-class-cron.mjs --daily-blast-scheduled-only
  *
- * --include-daily-blast  Fire drill-assigned-reminder at startup + hourly (broadcasts
- *                        to ALL learners with FCM tokens — use sparingly).
- * --daily-blast-once     Fire drill-assigned-reminder once at startup only.
+ * --daily-blast-once            Fire drill-daily-practice-reminder once at startup.
+ * --include-daily-blast         Fire at startup + again each day at 18:00 UTC.
+ * --daily-blast-scheduled-only  Wait until 18:00 UTC only (no startup blast).
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -28,6 +35,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+
+/** Production schedule: 18:00 UTC daily (6 PM UTC). */
+const DAILY_BLAST_UTC_HOUR = 18;
 
 function loadDotEnv(filePath) {
   if (!existsSync(filePath)) return;
@@ -64,6 +74,7 @@ function parseArgs() {
   let streakIntervalSec = 1800;
   let includeDailyBlast = false;
   let dailyBlastOnce = false;
+  let dailyBlastScheduledOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--base-url' && args[i + 1]) baseUrl = args[++i];
@@ -73,6 +84,7 @@ function parseArgs() {
       streakIntervalSec = Math.max(60, parseInt(args[++i], 10) || 1800);
     if (args[i] === '--include-daily-blast') includeDailyBlast = true;
     if (args[i] === '--daily-blast-once') dailyBlastOnce = true;
+    if (args[i] === '--daily-blast-scheduled-only') dailyBlastScheduledOnly = true;
   }
 
   return {
@@ -81,6 +93,7 @@ function parseArgs() {
     streakIntervalSec,
     includeDailyBlast,
     dailyBlastOnce,
+    dailyBlastScheduledOnly,
   };
 }
 
@@ -141,14 +154,16 @@ async function tickClasses(baseUrl, intervalSec) {
   const ts = new Date().toLocaleTimeString();
 
   console.log(`\n[${ts}] ── Classes (every ${formatInterval(intervalSec)}) ──`);
+  console.log('  → class-session-reminders: email + in-app + push');
+  console.log('  → class-session-nps: post-class NPS email + in-app + push');
 
   try {
     const [reminders, nps] = await Promise.all([
       hitCron(baseUrl, '/api/v1/cron/class-session-reminders', reminderSecret),
       hitCron(baseUrl, '/api/v1/cron/class-session-nps', npsSecret),
     ]);
-    summarize('reminders', reminders);
-    summarize('nps', nps);
+    summarize('class-reminders', reminders);
+    summarize('class-nps', nps);
   } catch (err) {
     console.error('  fetch failed — is `npm run dev` running?', err.message);
   }
@@ -159,11 +174,12 @@ async function tickStreakRolling(baseUrl, streakIntervalSec) {
   const ts = new Date().toLocaleTimeString();
 
   console.log(`\n[${ts}] ── Drills / streak (every ${formatInterval(streakIntervalSec)}) ──`);
+  console.log('  → drill-streak-reminder: in-app + push (rolling 24h window)');
 
   try {
     const result = await hitCron(
       baseUrl,
-      '/api/v1/cron/drill-daily-reminder',
+      '/api/v1/cron/drill-streak-reminder',
       drillSecret,
     );
     summarize('streak-rolling', result, { debug: false });
@@ -176,12 +192,13 @@ async function tickDailyPractice(baseUrl) {
   const drillSecret = resolveSecret(process.env.DRILL_REMINDER_CRON_SECRET);
   const ts = new Date().toLocaleTimeString();
 
-  console.log(`\n[${ts}] ── Drills / daily practice ──`);
+  console.log(`\n[${ts}] ── Drills / daily practice (${DAILY_BLAST_UTC_HOUR}:00 UTC) ──`);
+  console.log('  → drill-daily-practice-reminder: in-app + push (all active learners)');
 
   try {
     const result = await hitCron(
       baseUrl,
-      '/api/v1/cron/drill-assigned-reminder',
+      '/api/v1/cron/drill-daily-practice-reminder',
       drillSecret,
     );
     summarize('daily-practice', result, { debug: false });
@@ -190,22 +207,56 @@ async function tickDailyPractice(baseUrl) {
   }
 }
 
+/** True when within ±1 minute of the configured daily blast hour (UTC). */
+function isDailyBlastWindow(now = new Date()) {
+  return now.getUTCHours() === DAILY_BLAST_UTC_HOUR && now.getUTCMinutes() <= 1;
+}
+
+function utcDayKey(now = new Date()) {
+  return now.toISOString().slice(0, 10);
+}
+
+function formatNextDailyBlast() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCMinutes(0, 0, 0);
+  next.setUTCHours(DAILY_BLAST_UTC_HOUR);
+  if (now >= next) {
+    next.setUTCDate(next.getUTCDate() + 1);
+  }
+  return next.toISOString();
+}
+
 const {
   baseUrl,
   intervalSec,
   streakIntervalSec,
   includeDailyBlast,
   dailyBlastOnce,
+  dailyBlastScheduledOnly,
 } = parseArgs();
+
+const runScheduledDaily =
+  includeDailyBlast || dailyBlastScheduledOnly;
 
 console.log('Local cron runner (classes + drills) — private copy, not deployed');
 console.log(`  base URL: ${baseUrl}`);
 console.log(`  classes interval: every ${formatInterval(intervalSec)}`);
 console.log(`  streak interval: every ${formatInterval(streakIntervalSec)}`);
-if (includeDailyBlast) {
-  console.log('  daily practice: at startup + each hour (broadcasts to all FCM learners)');
+if (dailyBlastScheduledOnly) {
+  console.log(
+    `  daily practice: scheduled only at ${DAILY_BLAST_UTC_HOUR}:00 UTC (next: ${formatNextDailyBlast()})`,
+  );
+} else if (includeDailyBlast) {
+  console.log(
+    `  daily practice: at startup + daily at ${DAILY_BLAST_UTC_HOUR}:00 UTC`,
+  );
 } else if (dailyBlastOnce) {
-  console.log('  daily practice: once at startup only (broadcasts to all FCM learners)');
+  console.log('  daily practice: once at startup only');
+} else {
+  console.log(
+    `  daily practice: off (use --daily-blast-once, --include-daily-blast, or --daily-blast-scheduled-only)`,
+  );
 }
 console.log(
   '  secrets:',
@@ -218,27 +269,34 @@ if (process.env.CRON_DEBUG === 'true') {
 }
 console.log('Press Ctrl+C to stop.\n');
 
-let lastBlastHour = -1;
+let dailyBlastFiredToday = false;
+let lastBlastDay = '';
 
-async function maybeHourlyDailyBlast() {
-  if (!includeDailyBlast) return;
-  const hour = new Date().getHours();
-  if (hour === lastBlastHour) return;
-  lastBlastHour = hour;
+async function maybeScheduledDailyBlast() {
+  if (!runScheduledDaily) return;
+  const now = new Date();
+  const day = utcDayKey(now);
+  if (day === lastBlastDay && dailyBlastFiredToday) return;
+  if (!isDailyBlastWindow(now)) return;
+  lastBlastDay = day;
+  dailyBlastFiredToday = true;
   await tickDailyPractice(baseUrl);
 }
 
 await tickClasses(baseUrl, intervalSec);
 await tickStreakRolling(baseUrl, streakIntervalSec);
 
-if (dailyBlastOnce || includeDailyBlast) {
+if (dailyBlastOnce || (includeDailyBlast && !dailyBlastScheduledOnly)) {
   await tickDailyPractice(baseUrl);
-  if (includeDailyBlast) lastBlastHour = new Date().getHours();
+  if (includeDailyBlast) {
+    lastBlastDay = utcDayKey();
+    dailyBlastFiredToday = true;
+  }
 }
 
 setInterval(async () => {
   await tickClasses(baseUrl, intervalSec);
-  await maybeHourlyDailyBlast();
+  await maybeScheduledDailyBlast();
 }, intervalSec * 1000);
 
 setInterval(() => tickStreakRolling(baseUrl, streakIntervalSec), streakIntervalSec * 1000);

@@ -34,7 +34,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const drillListReturnPath =
-    sanitizeReturnTo(searchParams.get("returnTo")) ?? "/tutor/drills";
+    sanitizeReturnTo(searchParams.get("returnTo")) ?? "/tutor/drills/all";
   const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
 

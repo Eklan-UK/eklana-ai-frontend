@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Loader2, Search, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Search, X, ChevronDown } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
@@ -16,7 +16,7 @@ export interface AiStudentOption {
 
 export interface AIGenerationFormValues {
   studentIds: string[];
-  drillType: string;
+  drillTypes: string[];
   difficulty: string;
   journeyPart: LearningJourneyPartId | "";
   journeyTopic: string;
@@ -26,7 +26,7 @@ export interface AIGenerationFormValues {
 
 export type AIGenerationFormScalarField = Exclude<
   keyof AIGenerationFormValues,
-  "studentIds"
+  "studentIds" | "drillTypes"
 >;
 
 export type AIGenerationFormFieldValue =
@@ -39,6 +39,7 @@ interface AIGenerationFormProps {
     value: AIGenerationFormFieldValue,
   ) => void;
   onStudentIdsChange: (studentIds: string[]) => void;
+  onDrillTypesChange: (drillTypes: string[]) => void;
   students: AiStudentOption[];
   loadingStudents?: boolean;
   isGenerating?: boolean;
@@ -208,10 +209,149 @@ function AiStudentMultiSelect({
   );
 }
 
+function AiDrillTypeMultiSelect({
+  selectedTypes,
+  onChange,
+  disabled,
+}: {
+  selectedTypes: string[];
+  onChange: (types: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const toggleType = (value: string) => {
+    const next = new Set(selectedTypes);
+    if (next.has(value)) {
+      next.delete(value);
+    } else {
+      next.add(value);
+    }
+    onChange(Array.from(next));
+  };
+
+  const allSelected = AI_DRILL_TYPES.every((t) => selectedSet.has(t.value));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(AI_DRILL_TYPES.map((t) => t.value));
+    }
+  };
+
+  const buttonLabel =
+    selectedTypes.length === 0
+      ? "Select drill types…"
+      : `${selectedTypes.length} type${selectedTypes.length !== 1 ? "s" : ""} selected`;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        className={`${selectClass} flex items-center justify-between text-left disabled:opacity-50`}
+      >
+        <span className={selectedTypes.length === 0 ? "text-gray-400" : ""}>
+          {buttonLabel}
+        </span>
+        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
+      </button>
+
+      {selectedTypes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {AI_DRILL_TYPES.filter((t) => selectedSet.has(t.value)).map((t) => (
+            <span
+              key={t.value}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200"
+            >
+              {t.label}
+              <button
+                type="button"
+                onClick={() => toggleType(t.value)}
+                disabled={disabled}
+                className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50"
+                aria-label={`Remove ${t.label}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          <label className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 sticky top-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              disabled={disabled}
+              className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
+            />
+            <span className="text-xs font-medium text-gray-600">
+              Select all types
+            </span>
+          </label>
+          <div className="divide-y divide-gray-100">
+            {AI_DRILL_TYPES.map((t) => {
+              const isSelected = selectedSet.has(t.value);
+              return (
+                <label
+                  key={t.value}
+                  className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${
+                    !isSelected ? "opacity-80" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleType(t.value)}
+                    disabled={disabled}
+                    className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 shrink-0"
+                  />
+                  <span className="text-sm font-medium text-gray-900">
+                    {t.label}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500 mt-1.5">
+        {selectedTypes.length === 0
+          ? "Select at least one drill type"
+          : `${selectedTypes.length} type${selectedTypes.length !== 1 ? "s" : ""} selected`}
+      </p>
+    </div>
+  );
+}
+
 export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
   values,
   onChange,
   onStudentIdsChange,
+  onDrillTypesChange,
   students,
   loadingStudents = false,
   isGenerating = false,
@@ -260,41 +400,33 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label className="block text-xs font-bold text-gray-600 mb-1.5">
-            Drill Type <span className="text-red-500">*</span>
-          </Label>
-          <select
-            value={values.drillType}
-            onChange={(e) => onChange("drillType", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {AI_DRILL_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <Label className="block text-xs font-bold text-gray-600 mb-1.5">
-            Difficulty <span className="text-red-500">*</span>
-          </Label>
-          <select
-            value={values.difficulty}
-            onChange={(e) => onChange("difficulty", e.target.value)}
-            disabled={disabled}
-            className={selectClass}
-          >
-            {AI_DIFFICULTIES.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+          Drill Types <span className="text-red-500">*</span>
+        </Label>
+        <AiDrillTypeMultiSelect
+          selectedTypes={values.drillTypes}
+          onChange={onDrillTypesChange}
+          disabled={disabled || isGenerating}
+        />
+      </div>
+
+      <div>
+        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+          Difficulty <span className="text-red-500">*</span>
+        </Label>
+        <select
+          value={values.difficulty}
+          onChange={(e) => onChange("difficulty", e.target.value)}
+          disabled={disabled}
+          className={selectClass}
+        >
+          {AI_DIFFICULTIES.map((d) => (
+            <option key={d.value} value={d.value}>
+              {d.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <LearningJourneyPartTopicFields
@@ -347,7 +479,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
       <button
         type="button"
         onClick={onGenerate}
-        disabled={isGenerating || disabled}
+        disabled={isGenerating || disabled || values.drillTypes.length === 0}
         className="w-full py-2.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
       >
         {isGenerating ? (

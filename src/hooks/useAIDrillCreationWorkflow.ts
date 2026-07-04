@@ -9,10 +9,7 @@ import type {
   AiStudentOption,
 } from "@/components/drills/AIGenerationForm";
 import type { StudentContextData } from "@/lib/api";
-import {
-  composeStudentContextString,
-  getWeekCompletionDate,
-} from "@/lib/ai-user-builder/week-utils";
+import { composeStudentContextString } from "@/lib/ai-user-builder/week-utils";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import {
   getPartLabel,
@@ -21,9 +18,15 @@ import {
 import { normalizeAiGeneratedToParsedContent } from "@/utils/ai-drill-content";
 import type { ParsedContent } from "@/services/document-parser.service";
 
-export const AI_DRILL_PENDING_STORAGE_KEY = "eklana-ai-drill-pending";
+export const AI_DRILL_BULK_PENDING_STORAGE_KEY =
+  "eklana-ai-drill-bulk-pending";
 
-export interface AIDrillPendingApply {
+export interface AIGeneratedResult {
+  drillType: string;
+  content: Record<string, unknown>;
+}
+
+export interface AIDrillBulkPendingItem {
   parsed: ParsedContent;
   drillType: string;
   difficulty: string;
@@ -44,39 +47,31 @@ export interface UseAIDrillCreationWorkflowOptions {
   students: AiStudentOption[];
   initialContext?: AIDrillInitialContext;
   lockedStudentIds?: string[];
-  onApplyParsedContent: (content: ParsedContent) => void;
-  onUseDrillExtras?: (meta: {
-    drillType: string;
-    difficulty: string;
-    studentIds: string[];
-    journeyPart: LearningJourneyPartId | "";
-    journeyTopic: string;
-    completionDate?: string;
-  }) => void;
-  /** When set, navigates to builder instead of applying inline */
-  onNavigateToBuilder?: (pending: AIDrillPendingApply) => void;
+  /**
+   * Called after "Use These Drills" stores the bulk-pending payload to sessionStorage.
+   * The caller decides how to surface the wizard — navigate to the builder page, or
+   * update local state to render it inline (when already on the builder page).
+   */
+  onBulkReady?: (pending: AIDrillBulkPendingItem[]) => void;
 }
 
 export function useAIDrillCreationWorkflow({
   students,
   initialContext,
   lockedStudentIds,
-  onApplyParsedContent,
-  onUseDrillExtras,
-  onNavigateToBuilder,
+  onBulkReady,
 }: UseAIDrillCreationWorkflowOptions) {
   const [aiStudentIds, setAiStudentIds] = useState<string[]>([]);
-  const [aiDrillType, setAiDrillType] = useState("vocabulary");
+  const [aiDrillTypes, setAiDrillTypes] = useState<string[]>([]);
   const [aiDifficulty, setAiDifficulty] = useState("intermediate");
   const [aiJourneyPart, setAiJourneyPart] = useState<LearningJourneyPartId | "">("");
   const [aiJourneyTopic, setAiJourneyTopic] = useState("");
   const [aiContext, setAiContext] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
-  const [aiGeneratedContent, setAiGeneratedContent] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [aiGeneratedResults, setAiGeneratedResults] = useState<
+    AIGeneratedResult[] | null
+  >(null);
   const [showAiPreview, setShowAiPreview] = useState(false);
   const [showChatSidebar, setShowChatSidebar] = useState(false);
   const [showAiFormModal, setShowAiFormModal] = useState(false);
@@ -85,9 +80,13 @@ export function useAIDrillCreationWorkflow({
   const contextProficiency = initialContext?.studentContext?.proficiencyLevel;
   const lockedStudentIdsKey = lockedStudentIds?.join(",") ?? "";
 
+  // Deliberately depend on primitive fields (not the whole `initialContext` object,
+  // which is often a fresh reference per render from callers) to avoid recomputing
+  // on every render.
   const composedContext = useMemo(() => {
     if (!initialContext?.studentContext) return "";
     return composeStudentContextString(initialContext.studentContext);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     initialContext?.studentContext?.professionalRole,
     initialContext?.studentContext?.hospitalUnit,
@@ -160,18 +159,10 @@ export function useAIDrillCreationWorkflow({
     composedContext,
   ]);
 
-  const completionDate = useMemo(() => {
-    if (!initialContext?.weekNumber) return undefined;
-    return getWeekCompletionDate(
-      initialContext.weekNumber,
-      initialContext.anchorDate,
-    );
-  }, [initialContext?.weekNumber, initialContext?.anchorDate]);
-
   const aiFormValues: AIGenerationFormValues = useMemo(
     () => ({
       studentIds: aiStudentIds,
-      drillType: aiDrillType,
+      drillTypes: aiDrillTypes,
       difficulty: aiDifficulty,
       journeyPart: aiJourneyPart,
       journeyTopic: aiJourneyTopic,
@@ -180,7 +171,7 @@ export function useAIDrillCreationWorkflow({
     }),
     [
       aiStudentIds,
-      aiDrillType,
+      aiDrillTypes,
       aiDifficulty,
       aiJourneyPart,
       aiJourneyTopic,
@@ -192,9 +183,6 @@ export function useAIDrillCreationWorkflow({
   const handleAiFormChange = useCallback(
     (field: AIGenerationFormScalarField, value: AIGenerationFormFieldValue) => {
       switch (field) {
-        case "drillType":
-          setAiDrillType(value as string);
-          break;
         case "difficulty":
           setAiDifficulty(value as string);
           break;
@@ -220,6 +208,10 @@ export function useAIDrillCreationWorkflow({
       toast.error("Please select at least one student");
       return;
     }
+    if (aiDrillTypes.length === 0) {
+      toast.error("Please select at least one drill type");
+      return;
+    }
     if (!aiJourneyPart) {
       toast.error("Please select a mission");
       return;
@@ -243,7 +235,7 @@ export function useAIDrillCreationWorkflow({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          drillType: aiDrillType,
+          drillTypes: aiDrillTypes,
           difficulty: aiDifficulty,
           context: aiContext,
           prompt: aiPrompt,
@@ -258,11 +250,18 @@ export function useAIDrillCreationWorkflow({
         toast.error(json.message || "AI generation failed");
         return;
       }
-      setAiGeneratedContent(json.data);
+      const results: AIGeneratedResult[] = Array.isArray(json.data)
+        ? json.data
+        : [];
+      setAiGeneratedResults(results);
       setShowAiPreview(true);
       setShowChatSidebar(true);
       setShowAiFormModal(false);
-      toast.success("Drill generated successfully");
+      toast.success(
+        results.length > 1
+          ? `${results.length} drills generated successfully`
+          : "Drill generated successfully",
+      );
     } catch {
       toast.error("AI generation failed");
     } finally {
@@ -270,60 +269,60 @@ export function useAIDrillCreationWorkflow({
     }
   }, [
     aiStudentIds,
+    aiDrillTypes,
     aiJourneyPart,
     aiJourneyTopic,
     aiContext,
     aiPrompt,
-    aiDrillType,
     aiDifficulty,
   ]);
 
-  const handleUseAiDrill = useCallback(() => {
-    if (!aiGeneratedContent) return;
+  const updateAiGeneratedResult = useCallback(
+    (drillType: string, updatedContent: Record<string, unknown>) => {
+      setAiGeneratedResults((prev) =>
+        prev
+          ? prev.map((r) =>
+              r.drillType === drillType ? { ...r, content: updatedContent } : r,
+            )
+          : prev,
+      );
+    },
+    [],
+  );
 
-    if (aiDrillType === "definition") {
+  const handleUseTheseDrills = useCallback(() => {
+    if (!aiGeneratedResults || aiGeneratedResults.length === 0) return;
+
+    if (aiGeneratedResults.some((r) => r.drillType === "definition")) {
       toast.warning(
         "Definition drills are not yet supported in the manual builder.",
       );
     }
 
-    const parsed = normalizeAiGeneratedToParsedContent(
-      aiDrillType,
-      aiGeneratedContent,
+    const pendingItems: AIDrillBulkPendingItem[] = aiGeneratedResults.map(
+      ({ drillType, content }) => ({
+        parsed: normalizeAiGeneratedToParsedContent(drillType, content),
+        drillType,
+        difficulty: aiDifficulty,
+        studentIds: aiStudentIds,
+        journeyPart: aiJourneyPart,
+        journeyTopic: aiJourneyTopic,
+        completionDate: undefined,
+      }),
     );
 
-    const meta = {
-      drillType: aiDrillType,
-      difficulty: aiDifficulty,
-      studentIds: aiStudentIds,
-      journeyPart: aiJourneyPart,
-      journeyTopic: aiJourneyTopic,
-      completionDate,
-    };
-
-    if (onNavigateToBuilder) {
-      onNavigateToBuilder({ parsed, ...meta });
-      setShowAiPreview(false);
-      setShowChatSidebar(false);
-      return;
-    }
-
-    onApplyParsedContent(parsed);
-    onUseDrillExtras?.(meta);
+    storePendingBulkAiDrillApply(pendingItems);
+    onBulkReady?.(pendingItems);
 
     setShowAiPreview(false);
     setShowChatSidebar(false);
   }, [
-    aiGeneratedContent,
-    aiDrillType,
+    aiGeneratedResults,
     aiDifficulty,
     aiStudentIds,
     aiJourneyPart,
     aiJourneyTopic,
-    completionDate,
-    onApplyParsedContent,
-    onUseDrillExtras,
-    onNavigateToBuilder,
+    onBulkReady,
   ]);
 
   return {
@@ -331,40 +330,46 @@ export function useAIDrillCreationWorkflow({
     aiFormValues,
     handleAiFormChange,
     setAiStudentIds,
+    setAiDrillTypes,
     isGeneratingDrill,
-    aiGeneratedContent,
-    setAiGeneratedContent,
+    aiGeneratedResults,
+    setAiGeneratedResults,
+    updateAiGeneratedResult,
     showAiPreview,
     setShowAiPreview,
     showChatSidebar,
     setShowChatSidebar,
     showAiFormModal,
     setShowAiFormModal,
-    aiDrillType,
     handleAIGenerate,
-    handleUseAiDrill,
+    handleUseTheseDrills,
     lockedStudentIds: effectiveLockedIds,
-    completionDate,
   };
 }
 
-export function readPendingAiDrillApply(): AIDrillPendingApply | null {
+export function readPendingBulkAiDrillApply(): AIDrillBulkPendingItem[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(AI_DRILL_PENDING_STORAGE_KEY);
+    const raw = sessionStorage.getItem(AI_DRILL_BULK_PENDING_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AIDrillPendingApply;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as AIDrillBulkPendingItem[]) : null;
   } catch {
     return null;
   }
 }
 
-export function storePendingAiDrillApply(pending: AIDrillPendingApply): void {
+export function storePendingBulkAiDrillApply(
+  pending: AIDrillBulkPendingItem[],
+): void {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(AI_DRILL_PENDING_STORAGE_KEY, JSON.stringify(pending));
+  sessionStorage.setItem(
+    AI_DRILL_BULK_PENDING_STORAGE_KEY,
+    JSON.stringify(pending),
+  );
 }
 
-export function clearPendingAiDrillApply(): void {
+export function clearPendingBulkAiDrillApply(): void {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem(AI_DRILL_PENDING_STORAGE_KEY);
+  sessionStorage.removeItem(AI_DRILL_BULK_PENDING_STORAGE_KEY);
 }

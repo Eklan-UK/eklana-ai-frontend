@@ -2,26 +2,17 @@ import ClassSession from '@/models/class-session';
 import ClassSeries from '@/models/class-series';
 import ClassEnrollment from '@/models/class-enrollment';
 import SessionReminderDispatch from '@/models/session-reminder-dispatch';
-import FCMToken from '@/models/fcm-token';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
-import {
-  sendNotificationToUser,
-  NotificationType,
-} from '@/lib/fcm-trigger';
 import { sendClassReminderEmail } from '@/lib/api/email.service';
 import { buildClassEmailJoinUrl } from '@/lib/api/class-join-token';
+import { onClassSessionReminder } from '@/services/notification/triggers';
 
 /** Maximum reminder offset supported (minutes). Sessions starting further out are ignored. */
 const MAX_REMINDER_MINUTES = 120;
 
 /** Tolerance window around a scheduled reminder time (±1 minute). */
 const TOLERANCE_MS = 60 * 1000;
-
-function reminderTitle(minutesBefore: number): string {
-  if (minutesBefore === 60) return 'Class starts in 1 hour';
-  return `Class starts in ${minutesBefore} minute${minutesBefore === 1 ? '' : 's'}`;
-}
 
 export type ClassReminderDebugEntry = {
   sessionId: string;
@@ -42,7 +33,7 @@ export class ClassReminderService {
   /**
    * Called every minute by the cron route.
    * Finds sessions whose start time matches any per-series configured reminder
-   * offset (within ±1 min of now + offset) and sends FCM + email once per
+   * offset (within ±1 min of now + offset) and sends email + in-app/push once per
    * session/offset pair (deduped via SessionReminderDispatch).
    */
   async runDueReminders(
@@ -64,10 +55,8 @@ export class ClassReminderService {
 
     const nowMs = now.getTime();
 
-    // Fetch all scheduled sessions starting within the next MAX_REMINDER_MINUTES + 1 min.
-    // This is the broadest window we ever need to check.
     const windowEnd = new Date(nowMs + (MAX_REMINDER_MINUTES + 1) * 60 * 1000);
-    const windowStart = new Date(nowMs + TOLERANCE_MS); // at least 1 min from now
+    const windowStart = new Date(nowMs + TOLERANCE_MS);
 
     const sessions = await ClassSession.find({
       status: 'scheduled',
@@ -162,45 +151,11 @@ export class ClassReminderService {
         for (const enrollment of enrollments) {
           const learnerId = enrollment.learnerId.toString();
 
-          // --- FCM push ---
-          const tokens = await FCMToken.find({
-            userId: enrollment.learnerId,
-            isActive: true,
-          })
-            .select('token')
-            .lean();
-
-          for (const tok of tokens) {
-            try {
-              await sendNotificationToUser(learnerId, tok.token, {
-                type: NotificationType.CLASS_SESSION_REMINDER,
-                title: reminderTitle(m),
-                body: `${seriesTitle} — tap to open your schedule.`,
-                actionUrl: '/account/classes',
-                data: {
-                  sessionId: session._id.toString(),
-                  classSeriesId: session.classSeriesId.toString(),
-                  reminderKind: kind,
-                },
-              });
-              anySent = true;
-              sent += 1;
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              errors.push(`${session._id}/${kind}/${learnerId}/fcm: ${msg}`);
-              logger.warn('Class reminder FCM failed', {
-                sessionId: session._id,
-                kind,
-                learnerId,
-                msg,
-              });
-            }
-          }
-
-          // --- Email ---
           const learner = await User.findById(enrollment.learnerId)
             .select('email firstName lastName name')
             .lean();
+
+          // --- Email (unchanged) ---
           if (learner?.email) {
             const name =
               `${(learner as { firstName?: string }).firstName ?? ''} ${(learner as { lastName?: string }).lastName ?? ''}`.trim() ||
@@ -237,6 +192,39 @@ export class ClassReminderService {
               });
             }
           }
+
+          // --- In-app + push (unified + FCM fallback) ---
+          try {
+            const joinUrl =
+              session.meetingUrl?.trim()
+                ? buildClassEmailJoinUrl({
+                    sessionId: session._id.toString(),
+                    learnerId,
+                    sessionEndUtc: new Date(session.endUtc),
+                  })
+                : undefined;
+
+            const pushResult = await onClassSessionReminder(learnerId, {
+              sessionId: session._id.toString(),
+              seriesTitle,
+              minutesBefore: m,
+              joinUrl,
+            });
+
+            if (pushResult) {
+              anySent = true;
+              sent += 1;
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            errors.push(`${session._id}/${kind}/${learnerId}/push: ${msg}`);
+            logger.warn('Class reminder push failed', {
+              sessionId: session._id,
+              kind,
+              learnerId,
+              msg,
+            });
+          }
         }
 
         if (includeDebug && anySent) {
@@ -249,7 +237,6 @@ export class ClassReminderService {
           });
         }
 
-        // Record dispatch so this session/kind pair is never re-sent.
         if (enrollments.length === 0 || anySent) {
           try {
             await SessionReminderDispatch.create({
@@ -258,7 +245,6 @@ export class ClassReminderService {
               sentAt: new Date(),
             });
           } catch (err: unknown) {
-            // Unique index violation means a concurrent cron run already saved it — fine.
             const msg = err instanceof Error ? err.message : String(err);
             if (!msg.includes('duplicate key') && !msg.includes('E11000')) {
               logger.warn('SessionReminderDispatch.create failed', { msg });
