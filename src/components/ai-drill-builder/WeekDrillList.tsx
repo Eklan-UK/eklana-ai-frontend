@@ -13,11 +13,13 @@ const STATUS_STYLES: Record<string, string> = {
 interface WeekDrillListProps {
   drills: WeekDrillItem[];
   drillDetailBasePath: string;
+  returnTo: string;
 }
 
 export function WeekDrillList({
   drills,
   drillDetailBasePath,
+  returnTo,
 }: WeekDrillListProps) {
   if (drills.length === 0) {
     return (
@@ -67,7 +69,7 @@ export function WeekDrillList({
           return (
             <Link
               key={drill.assignmentId ?? String(drillId)}
-              href={`${drillDetailBasePath}/${drillId}`}
+              href={`${drillDetailBasePath}/${drillId}?returnTo=${encodeURIComponent(returnTo)}`}
             >
               {content}
             </Link>

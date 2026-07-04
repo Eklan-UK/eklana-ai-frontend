@@ -192,6 +192,7 @@ export function WeekDetailPage({
             <WeekDrillList
               drills={week?.drills ?? week?.items ?? []}
               drillDetailBasePath={drillDetailBasePath}
+              returnTo={returnTo}
             />
           </div>
 
@@ -201,7 +202,7 @@ export function WeekDetailPage({
               onClick={() => aiWorkflow.setShowAiFormModal(true)}
               className="flex-1 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
             >
-              Create Drill
+              Generate Drill with AI
             </button>
             <button
               type="button"
