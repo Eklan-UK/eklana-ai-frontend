@@ -464,15 +464,15 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         </Label>
         <Textarea
           value={values.prompt}
-          onChange={(e) => onChange("prompt", e.target.value.slice(0, 2000))}
+          onChange={(e) => onChange("prompt", e.target.value.slice(0, 5000))}
           rows={4}
-          maxLength={2000}
+          maxLength={5000}
           disabled={disabled}
           placeholder="Paste your curriculum prompt here"
           className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
         />
         <p className="text-xs text-gray-400 mt-1 text-right">
-          {values.prompt.length}/2000
+          {values.prompt.length}/5000
         </p>
       </div>
 

@@ -19,7 +19,7 @@ import {
   validateDrillDraft,
 } from "@/components/drills/drill-form-utils";
 import { clearPendingBulkAiDrillApply } from "@/hooks/useAIDrillCreationWorkflow";
-import { studentWeeksQueryKey } from "@/hooks/useStudentWeeks";
+import { invalidateStudentWeeks } from "@/hooks/useStudentWeeks";
 
 export interface BulkDrillWizardProps {
   variant: "admin" | "tutor";
@@ -100,11 +100,7 @@ export function BulkDrillWizard({
       clearPendingBulkAiDrillApply();
       const created = json.data?.created ?? drafts.length;
       const studentIds = [...new Set(drafts.flatMap((d) => d.selectedUsers))];
-      for (const id of studentIds) {
-        void queryClient.invalidateQueries({
-          queryKey: studentWeeksQueryKey(id),
-        });
-      }
+      await invalidateStudentWeeks(queryClient, studentIds);
       toast.success(
         created === 1
           ? "Drill created and assigned"

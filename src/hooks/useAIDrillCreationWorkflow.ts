@@ -9,7 +9,7 @@ import type {
   AiStudentOption,
 } from "@/components/drills/AIGenerationForm";
 import type { StudentContextData } from "@/lib/api";
-import { composeStudentContextString } from "@/lib/ai-user-builder/week-utils";
+import { composeStudentContextString } from "@/lib/ai-drill-builder/week-utils";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import {
   getPartLabel,

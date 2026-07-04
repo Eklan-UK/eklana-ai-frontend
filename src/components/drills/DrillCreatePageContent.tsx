@@ -47,7 +47,7 @@ import {
   readPendingBulkAiDrillApply,
   useAIDrillCreationWorkflow,
 } from "@/hooks/useAIDrillCreationWorkflow";
-import { studentWeeksQueryKey } from "@/hooks/useStudentWeeks";
+import { invalidateStudentWeeks } from "@/hooks/useStudentWeeks";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ParsedContent } from "@/services/document-parser.service";
 import {
@@ -453,11 +453,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         toastAssignmentResult(
           getAssignmentCounts(response?.data, assignedTo.length),
         );
-        for (const learnerId of assignedTo) {
-          void queryClient.invalidateQueries({
-            queryKey: studentWeeksQueryKey(learnerId),
-          });
-        }
+        await invalidateStudentWeeks(queryClient, assignedTo);
         router.push(
           returnToParam ? drillListReturnPath : getDrillPostCreatePath(variant),
         );

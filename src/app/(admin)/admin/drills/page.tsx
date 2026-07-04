@@ -1,6 +1,6 @@
 "use client";
 
-import { StudentListPage } from "@/components/ai-user-builder/StudentListPage";
+import { StudentListPage } from "@/components/ai-drill-builder/StudentListPage";
 
 export default function AdminDrillsPage() {
   return (

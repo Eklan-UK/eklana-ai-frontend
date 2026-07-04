@@ -1,7 +1,7 @@
 "use client";
 
 import { Header } from "@/components/layout/Header";
-import { StudentListPage } from "@/components/ai-user-builder/StudentListPage";
+import { StudentListPage } from "@/components/ai-drill-builder/StudentListPage";
 
 export default function TutorDrillsPage() {
   return (

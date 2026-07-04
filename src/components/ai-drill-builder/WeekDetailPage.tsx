@@ -4,20 +4,20 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { WeekDrillList } from "@/components/ai-user-builder/WeekDrillList";
+import { WeekDrillList } from "@/components/ai-drill-builder/WeekDrillList";
 import { AIGeneratedPreview } from "@/components/drills/AIGeneratedPreview";
 import { AIDrillCreationShell } from "@/components/drills/AIDrillCreationShell";
 import { useAIDrillCreationWorkflow } from "@/hooks/useAIDrillCreationWorkflow";
 import { useStudentContext } from "@/hooks/useStudentContext";
 import { useStudentWeeks } from "@/hooks/useStudentWeeks";
 import { useTutorStudents } from "@/hooks/useTutor";
-import { useAiUserBuilderLearners } from "@/hooks/useAiUserBuilderLearners";
-import { formatWeekDateRange } from "@/lib/ai-user-builder/week-utils";
+import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
+import { formatWeekDateRange } from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
   getLearnerId,
-} from "@/lib/ai-user-builder/learner-utils";
-import { LearnerAvatar } from "@/components/ai-user-builder/LearnerAvatar";
+} from "@/lib/ai-drill-builder/learner-utils";
+import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 import type { AiStudentOption } from "@/components/drills/AIGenerationForm";
 
 interface WeekDetailPageProps {
@@ -33,7 +33,7 @@ export function WeekDetailPage({
 }: WeekDetailPageProps) {
   const router = useRouter();
   const basePath =
-    variant === "tutor" ? "/tutor/ai-user-builder" : "/admin/ai-user-builder";
+    variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
   const builderPath =
     variant === "tutor" ? "/tutor/drills/create" : "/admin/drills/create";
   const drillDetailBasePath =
@@ -48,7 +48,7 @@ export function WeekDetailPage({
     { enabled: variant === "tutor" },
   );
   const { data: adminData, isLoading: adminStudentsLoading } =
-    useAiUserBuilderLearners(variant === "admin");
+    useAiDrillBuilderLearners(variant === "admin");
 
   const loadingStudents =
     variant === "tutor" ? tutorStudentsLoading : adminStudentsLoading;

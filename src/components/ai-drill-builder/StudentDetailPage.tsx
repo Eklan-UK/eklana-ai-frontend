@@ -3,17 +3,17 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Pencil } from "lucide-react";
-import { StudentContextForm } from "@/components/ai-user-builder/StudentContextForm";
-import { StudentWeeksView } from "@/components/ai-user-builder/StudentWeeksView";
+import { StudentContextForm } from "@/components/ai-drill-builder/StudentContextForm";
+import { StudentWeeksView } from "@/components/ai-drill-builder/StudentWeeksView";
 import { useStudentContext } from "@/hooks/useStudentContext";
 import { useTutorStudents } from "@/hooks/useTutor";
-import { useAiUserBuilderLearners } from "@/hooks/useAiUserBuilderLearners";
+import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import type { StudentContextData } from "@/lib/api";
 import {
   getLearnerDisplayName,
   getLearnerId,
-} from "@/lib/ai-user-builder/learner-utils";
-import { LearnerAvatar } from "@/components/ai-user-builder/LearnerAvatar";
+} from "@/lib/ai-drill-builder/learner-utils";
+import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 
 interface StudentDetailPageProps {
   variant: "tutor" | "admin";
@@ -22,7 +22,7 @@ interface StudentDetailPageProps {
 
 export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps) {
   const basePath =
-    variant === "tutor" ? "/tutor/ai-user-builder" : "/admin/ai-user-builder";
+    variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
   const listPath = variant === "tutor" ? "/tutor/drills" : "/admin/drills";
 
   const { data: context, isLoading } = useStudentContext(studentId);
@@ -35,7 +35,7 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
     { limit: 1000 },
     { enabled: variant === "tutor" },
   );
-  const { data: adminData } = useAiUserBuilderLearners(variant === "admin");
+  const { data: adminData } = useAiDrillBuilderLearners(variant === "admin");
 
   const studentInfo = useMemo(() => {
     if (variant === "tutor") {
