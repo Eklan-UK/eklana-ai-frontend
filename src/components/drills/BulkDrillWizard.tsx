@@ -57,10 +57,12 @@ export function BulkDrillWizard({
   const missingLabels = getMissingCompletionDateLabels(drafts);
 
   const patchCurrentDraft = useCallback(
-    (next: DrillDraft) => {
-      setDrafts((prev) =>
-        prev.map((d, i) => (i === currentIndex ? next : d)),
-      );
+    (update: DrillDraft | ((prev: DrillDraft) => DrillDraft)) => {
+      setDrafts((prev) => {
+        const current = prev[currentIndex];
+        const next = typeof update === "function" ? update(current) : update;
+        return prev.map((d, i) => (i === currentIndex ? next : d));
+      });
     },
     [currentIndex],
   );

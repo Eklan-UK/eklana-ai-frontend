@@ -277,11 +277,13 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
     }
   }, [isEditMode, drillData, users, applyDraft]);
 
+  // Apply preselection once users have finished loading so that even if a saved draft was
+  // restored (potentially with different selectedUsers), this effect re-fires when loadingUsers
+  // transitions to false and correctly seeds the preselected student.
   useEffect(() => {
-    if (preselectedStudentId && !isEditMode && !bulkDrafts) {
-      patchDraft({ selectedUsers: [preselectedStudentId] });
-    }
-  }, [preselectedStudentId, isEditMode, bulkDrafts, patchDraft]);
+    if (!preselectedStudentId || isEditMode || bulkDrafts || loadingUsers) return;
+    patchDraft({ selectedUsers: [preselectedStudentId] });
+  }, [preselectedStudentId, isEditMode, bulkDrafts, loadingUsers, patchDraft]);
 
   const initialAiContext = useMemo(() => {
     if (!preselectedStudentId) return undefined;
@@ -654,7 +656,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
 
       <DrillFormBody
         draft={draft}
-        onDraftChange={(next) => setDraft(next)}
+        onDraftChange={setDraft}
         users={users}
         loadingUsers={loadingUsers}
         variant={variant}
