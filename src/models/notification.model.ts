@@ -11,7 +11,9 @@ export type NotificationType =
   | 'achievement'
   | 'message'
   | 'tutor_update'
-  | 'system';
+  | 'system'
+  | 'class_session_reminder'
+  | 'class_nps_form';
 
 export interface INotificationData {
   screen?: string;        // For mobile deep linking (e.g., 'DrillDetail')
@@ -69,6 +71,8 @@ const NotificationSchema = new Schema<INotification>(
         'message',
         'tutor_update',
         'system',
+        'class_session_reminder',
+        'class_nps_form',
       ],
       required: true,
       index: true,

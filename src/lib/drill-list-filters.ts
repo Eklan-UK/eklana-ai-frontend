@@ -16,7 +16,16 @@ export const DEFAULT_DRILL_LIST_FILTERS: DrillListFilters = {
   offset: 0,
 };
 
-const ALLOWED_RETURN_PREFIXES = ["/admin/drill", "/tutor/drills"] as const;
+const ALLOWED_RETURN_PREFIXES = [
+  "/admin/drill",
+  "/admin/drills",
+  "/admin/ai-drill-builder",
+  "/admin/ai-user-builder",
+  "/tutor/drills",
+  "/tutor/drills/all",
+  "/tutor/ai-drill-builder",
+  "/tutor/ai-user-builder",
+] as const;
 
 function parseOffset(value: string | null): number {
   if (!value) return 0;
@@ -88,7 +97,10 @@ export function sanitizeReturnTo(value: string | null | undefined): string | nul
   if (!decoded.startsWith("/") || decoded.startsWith("//")) return null;
 
   const allowed = ALLOWED_RETURN_PREFIXES.some(
-    (prefix) => decoded === prefix || decoded.startsWith(`${prefix}?`)
+    (prefix) =>
+      decoded === prefix ||
+      decoded.startsWith(`${prefix}/`) ||
+      decoded.startsWith(`${prefix}?`),
   );
   if (!allowed) return null;
 

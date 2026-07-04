@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil } from "lucide-react";
-import { StudentContextForm } from "@/components/ai-user-builder/StudentContextForm";
-import { StudentWeeksView } from "@/components/ai-user-builder/StudentWeeksView";
+import { ArrowLeft, Loader2, Pencil } from "lucide-react";
+import { StudentContextForm } from "@/components/ai-drill-builder/StudentContextForm";
+import { StudentWeeksView } from "@/components/ai-drill-builder/StudentWeeksView";
 import { useStudentContext } from "@/hooks/useStudentContext";
 import { useTutorStudents } from "@/hooks/useTutor";
-import { useAiUserBuilderLearners } from "@/hooks/useAiUserBuilderLearners";
+import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import type { StudentContextData } from "@/lib/api";
 import {
   getLearnerDisplayName,
   getLearnerId,
-} from "@/lib/ai-user-builder/learner-utils";
-import { LearnerAvatar } from "@/components/ai-user-builder/LearnerAvatar";
+} from "@/lib/ai-drill-builder/learner-utils";
+import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 
 interface StudentDetailPageProps {
   variant: "tutor" | "admin";
@@ -22,9 +22,10 @@ interface StudentDetailPageProps {
 
 export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps) {
   const basePath =
-    variant === "tutor" ? "/tutor/ai-user-builder" : "/admin/ai-user-builder";
+    variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
+  const listPath = variant === "tutor" ? "/tutor/drills" : "/admin/drills";
 
-  const { data: context } = useStudentContext(studentId);
+  const { data: context, isLoading } = useStudentContext(studentId);
   const [localContext, setLocalContext] = useState<StudentContextData | null>(
     null,
   );
@@ -34,7 +35,7 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
     { limit: 1000 },
     { enabled: variant === "tutor" },
   );
-  const { data: adminData } = useAiUserBuilderLearners(variant === "admin");
+  const { data: adminData } = useAiDrillBuilderLearners(variant === "admin");
 
   const studentInfo = useMemo(() => {
     if (variant === "tutor") {
@@ -71,6 +72,14 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
 
   const activeContext = localContext ?? context;
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
   if (editingContext) {
     return (
       <div>
@@ -88,6 +97,36 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
     );
   }
 
+  if (!activeContext) {
+    return (
+      <div>
+        <div className="flex items-start gap-4 mb-6">
+          {studentInfo && <LearnerAvatar learner={studentInfo} size="lg" />}
+          <div>
+            <Link
+              href={listPath}
+              className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to students
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {studentInfo?.name ?? "Student"}
+            </h1>
+            {studentInfo?.email && (
+              <p className="text-sm text-gray-500 mt-0.5">{studentInfo.email}</p>
+            )}
+          </div>
+        </div>
+        <StudentContextForm
+          studentId={studentId}
+          isEdit={false}
+          onSaved={(data) => setLocalContext(data)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -97,7 +136,7 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
           )}
           <div>
             <Link
-              href={basePath}
+              href={listPath}
               className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -117,7 +156,7 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shrink-0"
         >
           <Pencil className="w-4 h-4" />
-          {activeContext ? "Edit context" : "Set up context"}
+          Edit context
         </button>
       </div>
 

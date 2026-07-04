@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import { getUserInitials } from "@/utils/user";
-import type { LearnerRecord } from "@/lib/ai-user-builder/learner-utils";
+import type { LearnerRecord } from "@/lib/ai-drill-builder/learner-utils";
 import {
   getLearnerAvatarUrl,
   getLearnerDisplayName,
-} from "@/lib/ai-user-builder/learner-utils";
+} from "@/lib/ai-drill-builder/learner-utils";
 
 const sizeClasses = {
   sm: "w-8 h-8 text-xs",

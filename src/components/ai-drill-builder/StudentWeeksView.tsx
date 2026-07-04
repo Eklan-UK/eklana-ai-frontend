@@ -13,7 +13,7 @@ import {
   formatWeekDateRange,
   mergeWeeksWithEmptySlots,
   type StudentWeek,
-} from "@/lib/ai-user-builder/week-utils";
+} from "@/lib/ai-drill-builder/week-utils";
 import { useStudentWeeks } from "@/hooks/useStudentWeeks";
 
 interface StudentWeeksViewProps {
