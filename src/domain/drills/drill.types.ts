@@ -8,7 +8,7 @@ export interface Drill {
   date: Date;
   duration_days: number;
   created_by: string;
-  createdById?: Types.ObjectId;
+  createdById?: Types.ObjectId | string;
   is_active: boolean;
   [key: string]: any;
 }
@@ -20,7 +20,7 @@ export interface CreateDrillData {
   date: Date;
   duration_days?: number;
   created_by: string;
-  createdById?: Types.ObjectId;
+  createdById?: Types.ObjectId | string;
   assigned_to?: string[];
   context?: string;
   audio_example_url?: string;

@@ -7,6 +7,7 @@ import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
 import FreeTalkAttempt from "@/models/free-talk-attempt";
 import { uploadToCloudinary } from "@/services/cloudinary.service";
+import { toUserIdQuery } from "@/lib/api/user-id";
 
 export const maxDuration = 120;
 
@@ -76,7 +77,12 @@ async function getHandler(
     const cursor = searchParams.get("cursor");
     const limit = Math.min(100, Math.max(1, parseInt(limitRaw || "30", 10) || 30));
 
-    const filter: Record<string, unknown> = { learnerId: context.userId };
+    // FreeTalkAttempt.learnerId is Schema.Types.Mixed, so Mongoose will NOT
+    // auto-cast a raw hex string into a real ObjectId — toUserIdQuery ensures
+    // legacy (ObjectId-keyed) learners still match their pre-existing attempts.
+    const filter: Record<string, unknown> = {
+      learnerId: toUserIdQuery(context.userId.toString()),
+    };
     if (cursor && Types.ObjectId.isValid(cursor)) {
       filter._id = { $lt: new Types.ObjectId(cursor) };
     }
@@ -176,7 +182,7 @@ async function postHandler(
     }
 
     const doc = await FreeTalkAttempt.create({
-      learnerId: context.userId,
+      learnerId: toUserIdQuery(context.userId.toString()),
       scenarioId: validated.scenarioId,
       scenarioTitle: validated.scenarioTitle,
       scenarioType: validated.scenarioType,

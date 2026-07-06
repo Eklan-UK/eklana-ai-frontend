@@ -4,6 +4,7 @@ import User from '@/models/user';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import { ValidationError } from '@/lib/api/response';
+import { toUserIdQuery, toUserIdQueryMulti } from '@/lib/api/user-id';
 import type { DrillAssignment as AssignmentType, CreateAssignmentData, AssignmentFilters } from './assignment.types';
 
 /**
@@ -34,7 +35,7 @@ export class AssignmentRepository {
       const query: any = {};
 
       if (filters.learnerId) {
-        query.learnerId = new Types.ObjectId(filters.learnerId);
+        query.learnerId = toUserIdQuery(filters.learnerId);
       }
       if (filters.drillId) {
         query.drillId = new Types.ObjectId(filters.drillId);
@@ -43,7 +44,7 @@ export class AssignmentRepository {
         query.status = filters.status;
       }
       if (filters.assignedBy) {
-        query.assignedBy = new Types.ObjectId(filters.assignedBy);
+        query.assignedBy = toUserIdQuery(filters.assignedBy);
       }
 
       const queryBuilder = DrillAssignment.find(query)
@@ -72,7 +73,7 @@ export class AssignmentRepository {
     try {
       const assignments = await DrillAssignment.find({
         drillId: new Types.ObjectId(drillId),
-        learnerId: { $in: userIds.map(id => new Types.ObjectId(id)) },
+        learnerId: { $in: toUserIdQueryMulti(userIds) },
       })
         .select('learnerId')
         .lean()
@@ -203,6 +204,10 @@ export class AssignmentRepository {
     try {
       const query = { drillId: new Types.ObjectId(drillId) };
 
+      // learnerId is Mixed (ObjectId or UUID string) and no longer has a
+      // schema-level `ref`, so `model: User` is passed explicitly here.
+      // Populate resolves correctly for both id formats because User._id is
+      // also Mixed (see src/models/user.ts) and therefore isn't cast.
       const assignments = await DrillAssignment.find(query)
         .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
@@ -229,7 +234,7 @@ export class AssignmentRepository {
     filters?: { status?: string; limit?: number; offset?: number }
   ): Promise<{ assignments: AssignmentType[]; total: number }> {
     try {
-      const query: any = { learnerId: new Types.ObjectId(learnerId) };
+      const query: any = { learnerId: toUserIdQuery(learnerId) };
       
       if (filters?.status) {
         // Map frontend status to backend status format

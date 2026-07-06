@@ -1,4 +1,3 @@
-import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
 import { AttemptRepository } from './attempt.repository';
 import { DrillRepository } from '../drills/drill.repository';
@@ -7,6 +6,7 @@ import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError } from '@/lib/api/response';
 import { sendDrillReviewNotification } from '@/lib/api/email.service';
 import { onDrillReviewed } from '@/services/notification/triggers';
+import { toUserIdQuery } from '@/lib/api/user-id';
 import DrillAttempt from '@/models/drill-attempt';
 import DrillAssignment from '@/models/drill-assignment';
 
@@ -76,7 +76,9 @@ export class AttemptReviewService {
       isCorrect: review.isCorrect,
       correctedText: review.isCorrect ? undefined : review.correctedText,
       reviewedAt: new Date(),
-      reviewedBy: new Types.ObjectId(reviewerId),
+      // reviewerId may be a UUID (Better Auth admin/tutor account) — a raw
+      // `new Types.ObjectId(...)` throws for UUID ids, unlike toUserIdQuery.
+      reviewedBy: toUserIdQuery(reviewerId),
     }));
 
     attemptDoc.sentenceResults.reviewStatus = 'reviewed';
@@ -137,7 +139,7 @@ export class AttemptReviewService {
       isCorrect: review.isCorrect,
       correctedText: review.isCorrect ? undefined : review.correctedText,
       reviewedAt: new Date(),
-      reviewedBy: new Types.ObjectId(reviewerId),
+      reviewedBy: toUserIdQuery(reviewerId),
     }));
 
     attemptDoc.grammarResults.reviewStatus = 'reviewed';
@@ -193,7 +195,7 @@ export class AttemptReviewService {
       isAcceptable: review.isAcceptable,
       correctedVersion: review.correctedVersion,
       reviewedAt: new Date(),
-      reviewedBy: new Types.ObjectId(reviewerId),
+      reviewedBy: toUserIdQuery(reviewerId),
     };
     attemptDoc.score = review.isAcceptable ? 100 : 0;
     await attemptDoc.save();

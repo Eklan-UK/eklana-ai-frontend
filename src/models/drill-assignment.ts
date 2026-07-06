@@ -7,8 +7,15 @@ import '@/models/drill';
 export interface IDrillAssignment extends Document {
 	_id: Types.ObjectId;
 	drillId: Types.ObjectId; // Reference to Drill
-	learnerId: Types.ObjectId; // Reference to User (kept as learnerId for backward compatibility)
-	assignedBy: Types.ObjectId; // Admin/Tutor who assigned
+	// Reference to User (kept as learnerId for backward compatibility).
+	// Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+	// user ids; legacy/mobile accounts use ObjectId. Stored as Mixed so both
+	// formats can be written and queried without a cast error.
+	learnerId: Types.ObjectId | string;
+	// Admin/Tutor who assigned. Mixed for the same reason as learnerId: Better
+	// Auth's UUID generateId applies to every role, so admin/tutor accounts
+	// can also have a UUID _id.
+	assignedBy: Types.ObjectId | string;
 	assignedAt: Date;
 	dueDate?: Date;
 	status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
@@ -27,14 +34,19 @@ const drillAssignmentSchema = new Schema<IDrillAssignment>(
 			// Removed index: true - covered by compound index { drillId: 1, learnerId: 1 }
 		},
 		learnerId: {
-			type: Schema.Types.ObjectId,
-			ref: 'User',
+			// Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up,
+			// incl. Google/Apple OAuth) can be stored alongside legacy
+			// ObjectId user ids without a Mongoose cast error. No `ref` since
+			// Mongoose populate cannot reliably resolve a mixed-type field;
+			// see AssignmentRepository.findByDrillId for the manual lookup.
+			type: Schema.Types.Mixed,
 			required: [true, 'User ID is required'],
 			// Removed index: true - covered by compound index { learnerId: 1, status: 1, dueDate: 1 }
 		},
 		assignedBy: {
-			type: Schema.Types.ObjectId,
-			ref: 'User',
+			// Mixed: admin/tutor accounts are also Better Auth users and can
+			// have a UUID _id, same as learners.
+			type: Schema.Types.Mixed,
 			required: [true, 'Assigned by user ID is required'],
 			index: true,
 		},

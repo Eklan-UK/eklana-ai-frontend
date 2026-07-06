@@ -6,6 +6,7 @@ import { getAuth } from "@/lib/api/better-auth";
 import { logger } from "@/lib/api/logger";
 import { connectToDatabase } from "@/lib/api/db";
 import config, { parseGoogleClientIds } from "@/lib/api/config";
+import { toRawUserIdFilter } from "@/lib/api/user-id";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,8 +117,14 @@ async function createOrFindUser(
   let user;
 
   if (existingAccount) {
-    // User exists, get user data
-    user = await usersCollection.findOne({ _id: new mongoose.Types.ObjectId(existingAccount.userId) });
+    // User exists, get user data. This is a raw driver query (bypasses
+    // Mongoose schema casting entirely), so it must build its own dual-format
+    // filter: `existingAccount.userId` can be a legacy hex ObjectId string
+    // *or* a Better Auth UUID string (e.g. this account was originally
+    // linked via web/OAuth sign-up and the user is now signing in on
+    // mobile) — force-casting to `Types.ObjectId` would throw for the UUID
+    // case.
+    user = await usersCollection.findOne(toRawUserIdFilter(String(existingAccount.userId)) as any);
     
     if (!user) {
       throw new Error("Account found but user not found");

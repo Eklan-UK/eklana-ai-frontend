@@ -1,6 +1,6 @@
 import Drill from '@/models/drill';
-import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
+import { toUserIdQuery } from '@/lib/api/user-id';
 import type { Drill as DrillType, CreateDrillData } from './drill.types';
 
 /**
@@ -45,7 +45,7 @@ export class DrillRepository {
     }
   ): Promise<DrillType[]> {
     const query: any = {
-      createdById: new Types.ObjectId(creatorId),
+      createdById: toUserIdQuery(creatorId),
     };
 
     if (filters?.type) query.type = filters.type;

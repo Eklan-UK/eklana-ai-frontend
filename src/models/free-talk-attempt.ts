@@ -18,7 +18,10 @@ export type FreeTalkAttemptGradeResult = {
 
 export interface IFreeTalkAttempt extends Document {
   _id: Types.ObjectId;
-  learnerId: Types.ObjectId;
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId. Mixed so both formats
+  // can be stored/queried without a cast error.
+  learnerId: Types.ObjectId | string;
   scenarioId: string;
   scenarioTitle: string;
   scenarioType: string;
@@ -57,8 +60,9 @@ const gradeResultSchema = new Schema<FreeTalkAttemptGradeResult>(
 const freeTalkAttemptSchema = new Schema<IFreeTalkAttempt>(
   {
     learnerId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+      // Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up,
+      // incl. Google/Apple OAuth) can be stored without a cast error.
+      type: Schema.Types.Mixed,
       required: true,
       index: true,
     },
