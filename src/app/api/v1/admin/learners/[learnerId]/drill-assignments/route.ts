@@ -45,7 +45,7 @@ async function handler(
 			learnerId: new Types.ObjectId(canonicalLearnerId),
 		})
 			.select('_id drillId assignedBy status assignedAt dueDate completedAt score')
-			.populate('drillId', 'title type difficulty')
+			.populate('drillId', 'title type difficulty learning_journey_part learning_journey_topic')
 			.populate('assignedBy', 'firstName lastName email')
 			.sort({ assignedAt: -1 })
 			.limit(limit)

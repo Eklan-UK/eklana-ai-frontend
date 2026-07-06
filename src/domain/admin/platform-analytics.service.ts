@@ -514,10 +514,21 @@ function computeOverallAverageScore(
 
 async function getDrillTypeAssignmentStats(
 	learnerMatch: Record<string, unknown>,
-	drillType: 'fill_blank' | 'key_phrases'
+	drillType: 'fill_blank' | 'key_phrases',
+	dateRange?: { from?: Date; to?: Date }
 ): Promise<DrillTypeAssignmentStats> {
+	const dateFilter: Record<string, unknown> = {};
+	if (dateRange?.from || dateRange?.to) {
+		const completedAt: { $gte?: Date; $lte?: Date } = {};
+		if (dateRange.from) completedAt.$gte = dateRange.from;
+		if (dateRange.to) completedAt.$lte = dateRange.to;
+		if (Object.keys(completedAt).length > 0) {
+			dateFilter.completedAt = completedAt;
+		}
+	}
+
 	const result = await DrillAssignment.aggregate([
-		{ $match: learnerMatch },
+		{ $match: { ...learnerMatch, ...dateFilter } },
 		{
 			$lookup: {
 				from: 'drills',
@@ -1054,6 +1065,22 @@ async function aggregateKeyPhrasesStats(
 	};
 }
 
+function parseDateRange(
+	range?: { from?: string; to?: string }
+): { from?: Date; to?: Date } | undefined {
+	if (!range?.from && !range?.to) return undefined;
+	const result: { from?: Date; to?: Date } = {};
+	if (range.from) {
+		const d = new Date(range.from);
+		if (!Number.isNaN(d.getTime())) result.from = d;
+	}
+	if (range.to) {
+		const d = new Date(range.to);
+		if (!Number.isNaN(d.getTime())) result.to = d;
+	}
+	return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function buildDateRangeFilter(
 	range?: { from?: string; to?: string },
 	days?: number
@@ -1085,11 +1112,13 @@ export async function getLearnerFillBlankAnalytics(
 		...buildDateRangeFilter(range),
 	};
 
+	const dateRange = parseDateRange(range);
 	const [attempts, assignmentStats] = await Promise.all([
 		DrillAttempt.find(filter).select('fillBlankResults').lean().exec(),
 		getDrillTypeAssignmentStats(
 			{ learnerId: new Types.ObjectId(learnerId) },
-			'fill_blank'
+			'fill_blank',
+			dateRange
 		),
 	]);
 
@@ -1111,11 +1140,13 @@ export async function getLearnerKeyPhrasesAnalytics(
 		...buildDateRangeFilter(range),
 	};
 
+	const dateRange = parseDateRange(range);
 	const [attempts, assignmentStats] = await Promise.all([
 		DrillAttempt.find(filter).select('keyPhrasesResults').lean().exec(),
 		getDrillTypeAssignmentStats(
 			{ learnerId: new Types.ObjectId(learnerId) },
-			'key_phrases'
+			'key_phrases',
+			dateRange
 		),
 	]);
 

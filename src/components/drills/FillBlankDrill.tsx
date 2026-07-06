@@ -349,7 +349,7 @@ export default function FillBlankDrill({
           type: drill.type,
           score,
         });
-      } else if (passed) {
+      } else {
         await completeLearnerDrill(queryClient, drill._id, {
           drillAssignmentId: assignmentId!,
           score,

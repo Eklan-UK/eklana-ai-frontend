@@ -186,6 +186,18 @@ export async function getLearnerMyDrillsPayload(
     };
   });
 
+  // Warn when the learner has drill.assigned_to entries but zero drill_assignments rows
+  // — a sign that the two collections have drifted out of sync.
+  if (drills.length === 0) {
+    const orphanCount = await Drill.countDocuments({ assigned_to: learnerId }).exec();
+    if (orphanCount > 0) {
+      console.warn(
+        '[getLearnerMyDrillsPayload] User has drill.assigned_to entries but 0 drill_assignments rows — possible sync issue',
+        { learnerId: learnerId.toString(), orphanDrillCount: orphanCount }
+      );
+    }
+  }
+
   await purgeExpiredFreeTalkScenarios();
 
   let freeTalkDrills: LearnerFreeTalkPlanRow[] = [];
