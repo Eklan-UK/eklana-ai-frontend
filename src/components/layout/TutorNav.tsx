@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock, List } from "lucide-react";
 
 export function TutorNav() {
   const pathname = usePathname();
@@ -25,8 +25,13 @@ export function TutorNav() {
     },
     {
       href: "/tutor/drills",
-      label: "Drills",
+      label: "Drill Builder",
       icon: BookOpen,
+    },
+    {
+      href: "/tutor/drills/all",
+      label: "Old Drill Builder",
+      icon: List,
     },
     {
       href: "/tutor/students",
@@ -42,8 +47,8 @@ export function TutorNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card md:relative md:h-screen md:w-64 md:border-r md:border-t-0 md:border-border">
-      {/* Mobile: 6-column grid — Dashboard, Classes, Hours, Drills, Students, Settings */}
-      <div className="grid grid-cols-6 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
+      {/* Mobile: 4-column grid with wrapping; desktop sidebar */}
+      <div className="grid grid-cols-4 md:flex md:flex-col md:items-stretch md:justify-start md:py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname?.startsWith(item.href);

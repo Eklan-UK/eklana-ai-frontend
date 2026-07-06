@@ -6,18 +6,24 @@ import { logger } from './logger';
 import { fromNodeHeaders } from 'better-auth/node';
 import { connectToDatabase } from './db';
 import { isUserSubscribed } from './user-subscription';
+import { toRawUserIdFilter } from './user-id';
 import User from '@/models/user';
 
 // Extend NextRequest to include user info
+//
+// userId is a string, not Types.ObjectId. Better Auth (web sign-up, incl.
+// Google/Apple OAuth) assigns UUID string user ids; legacy/mobile accounts
+// use ObjectId hex strings. Callers that need a Mongoose query value should
+// use toUserIdQuery()/toUserIdQueryMulti() from './user-id'.
 export interface AuthenticatedRequest extends NextRequest {
-	userId?: Types.ObjectId;
+	userId?: string;
 	userRole?: 'admin' | 'user' | 'tutor';
 }
 
 /**
  * Validate Bearer token from mobile app
  */
-async function validateBearerToken(token: string): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | null> {
+async function validateBearerToken(token: string): Promise<{ userId: string; userRole: 'admin' | 'user' | 'tutor' } | null> {
 	const maxRetries = 2;
 	let lastError: Error | null = null;
 	
@@ -79,52 +85,38 @@ async function validateBearerToken(token: string): Promise<{ userId: Types.Objec
 			expiresAt: session.expiresAt,
 		});
 
-		// Handle userId as string or ObjectId
-		let userId: Types.ObjectId;
+		// Normalize session.userId to a plain string. Better Auth (web
+		// sign-up, incl. Google/Apple OAuth) stores UUID string user ids;
+		// legacy/mobile accounts store ObjectId hex strings or BSON
+		// ObjectId instances. We no longer force-cast to Types.ObjectId
+		// here — that throws for UUID users and previously caused this
+		// function to return null (401) for every UUID-keyed session.
+		let rawUserId: string;
 		if (typeof session.userId === 'string') {
-			try {
-				userId = new Types.ObjectId(session.userId);
-			} catch (error) {
-				logger.error('Failed to convert userId string to ObjectId', {
-					userId: session.userId,
-					error: error instanceof Error ? error.message : String(error),
-				});
-				return null;
-			}
+			rawUserId = session.userId;
 		} else if (session.userId instanceof Types.ObjectId) {
-			userId = session.userId;
+			rawUserId = session.userId.toString();
 		} else if (session.userId && typeof session.userId === 'object' && 'toString' in session.userId) {
-			// Handle MongoDB ObjectId wrapper
-			userId = new Types.ObjectId(session.userId.toString());
+			rawUserId = session.userId.toString();
 		} else {
-			// Try to convert
-			try {
-				userId = new Types.ObjectId(String(session.userId));
-			} catch (error) {
-				logger.error('Failed to convert userId to ObjectId', {
-					userId: session.userId,
-					userIdType: typeof session.userId,
-					error: error instanceof Error ? error.message : String(error),
-				});
-				return null;
-			}
+			rawUserId = String(session.userId);
 		}
 
 		logger.info('Looking up user with userId', {
-			userId: userId.toString(),
+			userId: rawUserId,
 			userIdType: typeof session.userId,
 		});
 
-		// Get user from session - try both ObjectId and string
-		const user = await usersCollection.findOne({
-			$or: [
-				{ _id: userId },
-				{ _id: new Types.ObjectId(String(session.userId)) },
-			],
-		});
+		// Query the raw `users` collection directly (not via the Mongoose
+		// model) so the lookup works whether _id is a UUID string or an
+		// ObjectId, without any Mongoose/BSON cast attempt. The MongoDB
+		// driver's Filter<Document> type infers `_id` as ObjectId-only when
+		// the collection has no explicit schema, so `as any` is required
+		// here to intentionally allow both id shapes.
+		const user = await usersCollection.findOne(toRawUserIdFilter(rawUserId) as any);
 
 		if (!user) {
-			logger.warn('User not found for session userId:', userId);
+			logger.warn('User not found for session userId:', rawUserId);
 			return null;
 		}
 
@@ -134,13 +126,15 @@ async function validateBearerToken(token: string): Promise<{ userId: Types.Objec
 			userRole = 'user';
 		}
 
+			const resolvedUserId = user._id.toString();
+
 			logger.info('Bearer token validated successfully', {
-				userId: userId.toString(),
+				userId: resolvedUserId,
 				userRole,
 			});
 
 			return {
-				userId: new Types.ObjectId(user._id),
+				userId: resolvedUserId,
 				userRole: userRole as 'admin' | 'user' | 'tutor',
 			};
 		} catch (error: any) {
@@ -183,7 +177,7 @@ async function validateBearerToken(token: string): Promise<{ userId: Types.Objec
  */
 export const requireAuth = async (
 	req: NextRequest
-): Promise<{ userId: Types.ObjectId; userRole: 'admin' | 'user' | 'tutor' } | NextResponse> => {
+): Promise<{ userId: string; userRole: 'admin' | 'user' | 'tutor' } | NextResponse> => {
 	try {
 		// First, check for Bearer token (mobile app)
 		const authHeader = req.headers.get('authorization');
@@ -256,9 +250,12 @@ export const requireAuth = async (
 			userRole = 'user';
 		}
 
-		// Return userId and userRole
+		// Return userId and userRole. session.user.id is a UUID string for
+		// Better Auth web accounts (incl. Google/Apple OAuth) or an ObjectId
+		// hex string for legacy accounts — kept as a plain string rather than
+		// force-cast to Types.ObjectId, which throws for UUID users.
 		return {
-			userId: new Types.ObjectId(session.user.id),
+			userId: session.user.id,
 			userRole: userRole as 'admin' | 'user' | 'tutor',
 		};
 	} catch (error: any) {
@@ -311,7 +308,7 @@ export const requireRole = (allowedRoles: string[]) => {
 
 // Helper to create authenticated API handler
 export const withAuth = <T = any>(
-	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+	handler: (req: NextRequest, context: T & { userId: string; userRole: string }) => Promise<NextResponse>
 ) => {
 	return async (req: NextRequest, context?: any) => {
 		const authResult = await requireAuth(req);
@@ -324,10 +321,13 @@ export const withAuth = <T = any>(
 
 // Helper to create subscription-gated API handler (requires active premium plan)
 export const withPremium = <T = any>(
-	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+	handler: (req: NextRequest, context: T & { userId: string; userRole: string }) => Promise<NextResponse>
 ) => {
 	return withAuth<T>(async (req, context) => {
 		await connectToDatabase();
+		// User._id uses a custom SchemaType (see src/models/user.ts) that casts
+		// ObjectId-shaped strings to real ObjectIds for both formats, so
+		// findById works unmodified for both legacy ObjectId and UUID ids.
 		const user = await User.findById(context.userId)
 			.select(
 				'subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId'
@@ -350,7 +350,7 @@ export const withPremium = <T = any>(
 // Helper to create role-protected API handler
 export const withRole = <T = any>(
 	allowedRoles: string[],
-	handler: (req: NextRequest, context: T & { userId: Types.ObjectId; userRole: string }) => Promise<NextResponse>
+	handler: (req: NextRequest, context: T & { userId: string; userRole: string }) => Promise<NextResponse>
 ) => {
 	return async (req: NextRequest, context?: any) => {
 		const authResult = await requireAuth(req);

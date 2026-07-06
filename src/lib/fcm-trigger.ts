@@ -13,6 +13,7 @@ import {
 
 export enum NotificationType {
   CLASS_SESSION_REMINDER = "class_session_reminder",
+  CLASS_NPS_FORM = "class_nps_form",
   LESSON_REMINDER = "lesson_reminder",
   DRILL_REMINDER = "drill_reminder",
   ASSIGNMENT_DUE = "assignment_due",
@@ -416,6 +417,10 @@ export const getNotificationTemplate = (
     [NotificationType.CLASS_SESSION_REMINDER]: {
       title: "Class reminder",
       body: "Your live class is coming up soon",
+    },
+    [NotificationType.CLASS_NPS_FORM]: {
+      title: "Class feedback",
+      body: "Share your feedback about today's class",
     },
     [NotificationType.LESSON_REMINDER]: {
       title: "Lesson Reminder",

@@ -11,6 +11,7 @@ import '@/models/drill';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { drillDisplayLabel } from '@/lib/drill-display-label';
 
 const updateStudentNameSchema = z.object({
 	firstName: z.string().min(1).max(50),
@@ -105,7 +106,7 @@ async function handler(
 			learnerId: studentObjectId,
 			assignedBy: context.userId,
 		})
-			.populate('drillId', 'title type difficulty')
+			.populate('drillId', 'title type difficulty learning_journey_part learning_journey_topic')
 			.sort({ assignedAt: -1 })
 			.lean()
 			.exec();
@@ -152,7 +153,7 @@ async function handler(
 			const drillData = {
 				id: assignment._id,
 				drillId: drill?._id,
-				title: drill?.title || 'Unknown Drill',
+				title: drill?.title || drillDisplayLabel(drill) || 'Unknown Drill',
 				type: drill?.type || 'unknown',
 				difficulty: drill?.difficulty,
 				status: assignment.status,

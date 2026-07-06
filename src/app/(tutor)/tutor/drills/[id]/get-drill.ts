@@ -21,7 +21,7 @@ export async function getDrillById(drillId: string) {
     }
 
     const data = await response.json();
-    return data.drill || data;
+    return data.data?.drill || data.drill || null;
   } catch (error) {
     console.error('Failed to fetch drill:', error);
     return null;

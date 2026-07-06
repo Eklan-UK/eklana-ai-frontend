@@ -24,7 +24,7 @@ const assignmentFields = {
 };
 
 function refineAssignment(
-	data: { allLearners: boolean; assignedLearnerIds: Types.ObjectId[] },
+	data: { allLearners: boolean; assignedLearnerIds: Array<Types.ObjectId | string> },
 	ctx: z.RefinementCtx,
 ) {
 	if (!data.allLearners && data.assignedLearnerIds.length === 0) {
@@ -77,7 +77,7 @@ export const freeTalkScenarioPatchSchema = z
 	});
 
 export function serializeFreeTalkScenario(doc: Record<string, unknown>) {
-	const assigned = (doc.assignedLearnerIds as Types.ObjectId[] | undefined) ?? [];
+	const assigned = (doc.assignedLearnerIds as Array<Types.ObjectId | string> | undefined) ?? [];
 	const forEveryone = doc.allLearners !== false;
 	const completionDate = doc.completionDate as Date | undefined;
 	return {

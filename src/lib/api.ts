@@ -1068,12 +1068,18 @@ export const adminAPI = {
   },
 
   // Get drill assignments for a learner (admin/tutor)
-  getLearnerDrillAssignments: (learnerId: string) => {
+  getLearnerDrillAssignments: (learnerId: string, params?: { limit?: number | 'all' }) => {
     return apiRequest<{
       code?: string;
       message?: string;
       data?: {
         assignments: any[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
         statistics: {
           total: number;
           completed: number;
@@ -1084,7 +1090,7 @@ export const adminAPI = {
           completionRate: number;
         };
       };
-    }>(`/admin/learners/${learnerId}/drill-assignments`, {
+    }>(`/admin/learners/${learnerId}/drill-assignments?limit=${params?.limit ?? 0}`, {
       method: 'GET',
     });
   },
@@ -1987,6 +1993,80 @@ export const weeklyChallengeAPI = {
 			method: 'DELETE',
 		});
 	},
+};
+
+// Student context & weeks (AI User Builder)
+export interface StudentContextData {
+  _id?: string;
+  studentId: string;
+  nativeLanguage: string;
+  professionalRole: string;
+  hospitalUnit: string;
+  country: string;
+  proficiencyLevel: 'beginner' | 'intermediate' | 'advanced';
+  goals: string;
+  simulationWeaknesses?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpsertStudentContextInput {
+  nativeLanguage: string;
+  professionalRole: string;
+  hospitalUnit: string;
+  country: string;
+  proficiencyLevel: 'beginner' | 'intermediate' | 'advanced';
+  goals: string;
+  simulationWeaknesses?: string;
+}
+
+export interface StudentWeekDrill {
+  assignmentId: string;
+  drillId: string | null;
+  title: string | null;
+  type: string | null;
+  difficulty: string | null;
+  topic: string | null;
+  part: string | null;
+  status: string;
+  assignedAt: string;
+  dueDate: string | null;
+  completedAt: string | null;
+}
+
+export interface StudentWeekData {
+  weekNumber: number;
+  weekStartDate: string;
+  weekEndDate: string;
+  drills: StudentWeekDrill[];
+  items?: StudentWeekDrill[];
+}
+
+export const studentAPI = {
+  getStudentContext: (studentId: string) => {
+    return apiRequest<{ code: string; data: StudentContextData }>(
+      `/students/${studentId}/context`,
+      { cache: false },
+    );
+  },
+
+  upsertStudentContext: (studentId: string, data: UpsertStudentContextInput) => {
+    return apiRequest<{ code: string; data: StudentContextData }>(
+      `/students/${studentId}/context`,
+      { method: 'POST', data },
+    );
+  },
+
+  getStudentWeeks: (studentId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        anchorDate: string;
+        currentWeek: number;
+        weeks: StudentWeekData[];
+      };
+    }>(`/students/${studentId}/weeks`, { cache: false });
+  },
 };
 
 // Streak API

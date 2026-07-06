@@ -23,7 +23,7 @@ export default async function DrillDetailPage({
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Drill not found</h2>
-          <Link href="/tutor/drills">
+          <Link href="/tutor/drills/all">
             <Button variant="primary">Back to Drills</Button>
           </Link>
         </div>

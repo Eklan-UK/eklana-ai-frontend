@@ -16,7 +16,18 @@ export const DEFAULT_DRILL_LIST_FILTERS: DrillListFilters = {
   offset: 0,
 };
 
-const ALLOWED_RETURN_PREFIXES = ["/admin/drill", "/tutor/drills"] as const;
+const ALLOWED_RETURN_PREFIXES = [
+  "/admin/drill",
+  "/admin/drills",
+  "/admin/ai-drill-builder",
+  "/admin/ai-user-builder",
+  "/admin/learners",
+  "/tutor/drills",
+  "/tutor/drills/all",
+  "/tutor/ai-drill-builder",
+  "/tutor/ai-user-builder",
+  "/tutor/students",
+] as const;
 
 function parseOffset(value: string | null): number {
   if (!value) return 0;
@@ -88,18 +99,26 @@ export function sanitizeReturnTo(value: string | null | undefined): string | nul
   if (!decoded.startsWith("/") || decoded.startsWith("//")) return null;
 
   const allowed = ALLOWED_RETURN_PREFIXES.some(
-    (prefix) => decoded === prefix || decoded.startsWith(`${prefix}?`)
+    (prefix) =>
+      decoded === prefix ||
+      decoded.startsWith(`${prefix}/`) ||
+      decoded.startsWith(`${prefix}?`),
   );
   if (!allowed) return null;
 
   return decoded;
 }
 
+// NOTE: returns the raw (unencoded) path. `appendReturnTo` is responsible for
+// URI-encoding it when embedding it into another URL's query string - this
+// keeps every producer/consumer of a "returnTo" value working with plain,
+// decoded paths (matching what `searchParams.get("returnTo")` already gives
+// you) instead of some callers holding encoded values and others decoded.
 export function buildReturnToQueryParam(filters: DrillListFilters, basePath: string): string {
-  return encodeURIComponent(buildDrillListPath(basePath, filters));
+  return buildDrillListPath(basePath, filters);
 }
 
 export function appendReturnTo(href: string, returnTo: string): string {
   const separator = href.includes("?") ? "&" : "?";
-  return `${href}${separator}returnTo=${returnTo}`;
+  return `${href}${separator}returnTo=${encodeURIComponent(returnTo)}`;
 }

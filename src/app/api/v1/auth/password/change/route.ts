@@ -5,7 +5,6 @@ import { withAuth } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
 import User from "@/models/user";
-import { Types } from "mongoose";
 import {
   applyPasswordUpdate,
   getCredentialPasswordHash,
@@ -15,7 +14,9 @@ import {
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  // userId is a plain string (UUID for Better Auth web/OAuth users, hex
+  // ObjectId string for legacy/mobile accounts) — see src/lib/api/middleware.ts.
+  context: { userId: string; userRole: string },
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();

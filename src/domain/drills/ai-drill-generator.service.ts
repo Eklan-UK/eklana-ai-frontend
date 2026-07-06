@@ -21,6 +21,10 @@ interface GenerateDrillParams {
   prompt: string;
   topic: string;
   part: string;
+  studentContext?: object;
+  drillWeaknesses?: object[];
+  templatePrompt?: string;
+  drillHistory?: object[];
 }
 
 type FunctionTool = Extract<OpenAI.Chat.Completions.ChatCompletionTool, { type: 'function' }>;
@@ -83,7 +87,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_roleplay',
-      description: 'Generate roleplay drill content',
+      description: 'Generate roleplay drill content. Every character that speaks in the dialogue must be listed in ai_character_names. No character should appear as a speaker in the dialogue unless they are declared in student_character_name or ai_character_names.',
       parameters: {
         type: 'object',
         properties: {
@@ -93,6 +97,7 @@ const tools: Record<DrillType, FunctionTool> = {
             items: { type: 'string' },
           },
           drill_intro: { type: 'string' },
+          context: { type: 'string' },
           roleplay_scenes: {
             type: 'array',
             items: {
@@ -116,7 +121,7 @@ const tools: Record<DrillType, FunctionTool> = {
             },
           },
         },
-        required: ['student_character_name', 'ai_character_names', 'drill_intro', 'roleplay_scenes'],
+        required: ['student_character_name', 'ai_character_names', 'drill_intro', 'context', 'roleplay_scenes'],
       },
     },
   },
@@ -328,7 +333,21 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
       },
       {
         role: 'user',
-        content: `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,
+        content: [
+          params.templatePrompt ?? null,
+          `Generate ${params.drillType} drill content.\nDifficulty: ${params.difficulty}\nContext: ${context}\n${prompt}`,
+          params.studentContext
+            ? `Student Context: ${JSON.stringify(params.studentContext)}`
+            : null,
+          params.drillWeaknesses?.length
+            ? `Student Weaknesses to target: ${JSON.stringify(params.drillWeaknesses)}`
+            : null,
+          params.drillHistory?.length
+            ? `Previous drills created for this student (avoid repeating content): ${JSON.stringify(params.drillHistory)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
       },
     ],
     tools: toolsArray,

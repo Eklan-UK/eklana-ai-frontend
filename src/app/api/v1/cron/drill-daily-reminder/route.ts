@@ -1,4 +1,4 @@
-// GET /api/v1/cron/drill-daily-reminder — rolling streak reminder (every 30 min)
+// DEPRECATED — use /api/v1/cron/drill-streak-reminder (rolling streak reminder every 30 min)
 // Auth: CRON_SECRET (Vercel) or DRILL_REMINDER_CRON_SECRET (local)
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
@@ -9,14 +9,20 @@ import {
   sanitizeCronResult,
   shouldCronDebug,
 } from '@/lib/api/cron-auth';
-import '@/models/fcm-token';
+import '@/models/user';
 import '@/models/drill-assignment';
 import '@/models/profile';
 import '@/models/user-streak';
+import '@/models/push-token.model';
+import '@/models/notification.model';
 
 const ROUTE_SECRET_ENV = 'DRILL_REMINDER_CRON_SECRET';
 
 export async function GET(req: NextRequest) {
+  console.warn(
+    '[cron] drill-daily-reminder is deprecated — use drill-streak-reminder',
+  );
+
   if (!isCronConfigured(ROUTE_SECRET_ENV)) {
     return NextResponse.json(
       {

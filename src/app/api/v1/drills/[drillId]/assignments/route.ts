@@ -10,7 +10,7 @@ import { AssignmentRepository } from '@/domain/assignments/assignment.repository
 
 async function handler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string },
+	context: { userId: string; userRole: string },
 	params: { drillId: string }
 ) {
 	await connectToDatabase();

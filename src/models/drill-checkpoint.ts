@@ -3,7 +3,9 @@ import '@/models/user';
 
 export interface IDrillCheckpoint extends Document {
   _id: Types.ObjectId;
-  userId: Types.ObjectId;
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId.
+  userId: Types.ObjectId | string;
   drillId: Types.ObjectId;
   drillAssignmentId: Types.ObjectId;
   drillType: string;
@@ -19,8 +21,10 @@ export interface IDrillCheckpoint extends Document {
 const drillCheckpointSchema = new Schema<IDrillCheckpoint>(
   {
     userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
+      // Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up,
+      // incl. Google/Apple OAuth) can be stored without a cast error. No
+      // `ref` since populate cannot reliably resolve a mixed-type field.
+      type: Schema.Types.Mixed,
       required: true,
       index: true,
     },

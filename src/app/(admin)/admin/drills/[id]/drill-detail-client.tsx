@@ -7,6 +7,7 @@ import {
   Edit,
   Trash2,
   Users,
+  Eye,
   Clock,
   BookOpen,
   CheckCircle,
@@ -21,10 +22,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { useDrillAssignments } from "@/hooks/useAdmin";
+import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
+import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
 
 interface DrillDetailClientProps {
   drill: any;
@@ -33,7 +36,12 @@ interface DrillDetailClientProps {
 
 export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const drillListReturnPath =
+    sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill";
+  const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
+  const [showAssignedModal, setShowAssignedModal] = useState(false);
   const { data: assignmentsData } = useDrillAssignments(drillId);
   const assignments = assignmentsData?.assignments || [];
 
@@ -50,7 +58,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     try {
       await drillAPI.delete(drillId);
       toast.success("Drill deleted successfully");
-      router.push("/admin/drill");
+      router.push(drillListReturnPath);
     } catch (error: any) {
       toast.error(error.message || "Failed to delete drill");
     } finally {
@@ -114,25 +122,36 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
       <div className="max-w-4xl mx-auto px-4 py-6 md:px-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <Link href="/admin/drill">
+          <Link href={drillListReturnPath}>
             <Button variant="outline" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
           </Link>
           <div className="flex items-center gap-2">
-            <Link href={`/admin/drills/create?drillId=${drillId}`}>
+            <Link
+              href={
+                returnToParam
+                  ? appendReturnTo(
+                      `/admin/drills/create?drillId=${drillId}`,
+                      returnToParam,
+                    )
+                  : `/admin/drills/create?drillId=${drillId}`
+              }
+            >
               <Button variant="outline" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
             </Link>
-            <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
-              <Button variant="outline" size="sm">
-                <Users className="w-4 h-4 mr-2" />
-                Assign
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAssignedModal(true)}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -698,6 +717,14 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           </Card>
         )}
       </div>
+
+      {showAssignedModal && (
+        <AssignedStudentsModal
+          drillId={drillId}
+          drillTitle={drill.title}
+          onClose={() => setShowAssignedModal(false)}
+        />
+      )}
     </div>
   );
 }

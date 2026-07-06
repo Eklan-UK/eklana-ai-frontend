@@ -1,6 +1,6 @@
 import User from '@/models/user';
-import { Types } from 'mongoose';
 import { NotFoundError } from './response';
+import { toUserIdQueryMulti } from './user-id';
 
 /**
  * User service for common user operations
@@ -46,7 +46,7 @@ export const userService = {
    */
   findMultiple: async (userIds: string[], select?: string) => {
     return User.find({ 
-      _id: { $in: userIds.map(id => new Types.ObjectId(id)) } 
+      _id: { $in: toUserIdQueryMulti(userIds) } 
     })
       .select(select || 'email firstName lastName')
       .lean()
@@ -76,7 +76,7 @@ export const userService = {
       role === 'user' ? { $in: ['user', 'learner'] as const } : role;
 
     const users = await User.find({
-      _id: { $in: userIds.map(id => new Types.ObjectId(id)) },
+      _id: { $in: toUserIdQueryMulti(userIds) },
       role: roleFilter,
     })
       .select(select || 'email firstName lastName')
