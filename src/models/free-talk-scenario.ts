@@ -16,8 +16,13 @@ export interface IFreeTalkScenario extends Document {
 	hint: string;
 	/** When true, all learners see this scenario. When false, only `assignedLearnerIds`. */
 	allLearners: boolean;
-	/** User ids (role user) who can access the scenario when `allLearners` is false. */
-	assignedLearnerIds: Types.ObjectId[];
+	/**
+	 * User ids (role user) who can access the scenario when `allLearners` is
+	 * false. Mixed element type: Better Auth (web sign-up, incl. Google/Apple
+	 * OAuth) assigns UUID string user ids; legacy/mobile accounts use
+	 * ObjectId.
+	 */
+	assignedLearnerIds: Array<Types.ObjectId | string>;
 	/** End of availability; document is removed after this instant (TTL + read-time purge). */
 	completionDate: Date;
 	createdBy?: Types.ObjectId;
@@ -65,7 +70,10 @@ const FreeTalkScenarioSchema = new Schema<IFreeTalkScenario>(
 			default: true,
 		},
 		assignedLearnerIds: {
-			type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+			// Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up,
+			// incl. Google/Apple OAuth) can be stored without a cast error.
+			// No `ref` since populate cannot reliably resolve a mixed field.
+			type: [Schema.Types.Mixed],
 			default: [],
 		},
 		createdBy: {

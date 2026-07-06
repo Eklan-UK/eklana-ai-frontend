@@ -7,12 +7,13 @@
  *   npx tsx scripts/diagnose-drill-visibility.ts --userId 6962512f843eb475d11a9556
  */
 import "dotenv/config";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 import { connectToDatabase } from "../src/lib/api/db";
 import User from "../src/models/user";
 import Drill from "../src/models/drill";
 import DrillAssignment from "../src/models/drill-assignment";
 import { isUserSubscribed } from "../src/lib/api/user-subscription";
+import { isValidUserId, toUserIdQuery } from "../src/lib/api/user-id";
 
 function argValue(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
@@ -22,16 +23,6 @@ function argValue(flag: string): string | undefined {
 
 const targetEmail = argValue("--email")?.trim().toLowerCase();
 const targetUserId = argValue("--userId")?.trim();
-
-function canParseAsObjectId(id: string): boolean {
-  try {
-    if (!Types.ObjectId.isValid(id)) return false;
-    new Types.ObjectId(id);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function main() {
   if (!targetEmail && !targetUserId) {
@@ -52,11 +43,14 @@ async function main() {
       process.exit(1);
     }
   } else {
-    if (!canParseAsObjectId(targetUserId!)) {
+    // Accepts UUID (Better Auth web sign-up, incl. Google/Apple OAuth) or
+    // ObjectId (legacy/mobile) user ids. User._id is Schema.Types.Mixed, so
+    // findById works unmodified for both formats.
+    if (!isValidUserId(targetUserId!)) {
       console.error(`Invalid userId format: ${targetUserId}`);
       process.exit(1);
     }
-    user = await User.findById(new Types.ObjectId(targetUserId)).exec();
+    user = await User.findById(targetUserId).exec();
     if (!user) {
       console.error(`No user found for userId: ${targetUserId}`);
       process.exit(1);
@@ -90,9 +84,7 @@ async function main() {
   console.log(JSON.stringify({ isSubscribed: subscribed }, null, 2));
 
   // 3. Count drill_assignments rows for learnerId
-  const learnerObjectId = canParseAsObjectId(userId)
-    ? new Types.ObjectId(userId)
-    : userId;
+  const learnerObjectId = toUserIdQuery(userId);
   const assignmentCount = await DrillAssignment.countDocuments({
     learnerId: learnerObjectId,
   }).exec();

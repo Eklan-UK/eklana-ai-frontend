@@ -1,8 +1,8 @@
-import { Types } from "mongoose";
 import bcrypt from "bcryptjs";
 import { verifyPassword } from "better-auth/crypto";
 import { connectToDatabase } from "@/lib/api/db";
 import { getAuth } from "@/lib/api/better-auth";
+import { toRawUserIdFilter } from "@/lib/api/user-id";
 import User from "@/models/user";
 
 /** Shape used from Better Auth internalAdapter.findAccounts (credential row). */
@@ -15,22 +15,32 @@ function isBcryptHash(storedHash: string): boolean {
   return storedHash.startsWith("$2");
 }
 
-async function resolveAuthUserId(mongoUserId: Types.ObjectId): Promise<string> {
+// userId is a plain string: a UUID for Better Auth web/OAuth sign-ups, or a
+// 24-char hex ObjectId string for legacy/mobile accounts (see
+// src/lib/api/user-id.ts). Kept as `string` throughout rather than
+// `Types.ObjectId` since callers (auth middleware's `context.userId`) never
+// hand back a cast ObjectId instance anymore.
+async function resolveAuthUserId(userId: string): Promise<string> {
   await connectToDatabase();
   const auth = await getAuth();
   const ctx = await auth.$context;
 
-  const byMongoId = await ctx.internalAdapter.findUserById(mongoUserId.toString());
+  const byMongoId = await ctx.internalAdapter.findUserById(userId);
   if (byMongoId?.id) return byMongoId.id;
 
   const mongoose = await import("mongoose");
   const db = mongoose.connection.db;
-  const userDoc = await db?.collection("users").findOne({ _id: mongoUserId });
+  // Raw driver query against the `users` collection bypasses Mongoose's
+  // schema-based casting entirely, so a legacy hex-string id would never
+  // match a document whose `_id` is stored as a real BSON ObjectId unless
+  // we explicitly build the filter with `toRawUserIdFilter` (same pattern
+  // as the bearer-token path in src/lib/api/middleware.ts).
+  const userDoc = await db?.collection("users").findOne(toRawUserIdFilter(userId) as any);
   if (userDoc && typeof userDoc.id === "string" && userDoc.id.length > 0) {
     return userDoc.id;
   }
 
-  return mongoUserId.toString();
+  return userId;
 }
 
 export async function verifyStoredPassword(
@@ -47,7 +57,7 @@ export async function verifyStoredPassword(
 }
 
 export async function getCredentialPasswordHash(
-  userId: Types.ObjectId,
+  userId: string,
 ): Promise<string | null> {
   await connectToDatabase();
   const auth = await getAuth();
@@ -63,7 +73,7 @@ export async function getCredentialPasswordHash(
 }
 
 export async function userHasPassword(
-  userId: Types.ObjectId,
+  userId: string,
   userPassword?: string | null,
 ): Promise<boolean> {
   if (userPassword) return true;
@@ -73,7 +83,7 @@ export async function userHasPassword(
 
 /** Set password via Better Auth so email sign-in uses the same credential store. */
 export async function applyPasswordUpdate(
-  userId: Types.ObjectId,
+  userId: string,
   plainPassword: string,
 ): Promise<void> {
   await connectToDatabase();

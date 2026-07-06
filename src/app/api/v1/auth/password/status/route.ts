@@ -4,12 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
-import { Types } from "mongoose";
 import { userHasPassword } from "@/lib/api/password-account";
 
 async function handler(
   _req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  // userId is a plain string (UUID for Better Auth web/OAuth users, hex
+  // ObjectId string for legacy/mobile accounts) — see src/lib/api/middleware.ts.
+  context: { userId: string; userRole: string },
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();

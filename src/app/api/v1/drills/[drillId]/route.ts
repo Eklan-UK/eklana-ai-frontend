@@ -142,7 +142,7 @@ const updateDrillSchema = z.object({
 // GET handler
 async function getHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string },
+	context: { userId: string; userRole: string },
 	params: { drillId: string }
 ) {
 	await connectToDatabase();
@@ -171,7 +171,7 @@ async function getHandler(
 // PUT handler
 async function putHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string },
+	context: { userId: string; userRole: string },
 	params: { drillId: string }
 ) {
 	await connectToDatabase();
@@ -291,7 +291,7 @@ async function putHandler(
 // DELETE handler
 async function deleteHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string },
+	context: { userId: string; userRole: string },
 	params: { drillId: string }
 ) {
 	await connectToDatabase();

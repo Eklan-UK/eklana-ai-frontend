@@ -10,10 +10,10 @@
  *
  * Weekly change is derived by comparing the rolling 7-day window to the prior 7-day window.
  */
-import { Types } from 'mongoose';
 import { connectToDatabase } from '@/lib/api/db';
 import DrillAttempt from '@/models/drill-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
+import { toUserIdQuery } from '@/lib/api/user-id';
 import { extractDrillQualityScore, getConfidenceLabel } from '@/domain/confidence/confidence.service';
 import type { ConfidenceLabel } from '@/models/learner-confidence';
 
@@ -122,7 +122,13 @@ export async function computeProgressScorecard(
 	learnerId: string,
 ): Promise<ProgressScorecardMetrics> {
 	await connectToDatabase();
-	const oid = new Types.ObjectId(learnerId);
+	// learnerId may be a UUID (Better Auth web sign-up, incl. Google/Apple
+	// OAuth) or an ObjectId hex string (legacy/mobile accounts). DrillAttempt
+	// and FreeTalkAttempt both store `learnerId` as Schema.Types.Mixed, so a
+	// raw `new Types.ObjectId(...)` would throw for UUID learners (crashing
+	// this learner-facing scorecard endpoint) and would fail to auto-cast for
+	// ObjectId learners anyway since Mixed's castForQuery is a no-op.
+	const oid = toUserIdQuery(learnerId);
 
 	const now = new Date();
 	const WEEK_MS = 7 * 24 * 60 * 60 * 1000;

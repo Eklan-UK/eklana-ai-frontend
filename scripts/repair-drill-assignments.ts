@@ -16,6 +16,7 @@ import { connectToDatabase } from "../src/lib/api/db";
 import User from "../src/models/user";
 import Drill from "../src/models/drill";
 import DrillAssignment from "../src/models/drill-assignment";
+import { isValidUserId, toUserIdQuery } from "../src/lib/api/user-id";
 
 function argValue(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
@@ -30,16 +31,6 @@ function hasFlag(flag: string): boolean {
 const targetEmail = argValue("--email")?.trim().toLowerCase();
 const targetUserId = argValue("--userId")?.trim();
 const dryRun = !hasFlag("--apply");
-
-function canParseAsObjectId(id: string): boolean {
-  try {
-    if (!Types.ObjectId.isValid(id)) return false;
-    new Types.ObjectId(id);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function main() {
   if (!targetEmail && !targetUserId) {
@@ -64,11 +55,14 @@ async function main() {
       process.exit(1);
     }
   } else {
-    if (!canParseAsObjectId(targetUserId!)) {
+    // Accepts UUID (Better Auth web sign-up, incl. Google/Apple OAuth) or
+    // ObjectId (legacy/mobile) user ids. User._id is Schema.Types.Mixed, so
+    // findById works unmodified for both formats.
+    if (!isValidUserId(targetUserId!)) {
       console.error(`Invalid userId format: ${targetUserId}`);
       process.exit(1);
     }
-    user = await User.findById(new Types.ObjectId(targetUserId)).exec();
+    user = await User.findById(targetUserId).exec();
     if (!user) {
       console.error(`No user found for userId: ${targetUserId}`);
       process.exit(1);
@@ -76,12 +70,7 @@ async function main() {
   }
 
   const userId = String(user!._id);
-  if (!canParseAsObjectId(userId)) {
-    console.error(`Cannot convert userId to ObjectId: ${userId}`);
-    process.exit(1);
-  }
-
-  const learnerObjectId = new Types.ObjectId(userId);
+  const learnerObjectId = toUserIdQuery(userId);
   console.log(`\nUser: ${user!.email} (${userId})`);
 
   // Find all drills where assigned_to includes this learner
@@ -134,11 +123,13 @@ async function main() {
     const drillId = drill._id as Types.ObjectId;
     const drillTitle = (drill as any).title ?? "(untitled)";
 
-    const assignedBy: Types.ObjectId =
-      (drill as any).createdById instanceof Types.ObjectId
+    // createdById/assignedBy may be a UUID (Better Auth admin/tutor account)
+    // or an ObjectId (legacy/mobile account).
+    const assignedBy: Types.ObjectId | string =
+      (drill as any).createdById != null
         ? (drill as any).createdById
         : systemAdmin
-          ? (systemAdmin._id as Types.ObjectId)
+          ? systemAdmin._id
           : learnerObjectId;
 
     if (dryRun) {

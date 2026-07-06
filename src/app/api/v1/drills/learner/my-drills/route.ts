@@ -1,6 +1,5 @@
 // GET /api/v1/drills/learner/my-drills - Get learner's assigned drills
 import { NextRequest } from "next/server";
-import type { Types } from "mongoose";
 import { withRole } from "@/lib/api/middleware";
 import { withErrorHandler } from "@/lib/api/error-handler";
 import { parseQueryParams } from "@/lib/api/query-parser";
@@ -9,7 +8,7 @@ import { getLearnerMyDrillsPayload } from "@/lib/server/learner-my-drills.server
 
 async function getHandler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string }
+  context: { userId: string; userRole: string }
 ) {
   const queryParams = parseQueryParams(req);
   const drillId = new URL(req.url).searchParams.get('drillId') || undefined;

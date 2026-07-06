@@ -3,10 +3,13 @@ import User from '@/models/user';
 import Drill from '@/models/drill';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
+import { toUserIdQuery } from '@/lib/api/user-id';
 
 export interface CreateAttemptData {
   drillAssignmentId: Types.ObjectId;
-  learnerId: Types.ObjectId;
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId.
+  learnerId: Types.ObjectId | string;
   drillId: Types.ObjectId;
   startedAt: Date;
   completedAt: Date;
@@ -86,7 +89,7 @@ export class AttemptRepository {
   async findByLearnerId(learnerId: string, filters?: { limit?: number; offset?: number }): Promise<any[]> {
     try {
       const queryBuilder = DrillAttempt.find({
-        learnerId: new Types.ObjectId(learnerId),
+        learnerId: toUserIdQuery(learnerId),
       })
         .sort({ completedAt: -1 });
 

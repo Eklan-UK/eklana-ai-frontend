@@ -22,7 +22,7 @@ const reviewSchema = z.object({
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
   params: { attemptId: string }
 ) {
   await connectToDatabase();

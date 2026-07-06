@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { toUserIdQueryMulti } from '@/lib/api/user-id';
 import User from '@/models/user';
 import DrillAssignment from '@/models/drill-assignment';
 import DrillAttempt from '@/models/drill-attempt';
@@ -482,9 +483,7 @@ function buildLearnerIdMatch(learnerIds?: string[]): Record<string, unknown> {
 	if (!learnerIds?.length) {
 		return {};
 	}
-	const validIds = learnerIds
-		.filter((id) => Types.ObjectId.isValid(id))
-		.map((id) => new Types.ObjectId(id));
+	const validIds = toUserIdQueryMulti(learnerIds.filter((id) => id));
 	if (validIds.length === 0) {
 		return { learnerId: { $in: [] } };
 	}

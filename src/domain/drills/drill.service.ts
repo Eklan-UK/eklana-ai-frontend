@@ -6,6 +6,7 @@ import { AttemptRepository, CreateAttemptData } from '../attempts/attempt.reposi
 import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/api/response';
 import { onDrillCompleted, onDrillAssigned } from '@/services/notification/triggers';
+import { toUserIdQuery } from '@/lib/api/user-id';
 import Bookmark from '@/models/bookmark';
 import WordAnalytics from '@/models/word-analytics';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
@@ -24,7 +25,7 @@ export class DrillService {
   ) {}
 
   private assertBulkAssignmentCount(
-    created: Array<{ learnerId: Types.ObjectId }>,
+    created: Array<{ learnerId: Types.ObjectId | string }>,
     expected: CreateAssignmentData[],
     context: string
   ): void {
@@ -44,7 +45,7 @@ export class DrillService {
   }
 
   private notifyDrillAssigned(
-    assignments: Array<{ learnerId: Types.ObjectId }>,
+    assignments: Array<{ learnerId: Types.ObjectId | string }>,
     drill: { _id: Types.ObjectId | string; title: string; type: string },
     assigner: { firstName?: string; lastName?: string; name?: string }
   ): void {
@@ -120,7 +121,8 @@ export class DrillService {
       .map((user) => ({
         drillId: new Types.ObjectId(params.drillId),
         learnerId: user._id,
-        assignedBy: new Types.ObjectId(params.assignedBy),
+        // assignedBy may be a UUID (Better Auth admin/tutor account)
+        assignedBy: toUserIdQuery(params.assignedBy),
         assignedAt: new Date(),
         dueDate: dueDate!,
         status: 'pending' as const,
@@ -246,7 +248,8 @@ export class DrillService {
     // 3. Create drill
     const drill = await this.drillRepo.create({
       ...params.drillData,
-      createdById: new Types.ObjectId(params.creatorId),
+      // creatorId may be a UUID (Better Auth admin/tutor account)
+      createdById: toUserIdQuery(params.creatorId),
       created_by: creator.email,
     });
 
@@ -268,7 +271,9 @@ export class DrillService {
         .map((user) => ({
           drillId: drill._id,
           learnerId: user._id,
-          assignedBy: new Types.ObjectId(params.creatorId),
+          // creatorId may be a UUID (Better Auth admin/tutor account) — a raw
+          // `new Types.ObjectId(...)` throws for UUID ids, unlike toUserIdQuery.
+          assignedBy: toUserIdQuery(params.creatorId),
           assignedAt: new Date(),
           dueDate: dueDate,
           status: 'pending' as const,
@@ -474,7 +479,8 @@ export class DrillService {
       assignmentsData = assignedUsers.map((learner) => ({
         drillId: new Types.ObjectId(drillId),
         learnerId: learner._id,
-        assignedBy: new Types.ObjectId(userId),
+        // userId (the updater) may be a UUID (Better Auth admin/tutor account)
+        assignedBy: toUserIdQuery(userId),
         assignedAt: new Date(),
         dueDate: dueDate,
         status: 'pending' as const,
@@ -621,7 +627,8 @@ export class DrillService {
     // 5. Create drill attempt
     const attemptData: CreateAttemptData = {
       drillAssignmentId: new Types.ObjectId(params.drillAssignmentId),
-      learnerId: new Types.ObjectId(params.learnerId),
+      // learnerId may be a UUID (Better Auth web sign-up, incl. Google/Apple OAuth)
+      learnerId: toUserIdQuery(params.learnerId),
       drillId: new Types.ObjectId(drillId),
       drillType: drill.type,
       startedAt: new Date(Date.now() - params.timeSpent * 1000),

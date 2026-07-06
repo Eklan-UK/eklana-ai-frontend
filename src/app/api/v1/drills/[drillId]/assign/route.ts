@@ -5,13 +5,14 @@ import { withErrorHandler } from "@/lib/api/error-handler";
 import { connectToDatabase } from "@/lib/api/db";
 import { Types } from "mongoose";
 import { apiResponse, ValidationError } from "@/lib/api/response";
+import { isValidUserId, toUserIdQuery, toUserIdQueryMulti } from "@/lib/api/user-id";
 import Drill from "@/models/drill";
 import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
   params: { drillId: string }
 ): Promise<NextResponse> {
   await connectToDatabase();
@@ -29,8 +30,11 @@ async function handler(
     throw new ValidationError("userIds (non-empty array) is required");
   }
 
+  // Accept UUID (Better Auth web sign-up, incl. Google/Apple OAuth) or
+  // ObjectId (legacy/mobile) user ids — previously UUID ids were rejected
+  // here, meaning drills could never be assigned to those students.
   for (const uid of userIds) {
-    if (typeof uid !== "string" || !Types.ObjectId.isValid(uid)) {
+    if (typeof uid !== "string" || !isValidUserId(uid)) {
       throw new ValidationError(`Invalid userId format: ${String(uid)}`);
     }
   }
@@ -48,7 +52,7 @@ async function handler(
 
   // Validate all userIds belong to learners (role: user)
   const learners = await User.find({
-    _id: { $in: (userIds as string[]).map((id) => new Types.ObjectId(id)) },
+    _id: { $in: toUserIdQueryMulti(userIds as string[]) },
     role: "user",
   })
     .select("_id")
@@ -74,21 +78,24 @@ async function handler(
   }> = [];
 
   for (const uid of userIds as string[]) {
-    const learnerObjectId = new Types.ObjectId(uid);
+    // learnerId is stored as-is: Types.ObjectId for ObjectId-format users,
+    // string for UUID users (DrillAssignment.learnerId is Schema.Types.Mixed).
+    const learnerIdValue = toUserIdQuery(uid);
     try {
       const assignment = await DrillAssignment.create({
         drillId: drillObjectId,
-        learnerId: learnerObjectId,
-        assignedBy: context.userId,
+        learnerId: learnerIdValue,
+        assignedBy: toUserIdQuery(context.userId),
         assignedAt: new Date(),
         dueDate: dueDateObj,
         status: "pending",
       });
 
-      // Keep drill.assigned_to in sync — add learner if not already present
+      // Keep drill.assigned_to in sync — add learner if not already present.
+      // assigned_to is a [String] array, so always push the raw string id.
       await Drill.updateOne(
-        { _id: drillObjectId, assigned_to: { $ne: learnerObjectId } },
-        { $push: { assigned_to: learnerObjectId } }
+        { _id: drillObjectId, assigned_to: { $ne: uid } },
+        { $push: { assigned_to: uid } }
       ).exec();
 
       assignments.push({
@@ -102,7 +109,7 @@ async function handler(
         // Duplicate key — assignment already exists, return the existing row
         const existing = await DrillAssignment.findOne({
           drillId: drillObjectId,
-          learnerId: learnerObjectId,
+          learnerId: learnerIdValue,
         })
           .select("_id status dueDate")
           .lean()
