@@ -51,7 +51,13 @@ function normalizeLearnerDrillItem(item: any): any {
 function isLearnerDrillRow(item: any): boolean {
   if (item.itemType === "free_talk_scenario") return true;
   const drill = item.drill;
-  return drill && typeof drill === "object" && drill._id != null && !!drill.type;
+  if (drill && typeof drill === "object" && drill._id != null && !!drill.type) {
+    return true;
+  }
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("[useDrills] Dropping malformed drill row:", item);
+  }
+  return false;
 }
 
 async function fetchLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {

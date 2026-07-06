@@ -6,6 +6,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import PronunciationAssignment from '@/models/pronunciation-assignment';
 import LearnerPronunciationProgress from '@/models/learner-pronunciation-progress';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
+import DrillAttempt from '@/models/drill-attempt';
 import User from '@/models/user';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
@@ -239,6 +240,159 @@ async function handler(
 			wordStats = await getLearnerAttemptFallbackWordStats(learnerOid);
 		}
 
+		// ── Merge drill_attempts pronunciationResults ──────────────────────────────
+		// Learning-journey pronunciation drills write results to drill_attempts
+		// (not pronunciation_attempts), so we need to merge them in here.
+		const drillPronAttempts = await DrillAttempt.find({
+			learnerId: learnerOid,
+			'pronunciationResults.wordScores.0': { $exists: true },
+		}).select('pronunciationResults completedAt score').lean().exec();
+
+		// Merge overall stats
+		const drillAttemptsCount = drillPronAttempts.length;
+		const drillPassedCount = drillPronAttempts.filter(
+			(a) => ((a as any).score ?? 0) >= 70
+		).length;
+		const drillScoreSum = drillPronAttempts.reduce(
+			(sum, a) => sum + ((a as any).score ?? 0), 0
+		);
+
+		const combinedTotalAttempts = (stats.totalAttempts || 0) + drillAttemptsCount;
+		const combinedPassedCount = (stats.passedCount || 0) + drillPassedCount;
+		const existingScoreSum = (stats.averageScore || 0) * (stats.totalAttempts || 0);
+		const combinedAverageScore =
+			combinedTotalAttempts > 0
+				? (existingScoreSum + drillScoreSum) / combinedTotalAttempts
+				: 0;
+		const combinedPassRate =
+			combinedTotalAttempts > 0
+				? (combinedPassedCount / combinedTotalAttempts) * 100
+				: 0;
+
+		// Merge word stats from drill_attempts
+		const drillWordMap = new Map<string, { word: string; scores: number[]; lastDate: Date | null }>();
+		for (const attempt of drillPronAttempts) {
+			const pr = (attempt as any).pronunciationResults;
+			if (!pr?.wordScores) continue;
+			const date = (attempt as any).completedAt as Date | null;
+			for (const ws of pr.wordScores as Array<{ word?: string; score?: number }>) {
+				if (!ws.word) continue;
+				const key = ws.word.toLowerCase();
+				if (!drillWordMap.has(key)) {
+					drillWordMap.set(key, { word: ws.word, scores: [], lastDate: null });
+				}
+				const entry = drillWordMap.get(key)!;
+				entry.scores.push(ws.score ?? 0);
+				if (date && (!entry.lastDate || date > entry.lastDate)) {
+					entry.lastDate = date;
+				}
+			}
+		}
+
+		const drillWordStats = Array.from(drillWordMap.values()).map(({ word, scores, lastDate }) => {
+			const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length;
+			const bestScore = Math.max(...scores);
+			return {
+				wordId: null as Types.ObjectId | null,
+				title: word,
+				text: word,
+				difficulty: '',
+				attempts: scores.length,
+				bestScore: Math.round(bestScore * 100) / 100,
+				averageScore: Math.round(avgScore * 100) / 100,
+				isChallenging: scores.length > 3 || avgScore < 70,
+				status: bestScore >= 70 ? 'completed' : 'in-progress',
+				completedAt: null as Date | null,
+				lastAttemptAt: lastDate,
+			};
+		});
+
+		// Existing word titles take priority; drill-only words fill the gaps
+		const existingWordTitles = new Set(wordStats.map((w: any) => (w.title || '').toLowerCase()));
+		const drillOnlyWords = drillWordStats.filter(
+			(w) => !existingWordTitles.has(w.title.toLowerCase())
+		);
+		wordStats = [...wordStats, ...drillOnlyWords];
+
+		// Merge accuracy trend from drill_attempts (group by completedAt date)
+		const existingTrendMap = new Map(
+			accuracyTrendAgg.map((t: any) => [t.date as string, t as { date: string; averageScore: number; attempts: number }])
+		);
+		for (const attempt of drillPronAttempts) {
+			const date = (attempt as any).completedAt as Date | null;
+			if (!date) continue;
+			const dateStr = new Date(date).toISOString().slice(0, 10);
+			const score = (attempt as any).score ?? 0;
+			if (existingTrendMap.has(dateStr)) {
+				const existing = existingTrendMap.get(dateStr)!;
+				const totalAtt = existing.attempts + 1;
+				const newAvg = (existing.averageScore * existing.attempts + score) / totalAtt;
+				existingTrendMap.set(dateStr, {
+					date: dateStr,
+					averageScore: Math.round(newAvg * 100) / 100,
+					attempts: totalAtt,
+				});
+			} else {
+				existingTrendMap.set(dateStr, {
+					date: dateStr,
+					averageScore: Math.round(score * 100) / 100,
+					attempts: 1,
+				});
+			}
+		}
+		const mergedAccuracyTrend = Array.from(existingTrendMap.values())
+			.sort((a, b) => a.date.localeCompare(b.date));
+
+		// Difficult letters from drill_attempts: derive from phonemes if present
+		// (phonemes are not stored in the current schema, so this merges empty for now
+		// but is correct for future data that may include phonemes).
+		const drillLetterCounts = new Map<string, { count: number; words: Map<string, number> }>();
+		for (const attempt of drillPronAttempts) {
+			const pr = (attempt as any).pronunciationResults;
+			if (!pr?.wordScores) continue;
+			for (const ws of pr.wordScores as Array<{ word?: string; phonemes?: Array<{ phoneme?: string; correct?: boolean }> }>) {
+				if (!ws.phonemes) continue;
+				for (const ph of ws.phonemes) {
+					if (ph.correct !== false || !ph.phoneme) continue;
+					const letter = ph.phoneme;
+					if (!drillLetterCounts.has(letter)) {
+						drillLetterCounts.set(letter, { count: 0, words: new Map() });
+					}
+					const entry = drillLetterCounts.get(letter)!;
+					entry.count++;
+					if (ws.word) {
+						entry.words.set(ws.word, (entry.words.get(ws.word) ?? 0) + 1);
+					}
+				}
+			}
+		}
+
+		// Merge drill-derived letters with existing topIncorrectLetters
+		const existingLetterMap = new Map(
+			(problemAreas.topIncorrectLetters as Array<{ letter: string; count: number; words: Array<{ word: string; count: number }> }>)
+				.map((l) => [l.letter, { ...l }])
+		);
+		for (const [letter, { count, words }] of drillLetterCounts.entries()) {
+			if (existingLetterMap.has(letter)) {
+				const ex = existingLetterMap.get(letter)!;
+				ex.count += count;
+				const wordMap = new Map(ex.words.map((w) => [w.word, w.count]));
+				for (const [w, c] of words.entries()) {
+					wordMap.set(w, (wordMap.get(w) ?? 0) + c);
+				}
+				ex.words = Array.from(wordMap.entries()).map(([word, c]) => ({ word, count: c }));
+			} else {
+				existingLetterMap.set(letter, {
+					letter,
+					count,
+					words: Array.from(words.entries()).map(([word, c]) => ({ word, count: c })),
+				});
+			}
+		}
+		const mergedTopIncorrectLetters = Array.from(existingLetterMap.values())
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 10);
+
 		// ── Legacy assignments list (used by assignment-detail views) ─────────────
 		const assignmentsAggregation = await PronunciationAssignment.aggregate([
 			{ $match: { learnerId: learnerOid } },
@@ -296,12 +450,15 @@ async function handler(
 						completedAssignments,
 						inProgressAssignments,
 						pendingAssignments,
-						totalAttempts: stats.totalAttempts || 0,
-						averageScore: Math.round(averageScore * 100) / 100,
-						passRate: Math.round(passRate * 100) / 100,
+						totalAttempts: combinedTotalAttempts,
+						averageScore: Math.round(combinedAverageScore * 100) / 100,
+						passRate: Math.round(combinedPassRate * 100) / 100,
 					},
-					problemAreas,
-					accuracyTrend: accuracyTrendAgg,
+					problemAreas: {
+						...problemAreas,
+						topIncorrectLetters: mergedTopIncorrectLetters,
+					},
+					accuracyTrend: mergedAccuracyTrend,
 					wordStats,
 					assignments,
 				},

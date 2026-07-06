@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useLearnerDrillAssignments } from "@/hooks/useAdmin";
+import { drillDisplayLabel } from "@/lib/drill-display-label";
 import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
 import {
   DrillPerformanceReview,
@@ -68,7 +69,7 @@ export function DrillSubmissionsComponent({
   // Extract data with safe defaults (must be before conditional returns)
   // Filter out assignments whose drill was deleted (drill field is null/missing)
   const drills = (drillData?.assignments || []).filter(
-    (d: any) => d.drill && typeof d.drill === 'object' && d.drill.title
+    (d: any) => d.drill && typeof d.drill === 'object' && d.drill._id
   );
   const [filterStatus, setFilterStatus] = useState<
     "all" | "pending" | "in-progress" | "completed" | "review"
@@ -407,7 +408,10 @@ export function DrillSubmissionsComponent({
                       </span>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 truncate">
-                          {drill.drill?.title || drill.title || "Untitled Drill"}
+                          {drill.drill?.title ||
+                            drillDisplayLabel(drill.drill) ||
+                            drill.title ||
+                            "Untitled Drill"}
                         </h4>
                         <p className="text-xs text-gray-500 capitalize">
                           {drill.drill?.type || drill.type || "N/A"} •{" "}
