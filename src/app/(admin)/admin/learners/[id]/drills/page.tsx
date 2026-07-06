@@ -18,6 +18,7 @@ import {
   Link2,
 } from 'lucide-react';
 import { useLearnerById, useLearnerDrillAssignments } from '@/hooks/useAdmin';
+import { drillDisplayLabel } from '@/lib/drill-display-label';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
@@ -221,7 +222,9 @@ export default function StudentDrillsPage() {
                               <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
                                 {getTypeIcon(drill.type)}
                               </div>
-                              <h3 className="font-semibold text-gray-900">{drill.title}</h3>
+                              <h3 className="font-semibold text-gray-900">
+                                {drill.title || drillDisplayLabel(drill) || "Untitled Drill"}
+                              </h3>
                             </div>
                             <div className="flex flex-wrap gap-3 text-sm text-gray-500 ml-11">
                               <span className="capitalize">{drill.type?.replace('_', ' ')}</span>
