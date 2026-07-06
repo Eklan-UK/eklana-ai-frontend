@@ -35,7 +35,7 @@ export default function DrillsPage() {
 
   // My Plans needs the learner's FULL assignment history to compute accurate
   // per-mission progress — not just a recent-window page. See assignment.repository.ts.
-  const { data: drills = [] } = useLearnerDrills({ limit: 1000 });
+  const { data: drills = [], isError: drillsError } = useLearnerDrills({ limit: 1000 });
 
   const { data: classData, isLoading: classesLoading } = useLearnerClasses({
     limit: 100,
@@ -90,6 +90,12 @@ export default function DrillsPage() {
         <LearnerNextSessionCard session={nextSession} isLoading={classesLoading} />
 
         <SavedDrillsSection />
+
+        {drillsError && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Something went wrong loading your drills. Please refresh.
+          </div>
+        )}
 
         <div>
           <h2 className="text-lg font-bold text-foreground mb-3">My Learning Journey</h2>
