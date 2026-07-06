@@ -382,9 +382,23 @@ export function DrillSubmissionsComponent({
 
       {/* Drills List */}
       <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">
-          Drill Submissions
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-900">
+            Drill Submissions
+          </h3>
+          {filteredDrills.length > 0 && (
+            <span className="text-xs text-gray-500">
+              Showing{" "}
+              <span className="font-semibold text-gray-700">
+                {filteredDrills.length}
+              </span>
+              {filterStatus === "all" && drillData?.pagination?.total && drillData.pagination.total > filteredDrills.length ? (
+                <> of <span className="font-semibold text-gray-700">{drillData.pagination.total}</span></>
+              ) : null}{" "}
+              drill{filteredDrills.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
 
         {filteredDrills.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -392,7 +406,7 @@ export function DrillSubmissionsComponent({
             <p>No drills in this category</p>
           </div>
         ) : (
-          <div className="space-y-2 max-h-full">
+          <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
             {filteredDrills.map((drill: any, idx: number) => (
               <div
                 key={drill._id || idx}

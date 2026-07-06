@@ -1068,12 +1068,18 @@ export const adminAPI = {
   },
 
   // Get drill assignments for a learner (admin/tutor)
-  getLearnerDrillAssignments: (learnerId: string) => {
+  getLearnerDrillAssignments: (learnerId: string, params?: { limit?: number | 'all' }) => {
     return apiRequest<{
       code?: string;
       message?: string;
       data?: {
         assignments: any[];
+        pagination: {
+          total: number;
+          limit: number;
+          offset: number;
+          hasMore: boolean;
+        };
         statistics: {
           total: number;
           completed: number;
@@ -1084,7 +1090,7 @@ export const adminAPI = {
           completionRate: number;
         };
       };
-    }>(`/admin/learners/${learnerId}/drill-assignments`, {
+    }>(`/admin/learners/${learnerId}/drill-assignments?limit=${params?.limit ?? 0}`, {
       method: 'GET',
     });
   },

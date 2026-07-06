@@ -4,10 +4,10 @@ import { z } from "zod";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
-import { Types } from "mongoose";
 import Drill from "@/models/drill";
 import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
+import { isValidUserId, toUserIdQuery } from "@/lib/api/user-id";
 import {
   learningJourneyPartSchema,
   learningJourneyTopicSchema,
@@ -78,7 +78,7 @@ function mapContentFields(drillType: string, content: Record<string, any>): Reco
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string }
+  context: { userId: string; userRole: string }
 ): Promise<NextResponse> {
   try {
     const body = await req.json();
@@ -112,7 +112,7 @@ async function handler(
             );
           }
 
-          if (!Types.ObjectId.isValid(studentId)) {
+          if (!isValidUserId(studentId)) {
             throw new Error(`Invalid studentId: ${studentId}`);
           }
 
@@ -145,7 +145,7 @@ async function handler(
             context: "",
             is_active: true,
             created_by: (creator as any).email,
-            createdById: context.userId,
+            createdById: toUserIdQuery(context.userId),
             totalAssignments: 0,
             totalCompletions: 0,
             averageScore: 0,
@@ -160,8 +160,8 @@ async function handler(
 
           await DrillAssignment.create({
             drillId: drill._id,
-            learnerId: new Types.ObjectId(studentId),
-            assignedBy: context.userId,
+            learnerId: toUserIdQuery(studentId),
+            assignedBy: toUserIdQuery(context.userId),
             dueDate,
             status: "pending",
           });

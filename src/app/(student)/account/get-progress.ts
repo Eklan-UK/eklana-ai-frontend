@@ -1,11 +1,11 @@
 // Server-side function to get user progress from completed drills
-import { Types } from 'mongoose';
 import { getServerSession } from '@/lib/api/session';
 import {
   getLearnerMyDrillsPayload,
   type LearnerMyDrillRow,
 } from '@/lib/server/learner-my-drills.server';
 import { isFreeTalkPlanItem } from '@/lib/learner-assigned-plan';
+import { isValidUserId } from '@/lib/api/user-id';
 
 export interface UserProgress {
   drillsCompleted: number;
@@ -45,12 +45,14 @@ export async function getUserProgress(): Promise<UserProgress> {
       return getDefaultProgress();
     }
 
-    let userId: Types.ObjectId;
-    try {
-      userId = new Types.ObjectId(user.id);
-    } catch {
+    // user.id may be a UUID (Better Auth web sign-up, incl. Google/Apple
+    // OAuth) or an ObjectId hex string (legacy/mobile accounts). Previously
+    // this cast to Types.ObjectId silently swallowed UUID ids and returned
+    // zero progress for those users.
+    if (!isValidUserId(user.id)) {
       return getDefaultProgress();
     }
+    const userId = user.id;
 
     // Progress must be computed from the learner's FULL assignment history, not
     // a recent-window page — otherwise counts silently drift once a learner

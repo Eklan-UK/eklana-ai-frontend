@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { apiResponse } from '@/lib/api/response';
 import { ensureRoleplayProgressIndexes } from '@/lib/drill/ensure-roleplay-progress-indexes';
+import { toUserIdQuery } from '@/lib/api/user-id';
 
 const turnProgressSchema = z.record(
   z.string(),
@@ -74,10 +75,10 @@ const saveProgressSchema = z
     }
   });
 
-type AuthContext = { userId: Types.ObjectId; userRole: string };
+type AuthContext = { userId: string; userRole: string };
 
 function buildProgressFilter(
-  userId: Types.ObjectId,
+  userId: string,
   params: {
     source?: string | null;
     assignmentId?: string | null;
@@ -85,7 +86,11 @@ function buildProgressFilter(
     challengeItemIndex?: string | null;
   },
 ): Record<string, unknown> | null {
-  const base = { userId };
+  // RoleplayDrillProgress.userId is Schema.Types.Mixed (see model comment),
+  // so Mongoose will NOT auto-cast a raw hex string into a real ObjectId —
+  // toUserIdQuery ensures legacy (ObjectId-keyed) learners still match their
+  // pre-existing progress rows instead of silently getting an empty result.
+  const base = { userId: toUserIdQuery(userId) };
 
   if (params.source === 'assignment' && params.assignmentId && Types.ObjectId.isValid(params.assignmentId)) {
     return {
@@ -165,14 +170,19 @@ async function postHandler(
     const body = await req.json();
     const validated = saveProgressSchema.parse(body);
 
+    // postHandler writes via the raw MongoDB driver (RoleplayDrillProgress.collection
+    // below), which bypasses Mongoose schema casting entirely — userId must be
+    // explicitly converted here so legacy ObjectId learners' rows stay consistent.
+    const userIdQuery = toUserIdQuery(context.userId);
+
     const filter: Record<string, unknown> = {
-      userId: context.userId,
+      userId: userIdQuery,
       source: validated.source,
       drillId: new Types.ObjectId(drillId),
     };
 
     const update: Record<string, unknown> = {
-      userId: context.userId,
+      userId: userIdQuery,
       source: validated.source,
       drillId: new Types.ObjectId(drillId),
       currentSceneIndex: validated.currentSceneIndex,
@@ -227,7 +237,7 @@ async function postHandler(
     if (validated.source === 'assignment') {
       await collection.updateMany(
         {
-          userId: context.userId,
+          userId: userIdQuery,
           source: { $ne: 'weekly_challenge' },
         },
         { $unset: { challengeId: '', challengeItemIndex: '', weekStartDate: '' } },
@@ -259,7 +269,7 @@ async function postHandler(
 
       await ensureRoleplayProgressIndexes();
       await collection.updateMany(
-        { userId: context.userId },
+        { userId: userIdQuery },
         { $unset: { challengeId: '', challengeItemIndex: '', weekStartDate: '' } },
       );
 

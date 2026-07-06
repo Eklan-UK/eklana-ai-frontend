@@ -12,7 +12,7 @@ import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 
 async function getHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId },
+	context: { userId: string },
 	params: { assignmentId: string }
 ): Promise<any> {
 	await connectToDatabase();

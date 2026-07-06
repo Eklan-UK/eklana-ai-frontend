@@ -9,6 +9,7 @@ import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
 import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
+import { toUserIdQuery } from '@/lib/api/user-id';
 
 /** Lean populated assignment from `findByLearnerId` (drillId is a drill document). */
 type PopulatedLearnerAssignment = Omit<AssignmentRow, 'drillId' | 'assignedBy'> & {
@@ -79,9 +80,14 @@ export type LearnerFreeTalkPlanRow = LearnerMyDrillRow & {
 /**
  * Same data as GET /api/v1/drills/learner/my-drills — used from RSC to avoid
  * loopback fetch (wrong origin / connection refused in dev).
+ *
+ * learnerId is a plain string — Better Auth (web sign-up, incl. Google/Apple
+ * OAuth) assigns UUID string user ids; legacy/mobile accounts use ObjectId
+ * hex strings. Use toUserIdQuery()/toUserIdQuery() when building Mongoose
+ * query values from it.
  */
 export async function getLearnerMyDrillsPayload(
-  learnerId: Types.ObjectId,
+  learnerId: string,
   params: { status?: string; limit?: number; offset?: number; drillId?: string }
 ): Promise<LearnerMyDrillsPayload> {
   await connectToDatabase();
@@ -95,17 +101,17 @@ export async function getLearnerMyDrillsPayload(
   const result = params.drillId
     ? {
         assignments: await assignmentRepo.findMany({
-          learnerId: learnerId.toString(),
+          learnerId,
           drillId: params.drillId,
           status: params.status,
           limit: 1,
         }),
         total: await assignmentRepo.count({
-          learnerId: new Types.ObjectId(learnerId.toString()),
+          learnerId: toUserIdQuery(learnerId),
           drillId: new Types.ObjectId(params.drillId),
         }),
       }
-    : await assignmentRepo.findByLearnerId(learnerId.toString(), {
+    : await assignmentRepo.findByLearnerId(learnerId, {
         status: params.status,
         limit,
         offset,
@@ -116,7 +122,7 @@ export async function getLearnerMyDrillsPayload(
   );
   const attemptMap = await attemptRepo.getLatestAttemptsForAssignments(assignmentIds);
 
-  const bookmarkRows = await Bookmark.find({ userId: learnerId, type: 'drill' })
+  const bookmarkRows = await Bookmark.find({ userId: toUserIdQuery(learnerId), type: 'drill' })
     .select('drillId')
     .lean()
     .exec();
@@ -193,7 +199,7 @@ export async function getLearnerMyDrillsPayload(
     if (orphanCount > 0) {
       console.warn(
         '[getLearnerMyDrillsPayload] User has drill.assigned_to entries but 0 drill_assignments rows — possible sync issue',
-        { learnerId: learnerId.toString(), orphanDrillCount: orphanCount }
+        { learnerId, orphanDrillCount: orphanCount }
       );
     }
   }
@@ -212,7 +218,7 @@ export async function getLearnerMyDrillsPayload(
     const attemptRows =
       scenarioIds.length > 0
         ? await FreeTalkAttempt.find({
-            learnerId,
+            learnerId: toUserIdQuery(learnerId),
             scenarioId: { $in: scenarioIds },
           })
             .select({ scenarioId: 1, createdAt: 1 })
