@@ -61,6 +61,7 @@ All billing endpoints require the same auth as other `/api/v1` routes (Better Au
 | What | Where it lives | Mobile usage |
 |------|----------------|--------------|
 | Apple subscription **product ID** | Server: `APPLE_PRO_MONTHLY_PRODUCT_ID` (must match App Store Connect) | Hard-code or remote-config the **same** product ID string in the iOS app for StoreKit `requestPurchase`. Not a secret, but must match the server. |
+| Apple **`appAccountToken`** | Server: `user.iapAccountToken` (server-generated UUID v4, returned by `POST /api/v1/auth/verify-id-token` and `GET /api/v1/users/current`) | Pass `user.iapAccountToken` to StoreKit's purchase call as `appAccountToken`. **Do not** use `user.id` or `user.email` — see [`appAccountToken` requirement](#appaccounttoken-requirement-ios) below. |
 | Stripe **price** | Server only: `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | Android never sends a price ID; backend creates Checkout from env. |
 
 ### Central `billing` module
@@ -120,10 +121,25 @@ There is **no** mobile app in this workspace; pick a library that supports **aut
 
 Server verification uses the **App Store Server API** and optional JWS from the device — the app sends IDs/JWS to `POST /api/v1/apple/verify`; it does **not** unlock Pro based on client-only receipt trust.
 
+### `appAccountToken` requirement (iOS)
+
+Apple's `appAccountToken` purchase option must be set on **every** StoreKit purchase call so the server can reliably associate the transaction with the signed-in account (and so the Apple webhook can find the right user even before `/apple/verify` has run).
+
+- [ ] Before starting a purchase, fetch `user.iapAccountToken` from either `POST /api/v1/auth/verify-id-token` (on sign-in) or `GET /api/v1/users/current`. This is a server-generated **UUID v4** string, guaranteed to exist (the server lazily generates and persists it on first fetch if missing).
+- [ ] Pass it as the `appAccountToken` purchase option, e.g. in Swift/StoreKit 2:
+
+  ```swift
+  try await product.purchase(options: [.appAccountToken(UUID(uuidString: user.iapAccountToken)!)])
+  ```
+
+  Or the equivalent option exposed by whichever RN/Expo IAP library you use (e.g. `react-native-iap`'s `appAccountToken` purchase param).
+- [ ] **Do not** use `user.id` or `user.email` as `appAccountToken`. `user.id` may be a MongoDB ObjectId (not a valid UUID) for a large share of accounts, and Apple requires `appAccountToken` to be a valid UUID v4 — StoreKit will reject or silently drop an invalid value.
+
 ### Purchase flow
 
 - [ ] Initialize IAP connection when subscriptions screen mounts (iOS only).
 - [ ] Load product metadata for the configured monthly Pro product ID (same string as server `APPLE_PRO_MONTHLY_PRODUCT_ID`).
+- [ ] Fetch `user.iapAccountToken` and pass it as the `appAccountToken` purchase option (see [`appAccountToken` requirement](#appaccounttoken-requirement-ios) above) — never `user.id` or `user.email`.
 - [ ] On successful purchase (or `purchaseUpdated` listener), collect:
   - `transactionId`
   - `originalTransactionId`
@@ -204,7 +220,8 @@ Base path: `{API_HOST}/api/v1`. All examples assume JSON and session/Bearer auth
     "subscriptionExpiresAt": null,
     "stripeSubscriptionStatus": null,
     "appleSubscriptionStatus": null,
-    "isSubscribed": false
+    "isSubscribed": false,
+    "iapAccountToken": "<uuid>"
   }
 }
 ```
@@ -216,6 +233,7 @@ Base path: `{API_HOST}/api/v1`. All examples assume JSON and session/Bearer auth
 | `subscriptionExpiresAt` | Optional display; do not use alone for gating |
 | `stripeSubscriptionStatus` | Android diagnostics; server uses for `isUserSubscribed` |
 | `appleSubscriptionStatus` | iOS diagnostics (`active`, `billing_grace`, `billing_retry`, `expired`, etc.); server uses for Apple-paid users |
+| `iapAccountToken` | **iOS only.** Server-generated UUID v4; pass as StoreKit's `appAccountToken` purchase option (see [`appAccountToken` requirement](#appaccounttoken-requirement-ios)). Also returned by `POST /api/v1/auth/verify-id-token`. Lazily generated server-side if missing — always present after the first fetch. |
 
 Admin-only fields (`subscriptionPaymentMethod`, Stripe customer IDs, Apple transaction IDs) are **not** returned to the client.
 
@@ -242,6 +260,8 @@ Admin-only fields (`subscriptionPaymentMethod`, Stripe customer IDs, Apple trans
 | `originalTransactionId` | One of three | Stable id across renewals |
 | `signedTransactionInfo` | One of three | Preferred when library provides JWS |
 | `productId` | Recommended | Must match server `APPLE_PRO_MONTHLY_PRODUCT_ID` if sent |
+
+**`appAccountToken` cross-check (automatic, server-side):** if `signedTransactionInfo` is sent, the backend decodes the embedded `appAccountToken` from the transaction JWS and, if the signed-in user doesn't already have `iapAccountToken` set, backfills it from that value automatically. There is no separate client action for this step — it's a safety net for accounts that predate this field. The client's only responsibility is making sure `appAccountToken` was actually set at **purchase time** (see [`appAccountToken` requirement](#appaccounttoken-requirement-ios)); this backfill cannot recover a purchase made without it.
 
 **Success (200):**
 
