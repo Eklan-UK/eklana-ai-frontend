@@ -48,6 +48,19 @@ export function toUserIdQuery(id: string): Types.ObjectId | string {
 }
 
 /**
+ * Returns both the raw id and its ObjectId form (when applicable) for use in
+ * Mongo `$in` queries against Mixed userId fields that may be stored as either
+ * a string or a BSON ObjectId.
+ */
+export function toUserIdCandidates(id: string): Array<Types.ObjectId | string> {
+	const candidates: Array<Types.ObjectId | string> = [id];
+	if (isObjectId(id)) {
+		candidates.push(new Types.ObjectId(id));
+	}
+	return candidates;
+}
+
+/**
  * Builds a de-duplicated array of query values (Types.ObjectId | string) for
  * use in a Mongo `$in` clause, supporting a mix of ObjectId and UUID users in
  * the same array.

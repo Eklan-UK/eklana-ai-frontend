@@ -9,6 +9,7 @@ import Drill from '@/models/drill';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import User from '@/models/user';
 import UserStreak from '@/models/user-streak';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 import {
   BADGE_DEFINITIONS,
   BADGE_BY_ID,
@@ -254,10 +255,10 @@ async function evaluateDoneAndDusted(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateDejaVu(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
+  const userIdFilter = { $in: toUserIdCandidates(userId) };
 
   const [bookmarkRows, advancedRows] = await Promise.all([
-    Bookmark.find({ userId: uid, type: 'drill' })
+    Bookmark.find({ userId: userIdFilter, type: 'drill' })
       .select('drillId')
       .lean()
       .exec(),
@@ -277,7 +278,7 @@ async function evaluateDejaVu(userId: string): Promise<EvalResult> {
   }
 
   const attempts = await DrillAttempt.find({
-    learnerId: uid,
+    learnerId: { $in: toUserIdCandidates(userId) },
     drillId: { $in: [...difficultIds].map((id) => new Types.ObjectId(id)) },
     score: { $gte: PASSING_SCORE },
     completedAt: { $exists: true, $ne: null },
@@ -318,8 +319,10 @@ async function evaluateMonthlyChallenge(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateMasterCollector(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
-  const bookmarks = await Bookmark.find({ userId: uid, type: 'drill' })
+  const bookmarks = await Bookmark.find({
+    userId: { $in: toUserIdCandidates(userId) },
+    type: 'drill',
+  })
     .select('drillId')
     .lean()
     .exec();

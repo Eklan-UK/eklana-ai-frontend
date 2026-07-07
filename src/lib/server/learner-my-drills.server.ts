@@ -4,12 +4,12 @@ import { AssignmentRepository } from '@/domain/assignments/assignment.repository
 import type { DrillAssignment as AssignmentRow } from '@/domain/assignments/assignment.types';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import Drill from '@/models/drill';
-import Bookmark from '@/models/bookmark';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
 import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 import { toUserIdQuery } from '@/lib/api/user-id';
+import { getBookmarkedDrillIdSet } from '@/lib/server/learner-saved-drills.server';
 
 /** Lean populated assignment from `findByLearnerId` (drillId is a drill document). */
 type PopulatedLearnerAssignment = Omit<AssignmentRow, 'drillId' | 'assignedBy'> & {
@@ -122,11 +122,7 @@ export async function getLearnerMyDrillsPayload(
   );
   const attemptMap = await attemptRepo.getLatestAttemptsForAssignments(assignmentIds);
 
-  const bookmarkRows = await Bookmark.find({ userId: toUserIdQuery(learnerId), type: 'drill' })
-    .select('drillId')
-    .lean()
-    .exec();
-  const bookmarkedDrillIds = new Set(bookmarkRows.map((row) => String(row.drillId)));
+  const bookmarkedDrillIds = await getBookmarkedDrillIdSet(learnerId);
 
   // Repository types drillId as ObjectId; lean+populate returns a drill subdocument at runtime.
   const populated = result.assignments as unknown as PopulatedLearnerAssignment[];

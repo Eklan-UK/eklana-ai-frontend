@@ -89,6 +89,8 @@ export function useTTS(options: UseTTSOptions = {}) {
   const ownsObjectUrlRef = useRef(false);
   /** True when playing from the shared preload cache (do not revoke URL). */
   const fromPreloadCacheRef = useRef(false);
+  /** Incremented on stop or new play — stale in-flight playAudio calls bail out. */
+  const playGenerationRef = useRef(0);
 
   const detachActiveAudio = useCallback(() => {
     if (audioRef.current) {
@@ -121,6 +123,9 @@ export function useTTS(options: UseTTSOptions = {}) {
 
   const playAudio = useCallback(
     async (text: string, voiceId?: string) => {
+      const generation = ++playGenerationRef.current;
+      const isStale = () => generation !== playGenerationRef.current;
+
       try {
         detachActiveAudio();
         setIsGenerating(true);
@@ -137,10 +142,13 @@ export function useTTS(options: UseTTSOptions = {}) {
 
         if (!clip) {
           await preloadTTSAudio(trimmed, voiceId, apiPath);
+          if (isStale()) return;
           clip = preloadedClips.get(key);
         }
 
         if (clip) {
+          if (isStale()) return;
+
           const audio = clip.audio;
           audio.currentTime = 0;
           audioRef.current = audio;
@@ -158,9 +166,15 @@ export function useTTS(options: UseTTSOptions = {}) {
           });
 
           const playNow = async () => {
+            if (isStale()) {
+              audio.pause();
+              audio.currentTime = 0;
+              return;
+            }
             try {
               await audio.play();
             } catch (playErr: unknown) {
+              if (isStale()) return;
               const err = playErr as { name?: string };
               setIsGenerating(false);
               setIsPlaying(false);
@@ -199,6 +213,8 @@ export function useTTS(options: UseTTSOptions = {}) {
           apiPath,
         });
 
+        if (isStale()) return;
+
         const audioObjectUrl = URL.createObjectURL(audioBlob);
         objectUrlRef.current = audioObjectUrl;
         ownsObjectUrlRef.current = true;
@@ -228,8 +244,19 @@ export function useTTS(options: UseTTSOptions = {}) {
         });
 
         audio.load();
+        if (isStale()) {
+          audio.pause();
+          if (ownsObjectUrlRef.current && objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+            ownsObjectUrlRef.current = false;
+          }
+          audioRef.current = null;
+          return;
+        }
         await audio.play();
       } catch (error: unknown) {
+        if (isStale()) return;
         setIsGenerating(false);
         setIsPlaying(false);
         const err = error instanceof Error ? error : new Error("Failed to generate speech");
@@ -241,6 +268,7 @@ export function useTTS(options: UseTTSOptions = {}) {
   );
 
   const stopAudio = useCallback(() => {
+    playGenerationRef.current += 1;
     detachActiveAudio();
     setIsGenerating(false);
   }, [detachActiveAudio]);

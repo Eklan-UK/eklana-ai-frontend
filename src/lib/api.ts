@@ -141,6 +141,19 @@ export const drillAPI = {
     });
   },
 
+  getSavedDrills: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        drills: any[];
+      };
+    }>('/drills/learner/saved-drills', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
   getCheckpoint: (drillId: string, assignmentId: string) => {
     return apiRequest<{
       code?: string;

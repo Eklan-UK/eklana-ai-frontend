@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Bookmark from '@/models/bookmark';
-import { Types } from 'mongoose';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 
 // DELETE /api/v1/bookmarks/[id] - Delete a bookmark
 async function deleteBookmark(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string; params: Promise<{ id: string }> }
+  context: { userId: string; userRole: string; params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
@@ -16,7 +16,7 @@ async function deleteBookmark(
 
     const result = await Bookmark.deleteOne({
       _id: id,
-      userId: context.userId, // Ensure ownership
+      userId: { $in: toUserIdCandidates(context.userId) },
     });
 
     if (result.deletedCount === 0) {
@@ -39,7 +39,7 @@ async function deleteBookmark(
 // GET /api/v1/bookmarks/[id] - Get a single bookmark (for practice page)
 async function getBookmark(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string; params: Promise<{ id: string }> }
+  context: { userId: string; userRole: string; params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
@@ -48,7 +48,7 @@ async function getBookmark(
 
     const bookmark = await Bookmark.findOne({
       _id: id,
-      userId: context.userId,
+      userId: { $in: toUserIdCandidates(context.userId) },
     }).lean();
 
     if (!bookmark) {
@@ -70,4 +70,3 @@ async function getBookmark(
 
 export const DELETE = withAuth(deleteBookmark);
 export const GET = withAuth(getBookmark);
-
