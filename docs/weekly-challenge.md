@@ -323,6 +323,7 @@ weekEndDate       : <ISO date>
 ```ts
 {
   fill_blank_items: Array<{
+    context?: string;    // situational setup shown before the sentence
     sentence: string;      // contains ___ for each blank
     blanks: Array<{
       position: number;    // 0-based index

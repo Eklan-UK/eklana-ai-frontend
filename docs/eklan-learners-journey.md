@@ -160,3 +160,11 @@
 - Day 4 — Key Phrase Drills
 - Day 5 — Eklan Free Talk
 - Day 6 — Eklan Weekly Challenge
+
+### 16. Interview Preparation
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge

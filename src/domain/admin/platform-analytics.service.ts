@@ -11,6 +11,11 @@ import {
 	type OverallPronunciationStats,
 	type PhonemeProblemArea,
 } from '@/domain/pronunciations/pronunciation-analytics.service';
+import {
+	computeDrillAssignmentStatistics,
+	enrichDrillAssignment,
+	groupAttemptsByAssignmentId,
+} from '@/domain/drills/drill-assignment-analytics.service';
 
 export interface PlatformDrillOverview {
 	learners: {
@@ -326,42 +331,11 @@ async function getLearnerSummaryMaps(learnerIds: Types.ObjectId[]): Promise<
 		return new Map();
 	}
 
-	const [drillStats, drillScores, pronunciationStats] = await Promise.all([
-		DrillAssignment.aggregate([
-			{ $match: { learnerId: { $in: learnerIds } } },
-			{
-				$group: {
-					_id: '$learnerId',
-					total: { $sum: 1 },
-					completed: {
-						$sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
-					},
-				},
-			},
-		]),
-		DrillAssignment.aggregate([
-			{
-				$match: {
-					learnerId: { $in: learnerIds },
-					status: 'completed',
-				},
-			},
-			{
-				$lookup: {
-					from: 'drill_attempts',
-					localField: '_id',
-					foreignField: 'drillAssignmentId',
-					as: 'attempts',
-				},
-			},
-			{ $unwind: { path: '$attempts', preserveNullAndEmptyArrays: false } },
-			{
-				$group: {
-					_id: '$learnerId',
-					avgScore: { $avg: '$attempts.score' },
-				},
-			},
-		]),
+	const [assignments, pronunciationStats] = await Promise.all([
+		DrillAssignment.find({ learnerId: { $in: learnerIds } })
+			.select('_id learnerId status assignedAt dueDate completedAt score')
+			.lean()
+			.exec(),
 		LearnerPronunciationProgress.aggregate([
 			{ $match: { learnerId: { $in: learnerIds } } },
 			{
@@ -377,18 +351,52 @@ async function getLearnerSummaryMaps(learnerIds: Types.ObjectId[]): Promise<
 		]),
 	]);
 
-	const drillMap = new Map(
-		drillStats.map((d: { _id: Types.ObjectId; total: number; completed: number }) => [
-			d._id.toString(),
-			d,
-		])
-	);
-	const scoreMap = new Map(
-		drillScores.map((d: { _id: Types.ObjectId; avgScore: number }) => [
-			d._id.toString(),
-			d.avgScore || 0,
-		])
-	);
+	const assignmentIds = assignments.map((assignment) => assignment._id);
+	const attempts =
+		assignmentIds.length > 0
+			? await DrillAttempt.find({
+					drillAssignmentId: { $in: assignmentIds },
+				})
+					.select(
+						'drillAssignmentId score completedAt startedAt grammarResults sentenceResults summaryResults'
+					)
+					.lean()
+					.exec()
+			: [];
+
+	const attemptsByAssignment = groupAttemptsByAssignmentId(attempts);
+	const enrichedByLearner = new Map<string, ReturnType<typeof enrichDrillAssignment>[]>();
+
+	for (const assignment of assignments) {
+		const learnerId = assignment.learnerId?.toString();
+		if (!learnerId) {
+			continue;
+		}
+
+		const enriched = enrichDrillAssignment(
+			assignment,
+			attemptsByAssignment.get(assignment._id.toString()) || []
+		);
+
+		if (!enrichedByLearner.has(learnerId)) {
+			enrichedByLearner.set(learnerId, []);
+		}
+		enrichedByLearner.get(learnerId)!.push(enriched);
+	}
+
+	const drillMap = new Map<
+		string,
+		{ total: number; completed: number; averageScore: number }
+	>();
+	for (const [learnerId, enrichedAssignments] of enrichedByLearner) {
+		const stats = computeDrillAssignmentStatistics(enrichedAssignments);
+		drillMap.set(learnerId, {
+			total: stats.total,
+			completed: stats.completed,
+			averageScore: stats.averageScore,
+		});
+	}
+
 	const pronunciationMap = new Map(
 		pronunciationStats.map(
 			(p: {
@@ -404,7 +412,7 @@ async function getLearnerSummaryMaps(learnerIds: Types.ObjectId[]): Promise<
 
 	for (const id of learnerIds) {
 		const idStr = id.toString();
-		const drill = drillMap.get(idStr) as { total: number; completed: number } | undefined;
+		const drill = drillMap.get(idStr);
 		const pronunciation = pronunciationMap.get(idStr) as
 			| { totalWords: number; completedWords: number; avgScore: number }
 			| undefined;
@@ -416,7 +424,7 @@ async function getLearnerSummaryMaps(learnerIds: Types.ObjectId[]): Promise<
 
 		const drillCompletionRatePct =
 			drillTotal > 0 ? Math.round((drillCompleted / drillTotal) * 100) : 0;
-		const drillAverageScore = Math.round((scoreMap.get(idStr) as number) || 0);
+		const drillAverageScore = Math.round(drill?.averageScore || 0);
 		const pronunciationAverageScore = Math.round(pronunciation?.avgScore || 0);
 
 		summaryMap.set(idStr, {
@@ -564,71 +572,47 @@ async function getDrillAssignmentAggregates(
 	averageScore: number;
 	pendingReview: number;
 }> {
-	const [statusAggregation, avgScoreResult, pendingReviewResult] = await Promise.all([
-		DrillAssignment.aggregate([
-			{ $match: learnerMatch },
-			{
-				$group: {
-					_id: '$status',
-					count: { $sum: 1 },
-				},
-			},
-		]),
-		DrillAssignment.aggregate([
-			{ $match: { ...learnerMatch, status: 'completed' } },
-			{
-				$lookup: {
-					from: 'drill_attempts',
-					localField: '_id',
-					foreignField: 'drillAssignmentId',
-					as: 'attempts',
-				},
-			},
-			{ $unwind: { path: '$attempts', preserveNullAndEmptyArrays: true } },
-			{
-				$group: {
-					_id: null,
-					avgScore: { $avg: '$attempts.score' },
-					count: { $sum: 1 },
-				},
-			},
-		]),
-		DrillAssignment.aggregate([
-			{ $match: learnerMatch },
-			{
-				$lookup: {
-					from: 'drill_attempts',
-					localField: '_id',
-					foreignField: 'drillAssignmentId',
-					as: 'attempts',
-				},
-			},
-			{
-				$match: {
-					attempts: { $elemMatch: { requiresReview: true } },
-				},
-			},
-			{ $count: 'count' },
-		]),
-	]);
+	const assignments = await DrillAssignment.find(learnerMatch)
+		.select('_id status assignedAt dueDate completedAt score')
+		.lean()
+		.exec();
 
-	const statusCounts = statusAggregation.reduce<Record<string, number>>(
-		(acc, item: { _id: string; count: number }) => {
-			acc[item._id] = item.count;
-			return acc;
-		},
-		{}
+	if (assignments.length === 0) {
+		return {
+			statusCounts: {},
+			averageScore: 0,
+			pendingReview: 0,
+		};
+	}
+
+	const assignmentIds = assignments.map((assignment) => assignment._id);
+	const attempts = await DrillAttempt.find({
+		drillAssignmentId: { $in: assignmentIds },
+	})
+		.select(
+			'drillAssignmentId score completedAt startedAt grammarResults sentenceResults summaryResults'
+		)
+		.lean()
+		.exec();
+
+	const attemptsByAssignment = groupAttemptsByAssignmentId(attempts);
+	const enrichedAssignments = assignments.map((assignment) =>
+		enrichDrillAssignment(
+			assignment,
+			attemptsByAssignment.get(assignment._id.toString()) || []
+		)
 	);
-
-	const averageScore =
-		avgScoreResult.length > 0 && avgScoreResult[0].count > 0
-			? Math.round((avgScoreResult[0].avgScore || 0) * 100) / 100
-			: 0;
+	const stats = computeDrillAssignmentStatistics(enrichedAssignments);
 
 	return {
-		statusCounts,
-		averageScore,
-		pendingReview: pendingReviewResult[0]?.count ?? 0,
+		statusCounts: {
+			completed: stats.completed,
+			'in-progress': stats.inProgress,
+			pending: stats.pending,
+			overdue: stats.overdue,
+		},
+		averageScore: stats.averageScore,
+		pendingReview: stats.pendingReview,
 	};
 }
 

@@ -126,6 +126,8 @@ interface LearnerDrill {
   title: string;
   type: string;
   difficulty: string;
+  /** Server-resolved catalog topic title for home card display. Omitted when unmapped. */
+  topicTitle?: string | null;
   status: 'pending' | 'in-progress' | 'completed' | 'overdue';
   dueDate?: string;
   assignmentId: string;
@@ -136,6 +138,8 @@ interface LearnerDrill {
   };
 }
 ```
+
+Render `drill.topicTitle` above `drill.title` on home drill cards when present. Returned by `GET /drills/learner/my-drills` and `GET /drills/learner/saved-drills` — no client-side catalog lookup needed.
 
 ### 3.4 Parallel fetching strategy
 

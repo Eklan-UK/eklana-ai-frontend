@@ -106,11 +106,20 @@ function buildExcelRows(drillType: string, content: Record<string, unknown>): un
     case "fill_blank": {
       const items = (content.fill_blank_items as Record<string, unknown>[]) ?? [];
       return [
-        ["Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
+        ["Context", "Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
         ...items.map((item) => {
-          const opts = (item.options as string[]) ?? [];
-          const distractors = opts.filter((o) => o !== item.correctAnswer);
-          return [String(item.sentence ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? "", String(item.hint ?? "")];
+          const blanks = (item.blanks as Array<{ correctAnswer?: string; options?: string[]; hint?: string }>) ?? [];
+          const blank = blanks[0];
+          const opts = blank?.options ?? [];
+          const distractors = opts.filter((o) => o !== blank?.correctAnswer);
+          return [
+            String(item.context ?? ""),
+            String(item.sentence ?? ""),
+            String(blank?.correctAnswer ?? ""),
+            distractors[0] ?? "",
+            distractors[1] ?? "",
+            String(blank?.hint ?? ""),
+          ];
         }),
       ];
     }
@@ -253,6 +262,9 @@ function renderContentForType(
         <PreviewSection title={`Fill in the Blank — ${items.length} sentences`}>
           {items.map((item, i) => (
             <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+              {Boolean(item.context) && (
+                <p className="text-sm text-gray-600 mb-2">{String(item.context)}</p>
+              )}
               <p>{String(item.sentence ?? "")}</p>
               {Boolean(item.translation) && (
                 <p className="text-xs text-gray-500 mt-1">{String(item.translation)}</p>

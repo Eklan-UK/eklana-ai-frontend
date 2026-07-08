@@ -17,6 +17,7 @@ import { computeConfidenceMetrics } from '@/domain/confidence/confidence.service
 import { computePronunciationMetrics } from '@/domain/pronunciation/pronunciation.service';
 import { computeProgressScorecard } from '@/domain/progress/progress-scorecard.service';
 import { StreakService } from '@/services/streak.service';
+import { persistPhonemesFromDrillSnapshot } from '@/domain/pronunciations/drill-phoneme-persistence.service';
 import {
 	buildDrillCompletionEffects,
 	resolveDrillPassed,
@@ -240,6 +241,18 @@ async function handler(
 		},
 	});
 
+
+	if (validated.performanceReviewSnapshot) {
+		const passThreshold = validated.performanceReviewSnapshot.passThreshold ?? 70;
+		void persistPhonemesFromDrillSnapshot({
+			learnerId: context.userId.toString(),
+			drillAttemptId: result.attempt._id.toString(),
+			drillId,
+			snapshot: validated.performanceReviewSnapshot,
+			passThreshold,
+			drillType: result.attempt.drillType,
+		}).catch(() => {});
+	}
 
 	// Fire-and-forget: recompute metrics, streak, and badges in background
 	// Do not await — this must not block or throw to the user

@@ -25,6 +25,7 @@ export async function completeLearnerDrill(
     queryClient.invalidateQueries({ queryKey: queryKeys.badges.all }),
     queryClient.invalidateQueries({ queryKey: ['user-streak'] }),
     queryClient.invalidateQueries({ queryKey: ['progress-scorecard'] }),
+    queryClient.invalidateQueries({ queryKey: ['pronunciations', 'learner'] }),
   ]);
   return result;
 }

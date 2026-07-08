@@ -269,6 +269,7 @@ export function DrillFormBody({
       fillBlankItems: [
         ...draft.fillBlankItems,
         {
+          context: "",
           sentence: "",
           blanks: [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }],
           translation: "",
@@ -286,6 +287,12 @@ export function DrillFormBody({
   const updateFillBlankSentence = (itemIndex: number, sentence: string) => {
     const updated = [...draft.fillBlankItems];
     updated[itemIndex] = { ...updated[itemIndex], sentence };
+    patchDraft({ fillBlankItems: updated });
+  };
+
+  const updateFillBlankContext = (itemIndex: number, context: string) => {
+    const updated = [...draft.fillBlankItems];
+    updated[itemIndex] = { ...updated[itemIndex], context };
     patchDraft({ fillBlankItems: updated });
   };
 
@@ -1255,6 +1262,21 @@ export function DrillFormBody({
                     </div>
 
                     <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Context (Optional)
+                        </label>
+                        <textarea
+                          value={item.context ?? ""}
+                          onChange={(e) =>
+                            updateFillBlankContext(itemIndex, e.target.value)
+                          }
+                          placeholder='e.g., "You haven&apos;t seen your colleague for several shifts, so you say:"'
+                          rows={2}
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl resize-y"
+                        />
+                      </div>
+
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5">
                           Sentence with Blanks<span className="text-red-500">*</span>

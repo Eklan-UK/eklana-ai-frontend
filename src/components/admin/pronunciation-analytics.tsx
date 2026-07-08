@@ -5,7 +5,9 @@ import {
   Mic,
   AlertCircle,
   Volume2,
+  RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { useLearnerPronunciationAnalytics } from "@/hooks/usePronunciations";
 
 interface StrugglingWord {
@@ -70,6 +72,8 @@ export function PronunciationAnalyticsComponent({
     data: analytics,
     isLoading,
     error,
+    refetch,
+    isFetching,
   } = useLearnerPronunciationAnalytics(learnerId);
 
   const overall = analytics?.overall || {};
@@ -123,6 +127,24 @@ export function PronunciationAnalyticsComponent({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <Mic className="w-4 h-4 text-emerald-600" />
+          Pronunciation Analytics
+        </h3>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-gray-600 hover:text-gray-900"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-gray-600 mb-1 font-medium uppercase">

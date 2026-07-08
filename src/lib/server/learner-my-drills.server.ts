@@ -10,6 +10,7 @@ import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignme
 import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 import { toUserIdQuery } from '@/lib/api/user-id';
 import { getBookmarkedDrillIdSet } from '@/lib/server/learner-saved-drills.server';
+import { enrichLearnerDrillRowsWithTopicTitle } from '@/lib/server/enrich-learner-drill-topic';
 
 /** Lean populated assignment from `findByLearnerId` (drillId is a drill document). */
 type PopulatedLearnerAssignment = Omit<AssignmentRow, 'drillId' | 'assignedBy'> & {
@@ -269,7 +270,7 @@ export async function getLearnerMyDrillsPayload(
   }
 
   return {
-    drills: [...drills, ...freeTalkDrills],
+    drills: enrichLearnerDrillRowsWithTopicTitle([...drills, ...freeTalkDrills]),
     pagination: {
       total: result.total + freeTalkDrills.length,
       limit,

@@ -722,18 +722,68 @@ class DocumentParserService {
     return items;
   }
 
-  private parseExcelFillBlank(data: any[][], startRow: number): { sentence: string; translation: string; blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[] }[] {
-    const items: { sentence: string; translation: string; blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[] }[] = [];
+  private parseExcelFillBlank(
+    data: any[][],
+    startRow: number,
+  ): {
+    context?: string;
+    sentence: string;
+    translation: string;
+    blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[];
+  }[] {
+    const headerRow = data[0] ?? [];
+    const hasContextHeader = headerRow.some(
+      (cell) => String(cell || "").trim().toLowerCase() === "context",
+    );
+
+    const items: {
+      context?: string;
+      sentence: string;
+      translation: string;
+      blanks: { position: number; correctAnswer: string; options: string[]; hint: string }[];
+    }[] = [];
+
     for (let i = startRow; i < data.length; i++) {
       const row = data[i];
       if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
-      const sentence = String(row[0] || "").trim();
+
+      let context: string | undefined;
+      let sentence: string;
+      let correctAnswer: string;
+      let option2: string;
+      let option3: string;
+      let hint: string;
+
+      if (hasContextHeader) {
+        context = String(row[0] || "").trim() || undefined;
+        sentence = String(row[1] || "").trim();
+        correctAnswer = String(row[2] || "").trim();
+        option2 = String(row[3] || "").trim();
+        option3 = String(row[4] || "").trim();
+        hint = String(row[5] || "").trim();
+      } else {
+        const col0 = String(row[0] || "").trim();
+        const col1 = String(row[1] || "").trim();
+        if (!col0.includes("___") && col1.includes("___")) {
+          context = col0 || undefined;
+          sentence = col1;
+          correctAnswer = String(row[2] || "").trim();
+          option2 = String(row[3] || "").trim();
+          option3 = String(row[4] || "").trim();
+          hint = String(row[5] || "").trim();
+        } else {
+          sentence = col0;
+          correctAnswer = String(row[1] || "").trim();
+          option2 = String(row[2] || "").trim();
+          option3 = String(row[3] || "").trim();
+          hint = String(row[4] || "").trim();
+        }
+      }
+
       if (!sentence) continue;
-      const correctAnswer = String(row[1] || "").trim();
-      const option2 = String(row[2] || "").trim();
-      const option3 = String(row[3] || "").trim();
-      const hint = String(row[4] || "").trim();
+
       items.push({
+        ...(context ? { context } : {}),
         sentence,
         translation: "",
         blanks: [{
@@ -965,6 +1015,7 @@ class DocumentParserService {
       "title",
       "article",
       "content",
+      "context",
       "english",
       "korean",
       "column",

@@ -124,6 +124,9 @@ function DrillCardComponent({
 }: DrillCardProps) {
   // Memoize computed values to prevent recalculation on every render
   const typeInfo = useMemo(() => getDrillTypeInfo(drill.type), [drill.type]);
+
+  const topicTitle =
+    typeof drill.topicTitle === "string" ? drill.topicTitle : null;
   
   const drillStatus = useMemo(
     () =>
@@ -259,9 +262,16 @@ function DrillCardComponent({
         <span className="text-xl sm:text-2xl flex-shrink-0">{getDrillIcon(drill.type)}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-foreground text-sm sm:text-base line-clamp-2 sm:truncate">
-              {drill.title}
-            </h3>
+            <div className="min-w-0 flex-1">
+              {variant === "detailed" && topicTitle ? (
+                <p className="text-sm font-bold text-foreground line-clamp-2 mb-0.5">
+                  {topicTitle}
+                </p>
+              ) : null}
+              <h3 className="font-semibold text-foreground text-sm sm:text-base line-clamp-2 sm:truncate">
+                {drill.title}
+              </h3>
+            </div>
             <div className="flex-shrink-0 hidden sm:block">
               {getStatusBadge({
                 drill,

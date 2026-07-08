@@ -1099,6 +1099,7 @@ export const adminAPI = {
           inProgress: number;
           pending: number;
           overdue: number;
+          pendingReview: number;
           averageScore: number;
           completionRate: number;
         };
