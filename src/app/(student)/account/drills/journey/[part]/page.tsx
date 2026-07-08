@@ -28,8 +28,10 @@ export default function LearningJourneyPartPage() {
   const params = useParams();
   const part = parseLearningJourneyPartId(params.part);
   const { data: me, isLoading: meLoading } = useUserCurrent();
-  const { data: drills = [], isLoading: drillsLoading } = useLearnerDrills({
-    limit: 100,
+  // This page groups the learner's FULL history by topic — not just a recent
+  // window — so it needs the same higher limit as the My Plans overview page.
+  const { data: drills = [], isLoading: drillsLoading, isError: drillsError } = useLearnerDrills({
+    limit: 1000,
   });
   const prefetchDrill = usePrefetchDrill();
   const { handleBookmarkToggle } = useDrillBookmarkToggle();
@@ -81,6 +83,10 @@ export default function LearningJourneyPartPage() {
         {drillsLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-[#22c55e]" />
+          </div>
+        ) : drillsError ? (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Something went wrong loading your drills. Please refresh.
           </div>
         ) : (
           topicGroups.map(({ topic, items }) => (

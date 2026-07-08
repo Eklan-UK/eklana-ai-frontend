@@ -18,16 +18,19 @@ import {
   Link2,
 } from 'lucide-react';
 import { useLearnerById, useLearnerDrillAssignments } from '@/hooks/useAdmin';
+import { drillDisplayLabel } from '@/lib/drill-display-label';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useEffect } from 'react';
+import { appendReturnTo } from '@/lib/drill-list-filters';
 
 export default function StudentDrillsPage() {
   const params = useParams();
   const router = useRouter();
   const studentId = params.id as string;
+  const returnTo = `/admin/learners/${studentId}/drills`;
 
   // Use React Query hooks
   const { data: student, isLoading: studentLoading, error: studentError } = useLearnerById(studentId);
@@ -206,7 +209,10 @@ export default function StudentDrillsPage() {
                   return (
                     <Link
                       key={assignment._id}
-                      href={`/admin/drills/${drill._id || assignment.drillId}`}
+                      href={appendReturnTo(
+                        `/admin/drills/${drill._id || assignment.drillId}`,
+                        returnTo,
+                      )}
                       className="block"
                     >
                       <div className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
@@ -216,7 +222,9 @@ export default function StudentDrillsPage() {
                               <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
                                 {getTypeIcon(drill.type)}
                               </div>
-                              <h3 className="font-semibold text-gray-900">{drill.title}</h3>
+                              <h3 className="font-semibold text-gray-900">
+                                {drill.title || drillDisplayLabel(drill) || "Untitled Drill"}
+                              </h3>
                             </div>
                             <div className="flex flex-wrap gap-3 text-sm text-gray-500 ml-11">
                               <span className="capitalize">{drill.type?.replace('_', ' ')}</span>

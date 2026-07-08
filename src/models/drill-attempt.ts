@@ -6,7 +6,9 @@ import '@/models/user';
 export interface IDrillAttempt extends Document {
 	_id: Types.ObjectId;
 	drillAssignmentId: Types.ObjectId; // Which assignment
-	learnerId: Types.ObjectId;
+	// Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+	// user ids; legacy/mobile accounts use ObjectId.
+	learnerId: Types.ObjectId | string;
 	drillId: Types.ObjectId;
 	drillType?: string;
 
@@ -96,7 +98,8 @@ export interface IDrillAttempt extends Document {
 			isCorrect: boolean;
 			correctedText?: string;
 			reviewedAt?: Date;
-			reviewedBy?: Types.ObjectId;
+			// Reviewer (tutor/admin) id — Better Auth accounts may have a UUID _id.
+			reviewedBy?: Types.ObjectId | string;
 		}>;
 	};
 
@@ -133,7 +136,7 @@ export interface IDrillAttempt extends Document {
 			isCorrect: boolean;
 			correctedText?: string; // Only if isCorrect is false
 			reviewedAt?: Date;
-			reviewedBy?: Types.ObjectId; // Tutor/admin who reviewed
+			reviewedBy?: Types.ObjectId | string; // Tutor/admin who reviewed; Better Auth accounts may have a UUID _id
 		}>;
 	};
 
@@ -151,7 +154,7 @@ export interface IDrillAttempt extends Document {
 			isAcceptable: boolean;
 			correctedVersion?: string; // Optional improved version
 			reviewedAt?: Date;
-			reviewedBy?: Types.ObjectId;
+			reviewedBy?: Types.ObjectId | string; // Better Auth accounts may have a UUID _id
 		};
 	};
 
@@ -209,8 +212,11 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			// Removed index: true - covered by compound index { drillAssignmentId: 1, completedAt: -1 }
 		},
 	learnerId: {
-		type: Schema.Types.ObjectId,
-		ref: 'User', // learnerId now references User (kept name for backward compatibility)
+		// Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up,
+		// incl. Google/Apple OAuth) can be stored without a cast error. No
+		// `ref` since populate cannot reliably resolve a mixed-type field;
+		// `model: User` is passed explicitly at populate call sites instead.
+		type: Schema.Types.Mixed,
 		required: [true, 'User ID is required'],
 		// Removed index: true - covered by compound index { learnerId: 1, completedAt: -1 }
 	},
@@ -347,8 +353,9 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					correctedText: String,
 					reviewedAt: Date,
 					reviewedBy: {
-						type: Schema.Types.ObjectId,
-						ref: 'User',
+						// Mixed (not ObjectId): the reviewing tutor/admin may be a
+						// Better Auth account with a UUID _id, same as learnerId.
+						type: Schema.Types.Mixed,
 					},
 				},
 			],
@@ -399,8 +406,9 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					correctedText: String,
 					reviewedAt: Date,
 					reviewedBy: {
-						type: Schema.Types.ObjectId,
-						ref: 'User',
+						// Mixed (not ObjectId): the reviewing tutor/admin may be a
+						// Better Auth account with a UUID _id, same as learnerId.
+						type: Schema.Types.Mixed,
 					},
 				},
 			],
@@ -424,8 +432,9 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 				correctedVersion: String,
 				reviewedAt: Date,
 				reviewedBy: {
-					type: Schema.Types.ObjectId,
-					ref: 'User',
+					// Mixed (not ObjectId): the reviewing tutor/admin may be a
+					// Better Auth account with a UUID _id, same as learnerId.
+					type: Schema.Types.Mixed,
 				},
 			},
 		},

@@ -21,6 +21,15 @@ import type { ParsedContent } from "@/services/document-parser.service";
 export const AI_DRILL_BULK_PENDING_STORAGE_KEY =
   "eklana-ai-drill-bulk-pending";
 
+function scrollAppContentToTop() {
+  if (typeof window === "undefined") return;
+
+  document
+    .querySelector<HTMLElement>("[data-admin-shell] main")
+    ?.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 export interface AIGeneratedResult {
   drillType: string;
   content: Record<string, unknown>;
@@ -75,6 +84,7 @@ export function useAIDrillCreationWorkflow({
   const [showAiPreview, setShowAiPreview] = useState(false);
   const [showChatSidebar, setShowChatSidebar] = useState(false);
   const [showAiFormModal, setShowAiFormModal] = useState(false);
+  const scrollAfterGenerateRef = useRef(false);
 
   const contextStudentId = initialContext?.studentId;
   const contextProficiency = initialContext?.studentContext?.proficiencyLevel;
@@ -158,6 +168,16 @@ export function useAIDrillCreationWorkflow({
     contextProficiency,
     composedContext,
   ]);
+
+  useEffect(() => {
+    if (!scrollAfterGenerateRef.current) return;
+    if (!showAiPreview || !aiGeneratedResults?.length) return;
+
+    scrollAfterGenerateRef.current = false;
+    requestAnimationFrame(() => {
+      scrollAppContentToTop();
+    });
+  }, [showAiPreview, aiGeneratedResults]);
 
   const aiFormValues: AIGenerationFormValues = useMemo(
     () => ({
@@ -257,6 +277,7 @@ export function useAIDrillCreationWorkflow({
       setShowAiPreview(true);
       setShowChatSidebar(true);
       setShowAiFormModal(false);
+      scrollAfterGenerateRef.current = true;
       toast.success(
         results.length > 1
           ? `${results.length} drills generated successfully`

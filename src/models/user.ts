@@ -1,9 +1,82 @@
 // models/user.model.ts
-import { Schema, model, models, Document, Types } from "mongoose";
+import { Schema, SchemaType, model, models, Document, Types } from "mongoose";
 import bcrypt from "bcryptjs";
 
-export interface IUser extends Document {
-  _id: Types.ObjectId;
+// Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string ids
+// via `generateId: () => crypto.randomUUID()`. Legacy/mobile accounts use
+// standard ObjectIds. The `Document<Types.ObjectId | string>` generic tells
+// Mongoose's own typings to accept both, matching the `_id: UserId` schema
+// type below — this is what lets findById/findOne/$in/populate calls with a
+// UUID-shaped id compile and run without a CastError.
+//
+// IMPORTANT: `_id` used to be plain `Schema.Types.Mixed`. Mixed's
+// `castForQuery` is a no-op identity function (see
+// node_modules/mongoose/lib/schema/mixed.js) — unlike `Schema.Types.ObjectId`,
+// which auto-casts a 24-char hex string into a real `Types.ObjectId` BSON
+// instance before querying. With `_id: Mixed`, `User.findById("<hex string>")`
+// built the filter `{ _id: "<hex string>" }` (a JS string), which does NOT
+// match legacy documents whose `_id` is stored as a real BSON ObjectId — so
+// every `User.findById(rawStringId)` call site silently returned null for
+// legacy (pre-UUID-fix) users, even when they existed. Nearly every call site
+// in the codebase (withPremium, /api/v1/users/current, Stripe/Apple sync
+// routes, etc.) calls `findById`/`findOne` with a raw string id, so fixing
+// each call site individually wasn't practical — instead we fix it once here
+// with a custom SchemaType (`UserIdSchemaType` below) that casts
+// ObjectId-shaped strings/instances to `Types.ObjectId` and leaves anything
+// else (UUID strings) untouched, for both document values and query values
+// (including `$in`/`$nin`/`$all` arrays, via the inherited base
+// `SchemaType.prototype.castForQuery`).
+const OBJECT_ID_STRING_RE = /^[0-9a-fA-F]{24}$/;
+
+function looksLikeObjectId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    OBJECT_ID_STRING_RE.test(value) &&
+    Types.ObjectId.isValid(value)
+  );
+}
+
+/**
+ * Custom SchemaType for `User._id` that transparently supports both legacy
+ * 24-char hex ObjectIds and Better Auth UUID strings.
+ *
+ * - ObjectId-shaped string or `Types.ObjectId` instance -> cast to `Types.ObjectId`
+ *   (so it matches documents whose `_id` is stored as a real BSON ObjectId).
+ * - Anything else (UUID string) -> returned unchanged, exactly like `Mixed`.
+ *
+ * Only `cast()` is overridden; `castForQuery` is inherited from the base
+ * `SchemaType`, which calls `cast()` per-element for `$in`/`$nin`/`$all`
+ * arrays and for the plain-value case — so `User.find({ _id: { $in: [...] } })`
+ * with a mix of ObjectId and UUID ids works correctly too.
+ */
+class UserIdSchemaType extends SchemaType {
+  static schemaName = "UserId";
+
+  constructor(key: string, options?: Record<string, unknown>) {
+    super(key, options, "UserId");
+  }
+
+  cast(value: unknown): Types.ObjectId | string {
+    if (value instanceof Types.ObjectId) {
+      return value;
+    }
+    if (looksLikeObjectId(value)) {
+      return new Types.ObjectId(value);
+    }
+    // UUID string (or any other already-valid `_id` value) — store/query as-is.
+    return value as string;
+  }
+}
+
+// Register under Mongoose's global SchemaType registry so `interpretAsType`
+// (schema.js) can resolve `{ type: UserIdSchemaType }` by name. Mongoose's
+// own TypeScript types don't model arbitrary custom types on `Schema.Types`,
+// hence the cast — this mirrors the pattern from Mongoose's official custom
+// schema type docs (https://mongoosejs.com/docs/customschematypes.html).
+(Schema.Types as unknown as Record<string, unknown>).UserId = UserIdSchemaType;
+
+export interface IUser extends Document<Types.ObjectId | string> {
+  _id: Types.ObjectId | string;
   firstName: string; // Required for registration
   lastName: string; // Required for registration
   name?: string; // Better Auth uses this field (synced from firstName/lastName)
@@ -59,12 +132,32 @@ export interface IUser extends Document {
   appleOriginalTransactionId?: string;
   appleLatestTransactionId?: string;
   appleSubscriptionStatus?: string;
+  // Purpose-built UUID identifier for Apple StoreKit's appAccountToken.
+  // `_id` is unsafe to use directly here since roughly half the user base
+  // (legacy/mobile accounts) has a non-UUID ObjectId `_id`. Lazily
+  // generated on first login / profile fetch if missing — see
+  // verify-id-token and users/current routes.
+  iapAccountToken?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const userSchema = new Schema<IUser>(
   {
+    // Explicitly override the default ObjectId _id type so Mongoose accepts
+    // Better Auth's UUID string ids (web sign-up/OAuth) alongside legacy
+    // ObjectIds (mobile OAuth, pre-Better-Auth accounts). Unlike plain
+    // `Mixed`, `UserIdSchemaType` casts ObjectId-shaped values (both on
+    // save and on query) to real `Types.ObjectId` instances so lookups by
+    // legacy hex-string ids still match BSON ObjectId-keyed documents.
+    _id: {
+      // Mongoose's `Schema<IUser>` typings only know about `Mixed`/`String`/
+      // `ObjectId` as valid `_id` type definitions, so a custom SchemaType
+      // needs an escape hatch here. The runtime behavior is unaffected —
+      // `interpretAsType` resolves the actual constructor via the
+      // `Schema.Types.UserId` registry entry set up above.
+      type: UserIdSchemaType as unknown as typeof Schema.Types.Mixed,
+    },
     firstName: {
       type: String,
       required: [true, "First name is required"],
@@ -268,6 +361,15 @@ const userSchema = new Schema<IUser>(
     },
     appleSubscriptionStatus: {
       type: String,
+    },
+    // Sparse + indexed for query performance, but intentionally NOT a hard
+    // unique constraint — generation is lazy (crypto.randomUUID()) and
+    // UUID v4 collision probability is negligible, so a uniqueness
+    // constraint isn't needed here.
+    iapAccountToken: {
+      type: String,
+      index: true,
+      sparse: true,
     },
   },
   {

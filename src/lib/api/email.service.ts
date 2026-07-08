@@ -180,6 +180,91 @@ This is an automated notification from Eklan.
     };
   },
 
+  weeklyDrillDigest: (data: {
+    studentName: string;
+    drillCount: number;
+    drillTitles: string[];
+    weekLabel: string;
+  }) => {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const drillsUrl = `${appUrl}/account/drills`;
+    const maxListed = 5;
+    const listed = data.drillTitles.slice(0, maxListed);
+    const remaining = data.drillCount - listed.length;
+    const listItems = listed
+      .map(
+        (title) =>
+          `<li style="margin: 0 0 8px 0; font-size: 15px; color: #166534;">${title}</li>`,
+      )
+      .join("");
+    const moreLine =
+      remaining > 0
+        ? `<p style="margin: 12px 0 0 0; font-size: 14px; color: #6b7280;">and ${remaining} more</p>`
+        : "";
+
+    return {
+      subject: "Your new drills for this week are ready",
+      html: `
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>Weekly Drill Digest</title>
+			</head>
+			<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6;">
+				<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+					<div style="text-align: center; margin-bottom: 30px;">
+						<img src="${appUrl}/notification-logo.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+						<div style="font-size: 24px; font-weight: bold; color: #3a893e;">Eklan</div>
+					</div>
+					<div style="background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+						<div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: center;">
+							<div style="font-size: 48px; margin-bottom: 10px;">📅</div>
+							<h1 style="margin: 0; font-size: 24px; font-weight: 600;">Your new drills are ready</h1>
+							<p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Week of ${data.weekLabel}</p>
+						</div>
+						<div style="padding: 30px;">
+							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You have <strong>${data.drillCount}</strong> new drill${data.drillCount === 1 ? "" : "s"} this week. Open your plan to get started.</p>
+							<div style="background-color: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 25px 0;">
+								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #166534;">New drills</h2>
+								<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>
+								${moreLine}
+							</div>
+							<div style="text-align: center; margin: 30px 0;">
+								<a href="${drillsUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);">View My Drills →</a>
+							</div>
+							<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; text-align: center;">Keep up the great work! 🍀</p>
+						</div>
+					</div>
+					<div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+						<p style="margin: 0;">This is an automated notification from Eklan.</p>
+					</div>
+				</div>
+			</body>
+			</html>
+		`,
+      text: `
+Hi ${data.studentName},
+
+Your new drills for this week are ready (week of ${data.weekLabel}).
+
+You have ${data.drillCount} new drill${data.drillCount === 1 ? "" : "s"} this week.
+
+${listed.map((t) => `- ${t}`).join("\n")}${remaining > 0 ? `\n...and ${remaining} more` : ""}
+
+View your drills:
+${drillsUrl}
+
+Keep up the great work! 🍀
+
+---
+This is an automated notification from Eklan.
+		`.trim(),
+    };
+  },
+
   emailVerification: (data: { name: string; verificationLink: string }) => ({
     subject: "Verify Your Email Address",
     html: `
@@ -284,6 +369,42 @@ export const sendDrillAssignmentNotification = async (data: {
       studentEmail: data.studentEmail,
     });
     // Don't throw - email failure shouldn't break drill assignment
+  }
+};
+
+export const sendWeeklyDrillDigestEmail = async (data: {
+  studentEmail: string;
+  studentName: string;
+  drillCount: number;
+  drillTitles: string[];
+  weekLabel: string;
+}): Promise<void> => {
+  try {
+    const template = emailTemplates.weeklyDrillDigest({
+      studentName: data.studentName,
+      drillCount: data.drillCount,
+      drillTitles: data.drillTitles,
+      weekLabel: data.weekLabel,
+    });
+
+    await sendEmail({
+      to: data.studentEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+
+    logger.info('Weekly drill digest email sent', {
+      studentEmail: data.studentEmail,
+      drillCount: data.drillCount,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Error sending weekly drill digest email', {
+      error: message,
+      studentEmail: data.studentEmail,
+    });
+    throw error;
   }
 };
 

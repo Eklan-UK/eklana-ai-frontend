@@ -476,7 +476,7 @@ export interface IDrill extends Document {
 
   // Metadata
   created_by: string; // Email of the teacher/admin (kept for backward compatibility)
-  createdById?: Types.ObjectId; // ObjectId reference to creator (preferred)
+  createdById?: Types.ObjectId | string; // Reference to creator (preferred); UUID for Better Auth admin/tutor accounts
   created_date: Date;
   updated_date: Date;
   is_active: boolean;
@@ -726,10 +726,12 @@ const drillSchema = new Schema<IDrill>(
       // Keep for backward compatibility, but also add ObjectId reference
     },
     createdById: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+      // Mixed: admin/tutor creators are also Better Auth users and can have
+      // a UUID _id, not just ObjectId. No `ref` since populate cannot
+      // reliably resolve a mixed-type field.
+      type: Schema.Types.Mixed,
       required: false, // Optional for backward compatibility
-      description: "ObjectId reference to the user who created this drill",
+      description: "Reference (ObjectId or UUID) to the user who created this drill",
       index: true,
     },
 

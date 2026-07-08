@@ -181,7 +181,7 @@ const createDrillSchema = z.object({
 // GET handler
 async function getHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string }
+	context: { userId: string; userRole: string }
 ) {
 	await connectToDatabase();
 
@@ -229,7 +229,7 @@ async function getHandler(
 // POST handler
 async function postHandler(
 	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string }
+	context: { userId: string; userRole: string }
 ) {
 	await connectToDatabase();
 

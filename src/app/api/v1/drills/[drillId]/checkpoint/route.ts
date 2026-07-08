@@ -7,6 +7,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { apiResponse } from '@/lib/api/response';
+import { toUserIdQuery } from '@/lib/api/user-id';
 
 const saveCheckpointSchema = z.object({
   assignmentId: z.string().refine((v) => Types.ObjectId.isValid(v), {
@@ -29,7 +30,7 @@ const saveCheckpointSchema = z.object({
   startedAt: z.union([z.string(), z.date()]).optional(),
 });
 
-type AuthContext = { userId: Types.ObjectId; userRole: string };
+type AuthContext = { userId: string; userRole: string };
 
 async function getHandler(
   req: NextRequest,
@@ -51,7 +52,11 @@ async function getHandler(
     }
 
     const checkpoint = await DrillCheckpoint.findOne({
-      userId: context.userId,
+      // DrillCheckpoint.userId is Schema.Types.Mixed (see model comment), so
+      // Mongoose will NOT auto-cast a raw hex string into a real ObjectId
+      // here — toUserIdQuery ensures legacy (ObjectId-keyed) learners still
+      // match their pre-existing checkpoint rows.
+      userId: toUserIdQuery(context.userId),
       drillId: new Types.ObjectId(drillId),
       drillAssignmentId: new Types.ObjectId(assignmentId),
     })
@@ -81,7 +86,9 @@ async function postHandler(
     const validated = saveCheckpointSchema.parse(body);
 
     const filter = {
-      userId: context.userId,
+      // See getHandler comment — DrillCheckpoint.userId is Mixed, so it must
+      // be explicitly cast via toUserIdQuery for legacy ObjectId learners.
+      userId: toUserIdQuery(context.userId),
       drillId: new Types.ObjectId(drillId),
       drillAssignmentId: new Types.ObjectId(validated.assignmentId),
     };
@@ -139,7 +146,7 @@ async function deleteHandler(
     }
 
     await DrillCheckpoint.deleteOne({
-      userId: context.userId,
+      userId: toUserIdQuery(context.userId),
       drillId: new Types.ObjectId(drillId),
       drillAssignmentId: new Types.ObjectId(assignmentId),
     }).exec();

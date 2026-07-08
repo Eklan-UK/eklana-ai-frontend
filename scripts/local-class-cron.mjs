@@ -7,14 +7,16 @@
  *
  * Setup:
  *   cp scripts/local-class-cron.example.mjs scripts/local-class-cron.mjs
- *   Set CLASS_REMINDER_CRON_SECRET, CLASS_NPS_CRON_SECRET, DRILL_REMINDER_CRON_SECRET
- *   (or CRON_SECRET) in .env. Optional: CRON_DEBUG=true for verbose cron JSON.
+ *   Set CLASS_REMINDER_CRON_SECRET, CLASS_NPS_CRON_SECRET, DRILL_REMINDER_CRON_SECRET,
+ *   WEEKLY_DRILL_DIGEST_CRON_SECRET (or CRON_SECRET) in .env.
+ *   Optional: CRON_DEBUG=true for verbose cron JSON.
  *
  * Crons exercised (matches vercel.json):
- *   class-session-reminders  — class reminder email + in-app + push (every minute)
- *   class-session-nps        — post-class NPS email + in-app + push (every minute)
- *   drill-streak-reminder    — streak rolling nudge (every 30 min in prod)
+ *   class-session-reminders       — class reminder email + in-app + push (every minute)
+ *   class-session-nps             — post-class NPS email + in-app + push (every minute)
+ *   drill-streak-reminder         — streak rolling nudge (every 30 min in prod)
  *   drill-daily-practice-reminder — daily drill nudge at 18:00 UTC (6 PM UTC)
+ *   weekly-drill-digest           — weekly new-drill digest at Monday 09:00 UTC
  *
  * Usage:
  *   npm run dev:cron
@@ -23,10 +25,14 @@
  *   node scripts/local-class-cron.mjs --daily-blast-once
  *   node scripts/local-class-cron.mjs --include-daily-blast
  *   node scripts/local-class-cron.mjs --daily-blast-scheduled-only
+ *   node scripts/local-class-cron.mjs --weekly-digest-once
+ *   node scripts/local-class-cron.mjs --weekly-digest-scheduled-only
  *
  * --daily-blast-once            Fire drill-daily-practice-reminder once at startup.
  * --include-daily-blast         Fire at startup + again each day at 18:00 UTC.
  * --daily-blast-scheduled-only  Wait until 18:00 UTC only (no startup blast).
+ * --weekly-digest-once          Fire weekly-drill-digest once at startup.
+ * --weekly-digest-scheduled-only Wait until Monday 09:00 UTC only (no startup fire).
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -38,6 +44,8 @@ const ROOT = join(__dirname, '..');
 
 /** Production schedule: 18:00 UTC daily (6 PM UTC). */
 const DAILY_BLAST_UTC_HOUR = 18;
+/** Production schedule: Monday 09:00 UTC. */
+const WEEKLY_DIGEST_UTC_HOUR = 9;
 
 function loadDotEnv(filePath) {
   if (!existsSync(filePath)) return;
@@ -75,6 +83,8 @@ function parseArgs() {
   let includeDailyBlast = false;
   let dailyBlastOnce = false;
   let dailyBlastScheduledOnly = false;
+  let weeklyDigestOnce = false;
+  let weeklyDigestScheduledOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--base-url' && args[i + 1]) baseUrl = args[++i];
@@ -85,6 +95,8 @@ function parseArgs() {
     if (args[i] === '--include-daily-blast') includeDailyBlast = true;
     if (args[i] === '--daily-blast-once') dailyBlastOnce = true;
     if (args[i] === '--daily-blast-scheduled-only') dailyBlastScheduledOnly = true;
+    if (args[i] === '--weekly-digest-once') weeklyDigestOnce = true;
+    if (args[i] === '--weekly-digest-scheduled-only') weeklyDigestScheduledOnly = true;
   }
 
   return {
@@ -94,6 +106,8 @@ function parseArgs() {
     includeDailyBlast,
     dailyBlastOnce,
     dailyBlastScheduledOnly,
+    weeklyDigestOnce,
+    weeklyDigestScheduledOnly,
   };
 }
 
@@ -207,13 +221,57 @@ async function tickDailyPractice(baseUrl) {
   }
 }
 
+async function tickWeeklyDrillDigest(baseUrl) {
+  const digestSecret = resolveSecret(process.env.WEEKLY_DRILL_DIGEST_CRON_SECRET);
+  const ts = new Date().toLocaleTimeString();
+
+  console.log(`\n[${ts}] ── Drills / weekly digest (Monday ${WEEKLY_DIGEST_UTC_HOUR}:00 UTC) ──`);
+  console.log('  → weekly-drill-digest: email + in-app + push');
+
+  try {
+    const result = await hitCron(
+      baseUrl,
+      '/api/v1/cron/weekly-drill-digest',
+      digestSecret,
+    );
+    summarize('weekly-drill-digest', result);
+  } catch (err) {
+    console.error('  fetch failed — is `npm run dev` running?', err.message);
+  }
+}
+
 /** True when within ±1 minute of the configured daily blast hour (UTC). */
 function isDailyBlastWindow(now = new Date()) {
   return now.getUTCHours() === DAILY_BLAST_UTC_HOUR && now.getUTCMinutes() <= 1;
 }
 
+/** True when Monday 09:00 UTC ±1 minute. */
+function isWeeklyDigestWindow(now = new Date()) {
+  return (
+    now.getUTCDay() === 1 &&
+    now.getUTCHours() === WEEKLY_DIGEST_UTC_HOUR &&
+    now.getUTCMinutes() <= 1
+  );
+}
+
 function utcDayKey(now = new Date()) {
   return now.toISOString().slice(0, 10);
+}
+
+function isoWeekKey(now = new Date()) {
+  const d = new Date(now);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+  const week1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const weekNum =
+    1 +
+    Math.round(
+      ((d.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getUTCDay() + 6) % 7)) /
+        7,
+    );
+  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
 }
 
 function formatNextDailyBlast() {
@@ -227,6 +285,22 @@ function formatNextDailyBlast() {
   return next.toISOString();
 }
 
+function formatNextWeeklyDigest() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCMinutes(0, 0, 0);
+  next.setUTCHours(WEEKLY_DIGEST_UTC_HOUR);
+  let daysUntilMonday = (1 - now.getUTCDay() + 7) % 7;
+  if (daysUntilMonday === 0) {
+    const pastWindow =
+      now.getUTCHours() > WEEKLY_DIGEST_UTC_HOUR ||
+      (now.getUTCHours() === WEEKLY_DIGEST_UTC_HOUR && now.getUTCMinutes() > 1);
+    if (pastWindow) daysUntilMonday = 7;
+  }
+  next.setUTCDate(next.getUTCDate() + daysUntilMonday);
+  return next.toISOString();
+}
+
 const {
   baseUrl,
   intervalSec,
@@ -234,10 +308,13 @@ const {
   includeDailyBlast,
   dailyBlastOnce,
   dailyBlastScheduledOnly,
+  weeklyDigestOnce,
+  weeklyDigestScheduledOnly,
 } = parseArgs();
 
 const runScheduledDaily =
   includeDailyBlast || dailyBlastScheduledOnly;
+const runScheduledWeekly = weeklyDigestScheduledOnly;
 
 console.log('Local cron runner (classes + drills) — private copy, not deployed');
 console.log(`  base URL: ${baseUrl}`);
@@ -258,11 +335,23 @@ if (dailyBlastScheduledOnly) {
     `  daily practice: off (use --daily-blast-once, --include-daily-blast, or --daily-blast-scheduled-only)`,
   );
 }
+if (weeklyDigestScheduledOnly) {
+  console.log(
+    `  weekly digest: scheduled only Monday ${WEEKLY_DIGEST_UTC_HOUR}:00 UTC (next: ${formatNextWeeklyDigest()})`,
+  );
+} else if (weeklyDigestOnce) {
+  console.log('  weekly digest: once at startup only');
+} else {
+  console.log(
+    '  weekly digest: off (use --weekly-digest-once or --weekly-digest-scheduled-only)',
+  );
+}
 console.log(
   '  secrets:',
   resolveSecret(process.env.CLASS_REMINDER_CRON_SECRET) ? 'reminders ✓' : 'reminders ✗',
   resolveSecret(process.env.CLASS_NPS_CRON_SECRET) ? 'nps ✓' : 'nps ✗',
   resolveSecret(process.env.DRILL_REMINDER_CRON_SECRET) ? 'drills ✓' : 'drills ✗',
+  resolveSecret(process.env.WEEKLY_DRILL_DIGEST_CRON_SECRET) ? 'weekly-digest ✓' : 'weekly-digest ✗',
 );
 if (process.env.CRON_DEBUG === 'true') {
   console.log('  CRON_DEBUG=true — verbose cron responses enabled');
@@ -271,6 +360,8 @@ console.log('Press Ctrl+C to stop.\n');
 
 let dailyBlastFiredToday = false;
 let lastBlastDay = '';
+let weeklyDigestFiredThisWeek = false;
+let lastDigestWeek = '';
 
 async function maybeScheduledDailyBlast() {
   if (!runScheduledDaily) return;
@@ -281,6 +372,17 @@ async function maybeScheduledDailyBlast() {
   lastBlastDay = day;
   dailyBlastFiredToday = true;
   await tickDailyPractice(baseUrl);
+}
+
+async function maybeScheduledWeeklyDigest() {
+  if (!runScheduledWeekly) return;
+  const now = new Date();
+  const week = isoWeekKey(now);
+  if (week === lastDigestWeek && weeklyDigestFiredThisWeek) return;
+  if (!isWeeklyDigestWindow(now)) return;
+  lastDigestWeek = week;
+  weeklyDigestFiredThisWeek = true;
+  await tickWeeklyDrillDigest(baseUrl);
 }
 
 await tickClasses(baseUrl, intervalSec);
@@ -294,9 +396,16 @@ if (dailyBlastOnce || (includeDailyBlast && !dailyBlastScheduledOnly)) {
   }
 }
 
+if (weeklyDigestOnce && !weeklyDigestScheduledOnly) {
+  await tickWeeklyDrillDigest(baseUrl);
+  lastDigestWeek = isoWeekKey();
+  weeklyDigestFiredThisWeek = true;
+}
+
 setInterval(async () => {
   await tickClasses(baseUrl, intervalSec);
   await maybeScheduledDailyBlast();
+  await maybeScheduledWeeklyDigest();
 }, intervalSec * 1000);
 
 setInterval(() => tickStreakRolling(baseUrl, streakIntervalSec), streakIntervalSec * 1000);

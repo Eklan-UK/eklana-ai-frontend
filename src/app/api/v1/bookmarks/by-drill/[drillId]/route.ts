@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Bookmark from '@/models/bookmark';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 import { Types } from 'mongoose';
 
 // DELETE /api/v1/bookmarks/by-drill/[drillId] - Remove drill-level bookmark
 async function deleteDrillBookmark(
   req: NextRequest,
   context: {
-    userId: Types.ObjectId;
+    userId: string;
     userRole: string;
     params: Promise<{ drillId: string }>;
   },
@@ -23,7 +24,7 @@ async function deleteDrillBookmark(
     }
 
     const result = await Bookmark.deleteOne({
-      userId: context.userId,
+      userId: { $in: toUserIdCandidates(context.userId) },
       drillId: new Types.ObjectId(drillId),
       type: 'drill',
     });

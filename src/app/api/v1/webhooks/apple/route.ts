@@ -28,8 +28,20 @@ import {
 } from '@/services/apple-app-store.service';
 import { Status } from '@apple/app-store-server-library';
 
-async function findUserByAppleOriginalTransactionId(originalTransactionId: string) {
-  return User.findOne({ appleOriginalTransactionId: originalTransactionId }).exec();
+async function findUserByAppleOriginalTransactionId(
+  originalTransactionId: string,
+  appAccountToken?: string
+) {
+  const byTransactionId = await User.findOne({
+    appleOriginalTransactionId: originalTransactionId,
+  }).exec();
+  if (byTransactionId) return byTransactionId;
+
+  if (appAccountToken) {
+    return User.findOne({ iapAccountToken: appAccountToken }).exec();
+  }
+
+  return null;
 }
 
 async function decodeTransactionFromNotification(
@@ -96,13 +108,23 @@ async function handleNotification(
   }
 
   await connectToDatabase();
-  const user = await findUserByAppleOriginalTransactionId(originalTransactionId);
+  const user = await findUserByAppleOriginalTransactionId(
+    originalTransactionId,
+    transaction?.appAccountToken
+  );
   if (!user) {
     logger.warn('[Apple Webhook] User not found for originalTransactionId', {
       originalTransactionId,
       notificationType,
     });
     return;
+  }
+
+  if (user.appleOriginalTransactionId !== originalTransactionId) {
+    // Fallback lookup matched via appAccountToken (webhook race condition —
+    // fired before /apple/verify linked appleOriginalTransactionId). Link it
+    // now so future webhooks for this subscription hit the primary lookup.
+    user.appleOriginalTransactionId = originalTransactionId;
   }
 
   if (transaction?.transactionId) {

@@ -420,9 +420,11 @@ Shared collapsible section used on **Home** and **My Plans**.
 
 #### Data source
 
-- Fetch learner drills with `limit: 100`
-- Filter: `item.hasBookmarks === true`
-- Sort: same order as `sortAssignedPlanItems` on web (active/incomplete first, then by due date)
+- Fetch `GET /api/v1/drills/learner/saved-drills` (bookmark-first; no assignment pagination cap)
+- Every returned row has `hasBookmarks: true`
+- Sort: server returns `sortAssignedPlanItems` order (active/incomplete first, then by due date)
+
+**Fallback (not recommended):** `GET /api/v1/drills/learner/my-drills?limit=100` + filter `hasBookmarks === true` misses bookmarked drills outside the first 100 assignments.
 
 #### Header row layout (left → right)
 
@@ -943,7 +945,7 @@ All API endpoints require an authenticated session. The mobile app authenticates
 
 #### 7.2 `GET /api/v1/drills/learner/my-drills`
 
-This is the **single endpoint** the mobile app calls to load all data needed for the Learning Journey, Saved Drills, Home Assigned Drills, and My Plans screens.
+This is the **primary endpoint** the mobile app calls to load assigned drills for the Learning Journey, Home Assigned Drills, and My Plans screens. For **Saved Drills** (bookmark-first list), use `GET /api/v1/drills/learner/saved-drills` instead (§7.2.1).
 
 ##### Request
 
@@ -965,6 +967,40 @@ Authorization: Bearer <session-token>
 ```
 GET /api/v1/drills/learner/my-drills?limit=100
 ```
+
+##### 7.2.1 `GET /api/v1/drills/learner/saved-drills`
+
+Bookmark-first Saved Drills list for **Home**, **My Plans**, and **Profile → Bookmarks (Saved Drills section)**. Returns all drill-level bookmarks without assignment-list pagination caps.
+
+```
+GET /api/v1/drills/learner/saved-drills
+Authorization: Bearer <session-token>
+```
+
+**Response:**
+
+```jsonc
+{
+  "data": {
+    "drills": [
+      // LearnerMyDrillRow[] — same shape as my-drills (§7.2 above)
+      // includes free_talk_scenario rows when bookmarked
+      // every row: "hasBookmarks": true
+    ]
+  }
+}
+```
+
+**When to use:**
+
+| Screen | Endpoint |
+|--------|----------|
+| Saved Drills collapsible (Home / My Plans) | `saved-drills` |
+| Profile → Bookmarks → Saved Drills section | `saved-drills` |
+| Learning Journey / assigned drill lists | `my-drills` |
+| Bookmark icon initial state on journey rows | `hasBookmarks` from `my-drills` (now fixed for Mixed userId) |
+
+**Cache invalidation:** after bookmark toggle, refetch/invalidate **both** `my-drills` and `saved-drills`.
 
 ##### Response shape
 
@@ -1257,7 +1293,7 @@ Authorization: Bearer <session-token>
 
 The `hasBookmarks: boolean` field on each item in `my-drills` tells whether **the authenticated user** has an active drill-type bookmark for that drill. Use this to initialize the bookmark button state without an additional API call.
 
-After a bookmark toggle succeeds, **invalidate the `my-drills` cache** (re-fetch) so `hasBookmarks` stays in sync across all screens.
+After a bookmark toggle succeeds, **invalidate the `my-drills` and `saved-drills` caches** (re-fetch) so `hasBookmarks` and Saved Drills lists stay in sync across all screens.
 
 ##### Bookmark interaction flow
 
@@ -1270,7 +1306,7 @@ User taps bookmark button
   └─ hasBookmarks === true  → DELETE /api/v1/bookmarks/by-drill/{drillId}
 
 On success:
-  → Invalidate / refetch my-drills query
+  → Invalidate / refetch my-drills and saved-drills queries
   → Toast feedback (see §4.2 of this spec)
 
 On 409 / "Already bookmarked" (200 with message):

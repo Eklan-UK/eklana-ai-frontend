@@ -1,12 +1,18 @@
 // POST /api/v1/drills/bulk-create-assign - Create and assign multiple drills at once
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
-import { Types } from "mongoose";
 import Drill from "@/models/drill";
 import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
+import { isValidUserId, toUserIdQuery } from "@/lib/api/user-id";
+import {
+  learningJourneyPartSchema,
+  learningJourneyTopicSchema,
+  refineLearningJourneyFields,
+} from "@/domain/learning-journey/learning-journey.validation";
 
 interface BulkDrillInput {
   drillType: string;
@@ -15,9 +21,11 @@ interface BulkDrillInput {
   studentId: string;
   completionDate: string;
   difficulty: string;
-  topic?: string;
-  part?: string;
-  mission?: string;
+  // Left untyped on purpose — arbitrary request-body JSON, validated below via
+  // journeyFieldsSchema before ever being written to a Drill document.
+  topic?: unknown;
+  part?: unknown;
+  mission?: unknown;
 }
 
 // Builds a map from character name to its normalized speaker key
@@ -56,6 +64,19 @@ function normalizeRoleplayScenes(
     }),
   }));
 }
+
+// Mirrors the validation the manual create route (`/api/v1/drills`) applies to
+// `learning_journey_part`/`learning_journey_topic`, so bulk-created drills can never
+// silently persist with a mismatched or non-canonical mission/topic (e.g. display
+// labels like "Mission 1: ..." instead of the raw numeric id / topic slug).
+const journeyFieldsSchema = z
+  .object({
+    learning_journey_part: learningJourneyPartSchema.optional(),
+    learning_journey_topic: learningJourneyTopicSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    refineLearningJourneyFields(data, ctx, { requireAlways: true });
+  });
 
 // Maps the AI-generated/provided content object onto the type-specific Drill schema fields
 function mapContentFields(drillType: string, content: Record<string, any>): Record<string, any> {
@@ -100,18 +121,9 @@ function mapContentFields(drillType: string, content: Record<string, any>): Reco
   }
 }
 
-function parseLearningJourneyPart(part: any): number | undefined {
-  if (typeof part === "number") return part;
-  if (typeof part === "string") {
-    const match = part.match(/\d+/);
-    return match ? parseInt(match[0], 10) : undefined;
-  }
-  return undefined;
-}
-
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string }
+  context: { userId: string; userRole: string }
 ): Promise<NextResponse> {
   try {
     const body = await req.json();
@@ -146,7 +158,7 @@ async function handler(
             );
           }
 
-          if (!Types.ObjectId.isValid(studentId)) {
+          if (!isValidUserId(studentId)) {
             throw new Error(`Invalid studentId: ${studentId}`);
           }
 
@@ -154,6 +166,20 @@ async function handler(
           if (Number.isNaN(dueDate.getTime())) {
             throw new Error(`Invalid completionDate: ${completionDate}`);
           }
+
+          const journeyValidation = journeyFieldsSchema.safeParse({
+            learning_journey_part: rawPart,
+            learning_journey_topic: topic,
+          });
+          if (!journeyValidation.success) {
+            throw new Error(
+              journeyValidation.error.issues.map((issue) => issue.message).join("; ")
+            );
+          }
+          const {
+            learning_journey_part: validatedPart,
+            learning_journey_topic: validatedTopic,
+          } = journeyValidation.data;
 
           const drillData: any = {
             title: title ?? "",
@@ -165,7 +191,7 @@ async function handler(
             context: content.context ?? "",
             is_active: true,
             created_by: (creator as any).email,
-            createdById: context.userId,
+            createdById: toUserIdQuery(context.userId),
             totalAssignments: 0,
             totalCompletions: 0,
             averageScore: 0,
@@ -173,15 +199,15 @@ async function handler(
             ...mapContentFields(drillType, content),
           };
 
-          if (rawPart !== undefined) drillData.learning_journey_part = parseLearningJourneyPart(rawPart);
-          if (topic !== undefined) drillData.learning_journey_topic = topic;
+          if (validatedPart !== undefined) drillData.learning_journey_part = validatedPart;
+          if (validatedTopic !== undefined) drillData.learning_journey_topic = validatedTopic;
 
           const drill = await Drill.create(drillData);
 
           await DrillAssignment.create({
             drillId: drill._id,
-            learnerId: new Types.ObjectId(studentId),
-            assignedBy: context.userId,
+            learnerId: toUserIdQuery(studentId),
+            assignedBy: toUserIdQuery(context.userId),
             dueDate,
             status: "pending",
           });

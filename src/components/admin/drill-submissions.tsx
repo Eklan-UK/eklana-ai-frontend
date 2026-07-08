@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useLearnerDrillAssignments } from "@/hooks/useAdmin";
+import { drillDisplayLabel } from "@/lib/drill-display-label";
 import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
 import {
   DrillPerformanceReview,
@@ -68,7 +69,7 @@ export function DrillSubmissionsComponent({
   // Extract data with safe defaults (must be before conditional returns)
   // Filter out assignments whose drill was deleted (drill field is null/missing)
   const drills = (drillData?.assignments || []).filter(
-    (d: any) => d.drill && typeof d.drill === 'object' && d.drill.title
+    (d: any) => d.drill && typeof d.drill === 'object' && d.drill._id
   );
   const [filterStatus, setFilterStatus] = useState<
     "all" | "pending" | "in-progress" | "completed" | "review"
@@ -381,9 +382,23 @@ export function DrillSubmissionsComponent({
 
       {/* Drills List */}
       <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">
-          Drill Submissions
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-900">
+            Drill Submissions
+          </h3>
+          {filteredDrills.length > 0 && (
+            <span className="text-xs text-gray-500">
+              Showing{" "}
+              <span className="font-semibold text-gray-700">
+                {filteredDrills.length}
+              </span>
+              {filterStatus === "all" && drillData?.pagination?.total && drillData.pagination.total > filteredDrills.length ? (
+                <> of <span className="font-semibold text-gray-700">{drillData.pagination.total}</span></>
+              ) : null}{" "}
+              drill{filteredDrills.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
 
         {filteredDrills.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -391,7 +406,7 @@ export function DrillSubmissionsComponent({
             <p>No drills in this category</p>
           </div>
         ) : (
-          <div className="space-y-2 max-h-full">
+          <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
             {filteredDrills.map((drill: any, idx: number) => (
               <div
                 key={drill._id || idx}
@@ -407,7 +422,10 @@ export function DrillSubmissionsComponent({
                       </span>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 truncate">
-                          {drill.drill?.title || drill.title || "Untitled Drill"}
+                          {drill.drill?.title ||
+                            drillDisplayLabel(drill.drill) ||
+                            drill.title ||
+                            "Untitled Drill"}
                         </h4>
                         <p className="text-xs text-gray-500 capitalize">
                           {drill.drill?.type || drill.type || "N/A"} •{" "}

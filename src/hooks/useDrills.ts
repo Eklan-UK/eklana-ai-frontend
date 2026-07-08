@@ -51,11 +51,34 @@ function normalizeLearnerDrillItem(item: any): any {
 function isLearnerDrillRow(item: any): boolean {
   if (item.itemType === "free_talk_scenario") return true;
   const drill = item.drill;
-  return drill && typeof drill === "object" && drill._id != null && !!drill.type;
+  if (drill && typeof drill === "object" && drill._id != null && !!drill.type) {
+    return true;
+  }
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("[useDrills] Dropping malformed drill row:", item);
+  }
+  return false;
 }
 
 async function fetchLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {
   const response: any = await drillAPI.getLearnerDrills(filters || { limit: 100 });
+
+  let drillsData: any[] = [];
+  if (response.data?.drills) {
+    drillsData = response.data.drills;
+  } else if (response.drills) {
+    drillsData = response.drills;
+  } else if (Array.isArray(response)) {
+    drillsData = response;
+  }
+
+  return drillsData
+    .map(normalizeLearnerDrillItem)
+    .filter(isLearnerDrillRow);
+}
+
+async function fetchSavedDrills() {
+  const response: any = await drillAPI.getSavedDrills();
 
   let drillsData: any[] = [];
   if (response.data?.drills) {
@@ -78,6 +101,16 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
     queryFn: () => fetchLearnerDrills(filters),
     staleTime: 1000 * 60 * 2, // 2 minutes for learner drills
     refetchOnMount: true, // Override global false: refetch when stale/invalidated on mount (e.g. after drill completion)
+  });
+}
+
+// Get bookmark-first saved drills (no assignment pagination cap)
+export function useSavedDrills() {
+  return useQuery({
+    queryKey: queryKeys.drills.learner.saved(),
+    queryFn: () => fetchSavedDrills(),
+    staleTime: 1000 * 60 * 2,
+    refetchOnMount: true,
   });
 }
 

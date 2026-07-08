@@ -20,6 +20,10 @@ export function applyAppleSubscriptionToUser(
   user.appleSubscriptionStatus = verified.appleSubscriptionStatus;
   user.subscriptionProvider = 'apple';
 
+  if (verified.appAccountToken && !user.iapAccountToken) {
+    user.iapAccountToken = verified.appAccountToken;
+  }
+
   if (verified.expiresAt) {
     extendSubscriptionExpiresAt(user, verified.expiresAt);
   }

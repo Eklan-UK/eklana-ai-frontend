@@ -7,6 +7,7 @@ import {
   Edit,
   Trash2,
   Users,
+  Eye,
   Clock,
   BookOpen,
   CheckCircle,
@@ -25,6 +26,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { useDrillAssignments } from "@/hooks/useAdmin";
+import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
 import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
 
 interface DrillDetailClientProps {
@@ -39,6 +41,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill";
   const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
+  const [showAssignedModal, setShowAssignedModal] = useState(false);
   const { data: assignmentsData } = useDrillAssignments(drillId);
   const assignments = assignmentsData?.assignments || [];
 
@@ -141,12 +144,14 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 Edit
               </Button>
             </Link>
-            <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
-              <Button variant="outline" size="sm">
-                <Users className="w-4 h-4 mr-2" />
-                Assign
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAssignedModal(true)}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -712,6 +717,14 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           </Card>
         )}
       </div>
+
+      {showAssignedModal && (
+        <AssignedStudentsModal
+          drillId={drillId}
+          drillTitle={drill.title}
+          onClose={() => setShowAssignedModal(false)}
+        />
+      )}
     </div>
   );
 }

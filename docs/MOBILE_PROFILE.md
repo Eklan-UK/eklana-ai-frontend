@@ -45,6 +45,7 @@ All endpoints require `Authorization: Bearer <token>`. See `MOBILE_README.md`.
 | DELETE | `/users/current` | Yes | — | `{ code: 'Success', message }` | Soft-deletes account |
 | GET | `/pronunciation` | Yes | — | `{ code: 'Success', data: { pronunciation: PronunciationMetrics } }` | Profile pronunciation tile |
 | GET | `/drills/learner/my-drills` | Yes | `limit=200` | `{ code: 'Success', data: { drills } }` | Sum `timeSpent` for "time studied" |
+| GET | `/drills/learner/saved-drills` | Yes | — | `{ code: 'Success', data: { drills } }` | Whole-drill bookmarks (`type: 'drill'`) for Profile Saved Drills |
 | GET | `/users/streak` | Yes | — | `{ code: 'Success', data: StreakData }` | Streak summary |
 
 ---
@@ -212,9 +213,26 @@ function getInitials(user: User): string {
 - Settings icon → `settings/index`
 - Edit avatar → `profile/photo`
 - Edit name/email → `profile/edit`
-- Bookmarks tile → `bookmarks/index`
+- Bookmarks tile → `bookmarks/index` (word/sentence practice bookmarks **and** a Saved Drills section — see below)
 - Plan card → `settings/subscriptions`
 - Streak CTA → `practice/index`
+
+### 7.1.1 Profile Bookmarks screen (`bookmarks/index.tsx`)
+
+The Profile **Bookmarks** tile opens a screen with **two distinct bookmark types**:
+
+| Section | API | Content |
+|---------|-----|---------|
+| **Word / sentence practice** | `GET /api/v1/bookmarks?type=word` and `?type=sentence` | In-drill vocabulary bookmarks for spaced-repetition practice |
+| **Saved Drills** | `GET /api/v1/drills/learner/saved-drills` | Whole-drill bookmarks (`Bookmark.type === 'drill'`) from Learning Journey / My Plan |
+
+**Do not** use `GET /api/v1/bookmarks` alone for Saved Drills — that list mixes all bookmark types and the word/sentence card UI cannot render drill-level rows.
+
+**Saved Drills response:** `{ code: 'Success', data: { drills: LearnerMyDrillRow[] } }` — same row shape as `my-drills` (including `itemType: 'free_talk_scenario'` rows). Every returned row has `hasBookmarks: true`. Sort client-side with `sortAssignedPlanItems` if needed (server already returns sorted rows).
+
+**After bookmark toggle** (journey, My Plan, or Saved Drills list): invalidate/refetch both `my-drills` and `saved-drills` caches so bookmark icon state and lists stay in sync.
+
+See `docs/eklan-mobile-learning-journey-spec.md` §4.1 and §7.2.1 for Saved Drills UI wiring on Home / My Plan.
 
 ### 7.2 Edit Profile Screen (`profile/edit.tsx`)
 

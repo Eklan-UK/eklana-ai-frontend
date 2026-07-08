@@ -193,6 +193,7 @@ export function WeekDetailPage({
               drills={week?.drills ?? week?.items ?? []}
               drillDetailBasePath={drillDetailBasePath}
               returnTo={returnTo}
+              studentId={studentId}
             />
           </div>
 

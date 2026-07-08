@@ -3,7 +3,10 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 import '@/models/user';
 
 export interface IBookmark extends Document {
-  userId: Types.ObjectId;
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId. Mixed so both formats
+  // can be stored/queried without a cast error.
+  userId: Types.ObjectId | string;
   drillId: Types.ObjectId;
   type: 'word' | 'sentence' | 'drill';
   content: string; // The word or sentence being bookmarked, or drillId for drill bookmarks
@@ -15,7 +18,10 @@ export interface IBookmark extends Document {
 
 const BookmarkSchema = new Schema<IBookmark>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    // Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up, incl.
+    // Google/Apple OAuth) can be stored without a cast error. No `ref`
+    // since populate cannot reliably resolve a mixed-type field.
+    userId: { type: Schema.Types.Mixed, required: true, index: true },
     drillId: { type: Schema.Types.ObjectId, ref: 'Drill', required: true },
     type: { type: String, enum: ['word', 'sentence', 'drill'], required: true },
     content: { type: String, required: true },
