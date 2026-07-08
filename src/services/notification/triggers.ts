@@ -679,6 +679,69 @@ export async function onClassNpsForm(
 }
 
 /**
+ * Weekly drill digest — in-app + push alongside email cron.
+ *
+ * Mobile payload contract:
+ *   data.screen = 'MyPlan'
+ *   data.url = '/account/drills'
+ */
+export async function onWeeklyDrillDigest(
+  studentId: string,
+  params: {
+    drillCount: number;
+    drillTitles?: string[];
+    weekKey: string;
+  },
+) {
+  const { drillCount, weekKey } = params;
+  const title = 'Your new drills are ready';
+  const body = `You have ${drillCount} new drill${drillCount === 1 ? '' : 's'} this week. Open your plan to get started.`;
+  const notifData = {
+    screen: 'MyPlan',
+    url: '/account/drills',
+    resourceType: 'drill_digest',
+    weekKey,
+  };
+
+  console.log('[Notification Trigger] onWeeklyDrillDigest called:', {
+    studentId,
+    drillCount,
+    weekKey,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const delivery = await sendUnifiedWithFcmFallback({
+      userId: studentId,
+      title,
+      body,
+      type: 'weekly_drill_digest',
+      data: notifData,
+      fcmType: NotificationType.WEEKLY_DRILL_DIGEST,
+      fcmData: {
+        screen: 'MyPlan',
+        url: '/account/drills',
+        resourceType: 'drill_digest',
+        weekKey,
+        drillCount: String(drillCount),
+      },
+      actionUrl: '/account/drills',
+    });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    console.log('[Notification Trigger] onWeeklyDrillDigest result:', result);
+    return result;
+  } catch (error) {
+    console.error('[Notification Trigger] onWeeklyDrillDigest error:', error);
+    throw error;
+  }
+}
+
+/**
  * Trigger when a new student is assigned to a tutor
  */
 export async function onStudentAssigned(
