@@ -476,6 +476,11 @@ export default function FillBlankDrill({
 
                 return (
                   <div key={itemIdx} className="p-4 bg-muted rounded-lg">
+                    {item.context?.trim() && (
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        {item.context}
+                      </p>
+                    )}
                     <div className="mb-2">
                       {renderSentence(item, true, itemIdx)}
                     </div>
@@ -527,6 +532,12 @@ export default function FillBlankDrill({
                     />
                   )}
                 </div>
+
+                {currentItem.context?.trim() && (
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                    {currentItem.context}
+                  </p>
+                )}
 
                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   {renderSentence(currentItem, false)}

@@ -106,6 +106,7 @@ export function applyParsedContentToDraft(
           ? items.map((item) => {
               const row = item as Record<string, unknown>;
               return {
+                context: String(row.context || ""),
                 sentence: String(row.sentence || ""),
                 translation: String(row.translation || ""),
                 blanks:

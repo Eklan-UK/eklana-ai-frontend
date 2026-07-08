@@ -31,6 +31,8 @@ export function ContinuePracticeCard({
 
   const drillId = drillData._id || drill.drillId;
   const drillType = drillData.type || "practice";
+  const topicTitle =
+    typeof drillData.topicTitle === "string" ? drillData.topicTitle : null;
 
   return (
     <div className="mb-6">
@@ -41,6 +43,11 @@ export function ContinuePracticeCard({
             {isResume ? "Continue Practice" : "Start Practice"}
           </span>
         </div>
+        {topicTitle ? (
+          <p className="text-sm font-bold text-white line-clamp-2 mb-1">
+            {topicTitle}
+          </p>
+        ) : null}
         <h3 className="text-white text-xl font-bold font-nunito mb-2">{drillData.title}</h3>
         <div className="flex items-center gap-4 mb-4">
           <span className="text-white/80 text-sm capitalize">

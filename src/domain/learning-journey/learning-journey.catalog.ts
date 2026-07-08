@@ -134,6 +134,11 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         title: "Grammar",
         order: 4,
       },
+      {
+        id: "interview_preparation",
+        title: "Interview Preparation",
+        order: 5,
+      },
     ],
   },
 ];

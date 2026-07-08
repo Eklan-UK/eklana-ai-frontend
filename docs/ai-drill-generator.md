@@ -270,6 +270,7 @@ One OpenAI function tool is defined per drill type. `tool_choice: 'required'` fo
 ```ts
 {
   fill_blank_items: Array<{
+    context?: string;   // situational setup shown before the sentence
     sentence: string;       // MUST contain "___" for each blank — enforced in tool description
     translation: string;
     blanks: Array<{
@@ -336,7 +337,7 @@ The Excel/CSV import parser (`POST /api/v1/drills/parse-document`) was updated a
 | `definition` | Word, Hint/Definition |
 | `grammar` | Pattern, Hint, Example |
 | `sentence_writing` | Word, Hint |
-| `fill_blank` | Sentence, Translation, Correct Answer, Option 1–4, Hint |
+| `fill_blank` | Context, Sentence, Correct Answer, Option 2, Option 3, Hint |
 | `key_phrases` | Prompt, Respondent, Option 1–4, Correct Answer |
 | `summary` | Title, Content |
 

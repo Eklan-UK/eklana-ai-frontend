@@ -42,6 +42,7 @@ export interface RoleplayScene {
 }
 
 export interface FillBlankItem {
+  context?: string;
   sentence: string;
   blanks: Array<{
     position: number;
@@ -124,6 +125,7 @@ export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraf
     listeningContent: "",
     fillBlankItems: [
       {
+        context: "",
         sentence: "",
         blanks: [
           {

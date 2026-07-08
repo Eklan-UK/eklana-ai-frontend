@@ -121,6 +121,7 @@ CONSTRAINT: pronunciation_items must contain 15–20 items. Each item needs word
 "vocabulary" → {
   "vocabulary_items": [
     {
+      "context": "<short situational setup before the sentence, e.g. 'You are handing over to the night nurse, so you say:'>",
       "sentence": "<clinical sentence with ___ placeholder>",
       "blanks": [
         {

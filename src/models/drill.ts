@@ -284,6 +284,11 @@ const KeyPhraseItemSchema = new Schema(
 
 const FillBlankItemSchema = new Schema(
   {
+    context: {
+      type: String,
+      default: "",
+      description: "Optional situational setup text shown before the sentence",
+    },
     sentence: {
       type: String,
       required: true,
@@ -454,6 +459,7 @@ export interface IDrill extends Document {
 
   // Fill Blank Drill Fields
   fill_blank_items: Array<{
+    context?: string;
     sentence: string;  // "I ___ to the store ___ buy milk"
     blanks: Array<{
       position: number;  // 0, 1 (index of blank in sentence)

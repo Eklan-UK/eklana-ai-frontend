@@ -79,6 +79,12 @@ export function AssignedDrillsSectionClient() {
                   completionDate={item.drill?.completionDate ?? item.dueDate}
                   completedAt={item.completedAt}
                   locked={!subscribed}
+                  showTopicLabel
+                  topicTitle={
+                    typeof item.drill?.topicTitle === "string"
+                      ? item.drill.topicTitle
+                      : null
+                  }
                 />
               );
             }

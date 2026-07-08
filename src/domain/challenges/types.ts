@@ -20,6 +20,7 @@ export interface PronunciationGeneratedContent {
 
 export interface FillBlankGeneratedContent {
 	fill_blank_items: Array<{
+		context?: string;
 		sentence: string;
 		blanks: Array<{
 			position: number;

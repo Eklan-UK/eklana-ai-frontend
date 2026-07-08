@@ -21,7 +21,8 @@
 5. [API Integration](#5-api-integration)
 6. [Reference Implementation](#6-reference-implementation)
 7. [Learning Journey Catalog Update — Grammar Topic](#7-learning-journey-catalog-update--grammar-topic)
-8. [Test Plan](#8-test-plan)
+8. [Learning Journey Catalog Update — Interview Preparation Topic](#8-learning-journey-catalog-update--interview-preparation-topic)
+9. [Test Plan](#9-test-plan)
 
 ---
 
@@ -437,6 +438,7 @@ When creating or editing drills in the Drill Builder, tutors/admins assign a **M
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
 | 4 | **`grammar`** | **Grammar** | *(none — grammar drills use standard drill builder, not Free Talk)* |
+| 5 | **`interview_preparation`** | **Interview Preparation** | *(none — standard drill builder, not Free Talk)* |
 
 ### Mobile actions required
 
@@ -448,9 +450,25 @@ When creating or editing drills in the Drill Builder, tutors/admins assign a **M
 
 Full learner-side catalog spec: [`eklan-mobile-learning-journey-spec.md`](eklan-mobile-learning-journey-spec.md).
 
+For **Interview Preparation**, see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md).
+
 ---
 
-## 8. Test Plan
+## 8. Learning Journey Catalog Update — Interview Preparation Topic
+
+Mission 4 now includes a fifth topic for interview-focused drills. Full mobile handoff:
+
+**[`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md)**
+
+Quick reference:
+
+| Order | Topic ID | Title |
+|------:|----------|-------|
+| 5 | `interview_preparation` | Interview Preparation |
+
+---
+
+## 9. Test Plan
 
 | # | Scenario | Expected |
 |---|----------|----------|
@@ -462,6 +480,7 @@ Full learner-side catalog spec: [`eklan-mobile-learning-journey-spec.md`](eklan-
 | 6 | Bulk delete: one ID fails (403/404) | Partial success toast + failure toast; successful rows removed |
 | 7 | Admin pagination: select on page 1, go to page 2 | Selection cleared |
 | 8 | Create drill with Mission 4 + topic `grammar` | Saves; appears under Grammar on learner Mission 4 detail |
+| 9 | Create drill with Mission 4 + topic `interview_preparation` | Saves; appears under Interview Preparation on learner Mission 4 detail |
 
 ---
 
@@ -469,4 +488,5 @@ Full learner-side catalog spec: [`eklan-mobile-learning-journey-spec.md`](eklan-
 
 | Date | Change |
 |------|--------|
+| July 2026 | Interview Preparation topic under Bonus Scenarios — see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md) |
 | June 2026 | Initial spec: checkbox selection, safe bulk delete, Grammar topic under Bonus Scenarios |

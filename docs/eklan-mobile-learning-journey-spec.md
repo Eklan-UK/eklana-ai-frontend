@@ -650,6 +650,7 @@ Summary card for one Mission on My Plans.
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
 | 4 | `grammar` | Grammar | — |
+| 5 | `interview_preparation` | Interview Preparation | — |
 
 #### Drill-to-topic mapping (server-side fields)
 
@@ -1041,7 +1042,8 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
     "ai_character_name": "AI",
     "ai_character_names": [],
     "learning_journey_part": 1,                   // ← integer 1–4 (or null/absent)
-    "learning_journey_topic": "handling_emergency_critical"  // ← topic slug (or null/absent)
+    "learning_journey_topic": "handling_emergency_critical",  // ← topic slug (or null/absent)
+    "topicTitle": "Handling Emergency/Critical Situation"   // ← server-resolved display title (omit/null if unmapped)
   },
   "assignedBy": "663a0b1c2d3e4f5a6b7c8d9e",      // user _id of assigning admin/tutor
   "assignedAt": "2026-06-01T09:00:00.000Z",
@@ -1071,6 +1073,7 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
     "title": "ICU Emergency Free Talk",
     "type": "eklan_free_talk",
     "scenarioType": "icu_emergency",              // maps to freeTalkScenarioType in catalog
+    "topicTitle": "Handling Emergency/Critical Situation",  // ← server-resolved (omit/null if unmapped)
     "date": "2026-07-10T00:00:00.000Z",
     "completionDate": "2026-07-10T00:00:00.000Z"
   },
@@ -1086,7 +1089,7 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
 
 **How to distinguish:** check `item.itemType === "free_talk_scenario"` OR `item.drill?.type === "eklan_free_talk"`.
 
-> **Note:** Free Talk items do **not** carry `learning_journey_part` / `learning_journey_topic` fields. They are matched to the journey catalog via `drill.scenarioType` ↔ `topic.freeTalkScenarioType` (see §7.4).
+> **Note:** Free Talk items do **not** carry `learning_journey_part` / `learning_journey_topic` fields. They are matched to the journey catalog via `drill.scenarioType` ↔ `topic.freeTalkScenarioType` (see §7.4). For **home card display**, use `drill.topicTitle` (server-computed on `my-drills` and `saved-drills`) instead of resolving the catalog client-side.
 
 ---
 
@@ -1382,6 +1385,7 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
       { id: "phone_other_departments",title: "Phone Communication with Other Departments",           order: 2, freeTalkScenarioType: "phone_department" },
       { id: "phone_patient_families", title: "Phone Communication with the Patient's Families",      order: 3, freeTalkScenarioType: "phone_family" },
       { id: "grammar",                title: "Grammar",                                              order: 4 },
+      { id: "interview_preparation",  title: "Interview Preparation",                                order: 5 },
     ],
   },
 ];
@@ -1423,6 +1427,7 @@ The following table lists the fields on each item returned by `my-drills` that a
 | `context` | `string` | General context/instructions. Optional. |
 | `learning_journey_part` | `1 \| 2 \| 3 \| 4 \| null` | **Journey grouping field.** Which of the 4 missions this drill belongs to (`learning_journey_part` is the API field name). `null`/absent = not in the journey. |
 | `learning_journey_topic` | `string \| null` | **Journey grouping field.** Topic slug from the catalog (e.g. `"handling_emergency_critical"`). `null`/absent = not grouped into a topic. Always check in combination with `learning_journey_part`. |
+| `topicTitle` | `string \| null` | **Display field (server-computed).** Catalog topic title ready for UI (e.g. `"Handling Emergency/Critical Situation"`). Present on `my-drills` and `saved-drills` when mappable; omit or `null` otherwise. Use on home cards above `title`; keep `learning_journey_topic` for Mission Detail grouping. |
 | `scenarioType` | `string` | Free Talk only. Matches `freeTalkScenarioType` in the catalog to resolve Mission/Topic placement. |
 | `completionDate` | `string \| null` | Free Talk only. ISO date shown as due date. |
 

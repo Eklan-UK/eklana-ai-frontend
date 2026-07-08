@@ -163,7 +163,8 @@ export function useLearnerPronunciationAnalytics(learnerId: string) {
       return response.data;
     },
     enabled: !!learnerId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 60_000, // 1 minute
+    refetchOnMount: true,
   });
 }
 

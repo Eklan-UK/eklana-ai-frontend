@@ -98,6 +98,7 @@ const fillBlankBlankSchema = z.object({
 });
 
 const fillBlankItemSchema = z.object({
+	context: z.string().optional(),
 	sentence: z.string().trim().min(1),
 	blanks: z.array(fillBlankBlankSchema).min(1),
 	translation: z.string().optional(),

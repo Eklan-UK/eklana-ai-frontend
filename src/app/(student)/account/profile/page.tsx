@@ -59,6 +59,7 @@ export default function ProfilePage() {
   const initials = getUserInitials(user);
   const displayName = getUserDisplayName(user);
   const userEmail = user?.email || "";
+  const learnerId = user?._id ? String(user._id) : "";
   const planTitle = planTitleFromUser(subscriptionUser);
   const planMessage = getPlanCardMessage(isSubscribed);
 
@@ -152,7 +153,7 @@ export default function ProfilePage() {
         </div>
 
         <ConfidenceCard />
-        <PronunciationCard />
+        <PronunciationCard learnerId={learnerId} />
 
         <Link href="/account/settings/subscriptions" className="block mb-6">
           <Card className="mb-0 hover:bg-muted transition-colors">
