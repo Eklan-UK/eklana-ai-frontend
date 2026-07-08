@@ -11,10 +11,6 @@ import type {
 import type { StudentContextData } from "@/lib/api";
 import { composeStudentContextString } from "@/lib/ai-drill-builder/week-utils";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
-import {
-  getPartLabel,
-  getTopicById,
-} from "@/domain/learning-journey/learning-journey.catalog";
 import { normalizeAiGeneratedToParsedContent } from "@/utils/ai-drill-content";
 import type { ParsedContent } from "@/services/document-parser.service";
 
@@ -259,8 +255,8 @@ export function useAIDrillCreationWorkflow({
           difficulty: aiDifficulty,
           context: aiContext,
           prompt: aiPrompt,
-          part: getPartLabel(aiJourneyPart),
-          topic: getTopicById(aiJourneyTopic)?.title ?? "",
+          part: aiJourneyPart,
+          topic: aiJourneyTopic,
           studentId: aiStudentIds[0],
           studentIds: aiStudentIds,
         }),

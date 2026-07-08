@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import type { ParsedContent } from "@/services/document-parser.service";
 import {
   isValidPartTopicPair,
+  getPartLabel,
 } from "@/domain/learning-journey/learning-journey.catalog";
 import { normalizeFillBlankItems, validateFillBlankItems } from "@/utils/drill";
 import type { DrillDraft } from "@/components/drills/drill-draft.types";
@@ -466,7 +467,7 @@ export function buildBulkAssignPayload(drafts: DrillDraft[]) {
       completionDate: draft.completionDate,
       difficulty: draft.difficulty.toLowerCase(),
       topic: draft.journeyTopic || undefined,
-      part: draft.journeyPart ?? undefined,
+      part: draft.journeyPart ? getPartLabel(draft.journeyPart) : undefined,
     }));
   });
 }

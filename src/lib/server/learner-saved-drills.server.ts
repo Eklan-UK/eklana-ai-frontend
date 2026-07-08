@@ -232,6 +232,10 @@ export async function getLearnerSavedDrillsPayload(
   });
 
   return {
-    drills: sortAssignedPlanItems([...assignmentRows, ...freeTalkRows]) as LearnerMyDrillRow[],
+    drills: sortAssignedPlanItems(
+      [...assignmentRows, ...freeTalkRows] as unknown as Array<
+        LearnerMyDrillRow & { drill?: { date?: string | Date | null } }
+      >,
+    ) as LearnerMyDrillRow[],
   };
 }
