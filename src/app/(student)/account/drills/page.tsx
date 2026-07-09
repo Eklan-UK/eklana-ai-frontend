@@ -35,7 +35,9 @@ export default function DrillsPage() {
 
   // My Plans needs the learner's FULL assignment history to compute accurate
   // per-mission progress — not just a recent-window page. See assignment.repository.ts.
-  const { data: drills = [], isError: drillsError } = useLearnerDrills({ limit: 1000 });
+  const { data: drillsData, isPending, isFetching, isError: drillsError } = useLearnerDrills({ limit: 1000 });
+  const drills = drillsData ?? [];
+  const drillsLoading = isPending || (isFetching && drills.length === 0);
 
   const { data: classData, isLoading: classesLoading } = useLearnerClasses({
     limit: 100,

@@ -8,9 +8,11 @@ import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
 import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
-import { toUserIdQuery } from '@/lib/api/user-id';
+import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 import { getBookmarkedDrillIdSet } from '@/lib/server/learner-saved-drills.server';
 import { enrichLearnerDrillRowsWithTopicTitle } from '@/lib/server/enrich-learner-drill-topic';
+import DrillAssignment from '@/models/drill-assignment';
+import type { CreateAssignmentData } from '@/domain/assignments/assignment.types';
 
 /** Lean populated assignment from `findByLearnerId` (drillId is a drill document). */
 type PopulatedLearnerAssignment = Omit<AssignmentRow, 'drillId' | 'assignedBy'> & {
@@ -79,6 +81,60 @@ export type LearnerFreeTalkPlanRow = LearnerMyDrillRow & {
 };
 
 /**
+ * Drills can list a learner in `assigned_to` without a matching `drill_assignments`
+ * row (e.g. learner lookup failed silently at create time). Backfill so the
+ * student journey can surface them via my-drills.
+ */
+async function syncMissingAssignmentsForLearner(
+  learnerId: string,
+  assignmentRepo: AssignmentRepository,
+): Promise<number> {
+  const learnerCandidates = toUserIdCandidates(learnerId);
+  const drillsWithAssignee = await Drill.find({
+    assigned_to: { $in: learnerCandidates },
+  })
+    .select('_id date createdById')
+    .lean()
+    .exec();
+
+  if (drillsWithAssignee.length === 0) return 0;
+
+  const drillIds = drillsWithAssignee.map((d) => d._id);
+  const existing = await DrillAssignment.find({
+    learnerId: toUserIdQuery(learnerId),
+    drillId: { $in: drillIds },
+  })
+    .select('drillId')
+    .lean()
+    .exec();
+
+  const existingSet = new Set(existing.map((a) => String(a.drillId)));
+  const missing = drillsWithAssignee.filter((d) => !existingSet.has(String(d._id)));
+  if (missing.length === 0) return 0;
+
+  const assignmentsData: CreateAssignmentData[] = missing.map((drill) => {
+    const dueDate =
+      drill.date instanceof Date
+        ? drill.date
+        : drill.date
+          ? new Date(drill.date as string)
+          : new Date();
+    const assigner = drill.createdById != null ? String(drill.createdById) : learnerId;
+    return {
+      drillId: drill._id as Types.ObjectId,
+      learnerId: toUserIdQuery(learnerId),
+      assignedBy: toUserIdQuery(assigner),
+      assignedAt: new Date(),
+      dueDate,
+      status: 'pending' as const,
+    };
+  });
+
+  await assignmentRepo.createBulk(assignmentsData);
+  return assignmentsData.length;
+}
+
+/**
  * Same data as GET /api/v1/drills/learner/my-drills — used from RSC to avoid
  * loopback fetch (wrong origin / connection refused in dev).
  *
@@ -95,6 +151,10 @@ export async function getLearnerMyDrillsPayload(
 
   const assignmentRepo = new AssignmentRepository();
   const attemptRepo = new AttemptRepository();
+
+  if (!params.drillId) {
+    await syncMissingAssignmentsForLearner(learnerId, assignmentRepo);
+  }
 
   const limit = params.limit ?? 100;
   const offset = params.offset ?? 0;

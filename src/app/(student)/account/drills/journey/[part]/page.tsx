@@ -30,9 +30,11 @@ export default function LearningJourneyPartPage() {
   const { data: me, isLoading: meLoading } = useUserCurrent();
   // This page groups the learner's FULL history by topic — not just a recent
   // window — so it needs the same higher limit as the My Plans overview page.
-  const { data: drills = [], isLoading: drillsLoading, isError: drillsError } = useLearnerDrills({
+  const { data, isPending, isFetching, isError: drillsError } = useLearnerDrills({
     limit: 1000,
   });
+  const drills = data ?? [];
+  const drillsLoading = isPending || (isFetching && drills.length === 0);
   const prefetchDrill = usePrefetchDrill();
   const { handleBookmarkToggle } = useDrillBookmarkToggle();
 
