@@ -706,6 +706,7 @@ export const userAPI = {
         learningGoal?: string;
         learningGoals?: string[];
         theme?: 'system' | 'light' | 'dark';
+        timezone?: string;
         notificationPreferences?: {
           learningReminders: boolean;
           specialOffers: boolean;

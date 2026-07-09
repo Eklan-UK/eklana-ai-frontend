@@ -2,6 +2,8 @@
 
 > This document captures the complete Stripe billing integration as implemented in the Eklan web app.
 > It is intended as the authoritative reference for mirroring the same subscription system in the Eklan mobile app.
+>
+> **Planned pricing update:** Multi-plan checkout (US$20 / US$60 / $200), 2-week (14-day) gated trial, and price migration for existing subscribers — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
 
 ---
 

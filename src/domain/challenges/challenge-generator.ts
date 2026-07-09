@@ -36,7 +36,11 @@ const SYSTEM_INSTRUCTION =
 	'nurses and healthcare professionals communicate clearly and confidently. ' +
 	'You generate precise, clinically relevant practice content.';
 
-function buildPrompt(profile: WeaknessProfile): string {
+export interface ChallengeGenerationContext {
+	country?: string;
+}
+
+function buildPrompt(profile: WeaknessProfile, context?: ChallengeGenerationContext): string {
 	const weaknesses = profile.topWeaknesses.map((w) => ({
 		drillType: w.drillType,
 		category: w.category,
@@ -49,6 +53,10 @@ function buildPrompt(profile: WeaknessProfile): string {
 		profile.masteredPhonemes && profile.masteredPhonemes.length > 0
 			? `\nDo NOT generate pronunciation content targeting these phonemes as the student has recently mastered them: ${profile.masteredPhonemes.join(', ')}\n`
 			: '';
+
+	const countryNote = context?.country
+		? `\nThe learner practices nursing in ${context.country} — use clinical terminology, medication names, and healthcare-system conventions appropriate to that country.\n`
+		: '';
 
 	return `
 The learner has the following top weaknesses (up to 4), ranked by severity (1 = worst):
@@ -86,7 +94,7 @@ Use these exact instructions per drill type:
 - vocabulary: "Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage."
 - roleplay: "Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift."
 - key_phrases: "Practice responding in these clinical situations using the correct key phrases."
-${masteredNote}
+${masteredNote}${countryNote}
 Return a JSON object with this exact shape:
 
 {
@@ -183,11 +191,12 @@ Return ONLY valid JSON with this exact shape, no markdown, no preamble.
 }
 
 export async function generateWeeklyChallenge(
-	profile: WeaknessProfile
+	profile: WeaknessProfile,
+	context?: ChallengeGenerationContext
 ): Promise<WeeklyChallenge['content']> {
 	const responseText = await generateChallengeCompletion({
 		systemInstruction: SYSTEM_INSTRUCTION,
-		prompt: buildPrompt(profile),
+		prompt: buildPrompt(profile, context),
 		maxCompletionTokens: 10000,
 	});
 

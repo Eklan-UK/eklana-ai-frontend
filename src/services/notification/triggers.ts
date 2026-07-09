@@ -150,6 +150,64 @@ export async function onDrillDueSoon(
 }
 
 /**
+ * 6 PM local-time nudge when the learner has not completed a qualifying drill today.
+ */
+export async function onDailyPracticeNudge(
+  studentId: string,
+  params?: { pendingCount?: number; streakDays?: number },
+) {
+  const pendingCount = params?.pendingCount ?? 0;
+  let body =
+    "You haven't completed a drill yet today. Open your plan and keep learning.";
+  if (pendingCount > 0) {
+    const drillWord = pendingCount === 1 ? "drill" : "drills";
+    body += ` You have ${pendingCount} ${drillWord} waiting.`;
+  }
+
+  const title = "Time to practise today";
+
+  console.log("[Notification Trigger] onDailyPracticeNudge called:", {
+    studentId,
+    pendingCount,
+    streakDays: params?.streakDays,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const notifData = { screen: "MyPlan", url: "/account/drills" };
+
+    const delivery = await sendUnifiedWithFcmFallback({
+      userId: studentId,
+      title,
+      body,
+      type: "drill_reminder",
+      data: notifData,
+      fcmType: NotificationType.DRILL_REMINDER,
+      fcmData: notifData,
+      actionUrl: "/account/drills",
+    });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    if (!delivery.pushDelivered) {
+      console.warn(
+        "[Notification Trigger] No push delivery for student (in-app may still exist):",
+        studentId,
+      );
+    }
+
+    console.log("[Notification Trigger] onDailyPracticeNudge result:", result);
+    return result;
+  } catch (error) {
+    console.error("[Notification Trigger] onDailyPracticeNudge error:", error);
+    throw error;
+  }
+}
+
+/**
  * Daily practice reminder sent to a learner.
  * pendingCount > 0: they have drills to do.
  * pendingCount === 0: they've finished or have none assigned — send a motivational nudge.

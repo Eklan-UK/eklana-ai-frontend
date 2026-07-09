@@ -49,6 +49,9 @@ export interface IProfile extends Document {
 		subscriptionExpires: boolean;
 	};
 
+	/** IANA timezone for local-time notifications, e.g. Europe/London */
+	timezone?: string;
+
 	// Lesson preferences
 	lessonPreferences?: {
 		eklanTalks: boolean;
@@ -159,6 +162,10 @@ const profileSchema = new Schema<IProfile>(
 			learningReminders: { type: Boolean, default: true },
 			specialOffers: { type: Boolean, default: true },
 			subscriptionExpires: { type: Boolean, default: true },
+		},
+		timezone: {
+			type: String,
+			trim: true,
 		},
 		lessonPreferences: {
 			eklanTalks: { type: Boolean, default: true },

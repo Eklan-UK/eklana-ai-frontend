@@ -497,6 +497,8 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 // Indexes for performance
 // Learner's completion history
 drillAttemptSchema.index({ learnerId: 1, completedAt: -1 });
+// Daily practice reminder: qualifying attempts by learner + day window
+drillAttemptSchema.index({ learnerId: 1, completedAt: -1, score: 1 });
 
 // Drill performance analytics
 drillAttemptSchema.index({ drillId: 1, completedAt: -1 });
