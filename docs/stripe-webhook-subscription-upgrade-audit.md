@@ -329,7 +329,7 @@ Not a webhook bug; looks identical to users.
 | `invoice.finalized` | Not needed if `invoice.paid` works |
 | `payment_intent.succeeded` | Not used (Checkout + subscriptions model) |
 
-**Dashboard checklist:** Endpoint must subscribe to at least the five handled types (see `docs/stripe-implementation.md` §16).
+**Dashboard checklist:** Endpoint must subscribe to at least the five handled types (see [`stripe-implementation.md`](../stripe-implementation.md) §16).
 
 ---
 
@@ -537,7 +537,7 @@ Add case in webhook `switch` mirroring `handleSubscriptionUpdated` or call share
 | Config | `src/lib/api/config.ts` |
 | CLI sync | `scripts/stripe-sync-user.ts` |
 | Subscriptions UI | `src/app/(student)/account/settings/subscriptions/page.tsx` |
-| Docs | `docs/stripe-implementation.md`, `docs/STRIPE_PAYMENTS_AND_KEYS.md` |
+| Docs | [`stripe-implementation.md`](../stripe-implementation.md), [`STRIPE_PAYMENTS_AND_KEYS.md`](../STRIPE_PAYMENTS_AND_KEYS.md) |
 
 ---
 

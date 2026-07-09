@@ -3,6 +3,8 @@
 > **Path A (native):** StoreKit / In-App Purchase on iOS only. Stripe Checkout and Billing Portal on Android and web. One server-side entitlement; two payment rails.
 >
 > For Stripe keys, webhooks, and Android/web checkout, see [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) and [stripe-implementation.md](./stripe-implementation.md).
+>
+> **Planned pricing update:** Quarterly/annual products, gated 14-day intro offer, and monthly price increase with subscriber preservation — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
 
 ---
 
@@ -77,7 +79,7 @@ The same Better Auth user can sign in on iPhone, Android, and web. After any rai
 
 Mirror the same “webhook updates MongoDB → clients poll current user” pattern used for Stripe:
 
-- Webhook handler: [`src/app/api/v1/webhooks/stripe/route.ts`](../src/app/api/v1/webhooks/stripe/route.ts)
+- Webhook handler: [`src/app/api/v1/webhooks/stripe/route.ts`](src/app/api/v1/webhooks/stripe/route.ts)
 - Sets `subscriptionPlan = "premium"`, `subscriptionExpiresAt`, `subscriptionPaymentMethod = "stripe"`, Stripe IDs
 
 Apple handlers should write the **same core fields** with `subscriptionPaymentMethod = "apple"` and Apple-specific identifiers for idempotency and support.
@@ -151,7 +153,7 @@ Typical stack: `expo-in-app-purchases`, `react-native-iap`, or StoreKit 2 wrappe
 
 ### Environment variables
 
-From [`.env.example`](../.env.example) (Apple IAP section). **Separate from** `APPLE_CLIENT_ID` / Sign in with Apple OAuth keys.
+From [`.env.example`](.env.example) (Apple IAP section). **Separate from** `APPLE_CLIENT_ID` / Sign in with Apple OAuth keys.
 
 | Variable | Purpose |
 |----------|---------|
@@ -167,7 +169,7 @@ Never expose these to the mobile bundle or `NEXT_PUBLIC_*`.
 
 ### User model fields (implemented)
 
-[`src/models/user.ts`](../src/models/user.ts) includes Apple fields alongside Stripe:
+[`src/models/user.ts`](src/models/user.ts) includes Apple fields alongside Stripe:
 
 | Field | Example value | Notes |
 |-------|---------------|-------|
@@ -231,7 +233,7 @@ Keep existing Stripe fields on the same document; a user should only have **one*
 
 **Handler outline (mirror Stripe webhook structure):**
 
-Implemented in [`src/app/api/v1/webhooks/apple/route.ts`](../src/app/api/v1/webhooks/apple/route.ts).
+Implemented in [`src/app/api/v1/webhooks/apple/route.ts`](src/app/api/v1/webhooks/apple/route.ts).
 
 ```typescript
 // Same file layout as stripe/route.ts
@@ -255,7 +257,7 @@ export const runtime = "nodejs";
 | `DID_FAIL_TO_RENEW` | Set grace / billing retry status; optionally keep access until expiry |
 | `GRACE_PERIOD_EXPIRED` | Downgrade when grace ends |
 
-Compare with Stripe events in [`src/app/api/v1/webhooks/stripe/route.ts`](../src/app/api/v1/webhooks/stripe/route.ts): `checkout.session.completed`, `customer.subscription.updated`, `invoice.paid`, etc.
+Compare with Stripe events in [`src/app/api/v1/webhooks/stripe/route.ts`](src/app/api/v1/webhooks/stripe/route.ts): `checkout.session.completed`, `customer.subscription.updated`, `invoice.paid`, etc.
 
 ### Stripe vs Apple webhooks
 
@@ -455,4 +457,5 @@ If requirements change (e.g. unified analytics dashboard across stores), revisit
 - [MOBILE_EXPO_BILLING.md](./MOBILE_EXPO_BILLING.md) — Expo team: platform matrix, API reference, iOS/Android checklists, sandbox testing
 - [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) — Stripe env vars, webhook forwarding, restricted keys
 - [stripe-implementation.md](./stripe-implementation.md) — Implemented Stripe routes, `isUserSubscribed`, mobile Stripe checklist
-- [`.env.example`](../.env.example) — Apple IAP and Stripe variable templates
+- [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) — Multi-plan pricing, gated trial, grandfathering (Stripe + Apple)
+- [`.env.example`](.env.example) — Apple IAP and Stripe variable templates

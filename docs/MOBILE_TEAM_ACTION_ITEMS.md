@@ -40,7 +40,7 @@ Use the equivalent option in your RN/Expo IAP library (e.g. `react-native-iap`'s
 
 ## Required change #2: Confirm purchase flow sends `signedTransactionInfo`
 
-`POST /api/v1/apple/verify` — quick self-check (full contract already in [`docs/MOBILE_EXPO_BILLING.md`](./docs/MOBILE_EXPO_BILLING.md#post-apiv1appleverify-ios-only)):
+`POST /api/v1/apple/verify` — quick self-check (full contract already in [`MOBILE_EXPO_BILLING.md`](../MOBILE_EXPO_BILLING.md#post-apiv1appleverify-ios-only)):
 
 **Request** (at least one of these three):
 
@@ -87,8 +87,8 @@ These backend fixes are transparent to mobile; no client code needed:
 
 ## Still pending from backend/ops (blocking, not mobile's responsibility)
 
-- App Store Connect credentials (`.p8` private key, product ID, bundle ID, Apple App ID) are still being finalized on the backend/ops side. **IAP will not work end-to-end until those are set**, regardless of mobile-side correctness. See [`IOS_PAYMENT_AUDIT.md`](./IOS_PAYMENT_AUDIT.md) for full details and owners.
+- App Store Connect credentials (`.p8` private key, product ID, bundle ID, Apple App ID) are still being finalized on the backend/ops side. **IAP will not work end-to-end until those are set**, regardless of mobile-side correctness. See [`IOS_PAYMENT_AUDIT.md`](../IOS_PAYMENT_AUDIT.md) for full details and owners.
 
 ---
 
-**More detail:** [`docs/MOBILE_EXPO_BILLING.md`](./docs/MOBILE_EXPO_BILLING.md) (full API reference, platform matrix, existing checklists) · [`IOS_PAYMENT_AUDIT.md`](./IOS_PAYMENT_AUDIT.md) (complete root-cause audit)
+**More detail:** [`MOBILE_EXPO_BILLING.md`](../MOBILE_EXPO_BILLING.md) (full API reference, platform matrix, existing checklists) · [`IOS_PAYMENT_AUDIT.md`](../IOS_PAYMENT_AUDIT.md) (complete root-cause audit)

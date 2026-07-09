@@ -3,6 +3,8 @@
 > **Audience:** Expo / React Native team.  
 > **Backend:** This Next.js repo (`/api/v1/*`). The mobile app lives in a separate repo.  
 > **Rule:** One account, one server-side entitlement (`isSubscribed`). Two payment rails by platform.
+>
+> **Planned pricing update:** Three subscription durations, gated 14-day trial, and price migration — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
 
 ---
 
@@ -49,7 +51,7 @@ Stripe checkout, portal, polling, and Android patterns: [stripe-implementation.m
 ### API base URL
 
 - Point the Expo app at the correct API host per build flavor (development, staging, production).
-- Align with backend env: `NEXT_PUBLIC_API_URL` / `BETTER_AUTH_URL` (see [`.env.example`](../.env.example)).
+- Align with backend env: `NEXT_PUBLIC_API_URL` / `BETTER_AUTH_URL` (see [`.env.example`](.env.example)).
 - **Do not** embed Apple App Store Connect API keys, `.p8` private keys, shared secrets, or `STRIPE_SECRET_KEY` in the mobile bundle. Only the **public API host** and normal auth credentials belong on the client.
 
 ### Authentication
@@ -355,7 +357,7 @@ Backend Apple IAP routes are live in this repo; the Expo app and App Store Conne
 | Step | Owner | Action |
 |------|--------|--------|
 | App Store Connect | Product / backend | Create auto-renewable subscription product id; sandbox testers; App Store Connect API key (`.p8`) |
-| Env | DevOps | Set `APPLE_*` on **staging** and production (see [`.env.example`](../.env.example)); use `APPLE_APP_STORE_ENVIRONMENT=sandbox` on staging |
+| Env | DevOps | Set `APPLE_*` on **staging** and production (see [`.env.example`](.env.example)); use `APPLE_APP_STORE_ENVIRONMENT=sandbox` on staging |
 | Webhooks | DevOps + ASC | Register **App Store Server Notifications V2** — Production: `{BETTER_AUTH_URL}/api/v1/webhooks/apple`; Sandbox: staging HTTPS URL or ngrok for local |
 | Sandbox E2E | Mobile + QA | Physical device + sandbox Apple ID → purchase → `POST /api/v1/apple/verify` → `isSubscribed` on current user ([§Testing](#testing)) |
 | Mobile app | Expo repo | Complete checklist items **12–16** in [APPLE_IAP_IOS_IMPLEMENTATION.md §8](./APPLE_IAP_IOS_IMPLEMENTATION.md#8-implementation-checklist) |
@@ -370,7 +372,8 @@ Backend Apple IAP routes are live in this repo; the Expo app and App Store Conne
 | [APPLE_IAP_IOS_IMPLEMENTATION.md](./APPLE_IAP_IOS_IMPLEMENTATION.md) | Path A, platform matrix, verify/webhook design, App Store Connect, sandbox testing §9, checklist 12–16 |
 | [stripe-implementation.md](./stripe-implementation.md) | Stripe endpoints, polling, deep links, Android mobile checklist §16 |
 | [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) | Stripe env vars, webhook forwarding |
-| [`.env.example`](../.env.example) | `APPLE_*`, `STRIPE_*` templates (server only) |
+| [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) | Multi-plan pricing ($19.99 / $59.99 / $199), gated trial, grandfathering |
+| [`.env.example`](.env.example) | `APPLE_*`, `STRIPE_*` templates (server only) |
 
 Backend implementation references:
 
