@@ -430,7 +430,7 @@ When creating or editing drills in the Drill Builder, tutors/admins assign a **M
 
 `src/domain/learning-journey/learning-journey.catalog.ts`
 
-### Mission 4: Bonus Scenarios — updated topics
+### Mission 5: Bonus Scenarios — updated topics
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |------:|----------|-------|-------------------------|
@@ -438,25 +438,24 @@ When creating or editing drills in the Drill Builder, tutors/admins assign a **M
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
 | 4 | **`grammar`** | **Grammar** | *(none — grammar drills use standard drill builder, not Free Talk)* |
-| 5 | **`interview_preparation`** | **Interview Preparation** | *(none — standard drill builder, not Free Talk)* |
 
 ### Mobile actions required
 
-1. **Drill Builder (tutor/admin):** Add `Grammar` to the Mission 4 topic picker. Topic value stored as `learning_journey_topic: "grammar"`.
+1. **Drill Builder (tutor/admin):** Add `Grammar` to the Mission 5 topic picker. Topic value stored as `learning_journey_topic: "grammar"`.
 2. **Learner My Plan / Mission Detail:** Render the Grammar topic section even when empty (same as other topics). See [`eklan-mobile-learning-journey-spec.md`](eklan-mobile-learning-journey-spec.md) §4.4.
-3. **Validation:** Server accepts `"grammar"` as a valid topic ID when paired with `learning_journey_part: 4`.
+3. **Validation:** Server accepts `"grammar"` as a valid topic ID when paired with `learning_journey_part: 5`.
 
 > **Keep in sync:** Update mobile catalog constants in the same release as web when `learning-journey.catalog.ts` changes. There is no API for catalog versioning.
 
 Full learner-side catalog spec: [`eklan-mobile-learning-journey-spec.md`](eklan-mobile-learning-journey-spec.md).
 
-For **Interview Preparation**, see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md).
+For **Interview Preparation** (Mission 4), see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md).
 
 ---
 
-## 8. Learning Journey Catalog Update — Interview Preparation Topic
+## 8. Learning Journey Catalog Update — Mission 4: Interview Preparation
 
-Mission 4 now includes a fifth topic for interview-focused drills. Full mobile handoff:
+Interview Preparation is a dedicated **Mission 4** with eight topics. Full mobile handoff:
 
 **[`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md)**
 
@@ -464,7 +463,14 @@ Quick reference:
 
 | Order | Topic ID | Title |
 |------:|----------|-------|
-| 5 | `interview_preparation` | Interview Preparation |
+| 1 | `motivation_prep` | Motivation prep |
+| 2 | `technical_prep` | Technical prep |
+| 3 | `situation_judgement_prep` | Situation Judgement Prep |
+| 4 | `mock_1` | Mock 1 |
+| 5 | `mock_2` | Mock 2 |
+| 6 | `mock_3` | Mock 3 |
+| 7 | `mock_4` | Mock 4 |
+| 8 | `mock_5` | Mock 5 |
 
 ---
 
@@ -479,8 +485,9 @@ Quick reference:
 | 5 | Change search/filter/page | Selection cleared |
 | 6 | Bulk delete: one ID fails (403/404) | Partial success toast + failure toast; successful rows removed |
 | 7 | Admin pagination: select on page 1, go to page 2 | Selection cleared |
-| 8 | Create drill with Mission 4 + topic `grammar` | Saves; appears under Grammar on learner Mission 4 detail |
-| 9 | Create drill with Mission 4 + topic `interview_preparation` | Saves; appears under Interview Preparation on learner Mission 4 detail |
+| 8 | Create drill with Mission 5 + topic `grammar` | Saves; appears under Grammar on learner Mission 5 detail |
+| 9 | Create drill with Mission 4 + topic `motivation_prep` | Saves; appears under Motivation prep on learner Mission 4 detail |
+| 10 | Create drill with Mission 4 + topic `mock_3` | Saves; appears under Mock 3 on learner Mission 4 detail |
 
 ---
 
@@ -488,5 +495,5 @@ Quick reference:
 
 | Date | Change |
 |------|--------|
-| July 2026 | Interview Preparation topic under Bonus Scenarios — see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md) |
+| July 2026 | Mission 4 Interview Preparation — eight topics; Bonus Scenarios is Mission 5 — see [`MOBILE_INTERVIEW_PREPARATION_TOPIC.md`](MOBILE_INTERVIEW_PREPARATION_TOPIC.md) |
 | June 2026 | Initial spec: checkbox selection, safe bulk delete, Grammar topic under Bonus Scenarios |

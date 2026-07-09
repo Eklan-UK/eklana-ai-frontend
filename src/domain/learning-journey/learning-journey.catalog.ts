@@ -1,4 +1,4 @@
-export type LearningJourneyPartId = 1 | 2 | 3 | 4;
+export type LearningJourneyPartId = 1 | 2 | 3 | 4 | 5;
 
 export type LearningJourneyTopicId = string;
 
@@ -109,6 +109,52 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   },
   {
     part: 4,
+    title: "Interview Preparation",
+    topics: [
+      {
+        id: "motivation_prep",
+        title: "Motivation prep",
+        order: 1,
+      },
+      {
+        id: "technical_prep",
+        title: "Technical prep",
+        order: 2,
+      },
+      {
+        id: "situation_judgement_prep",
+        title: "Situation Judgement Prep",
+        order: 3,
+      },
+      {
+        id: "mock_1",
+        title: "Mock 1",
+        order: 4,
+      },
+      {
+        id: "mock_2",
+        title: "Mock 2",
+        order: 5,
+      },
+      {
+        id: "mock_3",
+        title: "Mock 3",
+        order: 6,
+      },
+      {
+        id: "mock_4",
+        title: "Mock 4",
+        order: 7,
+      },
+      {
+        id: "mock_5",
+        title: "Mock 5",
+        order: 8,
+      },
+    ],
+  },
+  {
+    part: 5,
     title: "Bonus Scenarios",
     topics: [
       {
@@ -134,11 +180,6 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         title: "Grammar",
         order: 4,
       },
-      {
-        id: "interview_preparation",
-        title: "Interview Preparation",
-        order: 5,
-      },
     ],
   },
 ];
@@ -150,7 +191,7 @@ const ALL_TOPIC_IDS = new Set(
 export function isLearningJourneyPartId(
   value: unknown,
 ): value is LearningJourneyPartId {
-  return value === 1 || value === 2 || value === 3 || value === 4;
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5;
 }
 
 export function parseLearningJourneyPartId(

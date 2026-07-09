@@ -487,8 +487,8 @@ export interface IDrill extends Document {
   updated_date: Date;
   is_active: boolean;
 
-  /** Learning journey mission (1–4) from eklan-learners-journey.md */
-  learning_journey_part?: 1 | 2 | 3 | 4;
+  /** Learning journey mission (1–5) from eklan-learners-journey.md */
+  learning_journey_part?: 1 | 2 | 3 | 4 | 5;
   /** Learning journey topic slug within the mission */
   learning_journey_topic?: string;
 
@@ -761,9 +761,9 @@ const drillSchema = new Schema<IDrill>(
 
     learning_journey_part: {
       type: Number,
-      enum: [1, 2, 3, 4],
+      enum: [1, 2, 3, 4, 5],
       required: false,
-      description: "Learning journey mission (1–4)",
+      description: "Learning journey mission (1–5)",
     },
 
     learning_journey_topic: {

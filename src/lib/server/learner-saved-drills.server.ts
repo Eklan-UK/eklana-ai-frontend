@@ -234,15 +234,11 @@ export async function getLearnerSavedDrillsPayload(
 
   return {
     drills: enrichLearnerDrillRowsWithTopicTitle(
-<<<<<<< HEAD
-      sortAssignedPlanItems([...assignmentRows, ...freeTalkRows]) as LearnerMyDrillRow[],
-=======
       sortAssignedPlanItems(
         [...assignmentRows, ...freeTalkRows] as unknown as Array<
           LearnerMyDrillRow & { drill?: { date?: string | Date | null } }
         >,
       ) as LearnerMyDrillRow[],
->>>>>>> stagin
     ),
   };
 }
