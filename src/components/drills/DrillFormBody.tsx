@@ -49,6 +49,7 @@ export function DrillFormBody({
   onDraftChange,
   users,
   loadingUsers = false,
+  variant,
   drillTypeLocked = false,
   studentSearch,
   onStudentSearchChange,
@@ -64,7 +65,7 @@ export function DrillFormBody({
     string | undefined
   >();
   const selectedStudentIds = useMemo(
-    () => draft.selectedUsers.map((u) => u._id.toString()),
+    () => draft.selectedUsers,
     [draft.selectedUsers],
   );
   const { enrolledParts } = useEnrolledPartsIntersection(selectedStudentIds);
