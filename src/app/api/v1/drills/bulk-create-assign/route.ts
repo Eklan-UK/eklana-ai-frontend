@@ -13,6 +13,7 @@ import {
   learningJourneyTopicSchema,
   refineLearningJourneyFields,
 } from "@/domain/learning-journey/learning-journey.validation";
+import { parseLearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 
 interface BulkDrillInput {
@@ -152,6 +153,7 @@ async function handler(
         try {
           const { drillType, title, content, studentId, completionDate, difficulty, topic, part, mission } = item;
           const rawPart = part ?? mission;
+          const extractedPart = typeof rawPart === 'string' ? rawPart.match(/\d+/)?.[0] : rawPart;
 
           if (!drillType || !content || !studentId || !completionDate || !difficulty) {
             throw new Error(
@@ -168,8 +170,10 @@ async function handler(
             throw new Error(`Invalid completionDate: ${completionDate}`);
           }
 
+          const parsedPart = parseLearningJourneyPartId(extractedPart);
+
           const journeyValidation = journeyFieldsSchema.safeParse({
-            learning_journey_part: rawPart,
+            learning_journey_part: parsedPart,
             learning_journey_topic: topic,
           });
           if (!journeyValidation.success) {
