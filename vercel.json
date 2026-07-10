@@ -25,5 +25,16 @@
       "path": "/api/v1/cron/weekly-challenge",
       "schedule": "0 6 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/v1/drills/ai-generate/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/v1/drills/ai-chat/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/v1/drills/bulk-create-assign/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }
