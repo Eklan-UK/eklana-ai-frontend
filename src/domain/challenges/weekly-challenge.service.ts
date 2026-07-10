@@ -4,6 +4,7 @@ import { aggregateWeaknesses } from './weakness-aggregator';
 import { generateWeeklyChallenge } from './challenge-generator';
 import { ChallengeRepository } from './challenge.repository';
 import { ChallengeService } from './challenge.service';
+import { notifyWeeklyChallengeReadyFromDoc } from './weekly-challenge-notification.service';
 import { currentWeekStartUtc, isWeeklyChallengeDayUtc } from '@/lib/challenges/utc-week-challenge';
 import type { ChallengeDrillItem } from './types';
 
@@ -157,6 +158,19 @@ async function runGeneration(
 		if (!readyDoc) {
 			throw new Error('Weekly challenge generation lock lost');
 		}
+
+		if ((readyDoc.content?.drillSequence?.length ?? 0) > 0) {
+			try {
+				await notifyWeeklyChallengeReadyFromDoc(readyDoc);
+			} catch (notifyErr: unknown) {
+				const msg = notifyErr instanceof Error ? notifyErr.message : String(notifyErr);
+				console.warn('[WeeklyChallenge] notification failed', {
+					learnerId: learnerId.toString(),
+					error: msg,
+				});
+			}
+		}
+
 		return readyDoc;
 	} catch (error) {
 		await WeeklyChallengeModel.findOneAndUpdate(

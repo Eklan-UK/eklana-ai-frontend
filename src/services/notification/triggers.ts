@@ -12,6 +12,7 @@ import { connectToDatabase } from "@/lib/api/db";
 import FCMToken from "@/models/fcm-token";
 import { StreakService } from "@/services/streak.service";
 import { sendUnifiedWithFcmFallback } from "@/services/notification/delivery";
+import { encodeWeekStartDate } from "@/lib/challenges/weekly-challenge-url";
 
 /**
  * Trigger when a drill is assigned to a student
@@ -795,6 +796,73 @@ export async function onWeeklyDrillDigest(
     return result;
   } catch (error) {
     console.error('[Notification Trigger] onWeeklyDrillDigest error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Weekly challenge ready — in-app + push alongside email after generation.
+ *
+ * Mobile payload contract:
+ *   data.screen = 'WeeklyChallenge' (practice/weekly-challenge/[weekStartDate])
+ *   data.url = '/account/practice/weekly-challenge/{encodeWeekStartDate(weekStartDate)}'
+ *   data.resourceType = 'weekly_challenge'
+ *   data.weekStartDate = ISO string
+ */
+export async function onWeeklyChallengeReady(
+  studentId: string,
+  params: {
+    drillCount: number;
+    drillTypes?: string[];
+    weekStartDate: string;
+  },
+) {
+  const { drillCount, weekStartDate } = params;
+  const title = 'Your weekly challenge is ready';
+  const drillWord = drillCount === 1 ? 'drill' : 'drills';
+  const body = `${drillCount} personalized ${drillWord} based on your practice this week. Start your challenge now.`;
+  const challengePath = `/account/practice/weekly-challenge/${encodeWeekStartDate(weekStartDate)}`;
+  const notifData = {
+    screen: 'WeeklyChallenge',
+    url: challengePath,
+    resourceType: 'weekly_challenge',
+    weekStartDate,
+  };
+
+  console.log('[Notification Trigger] onWeeklyChallengeReady called:', {
+    studentId,
+    drillCount,
+    weekStartDate,
+  });
+
+  try {
+    await connectToDatabase();
+
+    const delivery = await sendUnifiedWithFcmFallback({
+      userId: studentId,
+      title,
+      body,
+      type: 'weekly_challenge_ready',
+      data: notifData,
+      fcmType: NotificationType.WEEKLY_CHALLENGE_READY,
+      fcmData: {
+        screen: 'WeeklyChallenge',
+        url: challengePath,
+        resourceType: 'weekly_challenge',
+        weekStartDate,
+        drillCount: String(drillCount),
+      },
+      actionUrl: challengePath,
+    });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    console.log('[Notification Trigger] onWeeklyChallengeReady result:', result);
+    return result;
+  } catch (error) {
+    console.error('[Notification Trigger] onWeeklyChallengeReady error:', error);
     throw error;
   }
 }

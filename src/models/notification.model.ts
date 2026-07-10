@@ -14,7 +14,8 @@ export type NotificationType =
   | 'system'
   | 'class_session_reminder'
   | 'class_nps_form'
-  | 'weekly_drill_digest';
+  | 'weekly_drill_digest'
+  | 'weekly_challenge_ready';
 
 export interface INotificationData {
   screen?: string;        // For mobile deep linking (e.g., 'DrillDetail')
@@ -75,6 +76,7 @@ const NotificationSchema = new Schema<INotification>(
         'class_session_reminder',
         'class_nps_form',
         'weekly_drill_digest',
+        'weekly_challenge_ready',
       ],
       required: true,
       index: true,

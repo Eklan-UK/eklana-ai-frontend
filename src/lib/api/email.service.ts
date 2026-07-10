@@ -265,6 +265,82 @@ This is an automated notification from Eklan.
     };
   },
 
+  weeklyChallengeReady: (data: {
+    studentName: string;
+    drillCount: number;
+    drillTypes: string[];
+    weekLabel: string;
+    challengeUrl: string;
+  }) => {
+    const listItems = data.drillTypes
+      .map(
+        (type) =>
+          `<li style="margin: 0 0 8px 0; font-size: 15px; color: #92400e;">${type}</li>`,
+      )
+      .join("");
+
+    return {
+      subject: "Your weekly challenge is ready",
+      html: `
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>Weekly Challenge Ready</title>
+			</head>
+			<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background-color: #f3f4f6;">
+				<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+					<div style="text-align: center; margin-bottom: 30px;">
+						<img src="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/notification-logo.png" alt="eklan Logo" width="60" height="60" style="border-radius: 12px; margin-bottom: 10px;">
+						<div style="font-size: 24px; font-weight: bold; color: #3a893e;">Eklan</div>
+					</div>
+					<div style="background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+						<div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center;">
+							<div style="font-size: 48px; margin-bottom: 10px;">🏆</div>
+							<h1 style="margin: 0; font-size: 24px; font-weight: 600;">Your weekly challenge is ready</h1>
+							<p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Week of ${data.weekLabel}</p>
+						</div>
+						<div style="padding: 30px;">
+							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">Your personalized weekly challenge is ready with <strong>${data.drillCount}</strong> drill${data.drillCount === 1 ? "" : "s"} based on your practice this week.</p>
+							<div style="background-color: #fffbeb; border: 2px solid #fde68a; border-radius: 12px; padding: 20px; margin: 25px 0;">
+								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #92400e;">This week's drills</h2>
+								<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>
+							</div>
+							<div style="text-align: center; margin: 30px 0;">
+								<a href="${data.challengeUrl}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.4);">Start Your Challenge →</a>
+							</div>
+							<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; text-align: center;">Tackle your weaknesses and keep improving! 🍀</p>
+						</div>
+					</div>
+					<div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+						<p style="margin: 0;">This is an automated notification from Eklan.</p>
+					</div>
+				</div>
+			</body>
+			</html>
+		`,
+      text: `
+Hi ${data.studentName},
+
+Your weekly challenge is ready (week of ${data.weekLabel}).
+
+You have ${data.drillCount} personalized drill${data.drillCount === 1 ? "" : "s"} based on your practice this week.
+
+${data.drillTypes.map((t) => `- ${t}`).join("\n")}
+
+Start your challenge:
+${data.challengeUrl}
+
+Tackle your weaknesses and keep improving! 🍀
+
+---
+This is an automated notification from Eklan.
+		`.trim(),
+    };
+  },
+
   emailVerification: (data: { name: string; verificationLink: string }) => ({
     subject: "Verify Your Email Address",
     html: `
@@ -401,6 +477,44 @@ export const sendWeeklyDrillDigestEmail = async (data: {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('Error sending weekly drill digest email', {
+      error: message,
+      studentEmail: data.studentEmail,
+    });
+    throw error;
+  }
+};
+
+export const sendWeeklyChallengeReadyEmail = async (data: {
+  studentEmail: string;
+  studentName: string;
+  drillCount: number;
+  drillTypes: string[];
+  weekLabel: string;
+  challengeUrl: string;
+}): Promise<void> => {
+  try {
+    const template = emailTemplates.weeklyChallengeReady({
+      studentName: data.studentName,
+      drillCount: data.drillCount,
+      drillTypes: data.drillTypes,
+      weekLabel: data.weekLabel,
+      challengeUrl: data.challengeUrl,
+    });
+
+    await sendEmail({
+      to: data.studentEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+
+    logger.info('Weekly challenge ready email sent', {
+      studentEmail: data.studentEmail,
+      drillCount: data.drillCount,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Error sending weekly challenge ready email', {
       error: message,
       studentEmail: data.studentEmail,
     });
