@@ -13,6 +13,7 @@ import {
   learningJourneyTopicSchema,
   refineLearningJourneyFields,
 } from "@/domain/learning-journey/learning-journey.validation";
+import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 
 interface BulkDrillInput {
   drillType: string;
@@ -180,6 +181,13 @@ async function handler(
             learning_journey_part: validatedPart,
             learning_journey_topic: validatedTopic,
           } = journeyValidation.data;
+
+          if (validatedPart != null) {
+            await assertLearnersEnrolledForDrill({
+              learnerIds: [studentId],
+              part: validatedPart,
+            });
+          }
 
           const drillData: any = {
             title: title ?? "",

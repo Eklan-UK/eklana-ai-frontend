@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
+import React, { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Plus,
   X,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
+import { MissionEnrollmentModal } from "@/components/learning-journey/MissionEnrollmentModal";
+import { useEnrolledPartsIntersection } from "@/hooks/useMissionEnrollments";
 import type {
   DrillDraft,
   VocabularyItem,
@@ -57,6 +59,21 @@ export function DrillFormBody({
   sidebarLeadingContent,
   onDrillTypeChange,
 }: DrillFormBodyProps) {
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const [enrollmentFocusStudentId, setEnrollmentFocusStudentId] = useState<
+    string | undefined
+  >();
+  const selectedStudentIds = useMemo(
+    () => draft.selectedUsers.map((u) => u._id.toString()),
+    [draft.selectedUsers],
+  );
+  const { enrolledParts } = useEnrolledPartsIntersection(selectedStudentIds);
+
+  const openEnrollment = useCallback((studentId?: string) => {
+    setEnrollmentFocusStudentId(studentId);
+    setEnrollmentModalOpen(true);
+  }, []);
+
   // Use the functional-update form so multiple synchronous patchDraft calls (e.g. from
   // LearningJourneyPartTopicFields firing onPartChange then onTopicChange in the same handler)
   // compose against the running prev state rather than all spreading the same stale snapshot.
@@ -482,6 +499,7 @@ export function DrillFormBody({
   };
 
   return (
+    <>
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
       <div className="xl:col-span-2 space-y-8">
           {leadingContent}
@@ -1618,6 +1636,11 @@ export function DrillFormBody({
                 onPartChange={(v) => patchDraft({ journeyPart: v })}
                 onTopicChange={(v) => patchDraft({ journeyTopic: v })}
                 required
+                enrolledParts={
+                  selectedStudentIds.length > 0 ? enrolledParts : undefined
+                }
+                selectedStudentIds={selectedStudentIds}
+                onOpenEnrollment={openEnrollment}
               />
 
               {draft.drillType !== "roleplay" && (
@@ -1767,5 +1790,14 @@ export function DrillFormBody({
         )}
       </div>
     </div>
+
+    {enrollmentModalOpen && (
+      <MissionEnrollmentModal
+        variant={variant}
+        initialStudentId={enrollmentFocusStudentId}
+        onClose={() => setEnrollmentModalOpen(false)}
+      />
+    )}
+    </>
   );
 }

@@ -20,6 +20,7 @@ import {
 	learningJourneyTopicSchema,
 	refineLearningJourneyFields,
 } from '@/domain/learning-journey/learning-journey.validation';
+import { assertLearnersEnrolledForDrill } from '@/domain/learning-journey/mission-enrollment.service';
 
 // Validation schemas
 const targetSentenceSchema = z.object({
@@ -236,6 +237,13 @@ async function postHandler(
 
 	const body = await parseRequestBody(req);
 	const validated = validateRequest(createDrillSchema, body);
+
+	if (validated.learning_journey_part && validated.assigned_to.length > 0) {
+		await assertLearnersEnrolledForDrill({
+			learnerIds: validated.assigned_to,
+			part: validated.learning_journey_part,
+		});
+	}
 
 	// Initialize services
 	const drillRepo = new DrillRepository();

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight, Download, Settings2 } from "lucide-react";
 import { AI_DRILL_TYPES } from "@/constants/ai-drill";
 
 export interface AIGeneratedResultLike {
@@ -12,6 +12,7 @@ export interface AIGeneratedResultLike {
 interface AIGeneratedPreviewProps {
   results: AIGeneratedResultLike[];
   onUseDrills: () => void;
+  onEditSettings?: () => void;
 }
 
 function getDrillTypeLabel(drillType: string): string {
@@ -329,6 +330,7 @@ function renderContentForType(
 export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
   results,
   onUseDrills,
+  onEditSettings,
 }) => {
   const handleExport = () => {
     import("xlsx").then((XLSX) => {
@@ -373,6 +375,16 @@ export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
       </div>
 
       <div className="flex gap-3">
+        {onEditSettings && (
+          <button
+            type="button"
+            onClick={onEditSettings}
+            className="py-3 px-4 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <Settings2 className="w-4 h-4" />
+            Edit settings
+          </button>
+        )}
         <button
           type="button"
           onClick={handleExport}

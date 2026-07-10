@@ -3,6 +3,7 @@ import type { ParsedContent } from "@/services/document-parser.service";
 import {
   isValidPartTopicPair,
   getPartLabel,
+  type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
 import { normalizeFillBlankItems, validateFillBlankItems } from "@/utils/drill";
 import type { DrillDraft } from "@/components/drills/drill-draft.types";
@@ -162,7 +163,10 @@ export function draftFromBulkPendingItem(
 
 export function validateDrillDraft(
   draft: DrillDraft,
-  options?: { requireUsers?: boolean },
+  options?: {
+    requireUsers?: boolean;
+    enrolledParts?: LearningJourneyPartId[];
+  },
 ): boolean {
   if (!draft.completionDate) {
     toast.error("Please select a completion date");
@@ -171,6 +175,15 @@ export function validateDrillDraft(
 
   if (!draft.journeyPart || !draft.journeyTopic) {
     toast.error("Please select a learning journey mission and topic");
+    return false;
+  }
+
+  if (
+    options?.enrolledParts &&
+    draft.selectedUsers.length > 0 &&
+    !options.enrolledParts.includes(draft.journeyPart)
+  ) {
+    toast.error("Selected mission is not enrolled for all selected students");
     return false;
   }
 

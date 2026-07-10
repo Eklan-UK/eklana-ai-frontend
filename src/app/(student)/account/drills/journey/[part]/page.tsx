@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Card } from "@/components/ui/Card";
 import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
+import { useMyMissionEnrollments } from "@/hooks/useMissionEnrollments";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useDrillBookmarkToggle } from "@/hooks/useDrillBookmarkToggle";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
@@ -22,6 +23,7 @@ import {
   type JourneyDrillItem,
 } from "@/lib/learning-journey/group-journey-drills";
 import { trackActivity } from "@/utils/activity-cache";
+import { toast } from "sonner";
 
 export default function LearningJourneyPartPage() {
   const router = useRouter();
@@ -33,6 +35,8 @@ export default function LearningJourneyPartPage() {
   const { data, isPending, isFetching, isError: drillsError } = useLearnerDrills({
     limit: 1000,
   });
+  const { data: enrolledParts = [], isLoading: enrollmentsLoading } =
+    useMyMissionEnrollments();
   const drills = data ?? [];
   const drillsLoading = isPending || (isFetching && drills.length === 0);
   const prefetchDrill = usePrefetchDrill();
@@ -49,6 +53,14 @@ export default function LearningJourneyPartPage() {
       router.replace("/account/drills");
     }
   }, [params.part, part, router]);
+
+  useEffect(() => {
+    if (enrollmentsLoading || part == null) return;
+    if (!enrolledParts.includes(part)) {
+      toast.error("You are not enrolled in this mission yet.");
+      router.replace("/account/drills");
+    }
+  }, [enrollmentsLoading, enrolledParts, part, router]);
 
   const partDef = part != null ? getPartById(part) : undefined;
 

@@ -1,11 +1,13 @@
 # Learning Journey Mission Enrollment System
 
 > **Status:** Planned — not yet implemented  
-> **Last updated:** July 9, 2026
+> **Last updated:** July 10, 2026
+
+> **For step-by-step implementation**, see [`LEARNING_JOURNEY_MISSION_ENROLLMENT.md`](../LEARNING_JOURNEY_MISSION_ENROLLMENT.md) at the repo root.
 
 ## Overview
 
-Introduce mission-level enrollment (Missions 1–4) as a gate between tutor roster assignment and drill assignment. Tutors and admins enroll learners per mission via a new **Enrollment** modal in the Drill Builder. Enrollment unlocks mission/topic filters when creating drills and controls which missions are accessible on the student **My Learning Journey**.
+Introduce mission-level enrollment (Missions 1–5) as a gate between tutor roster assignment and drill assignment. Tutors and admins enroll learners per mission via a new **Enrollment** modal in the Drill Builder. Enrollment unlocks mission/topic filters when creating drills and controls which missions are accessible on the student **My Learning Journey**.
 
 **Product decisions (confirmed):**
 
@@ -16,7 +18,7 @@ Introduce mission-level enrollment (Missions 1–4) as a gate between tutor rost
 
 ## Problem
 
-Today, all 4 Learning Journey missions are visible to every subscribed student (`src/app/(student)/account/drills/page.tsx`), and tutors can pick any mission/topic when assigning drills (`src/components/admin/LearningJourneyPartTopicFields.tsx`). There is no enrollment layer — only `DrillAssignment` (drill content) and `ClassEnrollment` (live sessions) exist.
+Today, all 5 Learning Journey missions are visible to every subscribed student (`src/app/(student)/account/drills/page.tsx`), and tutors can pick any mission/topic when assigning drills (`src/components/admin/LearningJourneyPartTopicFields.tsx`). There is no enrollment layer — only `DrillAssignment` (drill content) and `ClassEnrollment` (live sessions) exist.
 
 **Goal:** Tutors/admins must enroll a student in a mission before:
 
@@ -49,7 +51,7 @@ flowchart LR
 | **Enrollment** | `LearnerMissionEnrollment` (learner + mission part) | Mission/topic pickers in drill create/AI forms | Mission card becomes accessible (not locked) |
 | **Assignment** | `DrillAssignment` (learner + drill) | N/A (output of create flow) | Drill rows inside mission topics |
 
-**Enrollment granularity:** Mission level only (`learning_journey_part` 1–4), matching `LEARNING_JOURNEY_PARTS` in `src/domain/learning-journey/learning-journey.catalog.ts`. All topics within an enrolled mission are available to the tutor for filtering.
+**Enrollment granularity:** Mission level only (`learning_journey_part` 1–5), matching `LEARNING_JOURNEY_PARTS` in `src/domain/learning-journey/learning-journey.catalog.ts`. All topics within an enrolled mission are available to the tutor for filtering.
 
 ---
 
@@ -62,7 +64,7 @@ New file: `src/models/learner-mission-enrollment.ts`
 ```typescript
 interface ILearnerMissionEnrollment {
   learnerId: ObjectId;          // ref User
-  learningJourneyPart: 1 | 2 | 3 | 4;
+  learningJourneyPart: 1 | 2 | 3 | 4 | 5;
   enrolledBy: ObjectId;         // ref User (tutor or admin)
   enrolledAt: Date;
   status: 'active' | 'withdrawn';
@@ -92,7 +94,7 @@ getEnrolledPartsForLearners(learnerIds[]): Map<learnerId, part[]>
 |--------|-------|-----|---------|
 | `GET` | `/api/v1/learning-journey/enrollments` | Tutor, Admin | List enrollments (filter by `learnerId`, optional `tutorId` scope) |
 | `GET` | `/api/v1/learning-journey/enrollments/learner/[learnerId]` | Tutor, Admin, Learner (own) | All enrolled missions for one learner |
-| `PUT` | `/api/v1/learning-journey/enrollments/learner/[learnerId]` | Tutor, Admin | Set enrolled missions (array of parts 1–4); diff add/withdraw |
+| `PUT` | `/api/v1/learning-journey/enrollments/learner/[learnerId]` | Tutor, Admin | Set enrolled missions (array of parts 1–5); diff add/withdraw |
 | `GET` | `/api/v1/learning-journey/enrollments/me` | Learner | Own enrolled missions for student UI |
 
 **Authorization:**
@@ -117,7 +119,7 @@ flowchart TD
   C --> D[Student list with search]
   D --> E[Click student row]
   E --> F[Student enrollment detail panel]
-  F --> G[Shows 4 missions with enrolled badges]
+  F --> G[Shows 5 missions with enrolled badges]
   G --> H[Add or Edit enrollments button]
   H --> I[Mission checklist modal]
   I --> J[Save - PUT enrollments API]
@@ -135,16 +137,16 @@ flowchart TD
 |-----------|----------|----------|
 | `EnrollmentButton` | Header of `StudentListPage.tsx` and optionally `StudentDetailPage.tsx` | Opens modal |
 | `MissionEnrollmentModal` | `src/components/learning-journey/MissionEnrollmentModal.tsx` | Two-step: student picker → detail |
-| `StudentMissionEnrollmentDetail` | Same folder | Lists 4 missions; enrolled = checkmark; unenrolled = empty |
-| `MissionEnrollmentChecklist` | Same folder | Checkbox list of Missions 1–4; pre-selects current; Save calls PUT |
+| `StudentMissionEnrollmentDetail` | Same folder | Lists 5 missions; enrolled = checkmark; unenrolled = empty |
+| `MissionEnrollmentChecklist` | Same folder | Checkbox list of Missions 1–5; pre-selects current; Save calls PUT |
 
 ### Modal flow detail
 
-1. **Step 1 — Student list:** Reuse roster from `useTutorStudents` / `useAiDrillBuilderLearners` (same sources as drill builder). Search, avatar, name, email. Show small badge: *"2/4 missions enrolled"*.
+1. **Step 1 — Student list:** Reuse roster from `useTutorStudents` / `useAiDrillBuilderLearners` (same sources as drill builder). Search, avatar, name, email. Show small badge: *"2/5 missions enrolled"*.
 2. **Step 2 — Student detail:** Header with student info. Section *"Enrolled Missions"* listing active enrollments with mission title from catalog. **"Manage enrollments"** button opens checklist sub-modal (or inline expand).
-3. **Checklist:** All 4 missions from `LEARNING_JOURNEY_PARTS`. Checked = enrolled. Save sends full desired set; server diffs.
+3. **Checklist:** All 5 missions from `LEARNING_JOURNEY_PARTS`. Checked = enrolled. Save sends full desired set; server diffs.
 
-**Secondary entry point:** `StudentDetailPage.tsx` header — *"Enrollments"* chip/button showing `2/4` for quick access without returning to list.
+**Secondary entry point:** `StudentDetailPage.tsx` header — *"Enrollments"* chip/button showing `2/5` for quick access without returning to list.
 
 ### Drill create gating
 
@@ -170,7 +172,7 @@ Files to wire gating:
 ```mermaid
 flowchart TD
   A[My Plans page] --> B[My Learning Journey section]
-  B --> C{For each Mission 1-4}
+  B --> C{For each Mission 1-5}
   C -->|Enrolled| D[Active card - tappable]
   C -->|Not enrolled| E[Locked card - not tappable]
   E --> F["Not enrolled yet" message]
@@ -306,13 +308,13 @@ Hooks in `src/hooks/useMissionEnrollments.ts`:
 | Admin assigns drill for tutor's student | Admin can enroll + assign (admin bypass on roster, not on enrollment) |
 | Free Talk scenarios mapped to topics | Free Talk rows in journey only show under enrolled missions (match via `freeTalkScenarioType` in catalog) |
 | Mission 4 (Interview Preparation) | Same enrollment rules as Missions 1–3 |
-| Mission 5 (Bonus Scenarios) | Same enrollment rules as Missions 1–3 |
+| Mission 5 (Bonus Scenarios) | Same enrollment rules as Missions 1–4 |
 
 ---
 
 ## Files Touched (summary)
 
-**New:** model, repository, service, API routes (3), migration script, 3–4 UI components, 1 hook file
+**New:** model, repository, service, API routes (4), migration script, 3–4 UI components, 1 hook file
 
 **Modified:** `StudentListPage`, `StudentDetailPage`, `LearningJourneyPartCard`, student drills pages (2), `LearningJourneyPartTopicFields`, `DrillFormBody`, `AIGenerationForm`, `drill-form-utils`, `learning-journey.validation`, drill API routes, `api.ts`
 
@@ -324,12 +326,14 @@ Hooks in `src/hooks/useMissionEnrollments.ts`:
 - Sequential auto-unlock (Mission 2 after Mission 1 complete)
 - Student self-enrollment
 - Notifications on enrollment (*"You've been enrolled in Mission 2"*)
-- Mobile-native app changes (web API supports both per `docs/eklan-mobile-learning-journey-spec.md`)
+- Mobile-native app UI (API is ready; see `docs/MOBILE_MISSION_ENROLLMENT.md` for mobile handoff)
 
 ---
 
 ## Related docs
 
+- [`LEARNING_JOURNEY_MISSION_ENROLLMENT.md`](../LEARNING_JOURNEY_MISSION_ENROLLMENT.md) — step-by-step implementation guide (repo root)
 - `docs/eklan-learners-journey.md` — curriculum overview (Day 1–7)
 - `docs/eklan-mobile-learning-journey-spec.md` — student journey UI spec
+- `docs/MOBILE_MISSION_ENROLLMENT.md` — mobile handoff for locked missions (same backend)
 - `docs/ai-drill-creation-full-implementation.md` — tutor drill builder flows

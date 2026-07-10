@@ -2084,6 +2084,66 @@ export const studentAPI = {
   },
 };
 
+// Learning Journey API
+export const learningJourneyAPI = {
+  getMyEnrollments: () => {
+    return apiRequest<{
+      code?: string;
+      data?: { enrolledParts: number[] };
+      enrolledParts?: number[];
+    }>('/learning-journey/enrollments/me', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  listEnrollments: (params?: { learnerId?: string }) => {
+    return apiRequest<{
+      code?: string;
+      data?: {
+        enrollments: Array<{
+          learnerId: string;
+          learningJourneyPart: number;
+          enrolledAt: string;
+          status: 'active';
+        }>;
+      };
+      enrollments?: Array<{
+        learnerId: string;
+        learningJourneyPart: number;
+        enrolledAt: string;
+        status: 'active';
+      }>;
+    }>('/learning-journey/enrollments', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  getLearnerEnrollments: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      data?: { learnerId: string; enrolledParts: number[] };
+      enrolledParts?: number[];
+    }>(`/learning-journey/enrollments/learner/${learnerId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  setLearnerEnrollments: (learnerId: string, parts: number[]) => {
+    return apiRequest<{
+      code?: string;
+      data?: { learnerId: string; enrolledParts: number[] };
+      enrolledParts?: number[];
+    }>(`/learning-journey/enrollments/learner/${learnerId}`, {
+      method: 'PUT',
+      data: { parts },
+    });
+  },
+};
+
 // Streak API
 export const streakAPI = {
   // Get user's streak data

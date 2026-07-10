@@ -800,6 +800,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
           lockedStudentIds={
             preselectedStudentId ? [preselectedStudentId] : undefined
           }
+          builderVariant={variant}
           showAiPreview={aiWorkflow.showAiPreview}
           aiGeneratedResults={aiWorkflow.aiGeneratedResults}
           handleUseTheseDrills={aiWorkflow.handleUseTheseDrills}

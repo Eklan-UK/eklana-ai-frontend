@@ -14,6 +14,7 @@ import { HomeBadgeButton } from "@/components/badges/HomeBadgeButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SavedDrillsSection } from "@/components/drills/SavedDrillsSection";
 import { LearningJourneyPartCard } from "@/components/drills/LearningJourneyPartCard";
+import { useMyMissionEnrollments } from "@/hooks/useMissionEnrollments";
 import {
   LEARNING_JOURNEY_PARTS,
   type LearningJourneyPartId,
@@ -52,6 +53,9 @@ export default function DrillsPage() {
     () => pickNextLearnerSession(teachingClasses),
     [teachingClasses],
   );
+
+  const { data: enrolledParts = [], isLoading: enrollmentsLoading } =
+    useMyMissionEnrollments();
 
   const journeyDrills = drills as JourneyDrillItem[];
 
@@ -107,12 +111,16 @@ export default function DrillsPage() {
                 completed: 0,
                 total: 0,
               };
+              const isEnrolled =
+                !enrollmentsLoading && enrolledParts.includes(partDef.part);
               return (
                 <LearningJourneyPartCard
                   key={partDef.part}
                   part={partDef.part}
                   completedCount={progress.completed}
                   totalCount={progress.total}
+                  isEnrolled={enrollmentsLoading ? false : isEnrolled}
+                  isLocked={enrollmentsLoading || !isEnrolled}
                 />
               );
             })}

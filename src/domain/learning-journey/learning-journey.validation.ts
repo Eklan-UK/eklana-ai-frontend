@@ -20,6 +20,32 @@ export const learningJourneyTopicSchema = z
     message: "Invalid learning journey topic",
   });
 
+export function refineEnrollmentForLearners(
+  data: {
+    learning_journey_part?: LearningJourneyPartId;
+    assigned_to?: string[];
+  },
+  enrolledPartsByLearner: Map<string, LearningJourneyPartId[]>,
+  ctx: z.RefinementCtx,
+): void {
+  const part = data.learning_journey_part;
+  const assignedTo = data.assigned_to ?? [];
+  if (part == null || assignedTo.length === 0) return;
+
+  const notEnrolled = assignedTo.filter((learnerId) => {
+    const parts = enrolledPartsByLearner.get(learnerId) ?? [];
+    return !parts.includes(part);
+  });
+
+  if (notEnrolled.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Learners not enrolled in mission ${part}: ${notEnrolled.join(', ')}`,
+      path: ['assigned_to'],
+    });
+  }
+}
+
 export function refineLearningJourneyFields(
   data: {
     learning_journey_part?: LearningJourneyPartId;
@@ -27,7 +53,11 @@ export function refineLearningJourneyFields(
     assigned_to?: string[];
   },
   ctx: z.RefinementCtx,
-  options?: { requireWhenAssigned?: boolean; requireAlways?: boolean },
+  options?: {
+    requireWhenAssigned?: boolean;
+    requireAlways?: boolean;
+    enrolledPartsByLearner?: Map<string, LearningJourneyPartId[]>;
+  },
 ): void {
   const requireWhenAssigned = options?.requireWhenAssigned ?? true;
   const requireAlways = options?.requireAlways ?? false;
@@ -68,5 +98,9 @@ export function refineLearningJourneyFields(
       message: "Learning journey mission and topic must both be set or both omitted",
       path: ["learning_journey_part"],
     });
+  }
+
+  if (options?.enrolledPartsByLearner) {
+    refineEnrollmentForLearners(data, options.enrolledPartsByLearner, ctx);
   }
 }
