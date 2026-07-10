@@ -3,6 +3,8 @@ import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import Bookmark from '@/models/bookmark';
+import Drill from '@/models/drill';
+import StudentContext from '@/models/studentContext';
 import type { IDrillAttempt } from '@/models/drill-attempt';
 import type { IPronunciationAttempt } from '@/models/pronunciation-attempt';
 import type { IFreeTalkAttempt } from '@/models/free-talk-attempt';
@@ -465,6 +467,44 @@ function pickTopFour(signals: WeaknessSignal[]): WeaknessSignal[] {
 	return picked.sort((a, b) => b.severity - a.severity);
 }
 
+async function computePrimaryMissionAndTopic(
+	learnerId: Types.ObjectId,
+	tenDaysAgo: Date
+): Promise<{ primaryMission: number | null; primaryTopic: string | null }> {
+	const attempts = await DrillAttempt.find({
+		learnerId,
+		createdAt: { $gte: tenDaysAgo },
+	})
+		.populate('drillId', 'learning_journey_part learning_journey_topic')
+		.lean();
+
+	const partFreq = new Map<number, number>();
+	const topicFreq = new Map<string, number>();
+
+	for (const attempt of attempts as unknown as Array<{
+		drillId?: { learning_journey_part?: number; learning_journey_topic?: string };
+	}>) {
+		const part = attempt.drillId?.learning_journey_part;
+		const topic = attempt.drillId?.learning_journey_topic;
+		if (part != null) partFreq.set(part, (partFreq.get(part) ?? 0) + 1);
+		if (topic) topicFreq.set(topic, (topicFreq.get(topic) ?? 0) + 1);
+	}
+
+	const primaryMission =
+		[...partFreq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+	const primaryTopic =
+		[...topicFreq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+	return { primaryMission, primaryTopic };
+}
+
+async function fetchCountry(learnerId: Types.ObjectId): Promise<string | null> {
+	const context = await StudentContext.findOne({ studentId: learnerId })
+		.select('country')
+		.lean<{ country?: string } | null>();
+	return context?.country ?? null;
+}
+
 export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
 	weekStartDate: Date
@@ -488,6 +528,8 @@ export async function aggregateWeaknesses(
 		recentPronAttempts,
 		recentBookmarks,
 		allTimeAnalysis,
+		missionAndTopic,
+		country,
 	] = await Promise.all([
 		DrillAttempt.find({ learnerId, completedAt: dateFilter }).lean() as Promise<IDrillAttempt[]>,
 		PronunciationAttemptModel.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IPronunciationAttempt[]>,
@@ -499,6 +541,8 @@ export async function aggregateWeaknesses(
 			type: { $in: ['word', 'sentence'] },
 		}).lean(),
 		computeAllTimePhonemeAnalysis(learnerId, tenDaysAgo),
+		computePrimaryMissionAndTopic(learnerId, tenDaysAgo),
+		fetchCountry(learnerId),
 	]);
 
 	// Group drill attempts by type
@@ -541,6 +585,9 @@ export async function aggregateWeaknesses(
 		weaknesses: deduplicated,
 		topWeaknesses: topFour,
 		masteredPhonemes: allTimeAnalysis.masteredPhonemes.length > 0 ? allTimeAnalysis.masteredPhonemes : undefined,
+		primaryMission: missionAndTopic.primaryMission,
+		primaryTopic: missionAndTopic.primaryTopic,
+		country,
 		generatedAt: new Date(),
 	};
 }

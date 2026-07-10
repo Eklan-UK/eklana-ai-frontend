@@ -25,6 +25,7 @@ interface GenerateDrillParams {
   drillWeaknesses?: object[];
   templatePrompt?: string;
   drillHistory?: object[];
+  competencyFramework?: string;
 }
 
 type FunctionTool = Extract<OpenAI.Chat.Completions.ChatCompletionTool, { type: 'function' }>;
@@ -348,6 +349,9 @@ export async function generateDrill(params: GenerateDrillParams): Promise<Record
             : null,
           params.drillHistory?.length
             ? `Previous drills created for this student (avoid repeating content): ${JSON.stringify(params.drillHistory)}`
+            : null,
+          params.competencyFramework
+            ? `Target these competencies in the generated drill content: ${params.competencyFramework}`
             : null,
         ]
           .filter(Boolean)

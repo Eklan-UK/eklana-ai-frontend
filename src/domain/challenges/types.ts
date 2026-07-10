@@ -66,6 +66,9 @@ export interface WeaknessProfile {
 	weaknesses: WeaknessSignal[];
 	topWeaknesses: WeaknessSignal[]; // top 4
 	masteredPhonemes?: string[];
+	primaryMission?: number | null;
+	primaryTopic?: string | null;
+	country?: string | null;
 	generatedAt: Date;
 }
 

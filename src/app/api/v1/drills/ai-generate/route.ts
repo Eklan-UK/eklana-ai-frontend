@@ -14,6 +14,7 @@ import {
   isValidPartTopicPair,
   parseLearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
+import { getCompetenciesForTopic } from "@/config/competency-framework";
 
 async function handler(
   req: NextRequest,
@@ -122,6 +123,19 @@ async function handler(
       );
     }
 
+    let competencyFramework: string | undefined;
+
+    if (topic) {
+      const competencies = getCompetenciesForTopic(String(topic));
+      if (competencies && competencies.length > 0) {
+        competencyFramework =
+          "Competency framework for this topic:\n" +
+          competencies
+            .map((c, i) => `${i + 1}. ${c.name}: ${c.description}`)
+            .join("\n");
+      }
+    }
+
     let drillHistory: object[] | undefined;
 
     if (studentId && Types.ObjectId.isValid(studentId)) {
@@ -176,6 +190,7 @@ async function handler(
           drillWeaknesses,
           templatePrompt: templatePromptByDrillType.get(dt),
           drillHistory,
+          competencyFramework,
         });
         return { drillType: dt, content };
       })
