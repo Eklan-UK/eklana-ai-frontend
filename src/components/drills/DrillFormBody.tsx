@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
+import React, { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Plus,
   X,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
+import { MissionEnrollmentModal } from "@/components/learning-journey/MissionEnrollmentModal";
+import { useEnrolledPartsIntersection } from "@/hooks/useMissionEnrollments";
 import type {
   DrillDraft,
   VocabularyItem,
@@ -57,6 +59,21 @@ export function DrillFormBody({
   sidebarLeadingContent,
   onDrillTypeChange,
 }: DrillFormBodyProps) {
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const [enrollmentFocusStudentId, setEnrollmentFocusStudentId] = useState<
+    string | undefined
+  >();
+  const selectedStudentIds = useMemo(
+    () => draft.selectedUsers.map((u) => u._id.toString()),
+    [draft.selectedUsers],
+  );
+  const { enrolledParts } = useEnrolledPartsIntersection(selectedStudentIds);
+
+  const openEnrollment = useCallback((studentId?: string) => {
+    setEnrollmentFocusStudentId(studentId);
+    setEnrollmentModalOpen(true);
+  }, []);
+
   // Use the functional-update form so multiple synchronous patchDraft calls (e.g. from
   // LearningJourneyPartTopicFields firing onPartChange then onTopicChange in the same handler)
   // compose against the running prev state rather than all spreading the same stale snapshot.
@@ -269,6 +286,7 @@ export function DrillFormBody({
       fillBlankItems: [
         ...draft.fillBlankItems,
         {
+          context: "",
           sentence: "",
           blanks: [{ position: 0, correctAnswer: "", options: ["", ""], hint: "" }],
           translation: "",
@@ -286,6 +304,12 @@ export function DrillFormBody({
   const updateFillBlankSentence = (itemIndex: number, sentence: string) => {
     const updated = [...draft.fillBlankItems];
     updated[itemIndex] = { ...updated[itemIndex], sentence };
+    patchDraft({ fillBlankItems: updated });
+  };
+
+  const updateFillBlankContext = (itemIndex: number, context: string) => {
+    const updated = [...draft.fillBlankItems];
+    updated[itemIndex] = { ...updated[itemIndex], context };
     patchDraft({ fillBlankItems: updated });
   };
 
@@ -475,6 +499,7 @@ export function DrillFormBody({
   };
 
   return (
+    <>
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
       <div className="xl:col-span-2 space-y-8">
           {leadingContent}
@@ -1257,6 +1282,21 @@ export function DrillFormBody({
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                          Context (Optional)
+                        </label>
+                        <textarea
+                          value={item.context ?? ""}
+                          onChange={(e) =>
+                            updateFillBlankContext(itemIndex, e.target.value)
+                          }
+                          placeholder='e.g., "You haven&apos;t seen your colleague for several shifts, so you say:"'
+                          rows={2}
+                          className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl resize-y"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">
                           Sentence with Blanks<span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1596,6 +1636,11 @@ export function DrillFormBody({
                 onPartChange={(v) => patchDraft({ journeyPart: v })}
                 onTopicChange={(v) => patchDraft({ journeyTopic: v })}
                 required
+                enrolledParts={
+                  selectedStudentIds.length > 0 ? enrolledParts : undefined
+                }
+                selectedStudentIds={selectedStudentIds}
+                onOpenEnrollment={openEnrollment}
               />
 
               {draft.drillType !== "roleplay" && (
@@ -1745,5 +1790,14 @@ export function DrillFormBody({
         )}
       </div>
     </div>
+
+    {enrollmentModalOpen && (
+      <MissionEnrollmentModal
+        variant={variant}
+        initialStudentId={enrollmentFocusStudentId}
+        onClose={() => setEnrollmentModalOpen(false)}
+      />
+    )}
+    </>
   );
 }

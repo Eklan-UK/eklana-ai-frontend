@@ -10,6 +10,10 @@ import PromptTemplate from "@/models/promptTemplate";
 import DrillAssignment from "@/models/drill-assignment";
 import Drill from "@/models/drill";
 import { Types } from "mongoose";
+import {
+  isValidPartTopicPair,
+  parseLearningJourneyPartId,
+} from "@/domain/learning-journey/learning-journey.catalog";
 
 async function handler(
   req: NextRequest,
@@ -35,6 +39,14 @@ async function handler(
     if (!part || !topic) {
       return NextResponse.json(
         { code: "ValidationError", message: "part and topic are required" },
+        { status: 400 }
+      );
+    }
+
+    const journeyPart = parseLearningJourneyPartId(part);
+    if (!journeyPart || !isValidPartTopicPair(journeyPart, String(topic))) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "Invalid learning journey mission/topic pair" },
         { status: 400 }
       );
     }

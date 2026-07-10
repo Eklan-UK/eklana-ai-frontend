@@ -39,16 +39,20 @@ describe("normalizeAiGeneratedToParsedContent", () => {
     expect(result.extractedData.items[0].content).toBe("Content here");
   });
 
-  it("maps fill_blank_items directly", () => {
+  it("maps fill_blank_items directly including context", () => {
     const result = normalizeAiGeneratedToParsedContent("fill_blank", {
       fill_blank_items: [
         {
+          context: "You haven't seen your colleague for several shifts, so you say:",
           sentence: "The ___ is red.",
           blanks: [{ position: 0, correctAnswer: "apple", options: ["apple", "banana"], hint: "" }],
         },
       ],
     });
     expect(result.extractedData.items).toHaveLength(1);
-    expect(result.extractedData.items[0].sentence).toContain("apple");
+    expect(result.extractedData.items[0].context).toBe(
+      "You haven't seen your colleague for several shifts, so you say:",
+    );
+    expect(result.extractedData.items[0].sentence).toContain("___");
   });
 });

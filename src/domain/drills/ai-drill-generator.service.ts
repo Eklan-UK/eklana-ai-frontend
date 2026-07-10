@@ -242,6 +242,10 @@ const tools: Record<DrillType, FunctionTool> = {
             items: {
               type: 'object',
               properties: {
+                context: {
+                  type: 'string',
+                  description: "Short situational setup that precedes the sentence, ending naturally before the quoted line (e.g. 'You haven't seen your colleague for several shifts, so you say:')",
+                },
                 sentence: { type: 'string', description: "IMPORTANT: The sentence MUST contain '___' (three underscores) where the blank should appear. Never write the answer into the sentence." },
                 translation: { type: 'string' },
                 blanks: {
@@ -261,7 +265,7 @@ const tools: Record<DrillType, FunctionTool> = {
                   },
                 },
               },
-              required: ['sentence', 'translation', 'blanks'],
+              required: ['context', 'sentence', 'translation', 'blanks'],
             },
           },
         },

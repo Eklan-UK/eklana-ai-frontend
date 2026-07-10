@@ -1,8 +1,43 @@
-import { LEARNING_JOURNEY_PARTS } from '@/domain/learning-journey/learning-journey.catalog';
+import {
+	LEARNING_JOURNEY_PARTS,
+	getTopicById,
+} from '@/domain/learning-journey/learning-journey.catalog';
 
 interface DrillLike {
 	learning_journey_part?: number | null;
 	learning_journey_topic?: string | null;
+}
+
+export interface DrillTopicLike {
+	learning_journey_topic?: string | null;
+	scenarioType?: string | null;
+}
+
+/**
+ * Returns the catalog topic title for a drill, e.g. "Handling Emergency/Critical Situation".
+ * Resolves from learning_journey_topic slug, or Free Talk scenarioType via catalog mapping.
+ */
+export function getDrillTopicTitle(
+	drill: DrillTopicLike | null | undefined,
+): string | null {
+	if (!drill) return null;
+
+	const topicId = drill.learning_journey_topic;
+	if (topicId) {
+		return getTopicById(topicId)?.title ?? null;
+	}
+
+	const scenarioType = drill.scenarioType;
+	if (scenarioType) {
+		for (const part of LEARNING_JOURNEY_PARTS) {
+			const topic = part.topics.find(
+				(t) => t.freeTalkScenarioType === scenarioType,
+			);
+			if (topic) return topic.title;
+		}
+	}
+
+	return null;
 }
 
 /**

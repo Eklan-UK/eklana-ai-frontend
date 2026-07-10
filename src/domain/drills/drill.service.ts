@@ -245,6 +245,17 @@ export class DrillService {
           )
         : [];
 
+    if (params.assignedUserIds.length > 0) {
+      const foundIds = new Set(assignedUsers.map((u) => u._id.toString()));
+      const missingLearnerIds = params.assignedUserIds.filter((id) => !foundIds.has(id));
+      if (missingLearnerIds.length > 0) {
+        throw new ValidationError(
+          `Could not assign drill to ${missingLearnerIds.length} learner(s). Check that each selected user exists and has the learner role.`,
+          { failedLearnerIds: missingLearnerIds },
+        );
+      }
+    }
+
     // 3. Create drill
     const drill = await this.drillRepo.create({
       ...params.drillData,

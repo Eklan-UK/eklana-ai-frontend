@@ -40,12 +40,16 @@ export interface PlanDrillRowProps {
     title: string;
     type: string;
     date: string;
+    topicTitle?: string | null;
+    learning_journey_topic?: string | null;
+    scenarioType?: string | null;
   };
   assignmentId?: string;
   dueDate?: string;
   completedAt?: string;
   status?: string;
   hasBookmarks?: boolean;
+  showTopicLabel?: boolean;
   onPrefetch?: (drillId: string) => void;
   /** Fires before navigation (e.g. activity tracking). */
   onNavigate?: () => void;
@@ -59,6 +63,7 @@ export function PlanDrillRow({
   completedAt,
   status,
   hasBookmarks = false,
+  showTopicLabel = false,
   onPrefetch,
   onNavigate,
   onBookmarkToggle,
@@ -84,6 +89,10 @@ export function PlanDrillRow({
   const catClass =
     CATEGORY_TEXT[typeInfo.color] ?? CATEGORY_TEXT.gray!;
   const thumbGrad = THUMB_GRADIENT[typeInfo.color] ?? THUMB_GRADIENT.gray!;
+  const topicTitle =
+    showTopicLabel && typeof drill.topicTitle === "string"
+      ? drill.topicTitle
+      : null;
 
   const handleBookmarkClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -110,6 +119,11 @@ export function PlanDrillRow({
         {getDrillIcon(drill.type)}
       </div>
       <div className="flex-1 min-w-0">
+        {topicTitle ? (
+          <p className="text-sm font-bold text-foreground line-clamp-2 mb-0.5">
+            {topicTitle}
+          </p>
+        ) : null}
         <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
           {drill.title?.trim() || getDrillTypeLabel(drill.type)}
         </h3>

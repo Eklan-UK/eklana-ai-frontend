@@ -28,6 +28,7 @@ interface AIDrillCreationShellProps {
   isGeneratingDrill: boolean;
   handleAIGenerate: () => void;
   lockedStudentIds?: string[];
+  builderVariant?: "tutor" | "admin";
   showAiPreview: boolean;
   aiGeneratedResults: AIGeneratedResult[] | null;
   handleUseTheseDrills: () => void;
@@ -57,6 +58,7 @@ export function AIDrillCreationShell({
   isGeneratingDrill,
   handleAIGenerate,
   lockedStudentIds,
+  builderVariant = "tutor",
   showAiPreview,
   aiGeneratedResults,
   handleUseTheseDrills,
@@ -72,6 +74,7 @@ export function AIDrillCreationShell({
       <AIGeneratedPreview
         results={aiGeneratedResults}
         onUseDrills={handleUseTheseDrills}
+        onEditSettings={() => setShowAiFormModal(true)}
       />
     ) : null;
 
@@ -93,6 +96,7 @@ export function AIDrillCreationShell({
           isGenerating={isGeneratingDrill}
           onGenerate={handleAIGenerate}
           lockedStudentIds={lockedStudentIds}
+          builderVariant={builderVariant}
         />
       )}
 

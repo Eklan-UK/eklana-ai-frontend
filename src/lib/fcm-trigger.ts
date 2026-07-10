@@ -17,6 +17,7 @@ export enum NotificationType {
   LESSON_REMINDER = "lesson_reminder",
   DRILL_REMINDER = "drill_reminder",
   WEEKLY_DRILL_DIGEST = "weekly_drill_digest",
+  WEEKLY_CHALLENGE_READY = "weekly_challenge_ready",
   ASSIGNMENT_DUE = "assignment_due",
   ASSIGNMENT_SUBMITTED = "assignment_submitted",
   PRONUNCIATION_FEEDBACK = "pronunciation_feedback",
@@ -478,6 +479,10 @@ export const getNotificationTemplate = (
     [NotificationType.WEEKLY_DRILL_DIGEST]: {
       title: "Your new drills are ready",
       body: "You have new drills this week. Open your plan to get started.",
+    },
+    [NotificationType.WEEKLY_CHALLENGE_READY]: {
+      title: "Your weekly challenge is ready",
+      body: "Personalized drills based on your practice this week. Start your challenge now.",
     },
   };
 

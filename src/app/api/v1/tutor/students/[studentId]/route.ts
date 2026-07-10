@@ -12,6 +12,12 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { drillDisplayLabel } from '@/lib/drill-display-label';
+import {
+	computeDrillAssignmentStatistics,
+	enrichDrillAssignment,
+	groupAttemptsByAssignmentId,
+	isPopulatedDrillRef,
+} from '@/domain/drills/drill-assignment-analytics.service';
 
 const updateStudentNameSchema = z.object({
 	firstName: z.string().min(1).max(50),
@@ -69,38 +75,6 @@ async function handler(
 			);
 		}
 
-		// Get drill assignment counts
-		const drillCounts = await DrillAssignment.aggregate([
-			{
-				$match: {
-					learnerId: studentObjectId,
-					assignedBy: context.userId,
-				},
-			},
-			{
-				$group: {
-					_id: null,
-					totalAssigned: { $sum: 1 },
-					completed: {
-						$sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
-					},
-					pending: {
-						$sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] },
-					},
-					inProgress: {
-						$sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] },
-					},
-				},
-			},
-		]).exec();
-
-		const counts = drillCounts[0] || {
-			totalAssigned: 0,
-			completed: 0,
-			pending: 0,
-			inProgress: 0,
-		};
-
 		// Get all drill assignments for this student (assigned by this tutor)
 		const allAssignments = await DrillAssignment.find({
 			learnerId: studentObjectId,
@@ -111,22 +85,27 @@ async function handler(
 			.lean()
 			.exec();
 
-		// Get all drill attempts for this student to check review status
-		const studentAttempts = await DrillAttempt.find({
-			learnerId: studentObjectId,
-		})
-			.select('drillAssignmentId drillId sentenceResults summaryResults grammarResults score completedAt')
-			.lean()
-			.exec();
+		const assignmentIds = allAssignments.map((assignment) => assignment._id);
+		const attempts =
+			assignmentIds.length > 0
+				? await DrillAttempt.find({
+						drillAssignmentId: { $in: assignmentIds },
+					})
+						.select(
+							'drillAssignmentId score completedAt startedAt grammarResults sentenceResults summaryResults'
+						)
+						.lean()
+						.exec()
+				: [];
 
-		// Create a map of attempts by assignment ID
-		const attemptsByAssignment = new Map<string, any>();
-		studentAttempts.forEach(attempt => {
-			const key = attempt.drillAssignmentId?.toString();
-			if (key) {
-				attemptsByAssignment.set(key, attempt);
-			}
-		});
+		const attemptsByAssignment = groupAttemptsByAssignmentId(attempts);
+		const enrichedAssignments = allAssignments.map((assignment) =>
+			enrichDrillAssignment(
+				assignment,
+				attemptsByAssignment.get(assignment._id.toString()) || []
+			)
+		);
+		const statistics = computeDrillAssignmentStatistics(enrichedAssignments);
 
 		// Categorize drills
 		const pendingDrills: any[] = [];
@@ -134,60 +113,46 @@ async function handler(
 		const reviewedDrills: any[] = [];
 		const recentDrills: any[] = [];
 
-		allAssignments.forEach((assignment) => {
-			const drill = assignment.drillId as any;
-			const attempt = attemptsByAssignment.get(assignment._id.toString());
-			
-			// Determine review status from attempt
-			let reviewStatus = null;
-			if (attempt) {
-				if (attempt.sentenceResults?.reviewStatus) {
-					reviewStatus = attempt.sentenceResults.reviewStatus;
-				} else if (attempt.summaryResults?.reviewStatus) {
-					reviewStatus = attempt.summaryResults.reviewStatus;
-				} else if (attempt.grammarResults?.reviewStatus) {
-					reviewStatus = attempt.grammarResults.reviewStatus;
-				}
-			}
+		enrichedAssignments.forEach((enriched) => {
+			const drill = isPopulatedDrillRef(enriched.drill) ? enriched.drill : null;
 
 			const drillData = {
-				id: assignment._id,
-				drillId: drill?._id,
-				title: drill?.title || drillDisplayLabel(drill) || 'Unknown Drill',
-				type: drill?.type || 'unknown',
+				id: enriched._id,
+				drillId: enriched.drillId,
+				title: (drill?.title as string) || drillDisplayLabel(drill) || 'Unknown Drill',
+				type: (drill?.type as string) || 'unknown',
 				difficulty: drill?.difficulty,
-				status: assignment.status,
-				score: attempt?.score || assignment.score,
-				reviewStatus: reviewStatus,
-				completedAt: attempt?.completedAt || assignment.completedAt,
-				dueDate: assignment.dueDate,
-				assignedAt: assignment.assignedAt,
+				status: enriched.status,
+				score: enriched.bestScore ?? enriched.latestAttempt?.score,
+				reviewStatus: enriched.reviewStatus,
+				completedAt: enriched.latestAttempt?.completedAt || enriched.completedAt,
+				dueDate: enriched.dueDate,
+				assignedAt: enriched.assignedAt,
 			};
 
-			// Categorize
-			if (assignment.status === 'pending' || assignment.status === 'in-progress' || assignment.status === 'overdue') {
+			if (
+				enriched.status === 'pending' ||
+				enriched.status === 'in-progress' ||
+				enriched.status === 'overdue'
+			) {
 				pendingDrills.push(drillData);
-			} else if (assignment.status === 'completed') {
-				if (reviewStatus === 'pending') {
+			} else if (enriched.status === 'completed') {
+				if (enriched.reviewStatus === 'pending') {
 					pendingReviewDrills.push(drillData);
-				} else if (reviewStatus === 'reviewed') {
-					reviewedDrills.push(drillData);
 				} else {
-					// Completed drills without review requirement
 					reviewedDrills.push(drillData);
 				}
 			}
 
-			// Add to recent drills (first 10)
 			if (recentDrills.length < 10) {
 				recentDrills.push(drillData);
 			}
 		});
 
-		// Calculate progress percentage
-		const progress = counts.totalAssigned > 0
-			? Math.round((counts.completed / counts.totalAssigned) * 100)
-			: 0;
+		const progress =
+			statistics.total > 0
+				? Math.round(statistics.completionRate)
+				: 0;
 
 		const student = {
 			id: user._id,
@@ -196,11 +161,11 @@ async function handler(
 			firstName: user.firstName,
 			lastName: user.lastName,
 			progress,
-			drillsCompleted: counts.completed,
-			drillsActive: counts.pending + counts.inProgress,
-			drillsPendingReview: pendingReviewDrills.length,
+			drillsCompleted: statistics.completed,
+			drillsActive: statistics.pending + statistics.inProgress + statistics.overdue,
+			drillsPendingReview: statistics.pendingReview,
 			drillsReviewed: reviewedDrills.length,
-			drillsTotal: counts.totalAssigned,
+			drillsTotal: statistics.total,
 			joinDate: user.createdAt,
 			lastActivity: user.lastActivity || null,
 			recentDrills,

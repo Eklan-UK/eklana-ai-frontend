@@ -15,6 +15,8 @@ Beyond these blockers, the audit uncovered a critical identity mismatch that aff
 
 **Primary action items for the mobile team:** (1) do not pass `user.id` as `appAccountToken` unless you have verified it is a UUID v4 — generate your own UUID v4 and store it; (2) always send `signedTransactionInfo` (the JWS string from StoreKit 2) to `POST /api/v1/apple/verify`; (3) treat any non-200 response from that endpoint as a hard failure. **Primary action items for the backend team:** flip `APPLE_APP_STORE_ENVIRONMENT` to `production`, add `APPLE_APP_APPLE_ID` to the IAP configuration check, and expand product ID validation to accept annual/quarterly plans.
 
+> **Implementation plan for multi-plan pricing and gated trial:** See [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) (addresses audit item **RC-2** / **A-9** — quarterly and annual product IDs).
+
 ---
 
 ## Status: Fixed (as of this implementation)
@@ -30,7 +32,7 @@ The backend code fixes below have been implemented (see the `iOS Payment Identit
 - [ ] **RC-2** (multi-product-ID / annual & quarterly plan support) — explicitly out of scope for this fix, not changed.
 - [ ] Corrupted `APPLE_APP_STORE_PRIVATE_KEY` in `.env` and the unverified `APPLE_PRO_MONTHLY_PRODUCT_ID` value — these still require a human to supply/verify the correct values from App Store Connect; there is nothing further to fix in code.
 
-**Mobile app changes are still required:** StoreKit purchases must pass `user.iapAccountToken` as the `appAccountToken` option — see [`appAccountToken` requirement (iOS) in docs/MOBILE_EXPO_BILLING.md](docs/MOBILE_EXPO_BILLING.md#appaccounttoken-requirement-ios).
+**Mobile app changes are still required:** StoreKit purchases must pass `user.iapAccountToken` as the `appAccountToken` option — see [`appAccountToken` requirement (iOS) in MOBILE_EXPO_BILLING.md](MOBILE_EXPO_BILLING.md#appaccounttoken-requirement-ios).
 
 ---
 
@@ -47,7 +49,7 @@ The backend code fixes below have been implemented (see the `iOS Payment Identit
 | Subscription reconciliation | `src/lib/api/subscription-reconciliation.ts` |
 | User model | `src/models/user.ts` |
 | API middleware | `src/lib/api/middleware.ts` |
-| Mobile documentation | `docs/MOBILE_EXPO_BILLING.md` |
+| Mobile documentation | `MOBILE_EXPO_BILLING.md` |
 
 ---
 
@@ -155,7 +157,7 @@ Replace the single-product-ID check with a set of accepted product IDs. See [Bac
 **Evidence**
 
 ```
-docs/MOBILE_EXPO_BILLING.md  — no mention of appAccountToken
+MOBILE_EXPO_BILLING.md  — no mention of appAccountToken
 src/app/api/v1/auth/verify-id-token/route.ts  line 278-294  — response includes both `id` and `email`
 ```
 
@@ -286,7 +288,7 @@ const appAccountToken = await getOrCreateAppAccountToken();
 
 **Description**
 
-`docs/MOBILE_EXPO_BILLING.md` — the primary reference document for the mobile team — contains no mention of `appAccountToken`, no guidance on what value to pass to StoreKit 2, and no warning about UUID format requirements.
+`MOBILE_EXPO_BILLING.md` — the primary reference document for the mobile team — contains no mention of `appAccountToken`, no guidance on what value to pass to StoreKit 2, and no warning about UUID format requirements.
 
 **Impact**
 
@@ -751,7 +753,7 @@ async function findUserByAppleOriginalTransactionId(
 }
 ```
 
-Also update `docs/MOBILE_EXPO_BILLING.md` to document `appAccountToken` requirements.
+Also update `MOBILE_EXPO_BILLING.md` to document `appAccountToken` requirements.
 
 ---
 

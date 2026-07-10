@@ -17,6 +17,57 @@ import type { ParsedContent } from "@/services/document-parser.service";
 export const AI_DRILL_BULK_PENDING_STORAGE_KEY =
   "eklana-ai-drill-bulk-pending";
 
+export const AI_GENERATION_FORM_STATE_STORAGE_KEY =
+  "eklana-ai-generation-form-state";
+
+export interface AIGenerationFormPersistedState {
+  contextKey: string;
+  formValues: AIGenerationFormValues;
+  generatedResults?: AIGeneratedResult[] | null;
+  showPreview?: boolean;
+}
+
+function buildAiFormContextKey(
+  initialContext?: AIDrillInitialContext,
+): string {
+  const studentId = initialContext?.studentId;
+  const weekNumber = initialContext?.weekNumber;
+  if (studentId && weekNumber != null) {
+    return `${studentId}|${weekNumber}`;
+  }
+  return "global";
+}
+
+export function readAiGenerationFormState(
+  contextKey: string,
+): AIGenerationFormPersistedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(AI_GENERATION_FORM_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AIGenerationFormPersistedState;
+    if (parsed.contextKey !== contextKey) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function writeAiGenerationFormState(
+  state: AIGenerationFormPersistedState,
+): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(
+    AI_GENERATION_FORM_STATE_STORAGE_KEY,
+    JSON.stringify(state),
+  );
+}
+
+export function clearAiGenerationFormState(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(AI_GENERATION_FORM_STATE_STORAGE_KEY);
+}
+
 function scrollAppContentToTop() {
   if (typeof window === "undefined") return;
 
@@ -66,18 +117,47 @@ export function useAIDrillCreationWorkflow({
   lockedStudentIds,
   onBulkReady,
 }: UseAIDrillCreationWorkflowOptions) {
-  const [aiStudentIds, setAiStudentIds] = useState<string[]>([]);
-  const [aiDrillTypes, setAiDrillTypes] = useState<string[]>([]);
-  const [aiDifficulty, setAiDifficulty] = useState("intermediate");
-  const [aiJourneyPart, setAiJourneyPart] = useState<LearningJourneyPartId | "">("");
-  const [aiJourneyTopic, setAiJourneyTopic] = useState("");
-  const [aiContext, setAiContext] = useState("");
-  const [aiPrompt, setAiPrompt] = useState("");
+  const contextKey = useMemo(
+    () => buildAiFormContextKey(initialContext),
+    [initialContext?.studentId, initialContext?.weekNumber],
+  );
+
+  const persistedOnMount = useMemo(
+    () => readAiGenerationFormState(contextKey),
+    [contextKey],
+  );
+
+  const hasRestoredPersistedRef = useRef(persistedOnMount !== null);
+  const hasUserEditedRef = useRef(persistedOnMount !== null);
+
+  const [aiStudentIds, setAiStudentIds] = useState<string[]>(
+    () => persistedOnMount?.formValues.studentIds ?? [],
+  );
+  const [aiDrillTypes, setAiDrillTypes] = useState<string[]>(
+    () => persistedOnMount?.formValues.drillTypes ?? [],
+  );
+  const [aiDifficulty, setAiDifficulty] = useState(
+    () => persistedOnMount?.formValues.difficulty ?? "intermediate",
+  );
+  const [aiJourneyPart, setAiJourneyPart] = useState<LearningJourneyPartId | "">(
+    () => persistedOnMount?.formValues.journeyPart ?? "",
+  );
+  const [aiJourneyTopic, setAiJourneyTopic] = useState(
+    () => persistedOnMount?.formValues.journeyTopic ?? "",
+  );
+  const [aiContext, setAiContext] = useState(
+    () => persistedOnMount?.formValues.context ?? "",
+  );
+  const [aiPrompt, setAiPrompt] = useState(
+    () => persistedOnMount?.formValues.prompt ?? "",
+  );
   const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
   const [aiGeneratedResults, setAiGeneratedResults] = useState<
     AIGeneratedResult[] | null
-  >(null);
-  const [showAiPreview, setShowAiPreview] = useState(false);
+  >(() => persistedOnMount?.generatedResults ?? null);
+  const [showAiPreview, setShowAiPreview] = useState(
+    () => persistedOnMount?.showPreview ?? false,
+  );
   const [showChatSidebar, setShowChatSidebar] = useState(false);
   const [showAiFormModal, setShowAiFormModal] = useState(false);
   const scrollAfterGenerateRef = useRef(false);
@@ -124,6 +204,7 @@ export function useAIDrillCreationWorkflow({
 
   useEffect(() => {
     if (!initialContext) return;
+    if (hasUserEditedRef.current || hasRestoredPersistedRef.current) return;
     if (lastSeededKeyRef.current === initialSeedKey) return;
     lastSeededKeyRef.current = initialSeedKey;
 
@@ -196,8 +277,63 @@ export function useAIDrillCreationWorkflow({
     ],
   );
 
+  useEffect(() => {
+    if (!hasUserEditedRef.current) return;
+    if (typeof window === "undefined") return;
+
+    const timer = window.setTimeout(() => {
+      writeAiGenerationFormState({
+        contextKey,
+        formValues: {
+          studentIds: aiStudentIds,
+          drillTypes: aiDrillTypes,
+          difficulty: aiDifficulty,
+          journeyPart: aiJourneyPart,
+          journeyTopic: aiJourneyTopic,
+          context: aiContext,
+          prompt: aiPrompt,
+        },
+        generatedResults: aiGeneratedResults,
+        showPreview: showAiPreview,
+      });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    contextKey,
+    aiStudentIds,
+    aiDrillTypes,
+    aiDifficulty,
+    aiJourneyPart,
+    aiJourneyTopic,
+    aiContext,
+    aiPrompt,
+    aiGeneratedResults,
+    showAiPreview,
+  ]);
+
+  const markUserEdited = useCallback(() => {
+    hasUserEditedRef.current = true;
+  }, []);
+
+  const setAiStudentIdsWithMark = useCallback(
+    (ids: string[]) => {
+      markUserEdited();
+      setAiStudentIds(ids);
+    },
+    [markUserEdited],
+  );
+
+  const setAiDrillTypesWithMark = useCallback(
+    (types: string[]) => {
+      markUserEdited();
+      setAiDrillTypes(types);
+    },
+    [markUserEdited],
+  );
+
   const handleAiFormChange = useCallback(
     (field: AIGenerationFormScalarField, value: AIGenerationFormFieldValue) => {
+      markUserEdited();
       switch (field) {
         case "difficulty":
           setAiDifficulty(value as string);
@@ -216,7 +352,7 @@ export function useAIDrillCreationWorkflow({
           break;
       }
     },
-    [],
+    [markUserEdited],
   );
 
   const handleAIGenerate = useCallback(async () => {
@@ -269,6 +405,7 @@ export function useAIDrillCreationWorkflow({
       const results: AIGeneratedResult[] = Array.isArray(json.data)
         ? json.data
         : [];
+      markUserEdited();
       setAiGeneratedResults(results);
       setShowAiPreview(true);
       setShowChatSidebar(true);
@@ -292,6 +429,7 @@ export function useAIDrillCreationWorkflow({
     aiContext,
     aiPrompt,
     aiDifficulty,
+    markUserEdited,
   ]);
 
   const updateAiGeneratedResult = useCallback(
@@ -331,6 +469,10 @@ export function useAIDrillCreationWorkflow({
     storePendingBulkAiDrillApply(pendingItems);
     onBulkReady?.(pendingItems);
 
+    clearAiGenerationFormState();
+    hasUserEditedRef.current = false;
+    hasRestoredPersistedRef.current = false;
+
     setShowAiPreview(false);
     setShowChatSidebar(false);
   }, [
@@ -342,12 +484,16 @@ export function useAIDrillCreationWorkflow({
     onBulkReady,
   ]);
 
+  const handleEditSettings = useCallback(() => {
+    setShowAiFormModal(true);
+  }, []);
+
   return {
     students,
     aiFormValues,
     handleAiFormChange,
-    setAiStudentIds,
-    setAiDrillTypes,
+    setAiStudentIds: setAiStudentIdsWithMark,
+    setAiDrillTypes: setAiDrillTypesWithMark,
     isGeneratingDrill,
     aiGeneratedResults,
     setAiGeneratedResults,
@@ -360,6 +506,7 @@ export function useAIDrillCreationWorkflow({
     setShowAiFormModal,
     handleAIGenerate,
     handleUseTheseDrills,
+    handleEditSettings,
     lockedStudentIds: effectiveLockedIds,
   };
 }

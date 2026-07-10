@@ -16,6 +16,7 @@ import type {
   LearnerFreeTalkPlanRow,
   LearnerMyDrillRow,
 } from '@/lib/server/learner-my-drills.server';
+import { enrichLearnerDrillRowsWithTopicTitle } from '@/lib/server/enrich-learner-drill-topic';
 
 const LEARNER_DRILL_SELECT =
   'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
@@ -232,10 +233,12 @@ export async function getLearnerSavedDrillsPayload(
   });
 
   return {
-    drills: sortAssignedPlanItems(
-      [...assignmentRows, ...freeTalkRows] as unknown as Array<
-        LearnerMyDrillRow & { drill?: { date?: string | Date | null } }
-      >,
-    ) as LearnerMyDrillRow[],
+    drills: enrichLearnerDrillRowsWithTopicTitle(
+      sortAssignedPlanItems(
+        [...assignmentRows, ...freeTalkRows] as unknown as Array<
+          LearnerMyDrillRow & { drill?: { date?: string | Date | null } }
+        >,
+      ) as LearnerMyDrillRow[],
+    ),
   };
 }

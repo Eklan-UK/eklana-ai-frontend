@@ -24,6 +24,7 @@ export async function completeWeeklyChallengeItem(
 		queryKey: queryKeys.weeklyChallenge.all,
 	});
 	await queryClient.invalidateQueries({ queryKey: ['progress-scorecard'] });
+	await queryClient.invalidateQueries({ queryKey: ['pronunciations', 'learner'] });
 
 	return response;
 }

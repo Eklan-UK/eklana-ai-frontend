@@ -90,6 +90,20 @@ export const queryKeys = {
     item: (weekStartDate: string, index: number) =>
       [...queryKeys.weeklyChallenge.all, 'item', weekStartDate, index] as const,
   },
+  learningJourney: {
+    all: ["learning-journey"] as const,
+    myEnrollments: () =>
+      [...queryKeys.learningJourney.all, "enrollments", "me"] as const,
+    enrollmentsList: (filters?: { learnerId?: string }) =>
+      [...queryKeys.learningJourney.all, "enrollments", "list", filters] as const,
+    learnerEnrollments: (learnerId: string) =>
+      [
+        ...queryKeys.learningJourney.all,
+        "enrollments",
+        "learner",
+        learnerId,
+      ] as const,
+  },
   classes: {
     all: ["admin", "classes"] as const,
     list: (filters?: { bucket?: string; limit?: number }) =>

@@ -59,7 +59,7 @@ export function AccountHomeContentClient({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
 
         <div className="mt-3">
-          <SavedDrillsSection />
+          <SavedDrillsSection showTopicLabel />
         </div>
       </div>
     </>

@@ -16,12 +16,14 @@ export interface SavedDrillsSectionProps {
   title?: string;
   /** Expand on mount (e.g. My Plan with #saved-drills) */
   defaultExpanded?: boolean;
+  showTopicLabel?: boolean;
 }
 
 export function SavedDrillsSection({
   id = "saved-drills",
   title = "Saved Drills",
   defaultExpanded = false,
+  showTopicLabel = false,
 }: SavedDrillsSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { data: bookmarked = [], isLoading } = useSavedDrills();
@@ -104,6 +106,12 @@ export function SavedDrillsSection({
                     scenarioType={drill?.scenarioType ?? ""}
                     completionDate={drill?.completionDate ?? item.dueDate}
                     completedAt={item.completedAt}
+                    showTopicLabel={showTopicLabel}
+                    topicTitle={
+                      typeof (drill as { topicTitle?: string })?.topicTitle === "string"
+                        ? (drill as { topicTitle: string }).topicTitle
+                        : null
+                    }
                   />
                 );
               }
@@ -112,6 +120,9 @@ export function SavedDrillsSection({
                 title: string;
                 type: string;
                 date: string;
+                topicTitle?: string | null;
+                learning_journey_topic?: string;
+                scenarioType?: string;
               };
               return (
                 <PlanDrillRow
@@ -126,6 +137,7 @@ export function SavedDrillsSection({
                   }
                   status={item.status}
                   hasBookmarks={item.hasBookmarks === true}
+                  showTopicLabel={showTopicLabel}
                   onPrefetch={prefetchDrill}
                   onBookmarkToggle={handleBookmarkToggle}
                   onNavigate={() =>

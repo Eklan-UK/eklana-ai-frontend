@@ -95,7 +95,7 @@ export default function BookmarksPage() {
               Bookmark words and sentences during your drills to build your personal practice list.
             </p>
           </div>
-        ) : (
+        ) : ( 
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {bookmarks.map((bookmark) => (
               <BookmarkCard 

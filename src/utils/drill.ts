@@ -198,6 +198,7 @@ export function getDrillIcon(type: string): string {
  * Get drill type info (icon, color, border color)
  */
 export interface FillBlankItemInput {
+  context?: string;
   sentence: string;
   blanks: Array<{
     position: number;
@@ -216,7 +217,10 @@ export interface FillBlankItemInput {
 export function normalizeFillBlankItems(items: FillBlankItemInput[]) {
   return items
     .filter((item) => item.sentence.trim())
-    .map((item) => ({
+    .map((item) => {
+      const context = item.context?.trim();
+      return {
+      ...(context ? { context } : {}),
       sentence: item.sentence.trim(),
       blanks: item.blanks
         .map((blank) => {
@@ -235,7 +239,8 @@ export function normalizeFillBlankItems(items: FillBlankItemInput[]) {
         .map((blank, idx) => ({ ...blank, position: idx })),
       translation: item.translation?.trim() || undefined,
       ...(item.audioUrl ? { audioUrl: item.audioUrl } : {}),
-    }))
+    };
+    })
     .filter((item) => item.blanks.length > 0);
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight, Download, Settings2 } from "lucide-react";
 import { AI_DRILL_TYPES } from "@/constants/ai-drill";
 
 export interface AIGeneratedResultLike {
@@ -12,6 +12,7 @@ export interface AIGeneratedResultLike {
 interface AIGeneratedPreviewProps {
   results: AIGeneratedResultLike[];
   onUseDrills: () => void;
+  onEditSettings?: () => void;
 }
 
 function getDrillTypeLabel(drillType: string): string {
@@ -106,11 +107,20 @@ function buildExcelRows(drillType: string, content: Record<string, unknown>): un
     case "fill_blank": {
       const items = (content.fill_blank_items as Record<string, unknown>[]) ?? [];
       return [
-        ["Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
+        ["Context", "Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
         ...items.map((item) => {
-          const opts = (item.options as string[]) ?? [];
-          const distractors = opts.filter((o) => o !== item.correctAnswer);
-          return [String(item.sentence ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? "", String(item.hint ?? "")];
+          const blanks = (item.blanks as Array<{ correctAnswer?: string; options?: string[]; hint?: string }>) ?? [];
+          const blank = blanks[0];
+          const opts = blank?.options ?? [];
+          const distractors = opts.filter((o) => o !== blank?.correctAnswer);
+          return [
+            String(item.context ?? ""),
+            String(item.sentence ?? ""),
+            String(blank?.correctAnswer ?? ""),
+            distractors[0] ?? "",
+            distractors[1] ?? "",
+            String(blank?.hint ?? ""),
+          ];
         }),
       ];
     }
@@ -253,6 +263,9 @@ function renderContentForType(
         <PreviewSection title={`Fill in the Blank — ${items.length} sentences`}>
           {items.map((item, i) => (
             <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+              {Boolean(item.context) && (
+                <p className="text-sm text-gray-600 mb-2">{String(item.context)}</p>
+              )}
               <p>{String(item.sentence ?? "")}</p>
               {Boolean(item.translation) && (
                 <p className="text-xs text-gray-500 mt-1">{String(item.translation)}</p>
@@ -317,6 +330,7 @@ function renderContentForType(
 export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
   results,
   onUseDrills,
+  onEditSettings,
 }) => {
   const handleExport = () => {
     import("xlsx").then((XLSX) => {
@@ -361,6 +375,16 @@ export const AIGeneratedPreview: React.FC<AIGeneratedPreviewProps> = ({
       </div>
 
       <div className="flex gap-3">
+        {onEditSettings && (
+          <button
+            type="button"
+            onClick={onEditSettings}
+            className="py-3 px-4 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <Settings2 className="w-4 h-4" />
+            Edit settings
+          </button>
+        )}
         <button
           type="button"
           onClick={handleExport}
