@@ -4,6 +4,7 @@
  *   - src/app/api/v1/drills/[drillId]/checkpoint/route.ts (DrillCheckpoint.userId)
  *   - src/app/api/v1/drills/[drillId]/roleplay-progress/route.ts (RoleplayDrillProgress.userId)
  *   - src/app/api/v1/ai/free-talk/attempts/route.ts (FreeTalkAttempt.learnerId)
+ *   - src/app/api/v1/bookmarks/* (Bookmark.userId)
  *
  * Each of these fields is Schema.Types.Mixed. Before the fix, these routes
  * queried/wrote them using the raw context.userId string. For legacy
@@ -23,7 +24,8 @@ import DrillCheckpoint from "../src/models/drill-checkpoint";
 import RoleplayDrillProgress from "../src/models/roleplay-drill-progress";
 import FreeTalkAttempt from "../src/models/free-talk-attempt";
 import Drill from "../src/models/drill";
-import { toUserIdQuery } from "../src/lib/api/user-id";
+import Bookmark from "../src/models/bookmark";
+import { toUserIdCandidates, toUserIdQuery } from "../src/lib/api/user-id";
 
 const failures: string[] = [];
 const cleanup: Array<() => Promise<unknown>> = [];
@@ -144,6 +146,78 @@ async function verifyFreeTalkAttempt(legacyUserId: Types.ObjectId) {
   );
 }
 
+async function verifyBookmark(legacyUserId: Types.ObjectId, drillId: Types.ObjectId) {
+  console.log("\n=== Bookmark (userId Mixed field) ===");
+
+  // Legacy bad write: userId stored as raw hex string (pre-fix bookmark routes).
+  const legacyDoc = await Bookmark.create({
+    userId: legacyUserId.toString(),
+    drillId,
+    type: "drill",
+    content: String(drillId),
+  });
+  cleanup.push(() => Bookmark.deleteOne({ _id: legacyDoc._id }).exec());
+
+  const legacyRaw = await Bookmark.collection.findOne({ _id: legacyDoc._id });
+  check("legacy string userId stored as BSON string", typeof legacyRaw?.userId === "string");
+
+  const foundLegacy = await Bookmark.findOne({
+    userId: { $in: toUserIdCandidates(legacyUserId.toString()) },
+    drillId,
+    type: "drill",
+  }).exec();
+  check("findOne with toUserIdCandidates(hexString) matches legacy string row", !!foundLegacy);
+
+  const foundLegacyWithObjectIdOnly = await Bookmark.findOne({
+    userId: toUserIdQuery(legacyUserId.toString()),
+    drillId,
+    type: "drill",
+  }).exec();
+  check(
+    "control: ObjectId-only query (pre-fix hasBookmarks path) fails on legacy string row",
+    !foundLegacyWithObjectIdOnly,
+  );
+
+  // Fixed write path stores canonical ObjectId for legacy learners.
+  const canonicalDoc = await Bookmark.create({
+    userId: toUserIdQuery(legacyUserId.toString()),
+    drillId: new Types.ObjectId(),
+    type: "drill",
+    content: String(new Types.ObjectId()),
+  });
+  cleanup.push(() => Bookmark.deleteOne({ _id: canonicalDoc._id }).exec());
+
+  const canonicalRaw = await Bookmark.collection.findOne({ _id: canonicalDoc._id });
+  check(
+    "toUserIdQuery on create stores userId as a real BSON ObjectId",
+    canonicalRaw?.userId instanceof mongoose.Types.ObjectId,
+  );
+
+  const foundCanonical = await Bookmark.findOne({
+    userId: { $in: toUserIdCandidates(legacyUserId.toString()) },
+    _id: canonicalDoc._id,
+  }).exec();
+  check("findOne with toUserIdCandidates(hexString) matches canonical ObjectId row", !!foundCanonical);
+
+  const foundWithRawString = await Bookmark.findOne({
+    userId: legacyUserId.toString(),
+    _id: canonicalDoc._id,
+  }).exec();
+  check(
+    "control: raw string query (pre-fix behavior) fails to match stored ObjectId row",
+    !foundWithRawString,
+  );
+
+  const { getBookmarkedDrillIdSet } = await import(
+    "../src/lib/server/learner-saved-drills.server"
+  );
+  const bookmarkedIds = await getBookmarkedDrillIdSet(legacyUserId.toString());
+  check(
+    "getBookmarkedDrillIdSet finds legacy and canonical drill bookmarks",
+    bookmarkedIds.has(drillId.toString()) && bookmarkedIds.has(String(canonicalDoc.drillId)),
+  );
+}
+
 async function main() {
   await connectToDatabase();
 
@@ -160,6 +234,7 @@ async function main() {
     await verifyDrillCheckpoint(legacyUserId, drillId);
     await verifyRoleplayProgress(legacyUserId, drillId);
     await verifyFreeTalkAttempt(legacyUserId);
+    await verifyBookmark(legacyUserId, drillId);
   } finally {
     console.log("\nCleaning up test data...");
     for (const fn of cleanup) {

@@ -20,6 +20,7 @@ export interface PronunciationGeneratedContent {
 
 export interface FillBlankGeneratedContent {
 	fill_blank_items: Array<{
+		context?: string;
 		sentence: string;
 		blanks: Array<{
 			position: number;
@@ -65,6 +66,9 @@ export interface WeaknessProfile {
 	weaknesses: WeaknessSignal[];
 	topWeaknesses: WeaknessSignal[]; // top 4
 	masteredPhonemes?: string[];
+	primaryMission?: number | null;
+	primaryTopic?: string | null;
+	country?: string | null;
 	generatedAt: Date;
 }
 

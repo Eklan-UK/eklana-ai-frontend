@@ -26,6 +26,7 @@ export interface VerifiedAppleSubscription {
   expiresAt: Date | null;
   appleSubscriptionStatus: AppleSubscriptionStatusString;
   environment: Environment;
+  appAccountToken?: string;
 }
 
 function normalizePrivateKey(key: string): string {
@@ -33,8 +34,12 @@ function normalizePrivateKey(key: string): string {
 }
 
 function getAppleEnvironment(): Environment {
-  const raw = (config.APPLE_APP_STORE_ENVIRONMENT || 'sandbox').toLowerCase();
-  return raw === 'production' ? Environment.PRODUCTION : Environment.SANDBOX;
+  const raw = config.APPLE_APP_STORE_ENVIRONMENT?.trim().toLowerCase();
+  if (raw === 'production') return Environment.PRODUCTION;
+  if (raw === 'sandbox') return Environment.SANDBOX;
+  throw new Error(
+    'APPLE_APP_STORE_ENVIRONMENT is not set. Must be "production" or "sandbox".'
+  );
 }
 
 function loadAppleRootCertificates(): Buffer[] {
@@ -44,6 +49,13 @@ function loadAppleRootCertificates(): Buffer[] {
 }
 
 export function isAppleIapConfigured(): boolean {
+  const environment = config.APPLE_APP_STORE_ENVIRONMENT?.trim().toLowerCase();
+  if (environment !== 'production' && environment !== 'sandbox') {
+    return false;
+  }
+  if (environment === 'production' && !config.APPLE_APP_APPLE_ID) {
+    return false;
+  }
   return Boolean(
     config.APPLE_APP_STORE_ISSUER_ID &&
       config.APPLE_APP_STORE_KEY_ID &&
@@ -256,5 +268,6 @@ export async function resolveAppleSubscription(input: {
     expiresAt,
     appleSubscriptionStatus,
     environment: getAppleEnvironment(),
+    appAccountToken: decoded.appAccountToken,
   };
 }

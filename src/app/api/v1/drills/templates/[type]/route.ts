@@ -181,8 +181,15 @@ function generateTemplate(type: string): { data: any[][] } {
     case "fill_blank":
       return {
         data: [
-          ["Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
-          ["She ___ to school every day.", "walks", "runs", "drives", "A verb meaning to travel on foot"],
+          ["Context", "Sentence", "Correct Answer", "Option 2", "Option 3", "Hint"],
+          [
+            "You haven't seen your colleague for several shifts, so you say:",
+            "She ___ to school every day.",
+            "walks",
+            "runs",
+            "drives",
+            "A verb meaning to travel on foot",
+          ],
         ],
       };
 

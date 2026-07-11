@@ -2,18 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Bookmark from '@/models/bookmark';
-import { Types } from 'mongoose';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 
 // GET /api/v1/bookmarks/drill-status - Bookmarked drill IDs for the current user
 async function getDrillBookmarkStatus(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
 ) {
   try {
     await connectToDatabase();
 
     const rows = await Bookmark.find({
-      userId: context.userId,
+      userId: { $in: toUserIdCandidates(context.userId) },
       type: 'drill',
     })
       .select('drillId')

@@ -13,6 +13,14 @@ import {
   getLearnerId,
 } from "@/lib/ai-drill-builder/learner-utils";
 import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
+import {
+  EnrollmentButton,
+  MissionEnrollmentModal,
+} from "@/components/learning-journey/MissionEnrollmentModal";
+import {
+  TOTAL_MISSION_COUNT,
+  useMissionEnrollmentsList,
+} from "@/hooks/useMissionEnrollments";
 
 interface StudentListPageProps {
   variant: "tutor" | "admin";
@@ -30,6 +38,7 @@ interface StudentCard {
 
 export function StudentListPage({ variant }: StudentListPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
   const basePath =
     variant === "tutor" ? "/tutor/ai-drill-builder" : "/admin/ai-drill-builder";
 
@@ -44,6 +53,8 @@ export function StudentListPage({ variant }: StudentListPageProps) {
     error: adminErrorDetail,
     refetch: refetchAdminLearners,
   } = useAiDrillBuilderLearners(variant === "admin");
+
+  const { data: enrollmentMap } = useMissionEnrollmentsList();
 
   const isLoading = variant === "tutor" ? tutorLoading : adminLoading;
   const isTutor = variant === "tutor";
@@ -96,6 +107,10 @@ export function StudentListPage({ variant }: StudentListPageProps) {
 
   return (
     <div>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <EnrollmentButton onClick={() => setEnrollmentModalOpen(true)} />
+      </div>
+
       <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -156,6 +171,10 @@ export function StudentListPage({ variant }: StudentListPageProps) {
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Week {currentWeek}
                           </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            {(enrollmentMap?.get(student.id)?.length ?? 0)}/{TOTAL_MISSION_COUNT}{" "}
+                            missions
+                          </span>
                         </div>
                         {student.email && (
                           <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
@@ -172,6 +191,13 @@ export function StudentListPage({ variant }: StudentListPageProps) {
             );
           })}
         </div>
+      )}
+
+      {enrollmentModalOpen && (
+        <MissionEnrollmentModal
+          variant={variant}
+          onClose={() => setEnrollmentModalOpen(false)}
+        />
       )}
     </div>
   );

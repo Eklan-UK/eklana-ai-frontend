@@ -32,6 +32,7 @@ export const queryKeys = {
       all: () => [...queryKeys.drills.all, "learner"] as const,
       list: (filters?: Record<string, any>) =>
         [...queryKeys.drills.learner.all(), "list", filters] as const,
+      saved: () => [...queryKeys.drills.learner.all(), "saved"] as const,
     },
     tutor: {
       all: () => [...queryKeys.drills.all, "tutor"] as const,
@@ -88,6 +89,20 @@ export const queryKeys = {
       [...queryKeys.weeklyChallenge.all, 'week', weekStartDate] as const,
     item: (weekStartDate: string, index: number) =>
       [...queryKeys.weeklyChallenge.all, 'item', weekStartDate, index] as const,
+  },
+  learningJourney: {
+    all: ["learning-journey"] as const,
+    myEnrollments: () =>
+      [...queryKeys.learningJourney.all, "enrollments", "me"] as const,
+    enrollmentsList: (filters?: { learnerId?: string }) =>
+      [...queryKeys.learningJourney.all, "enrollments", "list", filters] as const,
+    learnerEnrollments: (learnerId: string) =>
+      [
+        ...queryKeys.learningJourney.all,
+        "enrollments",
+        "learner",
+        learnerId,
+      ] as const,
   },
   classes: {
     all: ["admin", "classes"] as const,

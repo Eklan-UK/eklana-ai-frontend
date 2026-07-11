@@ -77,6 +77,23 @@ async function fetchLearnerDrills(filters?: { limit?: number; status?: 'pending'
     .filter(isLearnerDrillRow);
 }
 
+async function fetchSavedDrills() {
+  const response: any = await drillAPI.getSavedDrills();
+
+  let drillsData: any[] = [];
+  if (response.data?.drills) {
+    drillsData = response.data.drills;
+  } else if (response.drills) {
+    drillsData = response.drills;
+  } else if (Array.isArray(response)) {
+    drillsData = response;
+  }
+
+  return drillsData
+    .map(normalizeLearnerDrillItem)
+    .filter(isLearnerDrillRow);
+}
+
 // Get learner drills
 export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' | 'in_progress' | 'completed' }) {
   return useQuery({
@@ -84,6 +101,16 @@ export function useLearnerDrills(filters?: { limit?: number; status?: 'pending' 
     queryFn: () => fetchLearnerDrills(filters),
     staleTime: 1000 * 60 * 2, // 2 minutes for learner drills
     refetchOnMount: true, // Override global false: refetch when stale/invalidated on mount (e.g. after drill completion)
+  });
+}
+
+// Get bookmark-first saved drills (no assignment pagination cap)
+export function useSavedDrills() {
+  return useQuery({
+    queryKey: queryKeys.drills.learner.saved(),
+    queryFn: () => fetchSavedDrills(),
+    staleTime: 1000 * 60 * 2,
+    refetchOnMount: true,
   });
 }
 

@@ -11,6 +11,11 @@ import {
 	resolveLearnerIdToUserIdString,
 } from '@/lib/api/staff-learner-access';
 import { toUserIdQuery } from '@/lib/api/user-id';
+import {
+	computeDrillAssignmentStatistics,
+	enrichDrillAssignment,
+	isPopulatedDrillRef,
+} from '@/domain/drills/drill-assignment-analytics.service';
 
 async function handler(
 	req: NextRequest,
@@ -31,7 +36,6 @@ async function handler(
 			);
 		}
 
-		// Parse pagination parameters
 		// limit=0 (or unset) means "fetch all" with no cap
 		const { searchParams } = new URL(req.url);
 		const rawLimit = searchParams.get('limit');
@@ -39,153 +43,72 @@ async function handler(
 		const limit = fetchAll ? 0 : Math.min(parseInt(rawLimit || '50', 10), 500);
 		const offset = parseInt(searchParams.get('offset') || '0');
 
-		// Get total count for pagination (using aggregation for better performance)
-		const totalCount = await DrillAssignment.countDocuments({
-			learnerId: toUserIdQuery(canonicalLearnerId),
-		});
-
-		// Get drill assignments for this learner (all, or paginated)
-		const baseQuery = DrillAssignment.find({
+		const assignments = await DrillAssignment.find({
 			learnerId: toUserIdQuery(canonicalLearnerId),
 		})
 			.select('_id drillId assignedBy status assignedAt dueDate completedAt score')
 			.populate('drillId', 'title type difficulty learning_journey_part learning_journey_topic')
 			.populate('assignedBy', 'firstName lastName email')
-			.sort({ assignedAt: -1 });
+			.sort({ assignedAt: -1 })
+			.lean()
+			.exec();
 
-		if (!fetchAll) {
-			baseQuery.limit(limit).skip(offset);
-		}
-
-		const assignments = await baseQuery.lean().exec();
-
-		// Exclude assignments whose drill was deleted (populate returns null for missing refs)
-		const validAssignments = assignments.filter(
-			(a: any) => a.drillId && typeof a.drillId === 'object'
+		const validAssignments = assignments.filter((assignment) =>
+			isPopulatedDrillRef(assignment.drillId)
 		);
 
-		// Get attempts only for the current page of assignments (optimized)
-		const assignmentIds = validAssignments.map((a) => a._id);
-		const attempts = assignmentIds.length > 0 ? await DrillAttempt.find({
-			drillAssignmentId: { $in: assignmentIds },
-		})
-			.select(
-				'drillAssignmentId score completedAt startedAt timeSpent requiresReview vocabularyResults pronunciationResults roleplayResults performanceReviewSnapshot'
-			)
-			.sort({ completedAt: -1 })
-			.lean()
-			.exec() : [];
+		const assignmentIds = validAssignments.map((assignment) => assignment._id);
+		const attempts =
+			assignmentIds.length > 0
+				? await DrillAttempt.find({
+						drillAssignmentId: { $in: assignmentIds },
+					})
+						.select(
+							'drillAssignmentId score completedAt startedAt timeSpent vocabularyResults pronunciationResults roleplayResults performanceReviewSnapshot grammarResults sentenceResults summaryResults matchingResults'
+						)
+						.sort({ completedAt: -1 })
+						.lean()
+						.exec()
+				: [];
 
-		// Group attempts by assignment ID
-		const attemptsByAssignment = new Map<string, any[]>();
+		const attemptsByAssignment = new Map<string, typeof attempts>();
 		attempts.forEach((attempt) => {
 			const assignmentId = attempt.drillAssignmentId?.toString();
-			if (assignmentId) {
-				if (!attemptsByAssignment.has(assignmentId)) {
-					attemptsByAssignment.set(assignmentId, []);
-				}
-				attemptsByAssignment.get(assignmentId)!.push(attempt);
+			if (!assignmentId) {
+				return;
 			}
+			if (!attemptsByAssignment.has(assignmentId)) {
+				attemptsByAssignment.set(assignmentId, []);
+			}
+			attemptsByAssignment.get(assignmentId)!.push(attempt);
 		});
 
-		// Enrich assignments with attempt data
-		const enrichedAssignments = validAssignments.map((assignment: any) => {
-			const assignmentAttempts = attemptsByAssignment.get(assignment._id.toString()) || [];
-			const latestAttempt = assignmentAttempts.length > 0 ? assignmentAttempts[0] : null;
-			const bestAttempt = [...assignmentAttempts].sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;
+		const enrichedAssignments = validAssignments.map((assignment) =>
+			enrichDrillAssignment(
+				assignment,
+				attemptsByAssignment.get(assignment._id.toString()) || []
+			)
+		);
 
-			return {
-				_id: assignment._id,
-				drillId: assignment.drillId?._id || assignment.drillId,
-				drill: assignment.drillId,
-				status:
-					assignment.status === 'completed' || assignment.completedAt || latestAttempt?.completedAt
-						? 'completed'
-						: assignment.status,
-				assignedAt: assignment.assignedAt,
-				dueDate: assignment.dueDate,
-				completedAt: assignment.completedAt,
-				assignedBy: assignment.assignedBy,
-				attemptsCount: assignmentAttempts.length,
-				latestAttempt: latestAttempt
-					? {
-							score: latestAttempt.score,
-							completedAt: latestAttempt.completedAt,
-							startedAt: latestAttempt.startedAt,
-							timeSpent: latestAttempt.timeSpent,
-							vocabularyResults: latestAttempt.vocabularyResults,
-							pronunciationResults: latestAttempt.pronunciationResults,
-							roleplayResults: latestAttempt.roleplayResults,
-							performanceReviewSnapshot: latestAttempt.performanceReviewSnapshot,
-						}
-					: null,
-				bestScore: bestAttempt?.score || assignment.score || null,
-				requiresReview: assignmentAttempts.some((a: any) => a.requiresReview),
-			};
-		});
-
-		// Re-derive statistics from enrichedAssignments so that effective-status
-		// corrections (completedAt on assignment or latestAttempt) are reflected.
-		const effectiveStatusCounts = enrichedAssignments.reduce((acc, a) => {
-			const s = (a as any).status as string;
-			acc[s] = (acc[s] || 0) + 1;
-			return acc;
-		}, {} as Record<string, number>);
-
-		const totalAssignments = totalCount;
-		const completedAssignments = effectiveStatusCounts['completed'] || 0;
-		const inProgressAssignments = effectiveStatusCounts['in-progress'] || 0;
-		const pendingAssignments = effectiveStatusCounts['pending'] || 0;
-		const overdueAssignments = effectiveStatusCounts['overdue'] || 0;
-
-		// Calculate average score for completed assignments (using aggregation)
-		const avgScoreResult = await DrillAssignment.aggregate([
-			{ $match: { learnerId: toUserIdQuery(canonicalLearnerId), status: 'completed' } },
-			{
-				$lookup: {
-					from: 'drill_attempts',
-					localField: '_id',
-					foreignField: 'drillAssignmentId',
-					as: 'attempts',
-				},
-			},
-			{ $unwind: { path: '$attempts', preserveNullAndEmptyArrays: true } },
-			{
-				$group: {
-					_id: null,
-					avgScore: { $avg: '$attempts.score' },
-					count: { $sum: 1 },
-				},
-			},
-		]);
-
-		const averageScore = avgScoreResult.length > 0 && avgScoreResult[0].count > 0
-			? avgScoreResult[0].avgScore || 0
-			: 0;
+		const statistics = computeDrillAssignmentStatistics(enrichedAssignments);
+		const totalValid = enrichedAssignments.length;
+		const paginatedAssignments = fetchAll
+			? enrichedAssignments
+			: enrichedAssignments.slice(offset, offset + limit);
 
 		return NextResponse.json(
 			{
 				code: 'Success',
 				message: 'Drill assignments retrieved successfully',
 				data: {
-					assignments: enrichedAssignments,
-				pagination: {
-					total: totalCount,
-					limit: fetchAll ? totalCount : limit,
-					offset: fetchAll ? 0 : offset,
-					hasMore: fetchAll ? false : offset + limit < totalCount,
-				},
-					statistics: {
-						total: totalAssignments,
-						completed: completedAssignments,
-						inProgress: inProgressAssignments,
-						pending: pendingAssignments,
-						overdue: overdueAssignments,
-						averageScore: Math.round(averageScore * 100) / 100,
-						completionRate: totalAssignments > 0
-							? Math.round((completedAssignments / totalAssignments) * 100 * 100) / 100
-							: 0,
+					assignments: paginatedAssignments,
+					pagination: {
+						total: totalValid,
+						limit: fetchAll ? totalValid : limit,
+						offset: fetchAll ? 0 : offset,
+						hasMore: fetchAll ? false : offset + limit < totalValid,
 					},
+					statistics,
 				},
 			},
 			{ status: 200 }
@@ -215,4 +138,3 @@ export async function GET(
 		return handler(req, context, resolvedParams);
 	})(req);
 }
-

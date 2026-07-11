@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { generateChallengeCompletion } from '@/services/openai.service';
-import type { WeaknessProfile, WeeklyChallenge } from './types';
+import { topicPrompts } from './topic-prompts';
+import type { WeaknessProfile, WeeklyChallenge, ChallengeDrillItem } from './types';
+
+type TopicDrillType = 'pronunciation' | 'vocabulary' | 'key_phrases' | 'roleplay';
+
+const INSTRUCTIONS_BY_TYPE: Record<TopicDrillType, string> = {
+	pronunciation: 'Practice these words and phrases focusing on clear pronunciation.',
+	vocabulary:
+		'Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage.',
+	roleplay:
+		'Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift.',
+	key_phrases: 'Practice responding in these clinical situations using the correct key phrases.',
+};
 
 const drillItemSchema = z.object({
 	drillType: z.string(),
@@ -36,7 +48,11 @@ const SYSTEM_INSTRUCTION =
 	'nurses and healthcare professionals communicate clearly and confidently. ' +
 	'You generate precise, clinically relevant practice content.';
 
-function buildPrompt(profile: WeaknessProfile): string {
+export interface ChallengeGenerationContext {
+	country?: string;
+}
+
+function buildPrompt(profile: WeaknessProfile, context?: ChallengeGenerationContext): string {
 	const weaknesses = profile.topWeaknesses.map((w) => ({
 		drillType: w.drillType,
 		category: w.category,
@@ -49,6 +65,10 @@ function buildPrompt(profile: WeaknessProfile): string {
 		profile.masteredPhonemes && profile.masteredPhonemes.length > 0
 			? `\nDo NOT generate pronunciation content targeting these phonemes as the student has recently mastered them: ${profile.masteredPhonemes.join(', ')}\n`
 			: '';
+
+	const countryNote = context?.country
+		? `\nThe learner practices nursing in ${context.country} — use clinical terminology, medication names, and healthcare-system conventions appropriate to that country.\n`
+		: '';
 
 	return `
 The learner has the following top weaknesses (up to 4), ranked by severity (1 = worst):
@@ -86,7 +106,7 @@ Use these exact instructions per drill type:
 - vocabulary: "Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage."
 - roleplay: "Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift."
 - key_phrases: "Practice responding in these clinical situations using the correct key phrases."
-${masteredNote}
+${masteredNote}${countryNote}
 Return a JSON object with this exact shape:
 
 {
@@ -121,6 +141,7 @@ CONSTRAINT: pronunciation_items must contain 15–20 items. Each item needs word
 "vocabulary" → {
   "vocabulary_items": [
     {
+      "context": "<short situational setup before the sentence, e.g. 'You are handing over to the night nurse, so you say:'>",
       "sentence": "<clinical sentence with ___ placeholder>",
       "blanks": [
         {
@@ -181,12 +202,211 @@ Return ONLY valid JSON with this exact shape, no markdown, no preamble.
 `.trim();
 }
 
-export async function generateWeeklyChallenge(
-	profile: WeaknessProfile
+/**
+ * Looks up a hand-authored, mission/topic-specific prompt template for a given
+ * drill type. Returns null when no mission/topic is known, when nothing has
+ * been authored for that mission/topic/drillType combination, or when the
+ * entry is still an unfilled `TODO` placeholder (see topic-prompts/mission-*.ts).
+ */
+export function getTopicPrompt(
+	mission: number | null,
+	topic: string | null,
+	drillType: string
+): string | null {
+	if (mission == null && topic == null) return null;
+
+	const raw =
+		mission != null && topic != null
+			? topicPrompts[mission]?.[topic]?.[drillType as TopicDrillType]
+			: undefined;
+
+	if (!raw || raw.trim().toUpperCase() === 'TODO') return null;
+	return raw;
+}
+
+function extractEvidence(
+	profile: WeaknessProfile,
+	predicate: (w: WeaknessProfile['weaknesses'][number]) => boolean
+): string {
+	const evidence = profile.weaknesses.filter(predicate).flatMap((w) => w.evidence);
+	const unique = [...new Set(evidence)];
+	return unique.length > 0 ? unique.join('; ') : 'None recorded this week';
+}
+
+function extractEvidenceContaining(
+	profile: WeaknessProfile,
+	predicate: (w: WeaknessProfile['weaknesses'][number]) => boolean,
+	keyword: string
+): string {
+	const evidence = profile.weaknesses
+		.filter(predicate)
+		.flatMap((w) => w.evidence)
+		.filter((e) => e.toLowerCase().includes(keyword));
+	const unique = [...new Set(evidence)];
+	return unique.length > 0 ? unique.join('; ') : 'None recorded this week';
+}
+
+function substitutePlaceholders(
+	template: string,
+	profile: WeaknessProfile,
+	context?: ChallengeGenerationContext
+): string {
+	const values: Record<string, string> = {
+		country: context?.country ?? profile.country ?? 'the learner\'s home country',
+		mission: profile.primaryMission != null ? `Mission ${profile.primaryMission}` : 'General practice',
+		topic: profile.primaryTopic ?? 'General clinical communication',
+		weak_phonemes: extractEvidenceContaining(profile, (w) => w.category === 'pronunciation', 'phoneme'),
+		weak_words: extractEvidenceContaining(profile, (w) => w.category === 'pronunciation', 'word'),
+		missed_phrases: extractEvidence(profile, (w) => w.drillType === 'key_phrases'),
+		weak_vocabulary: extractEvidence(profile, (w) => w.category === 'vocabulary'),
+		practiced_scenarios: extractEvidence(
+			profile,
+			(w) => w.drillType === 'roleplay' || w.drillType === 'free_talk'
+		),
+	};
+
+	return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => values[key] ?? match);
+}
+
+// Topic-specific prompts (topic-prompts/mission-*.ts) instruct the model to
+// return a bare JSON array for these three drill types — not the object-wrapped
+// shape used by the generic buildPrompt() flow. Accept the array and normalize
+// it into the same *_items shape the rest of the app expects.
+const pronunciationContentSchema = z
+	.array(z.object({ word: z.string(), sentence: z.string(), sound: z.string().optional() }))
+	.transform((items) => ({ pronunciation_items: items }));
+
+const vocabularyContentSchema = z
+	.array(
+		z.object({
+			vocabulary: z.string().optional(),
+			sentence: z.string(),
+			correctAnswer: z.string(),
+			options: z.array(z.string()),
+		})
+	)
+	.transform((items) => ({
+		vocabulary_items: items.map((item) => ({
+			sentence: item.sentence,
+			blanks: [{ position: 0, correctAnswer: item.correctAnswer, options: item.options }],
+		})),
+	}));
+
+const keyPhrasesContentSchema = z
+	.array(
+		z.object({
+			prompt: z.string(),
+			options: z.array(z.string()),
+			correctAnswer: z.string(),
+			respondentName: z.string().optional(),
+		})
+	)
+	.transform((items) => ({ key_phrase_items: items }));
+
+const roleplayContentSchema = z.object({
+	student_character_name: z.string(),
+	ai_character_names: z.array(z.string()),
+	context: z.string().optional(),
+	roleplay_scenes: z.array(
+		z.object({
+			scene_name: z.string().optional(),
+			scene_title: z.string().optional(),
+			dialogue: z.array(z.object({ speaker: z.string(), text: z.string() })),
+		})
+	),
+});
+
+const TOPIC_CONTENT_SCHEMAS: Record<TopicDrillType, z.ZodTypeAny> = {
+	pronunciation: pronunciationContentSchema,
+	vocabulary: vocabularyContentSchema,
+	key_phrases: keyPhrasesContentSchema,
+	roleplay: roleplayContentSchema,
+};
+
+/**
+ * Topic-specific templates sometimes ask for a bare JSON array (pronunciation,
+ * vocabulary, key_phrases) and sometimes a JSON object (roleplay). A greedy
+ * `\{[\s\S]*\}` match will false-positive on an array of objects (it spans
+ * from the first `{` to the last `}`, skipping the wrapping brackets), so try
+ * the shape we expect for this drill type first, then fall back to the other
+ * shape in case the model didn't follow instructions exactly.
+ */
+function extractJsonPayload(text: string, preferArray: boolean): unknown {
+	const arrayMatch = text.match(/\[[\s\S]*\]/);
+	const objectMatch = text.match(/\{[\s\S]*\}/);
+	const candidates = preferArray
+		? [arrayMatch?.[0], objectMatch?.[0]]
+		: [objectMatch?.[0], arrayMatch?.[0]];
+
+	for (const candidate of candidates) {
+		if (!candidate) continue;
+		try {
+			return JSON.parse(candidate);
+		} catch {
+			// try the next candidate
+		}
+	}
+	return null;
+}
+
+async function generateTopicSpecificDrill(
+	drillType: TopicDrillType,
+	template: string,
+	profile: WeaknessProfile,
+	context?: ChallengeGenerationContext
+): Promise<ChallengeDrillItem | null> {
+	const prompt = substitutePlaceholders(template, profile, context);
+
+	const responseText = await generateChallengeCompletion({
+		systemInstruction: SYSTEM_INSTRUCTION,
+		prompt,
+		maxCompletionTokens: 4000,
+	});
+
+	const raw = extractJsonPayload(responseText, drillType !== 'roleplay');
+	if (raw === null) return null;
+
+	const validation = TOPIC_CONTENT_SCHEMAS[drillType].safeParse(raw);
+	if (!validation.success) return null;
+
+	let generatedContent = validation.data;
+	if (drillType === 'roleplay') {
+		const rp = generatedContent as z.infer<typeof roleplayContentSchema>;
+		generatedContent = {
+			...rp,
+			roleplay_scenes: rp.roleplay_scenes.map((scene) => ({
+				scene_name: scene.scene_name ?? scene.scene_title,
+				dialogue: scene.dialogue,
+			})),
+		};
+	}
+
+	const targetWeakness =
+		profile.topWeaknesses.find((w) => w.drillType === drillType) ??
+		profile.topWeaknesses[0] ?? {
+			drillType,
+			category: 'vocabulary' as const,
+			severity: 0,
+			evidence: [],
+			label: 'General practice',
+		};
+
+	return {
+		drillType,
+		targetWeakness,
+		instructions: INSTRUCTIONS_BY_TYPE[drillType],
+		generatedContent: generatedContent as ChallengeDrillItem['generatedContent'],
+		estimatedMinutes: 10,
+	};
+}
+
+async function generateBaselineChallenge(
+	profile: WeaknessProfile,
+	context?: ChallengeGenerationContext
 ): Promise<WeeklyChallenge['content']> {
 	const responseText = await generateChallengeCompletion({
 		systemInstruction: SYSTEM_INSTRUCTION,
-		prompt: buildPrompt(profile),
+		prompt: buildPrompt(profile, context),
 		maxCompletionTokens: 10000,
 	});
 
@@ -259,4 +479,36 @@ export async function generateWeeklyChallenge(
 	}
 
 	return validation.data as WeeklyChallenge['content'];
+}
+
+export async function generateWeeklyChallenge(
+	profile: WeaknessProfile,
+	context?: ChallengeGenerationContext
+): Promise<WeeklyChallenge['content']> {
+	const baseline = await generateBaselineChallenge(profile, context);
+
+	const drillTypes: TopicDrillType[] = ['pronunciation', 'vocabulary', 'roleplay', 'key_phrases'];
+
+	for (const drillType of drillTypes) {
+		const template = getTopicPrompt(
+			profile.primaryMission ?? null,
+			profile.primaryTopic ?? null,
+			drillType
+		);
+		if (!template) continue;
+
+		const item = await generateTopicSpecificDrill(drillType, template, profile, context);
+		if (!item) continue;
+
+		const idx = baseline.drillSequence.findIndex((d) => d.drillType === drillType);
+		if (idx >= 0) baseline.drillSequence[idx] = item;
+		else baseline.drillSequence.push(item);
+	}
+
+	baseline.totalEstimatedMinutes = baseline.drillSequence.reduce(
+		(sum, d) => sum + d.estimatedMinutes,
+		0
+	);
+
+	return baseline;
 }

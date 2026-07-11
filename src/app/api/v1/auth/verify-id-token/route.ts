@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OAuth2Client } from "google-auth-library";
-import jwt from "jsonwebtoken";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import mongoose from "mongoose";
 import { getAuth } from "@/lib/api/better-auth";
 import { logger } from "@/lib/api/logger";
 import { connectToDatabase } from "@/lib/api/db";
 import config, { parseGoogleClientIds } from "@/lib/api/config";
 import { toRawUserIdFilter } from "@/lib/api/user-id";
+
+// Cached at module scope so the JWKSet object (and jose's internal key
+// cache) is reused across requests instead of being recreated every call.
+const APPLE_JWKS = createRemoteJWKSet(
+  new URL("https://appleid.apple.com/auth/keys")
+);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,24 +65,34 @@ async function verifyGoogleIdToken(idToken: string): Promise<UserInfo> {
 }
 
 /**
- * Verify Apple ID token (simplified - decode only)
- * Note: For production, you should verify with Apple's public keys
- * This is a simplified version that decodes the JWT
+ * Verify Apple ID token
+ *
+ * Verifies the token's signature against Apple's public JWKS
+ * (https://appleid.apple.com/auth/keys), and checks issuer/audience/expiry,
+ * rather than blindly trusting a client-supplied, unverified JWT.
  */
 async function verifyAppleIdToken(idToken: string): Promise<UserInfo> {
   try {
-    // Decode without verification (for now)
-    // In production, verify with Apple's public keys
-    const decoded = jwt.decode(idToken) as any;
-    
-    if (!decoded) {
-      throw new Error("Invalid Apple ID token");
+    const { payload } = await jwtVerify(idToken, APPLE_JWKS, {
+      issuer: "https://appleid.apple.com",
+      audience: config.APPLE_BUNDLE_ID,
+    });
+
+    const decoded = payload as any;
+
+    if (!decoded.sub) {
+      throw new Error("Invalid Apple ID token: missing sub claim");
     }
 
-    // Apple provides email in the token, but might be null for subsequent sign-ins
-    // Use sub (subject) as fallback identifier
-    const email = decoded.email || `${decoded.sub}@privaterelay.appleid.com`;
-    
+    // Apple only includes `email` on the user's very first sign-in with this
+    // app; subsequent sign-ins omit it entirely. There is no real address to
+    // fall back to here, so we use a clearly-internal placeholder (never a
+    // genuine Apple "Hide My Email" relay address, and never a real user
+    // email) purely so downstream code that expects a non-empty `email`
+    // string keeps working. Account lookup prefers (provider, sub) over
+    // email, so this only matters for the first-touch edge case.
+    const email = decoded.email || `apple.${decoded.sub}@users.internal.eklan.ai`;
+
     return {
       email,
       name: decoded.name ? `${decoded.name.givenName || ''} ${decoded.name.familyName || ''}`.trim() : undefined,
@@ -114,7 +130,7 @@ async function createOrFindUser(
     providerAccountId: providerId,
   });
 
-  let user;
+  let user: any;
 
   if (existingAccount) {
     // User exists, get user data. This is a raw driver query (bypasses
@@ -136,8 +152,13 @@ async function createOrFindUser(
       { $set: { lastLoginAt: new Date() } }
     );
   } else {
+    // Normalize casing/whitespace so lookups match how the Stripe webhook
+    // path already stores emails, avoiding case-mismatch account splits
+    // (e.g. "User@x.com" vs "user@x.com" being treated as different users).
+    const normalizedEmail = userInfo.email.trim().toLowerCase();
+
     // Check if user exists by email
-    const existingUser = await usersCollection.findOne({ email: userInfo.email });
+    const existingUser = await usersCollection.findOne({ email: normalizedEmail });
 
     if (existingUser) {
       // User exists but account doesn't - link account
@@ -155,7 +176,7 @@ async function createOrFindUser(
       // Create new user
       const newUser = {
         _id: new mongoose.Types.ObjectId(),
-        email: userInfo.email,
+        email: normalizedEmail,
         name: userInfo.name || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() || userInfo.email,
         firstName: userInfo.firstName || userInfo.name?.split(' ')[0] || '',
         lastName: userInfo.lastName || userInfo.name?.split(' ').slice(1).join(' ') || '',
@@ -184,6 +205,18 @@ async function createOrFindUser(
 
       user = newUser;
     }
+  }
+
+  // Lazily backfill a purpose-built UUID identifier for use as StoreKit's
+  // appAccountToken — `user._id` is unsafe to use directly since roughly
+  // half the user base has a legacy non-UUID ObjectId `_id`.
+  if (!user.iapAccountToken) {
+    const newIapAccountToken = crypto.randomUUID();
+    await usersCollection.updateOne(
+      { _id: user._id },
+      { $set: { iapAccountToken: newIapAccountToken } }
+    );
+    user.iapAccountToken = newIapAccountToken;
   }
 
   return user;
@@ -284,6 +317,7 @@ export async function POST(req: NextRequest) {
           lastName: user.lastName || userInfo.lastName || '',
           avatar: user.avatar || user.image || userInfo.picture,
           emailVerified: user.emailVerified || user.isEmailVerified || true,
+          iapAccountToken: user.iapAccountToken,
         },
         token: token,
         session: {

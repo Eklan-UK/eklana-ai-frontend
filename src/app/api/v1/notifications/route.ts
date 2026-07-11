@@ -58,6 +58,7 @@ const createNotificationSchema = z.object({
     'message',
     'tutor_update',
     'system',
+    'weekly_challenge_ready',
   ]),
   data: z.object({
     screen: z.string().optional(),

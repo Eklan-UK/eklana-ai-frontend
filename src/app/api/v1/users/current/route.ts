@@ -35,6 +35,19 @@ async function handler(
     const effectiveRole = (user as any).role || context.userRole || "user";
     const subscribed = isUserSubscribed(user as any);
 
+    // Lazily backfill a purpose-built UUID identifier for use as StoreKit's
+    // appAccountToken, for users who signed up/logged in before this field
+    // existed. `user._id` is unsafe to use directly since roughly half the
+    // user base has a legacy non-UUID ObjectId `_id`.
+    let iapAccountToken = (user as any).iapAccountToken;
+    if (!iapAccountToken) {
+      iapAccountToken = crypto.randomUUID();
+      await User.updateOne(
+        { _id: context.userId },
+        { $set: { iapAccountToken } }
+      );
+    }
+
     const safeUser: any = {
       ...user,
       role: effectiveRole,
@@ -44,6 +57,7 @@ async function handler(
       stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,
       appleSubscriptionStatus: (user as any).appleSubscriptionStatus ?? null,
       isSubscribed: subscribed,
+      iapAccountToken,
     };
 
     delete safeUser.subscriptionMonthsPaidFor;

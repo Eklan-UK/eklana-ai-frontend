@@ -1,6 +1,6 @@
 # Stripe Web UI — Student Checkout & Subscription UX
 
-> **Related doc:** [`docs/STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md) (canonical) — API keys, webhook contracts, environment variables, backend responsibilities. Read that first.
+> **Related doc:** [`STRIPE_PAYMENTS_AND_KEYS.md`](../STRIPE_PAYMENTS_AND_KEYS.md) (canonical) — API keys, webhook contracts, environment variables, backend responsibilities. Read that first.
 
 This document specifies how the **student-facing web UI** integrates with Stripe: what the profile and subscriptions pages should look like, what copy the Pro card carries, how the upgrade button wires to Stripe Checkout, and exactly how access is granted after payment. It is documentation for implementation; no code is changed here.
 
@@ -15,7 +15,7 @@ The student side of the web app is the entry point for purchasing AI feature acc
 - How the **UI updates** after a successful payment.
 - An **implementation checklist** of the specific files to change.
 
-Backend webhook handling, environment variables, and Stripe key management are all in [`STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md). Mobile UI is out of scope here (but uses the same checkout URL pattern—see §5 note).
+Backend webhook handling, environment variables, and Stripe key management are all in [`STRIPE_PAYMENTS_AND_KEYS.md`](../STRIPE_PAYMENTS_AND_KEYS.md). Mobile UI is out of scope here (but uses the same checkout URL pattern—see §5 note).
 
 ---
 
@@ -48,7 +48,7 @@ The goal is a clear "what you have" vs "what you unlock" comparison. The **Premi
 
 ## 3. Pro Card Copy
 
-Replace the current Pro bullets (live tutoring, custom curriculum, speech analysis) with AI-focused copy that maps to the gated features listed in [`STRIPE_PAYMENTS_AND_KEYS.md §2`](./STRIPE_PAYMENTS_AND_KEYS.md).
+Replace the current Pro bullets (live tutoring, custom curriculum, speech analysis) with AI-focused copy that maps to the gated features listed in [`STRIPE_PAYMENTS_AND_KEYS.md §2`](../STRIPE_PAYMENTS_AND_KEYS.md).
 
 ### Suggested Pro card content
 
@@ -215,7 +215,7 @@ These are the specific changes needed when implementing this design. Each item m
 - [ ] Optionally update `CURRENT_PLAN_CARD_MESSAGE` copy to be upgrade-aware (show different message for free vs Pro users).
 
 **New API routes (backend PR, separate from UI PR)**
-- [ ] `POST /api/v1/stripe/checkout` — per implementation step 3 in [`STRIPE_PAYMENTS_AND_KEYS.md §9`](./STRIPE_PAYMENTS_AND_KEYS.md).
-- [ ] `POST /api/v1/stripe/portal` — per implementation step 4 in [`STRIPE_PAYMENTS_AND_KEYS.md §9`](./STRIPE_PAYMENTS_AND_KEYS.md).
+- [ ] `POST /api/v1/stripe/checkout` — per implementation step 3 in [`STRIPE_PAYMENTS_AND_KEYS.md §9`](../STRIPE_PAYMENTS_AND_KEYS.md).
+- [ ] `POST /api/v1/stripe/portal` — per implementation step 4 in [`STRIPE_PAYMENTS_AND_KEYS.md §9`](../STRIPE_PAYMENTS_AND_KEYS.md).
 
 > The UI PR can be merged before the backend routes exist—guard the button with a feature flag or keep it disabled until the API is live.

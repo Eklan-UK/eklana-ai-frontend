@@ -1,3 +1,5 @@
+// GET /api/v1/cron/weekly-challenge
+// Auth: CRON_SECRET (Vercel) or WEEKLY_CHALLENGE_CRON_SECRET (local)
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
@@ -6,13 +8,32 @@ import { aggregateWeaknesses } from '@/domain/challenges/weakness-aggregator';
 import { generateWeeklyChallenge } from '@/domain/challenges/challenge-generator';
 import WeeklyChallengeModel from '@/models/weekly-challenge';
 import UserModel from '@/models/user';
+import StudentContext from '@/models/studentContext';
+import { authorizeCron, isCronConfigured } from '@/lib/api/cron-auth';
 import '@/models/drill-attempt';
 import '@/models/pronunciation-attempt';
 import '@/models/free-talk-attempt';
+import '@/models/weekly-challenge-dispatch';
+import { notifyWeeklyChallengeReadyFromDoc } from '@/domain/challenges/weekly-challenge-notification.service';
+
+const ROUTE_SECRET_ENV = 'WEEKLY_CHALLENGE_CRON_SECRET';
 
 export async function GET(req: NextRequest) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ code: 'Unauthorized' }, { status: 401 });
+  if (!isCronConfigured(ROUTE_SECRET_ENV)) {
+    return NextResponse.json(
+      {
+        code: 'NotConfigured',
+        message: 'Set CRON_SECRET (Vercel) or WEEKLY_CHALLENGE_CRON_SECRET (local)',
+      },
+      { status: 503 },
+    );
+  }
+
+  if (!authorizeCron(req, ROUTE_SECRET_ENV)) {
+    return NextResponse.json(
+      { code: 'Unauthorized', message: 'Invalid cron secret' },
+      { status: 401 },
+    );
   }
 
   await connectToDatabase();
@@ -23,6 +44,9 @@ export async function GET(req: NextRequest) {
   let generated = 0;
   let skipped = 0;
   let errors = 0;
+  let notified = 0;
+  let notifySkipped = 0;
+  const notifyErrors: string[] = [];
 
   const learners = await UserModel.find({
     role: 'user',
@@ -30,6 +54,15 @@ export async function GET(req: NextRequest) {
   })
     .select('_id firstName lastName email subscriptionActivatedAt')
     .lean();
+
+  const contexts = await StudentContext.find({
+    studentId: { $in: learners.map((l) => l._id) },
+  })
+    .select('studentId country')
+    .lean();
+  const countryByStudentId = new Map(
+    contexts.map((c) => [String(c.studentId), c.country]),
+  );
 
   for (const learner of learners) {
     try {
@@ -53,9 +86,10 @@ export async function GET(req: NextRequest) {
       }
 
       const profile = await aggregateWeaknesses(learner._id, weekStartDate);
-      const content = await generateWeeklyChallenge(profile);
+      const country = countryByStudentId.get(String(learner._id));
+      const content = await generateWeeklyChallenge(profile, { country });
 
-      await WeeklyChallengeModel.findOneAndUpdate(
+      const saved = await WeeklyChallengeModel.findOneAndUpdate(
         { learnerId: learner._id, weekStartDate },
         {
           $set: {
@@ -72,6 +106,28 @@ export async function GET(req: NextRequest) {
       );
 
       generated++;
+
+      if (
+        saved &&
+        Array.isArray(saved.content?.drillSequence) &&
+        saved.content.drillSequence.length > 0
+      ) {
+        try {
+          const notifyResult = await notifyWeeklyChallengeReadyFromDoc(saved);
+          if (notifyResult.status === 'sent') {
+            notified++;
+          } else {
+            notifySkipped++;
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          notifyErrors.push(`${String(learner._id)}: ${msg}`);
+          logger.warn('[weekly-challenge cron] notification failed', {
+            learnerId: String(learner._id),
+            error: msg,
+          });
+        }
+      }
     } catch (err: any) {
       logger.error('[weekly-challenge cron] error processing learner', {
         learnerId: String(learner._id),
@@ -81,5 +137,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ generated, skipped, errors });
+  return NextResponse.json({ generated, skipped, errors, notified, notifySkipped, notifyErrors });
 }

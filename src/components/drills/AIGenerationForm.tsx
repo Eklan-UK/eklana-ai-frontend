@@ -5,6 +5,8 @@ import { Loader2, Search, X, ChevronDown } from "lucide-react";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
 import { LearningJourneyPartTopicFields } from "@/components/admin/LearningJourneyPartTopicFields";
+import { MissionEnrollmentModal } from "@/components/learning-journey/MissionEnrollmentModal";
+import { useEnrolledPartsIntersection } from "@/hooks/useMissionEnrollments";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { AI_DRILL_TYPES, AI_DIFFICULTIES } from "@/constants/ai-drill";
 
@@ -49,6 +51,8 @@ interface AIGenerationFormProps {
   variant?: "page" | "modal";
   /** When set, student multi-select is locked to these IDs */
   lockedStudentIds?: string[];
+  /** Tutor vs admin — used for enrollment modal */
+  builderVariant?: "tutor" | "admin";
 }
 
 const selectClass =
@@ -359,11 +363,22 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
   disabled = false,
   variant = "page",
   lockedStudentIds,
+  builderVariant = "tutor",
 }) => {
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const [enrollmentFocusStudentId, setEnrollmentFocusStudentId] = useState<
+    string | undefined
+  >();
   const isStudentLocked = !!lockedStudentIds?.length;
   const effectiveStudentIds = isStudentLocked
     ? lockedStudentIds!
     : values.studentIds;
+  const { enrolledParts } = useEnrolledPartsIntersection(effectiveStudentIds);
+
+  const openEnrollment = (studentId?: string) => {
+    setEnrollmentFocusStudentId(studentId);
+    setEnrollmentModalOpen(true);
+  };
 
   const fields = (
     <div className="space-y-4">
@@ -438,6 +453,11 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         }}
         onTopicChange={(topic) => onChange("journeyTopic", topic)}
         required
+        enrolledParts={
+          effectiveStudentIds.length > 0 ? enrolledParts : undefined
+        }
+        selectedStudentIds={effectiveStudentIds}
+        onOpenEnrollment={openEnrollment}
       />
 
       <div>
@@ -495,7 +515,18 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
   );
 
   if (variant === "modal") {
-    return fields;
+    return (
+      <>
+        {fields}
+        {enrollmentModalOpen && (
+          <MissionEnrollmentModal
+            variant={builderVariant}
+            initialStudentId={enrollmentFocusStudentId}
+            onClose={() => setEnrollmentModalOpen(false)}
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -507,6 +538,13 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
         Fill in the details below and AI will generate drill content for review.
       </p>
       {fields}
+      {enrollmentModalOpen && (
+        <MissionEnrollmentModal
+          variant={builderVariant}
+          initialStudentId={enrollmentFocusStudentId}
+          onClose={() => setEnrollmentModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

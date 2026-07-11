@@ -505,20 +505,18 @@ export default function PronunciationDrill({
           ];
         });
 
-        // Record pronunciation attempt (skip for weekly challenges — drill._id is not a valid ObjectId)
-        if (!weeklyChallengeMeta) {
-          try {
-            const audioBase64 = await blobToBase64(audioBlob);
-            await pronunciationAPI.createDrillAttempt({
-              text: textToAnalyze,
-              audioBase64,
-              drillId: drill._id,
-              drillType: 'pronunciation',
-              passingThreshold: PASS_THRESHOLD,
-            });
-          } catch (error) {
-            console.error('Failed to record pronunciation attempt:', error);
-          }
+        // Record pronunciation attempt (omit drillId for weekly challenges)
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          await pronunciationAPI.createDrillAttempt({
+            text: textToAnalyze,
+            audioBase64,
+            ...(weeklyChallengeMeta ? {} : { drillId: drill._id }),
+            drillType: 'pronunciation',
+            passingThreshold: PASS_THRESHOLD,
+          });
+        } catch (error) {
+          console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce - missing textScore");

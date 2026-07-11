@@ -51,14 +51,11 @@ export function LearnerProgressSummary({
     inProgress: 0,
     pending: 0,
     overdue: 0,
+    pendingReview: 0,
     averageScore: 0,
     completionRate: 0,
   };
-  const assignments = drillData?.assignments || [];
-  const pendingReviewCount = assignments.filter(
-    (d: { requiresReview?: boolean; reviewStatus?: string }) =>
-      d.requiresReview || d.reviewStatus === "pending",
-  ).length;
+  const pendingReviewCount = drillStats.pendingReview ?? 0;
   const pronunciationStats = pronunciationData?.overall || {};
   const wordStats = pronunciationData?.wordStats || [];
 
@@ -109,7 +106,7 @@ export function LearnerProgressSummary({
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-emerald-600">{overallProgress}%</p>
-            <p className="text-xs text-gray-600">Completion Rate</p>
+            <p className="text-xs text-gray-600">Overall completion (drills + pronunciation)</p>
           </div>
         </div>
         <div className="h-3 bg-emerald-200 rounded-full overflow-hidden">

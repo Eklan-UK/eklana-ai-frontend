@@ -23,6 +23,7 @@ const notificationStyles: Record<string, { icon: string; bgColor: string }> = {
   tutor_update: { icon: '👨‍🏫', bgColor: 'bg-pink-100' },
   class_session_reminder: { icon: '📅', bgColor: 'bg-violet-100' },
   class_nps_form: { icon: '⭐', bgColor: 'bg-orange-100' },
+  weekly_drill_digest: { icon: '🗓️', bgColor: 'bg-teal-100' },
   system: { icon: '📢', bgColor: 'bg-gray-100' },
 };
 

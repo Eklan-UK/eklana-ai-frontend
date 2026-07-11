@@ -3,15 +3,12 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Bookmark, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
+import { useSavedDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useDrillBookmarkToggle } from "@/hooks/useDrillBookmarkToggle";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
 import { isFreeTalkPlanItem } from "@/lib/learning-journey/group-journey-drills";
-import {
-  filterBookmarkedDrills,
-  type JourneyDrillItem,
-} from "@/lib/learning-journey/group-journey-drills";
+import type { JourneyDrillItem } from "@/lib/learning-journey/group-journey-drills";
 import { trackActivity } from "@/utils/activity-cache";
 
 export interface SavedDrillsSectionProps {
@@ -19,19 +16,19 @@ export interface SavedDrillsSectionProps {
   title?: string;
   /** Expand on mount (e.g. My Plan with #saved-drills) */
   defaultExpanded?: boolean;
+  showTopicLabel?: boolean;
 }
 
 export function SavedDrillsSection({
   id = "saved-drills",
   title = "Saved Drills",
   defaultExpanded = false,
+  showTopicLabel = false,
 }: SavedDrillsSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const { data: drills = [], isLoading } = useLearnerDrills({ limit: 100 });
+  const { data: bookmarked = [], isLoading } = useSavedDrills();
   const prefetchDrill = usePrefetchDrill();
   const { handleBookmarkToggle } = useDrillBookmarkToggle();
-
-  const bookmarked = filterBookmarkedDrills(drills as JourneyDrillItem[]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -90,7 +87,7 @@ export function SavedDrillsSection({
               </p>
             </Card>
           ) : (
-            bookmarked.map((item) => {
+            (bookmarked as JourneyDrillItem[]).map((item) => {
               const key = String(
                 item.assignmentId ?? (item.drill as { _id?: string })?._id ?? "",
               );
@@ -109,6 +106,12 @@ export function SavedDrillsSection({
                     scenarioType={drill?.scenarioType ?? ""}
                     completionDate={drill?.completionDate ?? item.dueDate}
                     completedAt={item.completedAt}
+                    showTopicLabel={showTopicLabel}
+                    topicTitle={
+                      typeof (drill as { topicTitle?: string })?.topicTitle === "string"
+                        ? (drill as { topicTitle: string }).topicTitle
+                        : null
+                    }
                   />
                 );
               }
@@ -117,6 +120,9 @@ export function SavedDrillsSection({
                 title: string;
                 type: string;
                 date: string;
+                topicTitle?: string | null;
+                learning_journey_topic?: string;
+                scenarioType?: string;
               };
               return (
                 <PlanDrillRow
@@ -131,6 +137,7 @@ export function SavedDrillsSection({
                   }
                   status={item.status}
                   hasBookmarks={item.hasBookmarks === true}
+                  showTopicLabel={showTopicLabel}
                   onPrefetch={prefetchDrill}
                   onBookmarkToggle={handleBookmarkToggle}
                   onNavigate={() =>

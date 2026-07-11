@@ -132,6 +132,12 @@ export interface IUser extends Document<Types.ObjectId | string> {
   appleOriginalTransactionId?: string;
   appleLatestTransactionId?: string;
   appleSubscriptionStatus?: string;
+  // Purpose-built UUID identifier for Apple StoreKit's appAccountToken.
+  // `_id` is unsafe to use directly here since roughly half the user base
+  // (legacy/mobile accounts) has a non-UUID ObjectId `_id`. Lazily
+  // generated on first login / profile fetch if missing — see
+  // verify-id-token and users/current routes.
+  iapAccountToken?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -355,6 +361,15 @@ const userSchema = new Schema<IUser>(
     },
     appleSubscriptionStatus: {
       type: String,
+    },
+    // Sparse + indexed for query performance, but intentionally NOT a hard
+    // unique constraint — generation is lazy (crypto.randomUUID()) and
+    // UUID v4 collision probability is negligible, so a uniqueness
+    // constraint isn't needed here.
+    iapAccountToken: {
+      type: String,
+      index: true,
+      sparse: true,
     },
   },
   {

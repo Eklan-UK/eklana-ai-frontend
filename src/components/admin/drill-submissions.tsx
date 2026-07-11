@@ -66,11 +66,8 @@ export function DrillSubmissionsComponent({
     error,
   } = useLearnerDrillAssignments(learnerId);
 
-  // Extract data with safe defaults (must be before conditional returns)
-  // Filter out assignments whose drill was deleted (drill field is null/missing)
-  const drills = (drillData?.assignments || []).filter(
-    (d: any) => d.drill && typeof d.drill === 'object' && d.drill._id
-  );
+  const drills = drillData?.assignments || [];
+  const drillStatistics = drillData?.statistics;
   const [filterStatus, setFilterStatus] = useState<
     "all" | "pending" | "in-progress" | "completed" | "review"
   >("all");
@@ -87,7 +84,7 @@ export function DrillSubmissionsComponent({
       completed: drills.filter((d: any) => d.status === "completed"),
       overdue: drills.filter((d: any) => d.status === "overdue"),
       review: drills.filter(
-        (d: any) => d.requiresReview || d.reviewStatus === "pending",
+        (d: any) => d.requiresReview === true || d.reviewStatus === "pending",
       ),
     };
   }, [drills]);
@@ -117,28 +114,11 @@ export function DrillSubmissionsComponent({
     setExpandedDrill((prev) => (prev === drillId ? null : drillId));
   }, []);
 
-  // Memoize statistics calculations
-  const statistics = useMemo(() => {
-    const completed = categorizedDrills.completed;
-    const review = categorizedDrills.review;
-
-    return {
-      completionRate: drills.length > 0
-        ? ((completed.length / drills.length) * 100).toFixed(1)
-        : 0,
-      averageScoreValue: completed.length > 0
-        ? (
-          completed.reduce(
-            (sum: number, d: any) => sum + (d.latestAttempt?.score || 0),
-            0,
-          ) / completed.length
-        ).toFixed(1)
-        : 0,
-      pendingReviewCount: review.length,
-    };
-  }, [drills.length, categorizedDrills]);
-
-  const { completionRate, averageScoreValue, pendingReviewCount } = statistics;
+  const completionRate = drillStatistics?.completionRate ?? 0;
+  const averageScoreValue = drillStatistics?.averageScore ?? 0;
+  const pendingReviewCount = drillStatistics?.pendingReview ?? 0;
+  const completedCount = drillStatistics?.completed ?? categorizedDrills.completed.length;
+  const totalCount = drillStatistics?.total ?? drills.length;
 
   // Conditional returns AFTER all hooks
   if (isLoading) {
@@ -335,7 +315,7 @@ export function DrillSubmissionsComponent({
       </div>
 
       {/* Performance Summary */}
-      {categorizedDrills.completed.length > 0 && (
+      {completedCount > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-linear-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
             <p className="text-xs font-semibold text-gray-600 mb-2 uppercase">
@@ -346,7 +326,7 @@ export function DrillSubmissionsComponent({
                 {completionRate}%
               </p>
               <p className="text-xs text-gray-600">
-                {categorizedDrills.completed.length} of {drills.length}
+                {completedCount} of {totalCount}
               </p>
             </div>
             <div className="mt-2 h-1.5 bg-green-200 rounded-full overflow-hidden">

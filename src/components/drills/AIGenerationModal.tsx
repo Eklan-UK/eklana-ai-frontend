@@ -25,6 +25,7 @@ interface AIGenerationModalProps {
   isGenerating?: boolean;
   onGenerate: () => void;
   lockedStudentIds?: string[];
+  builderVariant?: "tutor" | "admin";
 }
 
 export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
@@ -39,6 +40,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
   isGenerating = false,
   onGenerate,
   lockedStudentIds,
+  builderVariant = "tutor",
 }) => {
   if (!open) return null;
 
@@ -83,6 +85,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({
             isGenerating={isGenerating}
             onGenerate={onGenerate}
             lockedStudentIds={lockedStudentIds}
+            builderVariant={builderVariant}
           />
         </div>
       </div>

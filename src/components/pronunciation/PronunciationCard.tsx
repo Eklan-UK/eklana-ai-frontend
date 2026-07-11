@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Mic, BarChart2, TrendingUp } from 'lucide-react';
+import { Mic, BarChart2, Volume2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { usePronunciation } from '@/hooks/usePronunciation';
+import { useLearnerPronunciationAnalytics } from '@/hooks/usePronunciations';
 
 // ── Circular Progress Ring ─────────────────────────────────────
 function PronunciationRing({ score }: { score: number }) {
@@ -48,9 +49,14 @@ function PronunciationRing({ score }: { score: number }) {
   );
 }
 
+interface PronunciationCardProps {
+  learnerId?: string;
+}
+
 // ── Main Card for Profile ──────────────────────────────────────
-export function PronunciationCard() {
+export function PronunciationCard({ learnerId = '' }: PronunciationCardProps) {
   const { data: metrics, isLoading, isError } = usePronunciation();
+  const { data: analytics } = useLearnerPronunciationAnalytics(learnerId);
 
   if (isLoading) {
     return (
@@ -72,6 +78,7 @@ export function PronunciationCard() {
 
   const score = metrics?.overallScore ?? 0;
   const totalWords = metrics?.totalWordsPronounced ?? 0;
+  const difficultSounds = (analytics?.problemAreas?.topIncorrectPhonemes ?? []).slice(0, 5);
 
   return (
     <Card className="mb-6 !p-6 relative overflow-hidden">
@@ -112,6 +119,31 @@ export function PronunciationCard() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Difficult Sounds */}
+      <div className="mt-6 pt-5 border-t border-border relative z-10">
+        <p className="text-xs text-muted-foreground font-satoshi uppercase tracking-wider font-semibold mb-3 flex items-center gap-1.5">
+          <Volume2 className="w-3.5 h-3.5 text-green-600" />
+          Difficult Sounds
+        </p>
+        {difficultSounds.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {difficultSounds.map((item: { phoneme: string; count: number }, idx: number) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-600/10 border border-green-600/20 text-sm font-medium text-foreground font-satoshi"
+              >
+                <span className="text-green-700">/{item.phoneme}/</span>
+                <span className="text-xs text-muted-foreground">×{item.count}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground font-satoshi">
+            Complete pronunciation drills to discover your difficult sounds.
+          </p>
+        )}
       </div>
     </Card>
   );

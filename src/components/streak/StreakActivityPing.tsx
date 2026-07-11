@@ -7,7 +7,8 @@ function utcDateString(d: Date) {
 }
 
 /**
- * Once per UTC calendar day, records learner presence for streaks (login ping).
+ * Once per UTC calendar day, records learner presence for streaks (login ping)
+ * and bootstraps Profile.timezone from the device when unset.
  */
 export function StreakActivityPing() {
   const ran = useRef(false);
@@ -29,6 +30,37 @@ export function StreakActivityPing() {
         });
         if (res.ok && typeof sessionStorage !== "undefined") {
           sessionStorage.setItem(key, "1");
+        }
+      } catch {
+        // non-blocking
+      }
+
+      // Bootstrap IANA timezone once per session when profile has none set.
+      const tzKey = "timezoneBootstrap";
+      if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(tzKey)) {
+        return;
+      }
+      const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!deviceTz) return;
+
+      try {
+        const prefsRes = await fetch("/api/v1/users/preferences", {
+          credentials: "include",
+        });
+        if (!prefsRes.ok) return;
+
+        const prefsJson = await prefsRes.json();
+        const currentTz = prefsJson?.data?.timezone as string | undefined;
+        if (!currentTz) {
+          await fetch("/api/v1/users/preferences", {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timezone: deviceTz }),
+          });
+        }
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(tzKey, "1");
         }
       } catch {
         // non-blocking

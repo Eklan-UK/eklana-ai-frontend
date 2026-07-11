@@ -182,6 +182,7 @@ export function WeekDetailPage({
               <AIGeneratedPreview
                 results={aiWorkflow.aiGeneratedResults}
                 onUseDrills={aiWorkflow.handleUseTheseDrills}
+                onEditSettings={aiWorkflow.handleEditSettings}
               />
             )}
 
@@ -228,6 +229,7 @@ export function WeekDetailPage({
         isGeneratingDrill={aiWorkflow.isGeneratingDrill}
         handleAIGenerate={aiWorkflow.handleAIGenerate}
         lockedStudentIds={aiWorkflow.lockedStudentIds}
+        builderVariant={variant}
         showAiPreview={false}
         aiGeneratedResults={aiWorkflow.aiGeneratedResults}
         handleUseTheseDrills={aiWorkflow.handleUseTheseDrills}

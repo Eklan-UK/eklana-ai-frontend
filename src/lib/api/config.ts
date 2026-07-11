@@ -147,7 +147,8 @@ export const config = {
 	APPLE_BUNDLE_ID: process.env.APPLE_BUNDLE_ID,
 	APPLE_PRO_MONTHLY_PRODUCT_ID: process.env.APPLE_PRO_MONTHLY_PRODUCT_ID,
 	APPLE_APP_STORE_SHARED_SECRET: process.env.APPLE_APP_STORE_SHARED_SECRET,
-	APPLE_APP_STORE_ENVIRONMENT: process.env.APPLE_APP_STORE_ENVIRONMENT || 'sandbox',
+	/** No default — must be explicitly "production" or "sandbox". See getAppleEnvironment() in apple-app-store.service.ts. */
+	APPLE_APP_STORE_ENVIRONMENT: process.env.APPLE_APP_STORE_ENVIRONMENT,
 	/** Required by SignedDataVerifier in Production only (numeric App Store app id). */
 	APPLE_APP_APPLE_ID: process.env.APPLE_APP_APPLE_ID,
 	// OpenAI

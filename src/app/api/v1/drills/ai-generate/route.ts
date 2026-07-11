@@ -10,6 +10,11 @@ import PromptTemplate from "@/models/promptTemplate";
 import DrillAssignment from "@/models/drill-assignment";
 import Drill from "@/models/drill";
 import { Types } from "mongoose";
+import {
+  isValidPartTopicPair,
+  parseLearningJourneyPartId,
+} from "@/domain/learning-journey/learning-journey.catalog";
+import { getCompetenciesForTopic } from "@/config/competency-framework";
 
 async function handler(
   req: NextRequest,
@@ -35,6 +40,14 @@ async function handler(
     if (!part || !topic) {
       return NextResponse.json(
         { code: "ValidationError", message: "part and topic are required" },
+        { status: 400 }
+      );
+    }
+
+    const journeyPart = parseLearningJourneyPartId(part);
+    if (!journeyPart || !isValidPartTopicPair(journeyPart, String(topic))) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "Invalid learning journey mission/topic pair" },
         { status: 400 }
       );
     }
@@ -110,6 +123,19 @@ async function handler(
       );
     }
 
+    let competencyFramework: string | undefined;
+
+    if (topic) {
+      const competencies = getCompetenciesForTopic(String(topic));
+      if (competencies && competencies.length > 0) {
+        competencyFramework =
+          "Competency framework for this topic:\n" +
+          competencies
+            .map((c, i) => `${i + 1}. ${c.name}: ${c.description}`)
+            .join("\n");
+      }
+    }
+
     let drillHistory: object[] | undefined;
 
     if (studentId && Types.ObjectId.isValid(studentId)) {
@@ -164,6 +190,7 @@ async function handler(
           drillWeaknesses,
           templatePrompt: templatePromptByDrillType.get(dt),
           drillHistory,
+          competencyFramework,
         });
         return { drillType: dt, content };
       })

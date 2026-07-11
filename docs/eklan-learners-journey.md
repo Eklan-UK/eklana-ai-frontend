@@ -132,7 +132,75 @@
 
 ---
 
-## Mission 4: Bonus Scenarios
+## Mission 4: Interview Preparation
+
+### 17. Motivation prep
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 18. Technical prep
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 19. Situation Judgement Prep
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 20. Mock 1
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 21. Mock 2
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 22. Mock 3
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 23. Mock 4
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+### 24. Mock 5
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge
+
+---
+
+## Mission 5: Bonus Scenarios
 
 ### 13. Phone Communication with Colleagues
 
@@ -160,3 +228,11 @@
 - Day 4 — Key Phrase Drills
 - Day 5 — Eklan Free Talk
 - Day 6 — Eklan Weekly Challenge
+
+### 16. Grammar
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Weekly Challenge

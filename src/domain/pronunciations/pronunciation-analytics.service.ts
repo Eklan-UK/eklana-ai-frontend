@@ -1,6 +1,19 @@
 import { Types } from 'mongoose';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
+import DrillAttempt from '@/models/drill-attempt';
 import LearnerPronunciationProgress from '@/models/learner-pronunciation-progress';
+import {
+	accumulatePhonemeHits,
+	buildPhonemeProblemAreas,
+	extractPhonemesFromReviewSnapshot,
+	mergePhonemeProblemAreas,
+	type PerformanceReviewSnapshot,
+} from './pronunciation-phoneme-utils';
+
+export {
+	extractPhonemesFromReviewSnapshot,
+	mergePhonemeProblemAreas,
+} from './pronunciation-phoneme-utils';
 
 export interface StrugglingWord {
 	word: string;
@@ -252,15 +265,126 @@ async function aggregateSoundProblems(
 	return results;
 }
 
+/**
+ * PronunciationAttempt match for phoneme aggregation.
+ * Excludes per-line drill attempts (drillId without drillAttemptId) to avoid
+ * double-counting with drill snapshot / drill-complete summary records.
+ */
+function buildAttemptPhonemeMatch(learnerId: Types.ObjectId): Record<string, unknown> {
+	return {
+		learnerId,
+		$or: [
+			{ drillId: { $exists: false } },
+			{ drillId: null },
+			{ drillAttemptId: { $exists: true, $ne: null } },
+		],
+	};
+}
+
+export async function getPhonemeProblemsFromDrillSnapshots(
+	learnerId: Types.ObjectId,
+	passThreshold = 70
+): Promise<PhonemeProblemArea[]> {
+	const coveredDrillAttemptIds = new Set(
+		(
+			await PronunciationAttempt.find({
+				learnerId,
+				drillAttemptId: { $exists: true, $ne: null },
+			})
+				.select('drillAttemptId')
+				.lean()
+				.exec()
+		).map((a) => String(a.drillAttemptId))
+	);
+
+	const drillAttempts = await DrillAttempt.find({
+		learnerId,
+		'performanceReviewSnapshot.groups.0': { $exists: true },
+	})
+		.select('performanceReviewSnapshot')
+		.lean()
+		.exec();
+
+	const phonemeCounts = new Map<string, { count: number; words: Map<string, number> }>();
+
+	for (const attempt of drillAttempts) {
+		if (coveredDrillAttemptIds.has(String(attempt._id))) continue;
+
+		const snapshot = (attempt as { performanceReviewSnapshot?: PerformanceReviewSnapshot })
+			.performanceReviewSnapshot;
+		if (!snapshot) continue;
+
+		const threshold = snapshot.passThreshold ?? passThreshold;
+		const extracted = extractPhonemesFromReviewSnapshot(snapshot, threshold);
+		accumulatePhonemeHits(phonemeCounts, extracted, threshold);
+	}
+
+	return buildPhonemeProblemAreas(phonemeCounts);
+}
+
+export async function getPhonemeProblemsFromProgress(
+	learnerId: Types.ObjectId
+): Promise<PhonemeProblemArea[]> {
+	const progressRecords = await LearnerPronunciationProgress.find({
+		learnerId,
+		'weakPhonemes.0': { $exists: true },
+	})
+		.populate('wordId', 'word')
+		.lean()
+		.exec();
+
+	const phonemeCounts = new Map<string, { count: number; words: Map<string, number> }>();
+
+	for (const record of progressRecords) {
+		const wordDoc = record.wordId as { word?: string } | Types.ObjectId | null;
+		const word =
+			wordDoc && typeof wordDoc === 'object' && 'word' in wordDoc
+				? String(wordDoc.word ?? '')
+				: '';
+
+		for (const phoneme of record.weakPhonemes ?? []) {
+			if (!phoneme) continue;
+			if (!phonemeCounts.has(phoneme)) {
+				phonemeCounts.set(phoneme, { count: 0, words: new Map() });
+			}
+			const entry = phonemeCounts.get(phoneme)!;
+			entry.count++;
+			if (word) {
+				entry.words.set(word, (entry.words.get(word) ?? 0) + 1);
+			}
+		}
+	}
+
+	return buildPhonemeProblemAreas(phonemeCounts);
+}
+
 export async function getProblemAreasWithWords(learnerId: Types.ObjectId): Promise<{
 	topIncorrectPhonemes: PhonemeProblemArea[];
 	topIncorrectLetters: LetterProblemArea[];
 }> {
-	const match = { learnerId };
-	const [topIncorrectPhonemes, topIncorrectLetters] = await Promise.all([
-		aggregateSoundProblems(match, 'incorrectPhonemes', 'phoneme') as Promise<PhonemeProblemArea[]>,
-		aggregateSoundProblems(match, 'incorrectLetters', 'letter') as Promise<LetterProblemArea[]>,
+	const attemptMatch = buildAttemptPhonemeMatch(learnerId);
+
+	const [
+		attemptPhonemes,
+		snapshotPhonemes,
+		progressPhonemes,
+		topIncorrectLetters,
+	] = await Promise.all([
+		aggregateSoundProblems(attemptMatch, 'incorrectPhonemes', 'phoneme') as Promise<
+			PhonemeProblemArea[]
+		>,
+		getPhonemeProblemsFromDrillSnapshots(learnerId),
+		getPhonemeProblemsFromProgress(learnerId),
+		aggregateSoundProblems({ learnerId }, 'incorrectLetters', 'letter') as Promise<
+			LetterProblemArea[]
+		>,
 	]);
+
+	const topIncorrectPhonemes = mergePhonemeProblemAreas(
+		attemptPhonemes,
+		snapshotPhonemes,
+		progressPhonemes
+	);
 
 	return { topIncorrectPhonemes, topIncorrectLetters };
 }

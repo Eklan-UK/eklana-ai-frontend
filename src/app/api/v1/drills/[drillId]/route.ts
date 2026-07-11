@@ -108,6 +108,7 @@ const updateDrillSchema = z.object({
 	article_content: z.string().optional(),
 	article_audio_url: z.string().optional(),
 	fill_blank_items: z.array(z.object({
+		context: z.string().optional(),
 		sentence: z.string().trim().min(1),
 		blanks: z.array(z.object({
 			position: z.number().int().min(0),

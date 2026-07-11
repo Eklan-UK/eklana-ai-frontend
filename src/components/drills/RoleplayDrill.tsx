@@ -180,6 +180,8 @@ export default function RoleplayDrill({
   const [sceneBreak, setSceneBreak] = useState<SceneBreak | null>(null);
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+  /** True when saved assignment progress was restored — skip pre-start intro TTS on resume. */
+  const [hasRestoredProgress, setHasRestoredProgress] = useState(false);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
 
   // Track if we're on review screen vs completion screen
@@ -490,6 +492,7 @@ export default function RoleplayDrill({
             completedSceneIndex: completedIdx,
             nextSceneIndex: savedSceneIndex,
           });
+          setHasRestoredProgress(true);
           setSessionStarted(true);
           const nextName =
             scenes[savedSceneIndex]?.scene_name || `Scene ${savedSceneIndex + 1}`;
@@ -497,6 +500,7 @@ export default function RoleplayDrill({
         } else {
           setCurrentSceneIndex(savedSceneIndex);
           setCurrentTurnIndex(Number(progress.currentTurnIndex ?? 0));
+          setHasRestoredProgress(true);
           setSessionStarted(true);
           const sceneName =
             scenes[savedSceneIndex]?.scene_name || `Scene ${savedSceneIndex + 1}`;
@@ -602,7 +606,9 @@ export default function RoleplayDrill({
 
   // Auto-read intro + roles when the learner lands on the pre-start screen (browser may block until a tap).
   useEffect(() => {
-    if (sessionStarted || isCompleted || showReview) return;
+    if (sessionStarted || isCompleted || showReview || isLoadingProgress || hasRestoredProgress) {
+      return;
+    }
 
     const d = scenes[currentSceneIndex]?.dialogue;
     const turn = d?.[currentTurnIndex];
@@ -616,6 +622,8 @@ export default function RoleplayDrill({
     sessionStarted,
     isCompleted,
     showReview,
+    isLoadingProgress,
+    hasRestoredProgress,
     currentSceneIndex,
     currentTurnIndex,
     scenes,
@@ -649,6 +657,9 @@ export default function RoleplayDrill({
     }
     playedAITurnsRef.current.add(turnKey);
     setIsPlayingAI(true);
+
+    // Silence any pre-start intro TTS still playing via useTTS before scene audio.
+    stopTTSAudio();
 
     // Add AI message to completed messages
     const aiMessage: CompletedMessage = {
@@ -710,7 +721,7 @@ export default function RoleplayDrill({
         moveToNextTurn();
       }
     }
-  }, [playTTSAudio, moveToNextTurn, currentSceneIndex]);
+  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio]);
 
   // Auto-play AI turns - only after session start and if not already played
   useEffect(() => {
@@ -1090,6 +1101,7 @@ export default function RoleplayDrill({
       preGenAudioRef.current = null;
     }
     setSessionStarted(false);
+    setHasRestoredProgress(false);
     void clearCheckpoint();
     toast.success(`Starting over from the beginning as ${currentStudentRole}.`);
   };
@@ -1129,6 +1141,7 @@ export default function RoleplayDrill({
     stopTTSAudio();
     if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
     setSessionStarted(false);
+    setHasRestoredProgress(false);
     toast.success(`Switched roles! You are now playing as ${newMode === "original" ? studentCharacter : aiCharacters[0] || "AI"}`);
   };
 

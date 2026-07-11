@@ -1,11 +1,11 @@
-// PATCH /api/v1/users/preferences
-// Update user's learning preferences stored in the Profile model
-// (nationality, language, learningGoal)
+// GET /api/v1/users/preferences — read learning preferences from Profile
+// PATCH /api/v1/users/preferences — update learning preferences on Profile
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import ProfileModel from '@/models/profile';
 import { logger } from '@/lib/api/logger';
+import { validateTimezone } from '@/lib/timezone/validate-timezone';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 
@@ -15,6 +15,7 @@ const preferencesSchema = z.object({
 	learningGoal: z.string().optional(),
 	learningGoals: z.array(z.string()).optional(),
 	theme: z.enum(['system', 'light', 'dark']).optional(),
+	timezone: z.string().min(1).optional(),
 	notificationPreferences: z.object({
 		learningReminders: z.boolean(),
 		specialOffers: z.boolean(),
@@ -29,22 +30,51 @@ const preferencesSchema = z.object({
 	}).optional(),
 });
 
-async function handler(
-	req: NextRequest,
-	context: { userId: Types.ObjectId; userRole: string }
+function profilePreferencesPayload(profile: {
+	nationality?: string;
+	language?: string;
+	learningGoal?: string;
+	learningGoals?: string[];
+	theme?: string;
+	timezone?: string;
+	notificationPreferences?: {
+		learningReminders: boolean;
+		specialOffers: boolean;
+		subscriptionExpires: boolean;
+	};
+	lessonPreferences?: {
+		eklanTalks: boolean;
+		chatTranslation: boolean;
+		englishAccent: string;
+		voiceTone: string;
+		speakingSpeed: string;
+	};
+}) {
+	return {
+		nationality: profile.nationality,
+		language: profile.language,
+		learningGoal: profile.learningGoal,
+		learningGoals: profile.learningGoals,
+		theme: profile.theme,
+		timezone: profile.timezone,
+		notificationPreferences: profile.notificationPreferences,
+		lessonPreferences: profile.lessonPreferences,
+	};
+}
+
+async function getHandler(
+	_req: NextRequest,
+	context: { userId: Types.ObjectId; userRole: string },
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
 
-		const body = await req.json();
-		const validated = preferencesSchema.parse(body);
-
-		// Find and update the user's Profile document
-		const profile = await ProfileModel.findOneAndUpdate(
-			{ userId: context.userId },
-			{ $set: validated },
-			{ new: true, upsert: false }
-		).lean().exec();
+		const profile = await ProfileModel.findOne({ userId: context.userId })
+			.select(
+				'nationality language learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
+			)
+			.lean()
+			.exec();
 
 		if (!profile) {
 			return NextResponse.json(
@@ -52,32 +82,102 @@ async function handler(
 					code: 'NotFoundError',
 					message: 'Profile not found. Please complete onboarding first.',
 				},
-				{ status: 404 }
+				{ status: 404 },
+			);
+		}
+
+		return NextResponse.json(
+			{
+				code: 'Success',
+				data: profilePreferencesPayload(profile),
+			},
+			{ status: 200 },
+		);
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : 'Failed to load preferences';
+		logger.error('Error loading preferences', {
+			error: message,
+			userId: context.userId,
+		});
+
+		return NextResponse.json(
+			{
+				code: 'ServerError',
+				message,
+			},
+			{ status: 500 },
+		);
+	}
+}
+
+async function patchHandler(
+	req: NextRequest,
+	context: { userId: Types.ObjectId; userRole: string },
+): Promise<NextResponse> {
+	try {
+		await connectToDatabase();
+
+		const body = await req.json();
+		const validated = preferencesSchema.parse(body);
+
+		if (validated.timezone && !validateTimezone(validated.timezone)) {
+			return NextResponse.json(
+				{
+					code: 'ValidationError',
+					message: 'Invalid IANA timezone',
+				},
+				{ status: 400 },
+			);
+		}
+
+		const update: Record<string, unknown> = { ...validated };
+
+		// Bootstrap only: do not overwrite an existing timezone choice.
+		if (validated.timezone) {
+			const existing = await ProfileModel.findOne({ userId: context.userId })
+				.select('timezone')
+				.lean()
+				.exec();
+			if (existing?.timezone) {
+				delete update.timezone;
+			}
+		}
+
+		const profile = await ProfileModel.findOneAndUpdate(
+			{ userId: context.userId },
+			{ $set: update },
+			{ new: true, upsert: false },
+		)
+			.select(
+				'nationality language learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
+			)
+			.lean()
+			.exec();
+
+		if (!profile) {
+			return NextResponse.json(
+				{
+					code: 'NotFoundError',
+					message: 'Profile not found. Please complete onboarding first.',
+				},
+				{ status: 404 },
 			);
 		}
 
 		logger.info('User preferences updated', {
 			userId: context.userId,
-			updatedFields: Object.keys(validated),
+			updatedFields: Object.keys(update),
 		});
 
 		return NextResponse.json(
 			{
 				code: 'Success',
 				message: 'Preferences updated successfully',
-				data: {
-					nationality: profile.nationality,
-					language: profile.language,
-					learningGoal: profile.learningGoal,
-					learningGoals: profile.learningGoals,
-					theme: profile.theme,
-					notificationPreferences: profile.notificationPreferences,
-					lessonPreferences: profile.lessonPreferences,
-				},
+				data: profilePreferencesPayload(profile),
 			},
-			{ status: 200 }
+			{ status: 200 },
 		);
-	} catch (error: any) {
+	} catch (error: unknown) {
 		if (error instanceof z.ZodError) {
 			return NextResponse.json(
 				{
@@ -85,24 +185,25 @@ async function handler(
 					message: 'Validation failed',
 					errors: error.issues,
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 
+		const message = error instanceof Error ? error.message : 'Failed to update preferences';
 		logger.error('Error updating preferences', {
-			error: error.message,
-			stack: error.stack,
+			error: message,
 			userId: context.userId,
 		});
 
 		return NextResponse.json(
 			{
 				code: 'ServerError',
-				message: error.message || 'Failed to update preferences',
+				message,
 			},
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }
 
-export const PATCH = withAuth(handler);
+export const GET = withAuth(getHandler);
+export const PATCH = withAuth(patchHandler);

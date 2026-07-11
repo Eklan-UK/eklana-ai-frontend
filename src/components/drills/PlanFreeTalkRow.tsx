@@ -18,6 +18,8 @@ export interface PlanFreeTalkRowProps {
   completionDate?: string | Date | null;
   completedAt?: string | Date | null;
   locked?: boolean;
+  showTopicLabel?: boolean;
+  topicTitle?: string | null;
 }
 
 export function PlanFreeTalkRow({
@@ -27,9 +29,13 @@ export function PlanFreeTalkRow({
   completionDate,
   completedAt,
   locked = false,
+  showTopicLabel = false,
+  topicTitle: topicTitleProp,
 }: PlanFreeTalkRowProps) {
   const href = `/account/practice/free-talk/session?scenarioId=${encodeURIComponent(scenarioId)}`;
   const typeLabel = freeTalkScenarioTypeLabel(scenarioType);
+  const topicTitle =
+    showTopicLabel && typeof topicTitleProp === "string" ? topicTitleProp : null;
   const completed = completedAt != null;
   const showDue =
     completionDate != null && isFreeTalkScenarioDueSoon(completionDate, completed);
@@ -44,6 +50,11 @@ export function PlanFreeTalkRow({
         <MessageSquare className="w-7 h-7 text-emerald-800" aria-hidden />
       </div>
       <div className="flex-1 min-w-0">
+        {topicTitle ? (
+          <p className="text-sm font-bold text-foreground line-clamp-2 mb-0.5">
+            {topicTitle}
+          </p>
+        ) : null}
         <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
           {title}
         </h3>

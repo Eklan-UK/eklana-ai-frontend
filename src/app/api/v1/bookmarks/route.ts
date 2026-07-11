@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import Bookmark from '@/models/bookmark';
+import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 import { z } from 'zod';
 import { Types } from 'mongoose';
 
@@ -17,14 +18,16 @@ const createBookmarkSchema = z.object({
 });
 
 // GET /api/v1/bookmarks - Get all bookmarks for the current user
-async function getBookmarks(req: NextRequest, context: { userId: Types.ObjectId; userRole: string }) {
+async function getBookmarks(req: NextRequest, context: { userId: string; userRole: string }) {
   try {
     await connectToDatabase();
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type');
 
-    const query: Record<string, unknown> = { userId: context.userId };
+    const query: Record<string, unknown> = {
+      userId: { $in: toUserIdCandidates(context.userId) },
+    };
     if (type && ['word', 'sentence', 'drill'].includes(type)) {
       query.type = type;
     }
@@ -44,7 +47,7 @@ async function getBookmarks(req: NextRequest, context: { userId: Types.ObjectId;
 }
 
 // POST /api/v1/bookmarks - Create a new bookmark
-async function createBookmark(req: NextRequest, context: { userId: Types.ObjectId; userRole: string }) {
+async function createBookmark(req: NextRequest, context: { userId: string; userRole: string }) {
   try {
     await connectToDatabase();
     
@@ -59,10 +62,11 @@ async function createBookmark(req: NextRequest, context: { userId: Types.ObjectI
     }
 
     const { drillId, type, content, translation, context: bookmarkContext } = result.data;
+    const userId = toUserIdQuery(context.userId);
 
     // Check for duplicate
     const existing = await Bookmark.findOne({
-      userId: context.userId,
+      userId: { $in: toUserIdCandidates(context.userId) },
       drillId,
       content,
     });
@@ -75,7 +79,7 @@ async function createBookmark(req: NextRequest, context: { userId: Types.ObjectI
     }
 
     const bookmark = await Bookmark.create({
-      userId: context.userId,
+      userId,
       drillId,
       type,
       content,
@@ -86,7 +90,7 @@ async function createBookmark(req: NextRequest, context: { userId: Types.ObjectI
     let badgesUnlocked: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[] = [];
     try {
       const { triggerBadgeEvaluation } = await import('@/services/streak.service');
-      badgesUnlocked = await triggerBadgeEvaluation(context.userId.toString());
+      badgesUnlocked = await triggerBadgeEvaluation(context.userId);
     } catch {
       // badges must not fail bookmark creation
     }

@@ -18,6 +18,8 @@ const notificationStyles: Record<string, { icon: string; bgColor: string; textCo
   tutor_update: { icon: '👨‍🏫', bgColor: 'bg-pink-100', textColor: 'text-pink-600' },
   class_session_reminder: { icon: '📅', bgColor: 'bg-violet-100', textColor: 'text-violet-600' },
   class_nps_form: { icon: '⭐', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
+  weekly_drill_digest: { icon: '🗓️', bgColor: 'bg-teal-100', textColor: 'text-teal-600' },
+  weekly_challenge_ready: { icon: '🏆', bgColor: 'bg-amber-100', textColor: 'text-amber-600' },
   system: { icon: '📢', bgColor: 'bg-gray-100', textColor: 'text-gray-600' },
 };
 

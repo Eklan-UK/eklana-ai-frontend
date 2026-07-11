@@ -1,5 +1,7 @@
 # Stripe Payments & API Keys Guide
 
+> **Planned pricing update:** Multi-plan pricing (US$20 / US$60 / $200), 2-week (14-day) gated trial, and grandfathering for existing monthly payers — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
+
 ## 1. Goals
 
 - Use Stripe as the payment rail for **Android and web** (not iOS digital subscriptions — see [APPLE_IAP_IOS_IMPLEMENTATION.md](./APPLE_IAP_IOS_IMPLEMENTATION.md)).
@@ -122,6 +124,11 @@ STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
 # Optional: annual Price ID if you offer it
 # STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_...
 
+# Planned (see PRICING_AND_TRIAL_MIGRATION.md):
+# STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY=price_...
+# STRIPE_PREMIUM_QUARTERLY_PRICE_ID=price_...
+# SUBSCRIPTION_TRIAL_LAUNCH_AT=2026-08-01T00:00:00.000Z
+
 
 # ── Client-safe (safe to expose in browser / mobile bundle) ──────────────────
 
@@ -217,7 +224,7 @@ Stripe maintains fully separate environments. **Always develop in test mode firs
 
 ## 8. Relation to the Existing Admin Subscription Endpoint
 
-`POST /api/v1/admin/users/subscription` ([source](../src/app/api/v1/admin/users/subscription/route.ts)) allows admins to manually grant or revoke a premium subscription (offline payment, support grants, comps).
+`POST /api/v1/admin/users/subscription` ([source](src/app/api/v1/admin/users/subscription/route.ts)) allows admins to manually grant or revoke a premium subscription (offline payment, support grants, comps).
 
 This endpoint **should remain** after Stripe is integrated:
 

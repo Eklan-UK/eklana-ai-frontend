@@ -19,7 +19,7 @@
 
 ## 1. Overview
 
-The **Eklan Learning Journey System** reorganizes how learners discover and track assigned drills. Instead of a single flat list with Ongoing / Completed / Bookmarked tabs on **My Plans**, drills are now grouped into four curriculum **Missions**, each containing ordered **Topics** from a hard-coded catalog. Learners browse Missions → Topics → individual drill rows, bookmark drills for quick access, and see completion progress at the mission level.
+The **Eklan Learning Journey System** reorganizes how learners discover and track assigned drills. Instead of a single flat list with Ongoing / Completed / Bookmarked tabs on **My Plans**, drills are now grouped into five curriculum **Missions**, each containing ordered **Topics** from a hard-coded catalog. Learners browse Missions → Topics → individual drill rows, bookmark drills for quick access, and see completion progress at the mission level.
 
 ### High-level user journey
 
@@ -33,6 +33,7 @@ Home                          My Plans
                                         ├─ Mission 2 card ──► Mission Detail
                                         ├─ Mission 3 card ──► Mission Detail
                                         └─ Mission 4 card ──► Mission Detail
+                                        └─ Mission 5 card ──► Mission Detail
                                               │
                                               └─ Topics (sections)
                                                     └─ Drill rows per topic
@@ -42,7 +43,7 @@ Home                          My Plans
 
 | Concept | Description |
 |---|---|
-| **Mission** | One of four curriculum sections (1–4). Has a title and a list of topics. Progress shown as "X of Y drills completed". |
+| **Mission** | One of five curriculum sections (1–5). Has a title and a list of topics. Progress shown as "X of Y drills completed". |
 | **Topic** | A sub-section within a Mission (e.g. "Handling Emergency/Critical Situation"). Drills are grouped under topics via `learning_journey_part` + `learning_journey_topic` fields on the drill document. |
 | **Catalog** | Hard-coded list of Missions and Topics (see [§4.4](#44-learning-journey-catalog)). Always render all topics for a Mission, even when no drills are assigned. |
 | **Saved Drills** | Drills the learner has bookmarked (`hasBookmarks === true`). Shown in a collapsible section on Home and My Plans. |
@@ -108,7 +109,7 @@ The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live 
 
 ---
 
-### 2.3 New screen: Mission Detail (`/account/drills/journey/[1-4]`)
+### 2.3 New screen: Mission Detail (`/account/drills/journey/[1-5]`)
 
 Brand-new screen. Shows all topics for the selected Mission, each with its assigned drill rows.
 
@@ -175,7 +176,7 @@ Brand-new screen. Shows all topics for the selected Mission, each with its assig
 #### Data loading
 
 - Fetch learner drills (`limit: 100`) on mount
-- Compute per-mission progress: `{ completed, total }` for each Mission 1–4
+- Compute per-mission progress: `{ completed, total }` for each Mission 1–5
 - Mission cards always render all 4 parts regardless of assignment state
 
 ---
@@ -420,9 +421,11 @@ Shared collapsible section used on **Home** and **My Plans**.
 
 #### Data source
 
-- Fetch learner drills with `limit: 100`
-- Filter: `item.hasBookmarks === true`
-- Sort: same order as `sortAssignedPlanItems` on web (active/incomplete first, then by due date)
+- Fetch `GET /api/v1/drills/learner/saved-drills` (bookmark-first; no assignment pagination cap)
+- Every returned row has `hasBookmarks: true`
+- Sort: server returns `sortAssignedPlanItems` order (active/incomplete first, then by due date)
+
+**Fallback (not recommended):** `GET /api/v1/drills/learner/my-drills?limit=100` + filter `hasBookmarks === true` misses bookmarked drills outside the first 100 assignments.
 
 #### Header row layout (left → right)
 
@@ -640,7 +643,20 @@ Summary card for one Mission on My Plans.
 | 2 | `doctor_rounds` | Going on Rounds with Doctors | `doctor_rounds` |
 | 3 | `answering_family_questions` | Answering Families and Friend's Questions | `family_questions` |
 
-#### Mission 4: Bonus Scenarios
+#### Mission 4: Interview Preparation
+
+| Order | Topic ID | Title | Free Talk scenario type |
+|---|---|---|---|
+| 1 | `motivation_prep` | Motivation prep | — |
+| 2 | `technical_prep` | Technical prep | — |
+| 3 | `situation_judgement_prep` | Situation Judgement Prep | — |
+| 4 | `mock_1` | Mock 1 | — |
+| 5 | `mock_2` | Mock 2 | — |
+| 6 | `mock_3` | Mock 3 | — |
+| 7 | `mock_4` | Mock 4 | — |
+| 8 | `mock_5` | Mock 5 | — |
+
+#### Mission 5: Bonus Scenarios
 
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
@@ -654,7 +670,7 @@ Summary card for one Mission on My Plans.
 Each drill document may include:
 
 ```typescript
-learning_journey_part?: 1 | 2 | 3 | 4;
+learning_journey_part?: 1 | 2 | 3 | 4 | 5;
 learning_journey_topic?: string; // topic ID from catalog
 ```
 
@@ -943,7 +959,7 @@ All API endpoints require an authenticated session. The mobile app authenticates
 
 #### 7.2 `GET /api/v1/drills/learner/my-drills`
 
-This is the **single endpoint** the mobile app calls to load all data needed for the Learning Journey, Saved Drills, Home Assigned Drills, and My Plans screens.
+This is the **primary endpoint** the mobile app calls to load assigned drills for the Learning Journey, Home Assigned Drills, and My Plans screens. For **Saved Drills** (bookmark-first list), use `GET /api/v1/drills/learner/saved-drills` instead (§7.2.1).
 
 ##### Request
 
@@ -965,6 +981,40 @@ Authorization: Bearer <session-token>
 ```
 GET /api/v1/drills/learner/my-drills?limit=100
 ```
+
+##### 7.2.1 `GET /api/v1/drills/learner/saved-drills`
+
+Bookmark-first Saved Drills list for **Home**, **My Plans**, and **Profile → Bookmarks (Saved Drills section)**. Returns all drill-level bookmarks without assignment-list pagination caps.
+
+```
+GET /api/v1/drills/learner/saved-drills
+Authorization: Bearer <session-token>
+```
+
+**Response:**
+
+```jsonc
+{
+  "data": {
+    "drills": [
+      // LearnerMyDrillRow[] — same shape as my-drills (§7.2 above)
+      // includes free_talk_scenario rows when bookmarked
+      // every row: "hasBookmarks": true
+    ]
+  }
+}
+```
+
+**When to use:**
+
+| Screen | Endpoint |
+|--------|----------|
+| Saved Drills collapsible (Home / My Plans) | `saved-drills` |
+| Profile → Bookmarks → Saved Drills section | `saved-drills` |
+| Learning Journey / assigned drill lists | `my-drills` |
+| Bookmark icon initial state on journey rows | `hasBookmarks` from `my-drills` (now fixed for Mixed userId) |
+
+**Cache invalidation:** after bookmark toggle, refetch/invalidate **both** `my-drills` and `saved-drills`.
 
 ##### Response shape
 
@@ -1004,8 +1054,9 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
     "student_character_name": "Student",
     "ai_character_name": "AI",
     "ai_character_names": [],
-    "learning_journey_part": 1,                   // ← integer 1–4 (or null/absent)
-    "learning_journey_topic": "handling_emergency_critical"  // ← topic slug (or null/absent)
+    "learning_journey_part": 1,                   // ← integer 1–5 (or null/absent)
+    "learning_journey_topic": "handling_emergency_critical",  // ← topic slug (or null/absent)
+    "topicTitle": "Handling Emergency/Critical Situation"   // ← server-resolved display title (omit/null if unmapped)
   },
   "assignedBy": "663a0b1c2d3e4f5a6b7c8d9e",      // user _id of assigning admin/tutor
   "assignedAt": "2026-06-01T09:00:00.000Z",
@@ -1035,6 +1086,7 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
     "title": "ICU Emergency Free Talk",
     "type": "eklan_free_talk",
     "scenarioType": "icu_emergency",              // maps to freeTalkScenarioType in catalog
+    "topicTitle": "Handling Emergency/Critical Situation",  // ← server-resolved (omit/null if unmapped)
     "date": "2026-07-10T00:00:00.000Z",
     "completionDate": "2026-07-10T00:00:00.000Z"
   },
@@ -1050,7 +1102,7 @@ The top-level wrapper is `{ "data": { ... } }` — access the array at `response
 
 **How to distinguish:** check `item.itemType === "free_talk_scenario"` OR `item.drill?.type === "eklan_free_talk"`.
 
-> **Note:** Free Talk items do **not** carry `learning_journey_part` / `learning_journey_topic` fields. They are matched to the journey catalog via `drill.scenarioType` ↔ `topic.freeTalkScenarioType` (see §7.4).
+> **Note:** Free Talk items do **not** carry `learning_journey_part` / `learning_journey_topic` fields. They are matched to the journey catalog via `drill.scenarioType` ↔ `topic.freeTalkScenarioType` (see §7.4). For **home card display**, use `drill.topicTitle` (server-computed on `my-drills` and `saved-drills`) instead of resolving the catalog client-side.
 
 ---
 
@@ -1099,7 +1151,7 @@ function groupDrillsByJourney(
       }
     } else {
       // Match standard drills by learning_journey_part + learning_journey_topic
-      const part = item.drill?.learning_journey_part;   // number 1–4 or null
+      const part = item.drill?.learning_journey_part;   // number 1–5 or null
       const topicId = item.drill?.learning_journey_topic; // string slug or null
 
       if (part != null && topicId != null) {
@@ -1118,7 +1170,7 @@ function groupDrillsByJourney(
  */
 function getDrillsForPart(
   groupedDrills: Map<number, Map<string, DrillItem[]>>,
-  part: 1 | 2 | 3 | 4
+  part: 1 | 2 | 3 | 4 | 5
 ): Array<{ topicId: string; topicTitle: string; items: DrillItem[] }> {
   const partDef = LEARNING_JOURNEY_PARTS.find(p => p.part === part);
   if (!partDef) return [];
@@ -1163,7 +1215,7 @@ function isCompleted(item: DrillItem): boolean {
  */
 function computePartProgress(
   drills: DrillItem[]
-): Record<1 | 2 | 3 | 4, PartProgress> {
+): Record<1 | 2 | 3 | 4 | 5, PartProgress> {
   const progress: Record<number, PartProgress> = {
     1: { completed: 0, total: 0 },
     2: { completed: 0, total: 0 },
@@ -1196,7 +1248,7 @@ function computePartProgress(
     }
   }
 
-  return progress as Record<1 | 2 | 3 | 4, PartProgress>;
+  return progress as Record<1 | 2 | 3 | 4 | 5, PartProgress>;
 }
 ```
 
@@ -1257,7 +1309,7 @@ Authorization: Bearer <session-token>
 
 The `hasBookmarks: boolean` field on each item in `my-drills` tells whether **the authenticated user** has an active drill-type bookmark for that drill. Use this to initialize the bookmark button state without an additional API call.
 
-After a bookmark toggle succeeds, **invalidate the `my-drills` cache** (re-fetch) so `hasBookmarks` stays in sync across all screens.
+After a bookmark toggle succeeds, **invalidate the `my-drills` and `saved-drills` caches** (re-fetch) so `hasBookmarks` and Saved Drills lists stay in sync across all screens.
 
 ##### Bookmark interaction flow
 
@@ -1270,7 +1322,7 @@ User taps bookmark button
   └─ hasBookmarks === true  → DELETE /api/v1/bookmarks/by-drill/{drillId}
 
 On success:
-  → Invalidate / refetch my-drills query
+  → Invalidate / refetch my-drills and saved-drills queries
   → Toast feedback (see §4.2 of this spec)
 
 On 409 / "Already bookmarked" (200 with message):
@@ -1291,7 +1343,7 @@ There is **no API endpoint** for the learning journey catalog. The mobile app mu
 // domain/learning-journey/learning-journey.catalog.ts
 // Mirror of server-side catalog — hard-coded, no API fetch required.
 
-export type LearningJourneyPartId = 1 | 2 | 3 | 4;
+export type LearningJourneyPartId = 1 | 2 | 3 | 4 | 5;
 
 export type LearningJourneyTopic = {
   id: string;
@@ -1340,6 +1392,20 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   },
   {
     part: 4,
+    title: "Interview Preparation",
+    topics: [
+      { id: "motivation_prep",          title: "Motivation prep",           order: 1 },
+      { id: "technical_prep",           title: "Technical prep",            order: 2 },
+      { id: "situation_judgement_prep", title: "Situation Judgement Prep",  order: 3 },
+      { id: "mock_1",                   title: "Mock 1",                    order: 4 },
+      { id: "mock_2",                   title: "Mock 2",                    order: 5 },
+      { id: "mock_3",                   title: "Mock 3",                    order: 6 },
+      { id: "mock_4",                   title: "Mock 4",                    order: 7 },
+      { id: "mock_5",                   title: "Mock 5",                    order: 8 },
+    ],
+  },
+  {
+    part: 5,
     title: "Bonus Scenarios",
     topics: [
       { id: "phone_colleagues",      title: "Phone Communication with Colleagues",                   order: 1, freeTalkScenarioType: "phone_colleague" },
@@ -1387,6 +1453,7 @@ The following table lists the fields on each item returned by `my-drills` that a
 | `context` | `string` | General context/instructions. Optional. |
 | `learning_journey_part` | `1 \| 2 \| 3 \| 4 \| null` | **Journey grouping field.** Which of the 4 missions this drill belongs to (`learning_journey_part` is the API field name). `null`/absent = not in the journey. |
 | `learning_journey_topic` | `string \| null` | **Journey grouping field.** Topic slug from the catalog (e.g. `"handling_emergency_critical"`). `null`/absent = not grouped into a topic. Always check in combination with `learning_journey_part`. |
+| `topicTitle` | `string \| null` | **Display field (server-computed).** Catalog topic title ready for UI (e.g. `"Handling Emergency/Critical Situation"`). Present on `my-drills` and `saved-drills` when mappable; omit or `null` otherwise. Use on home cards above `title`; keep `learning_journey_topic` for Mission Detail grouping. |
 | `scenarioType` | `string` | Free Talk only. Matches `freeTalkScenarioType` in the catalog to resolve Mission/Topic placement. |
 | `completionDate` | `string \| null` | Free Talk only. ISO date shown as due date. |
 

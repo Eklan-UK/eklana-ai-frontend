@@ -5,6 +5,7 @@ import { aggregateWeaknesses } from './weakness-aggregator';
 import { generateWeeklyChallenge } from './challenge-generator';
 import type { IWeeklyChallenge } from '@/models/weekly-challenge';
 import type { WeeklyChallenge } from './types';
+import { notifyWeeklyChallengeReadyFromDoc } from './weekly-challenge-notification.service';
 
 export class ChallengeService {
 	constructor(private challengeRepo: ChallengeRepository) {}
@@ -83,6 +84,19 @@ export class ChallengeService {
 				drillCount: content.drillSequence.length,
 				totalMinutes: content.totalEstimatedMinutes,
 			});
+
+			if (content.drillSequence.length > 0) {
+				try {
+					await notifyWeeklyChallengeReadyFromDoc(saved);
+				} catch (notifyErr: unknown) {
+					const msg = notifyErr instanceof Error ? notifyErr.message : String(notifyErr);
+					logger.warn('Weekly challenge notification failed', {
+						learnerId: learnerId.toString(),
+						weekStartDate,
+						error: msg,
+					});
+				}
+			}
 
 			return saved;
 		} catch (error: any) {

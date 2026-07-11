@@ -9,6 +9,8 @@ import { isValidUserId, toUserIdQuery, toUserIdQueryMulti } from "@/lib/api/user
 import Drill from "@/models/drill";
 import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
+import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
+import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 
 async function handler(
   req: NextRequest,
@@ -42,7 +44,10 @@ async function handler(
   const drillObjectId = new Types.ObjectId(drillId);
 
   // Verify drill exists
-  const drill = await Drill.findById(drillObjectId).select("_id assigned_to").lean().exec();
+  const drill = await Drill.findById(drillObjectId)
+    .select("_id assigned_to learning_journey_part")
+    .lean()
+    .exec();
   if (!drill) {
     return NextResponse.json(
       { code: "NotFound", message: "Drill not found" },
@@ -65,6 +70,14 @@ async function handler(
     throw new ValidationError(
       `The following userIds are not valid learners (role: user): ${invalidIds.join(", ")}`
     );
+  }
+
+  const journeyPart = drill.learning_journey_part as LearningJourneyPartId | undefined;
+  if (journeyPart != null) {
+    await assertLearnersEnrolledForDrill({
+      learnerIds: userIds as string[],
+      part: journeyPart,
+    });
   }
 
   const dueDateObj =

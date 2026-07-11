@@ -8,6 +8,11 @@ import { StudentWeeksView } from "@/components/ai-drill-builder/StudentWeeksView
 import { useStudentContext } from "@/hooks/useStudentContext";
 import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
+import {
+  TOTAL_MISSION_COUNT,
+  useLearnerMissionEnrollments,
+} from "@/hooks/useMissionEnrollments";
+import { MissionEnrollmentModal } from "@/components/learning-journey/MissionEnrollmentModal";
 import type { StudentContextData } from "@/lib/api";
 import {
   getLearnerDisplayName,
@@ -30,6 +35,9 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
     null,
   );
   const [editingContext, setEditingContext] = useState(false);
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+
+  const { data: enrolledParts = [] } = useLearnerMissionEnrollments(studentId);
 
   const { data: tutorData } = useTutorStudents(
     { limit: 1000 },
@@ -150,14 +158,23 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditingContext(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shrink-0"
-        >
-          <Pencil className="w-4 h-4" />
-          Edit context
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setEnrollmentModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors"
+          >
+            Enrollments {enrolledParts.length}/{TOTAL_MISSION_COUNT}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingContext(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit context
+          </button>
+        </div>
       </div>
 
       <StudentWeeksView
@@ -166,6 +183,14 @@ export function StudentDetailPage({ variant, studentId }: StudentDetailPageProps
         basePath={basePath}
         anchorDate={studentInfo?.anchorDate}
       />
+
+      {enrollmentModalOpen && (
+        <MissionEnrollmentModal
+          variant={variant}
+          initialStudentId={studentId}
+          onClose={() => setEnrollmentModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

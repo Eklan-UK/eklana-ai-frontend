@@ -343,56 +343,6 @@ async function handler(
 		const mergedAccuracyTrend = Array.from(existingTrendMap.values())
 			.sort((a, b) => a.date.localeCompare(b.date));
 
-		// Difficult letters from drill_attempts: derive from phonemes if present
-		// (phonemes are not stored in the current schema, so this merges empty for now
-		// but is correct for future data that may include phonemes).
-		const drillLetterCounts = new Map<string, { count: number; words: Map<string, number> }>();
-		for (const attempt of drillPronAttempts) {
-			const pr = (attempt as any).pronunciationResults;
-			if (!pr?.wordScores) continue;
-			for (const ws of pr.wordScores as Array<{ word?: string; phonemes?: Array<{ phoneme?: string; correct?: boolean }> }>) {
-				if (!ws.phonemes) continue;
-				for (const ph of ws.phonemes) {
-					if (ph.correct !== false || !ph.phoneme) continue;
-					const letter = ph.phoneme;
-					if (!drillLetterCounts.has(letter)) {
-						drillLetterCounts.set(letter, { count: 0, words: new Map() });
-					}
-					const entry = drillLetterCounts.get(letter)!;
-					entry.count++;
-					if (ws.word) {
-						entry.words.set(ws.word, (entry.words.get(ws.word) ?? 0) + 1);
-					}
-				}
-			}
-		}
-
-		// Merge drill-derived letters with existing topIncorrectLetters
-		const existingLetterMap = new Map(
-			(problemAreas.topIncorrectLetters as Array<{ letter: string; count: number; words: Array<{ word: string; count: number }> }>)
-				.map((l) => [l.letter, { ...l }])
-		);
-		for (const [letter, { count, words }] of drillLetterCounts.entries()) {
-			if (existingLetterMap.has(letter)) {
-				const ex = existingLetterMap.get(letter)!;
-				ex.count += count;
-				const wordMap = new Map(ex.words.map((w) => [w.word, w.count]));
-				for (const [w, c] of words.entries()) {
-					wordMap.set(w, (wordMap.get(w) ?? 0) + c);
-				}
-				ex.words = Array.from(wordMap.entries()).map(([word, c]) => ({ word, count: c }));
-			} else {
-				existingLetterMap.set(letter, {
-					letter,
-					count,
-					words: Array.from(words.entries()).map(([word, c]) => ({ word, count: c })),
-				});
-			}
-		}
-		const mergedTopIncorrectLetters = Array.from(existingLetterMap.values())
-			.sort((a, b) => b.count - a.count)
-			.slice(0, 10);
-
 		// ── Legacy assignments list (used by assignment-detail views) ─────────────
 		const assignmentsAggregation = await PronunciationAssignment.aggregate([
 			{ $match: { learnerId: learnerOid } },
@@ -454,10 +404,7 @@ async function handler(
 						averageScore: Math.round(combinedAverageScore * 100) / 100,
 						passRate: Math.round(combinedPassRate * 100) / 100,
 					},
-					problemAreas: {
-						...problemAreas,
-						topIncorrectLetters: mergedTopIncorrectLetters,
-					},
+					problemAreas,
 					accuracyTrend: mergedAccuracyTrend,
 					wordStats,
 					assignments,
