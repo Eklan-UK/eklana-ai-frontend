@@ -15,7 +15,7 @@ Beyond these blockers, the audit uncovered a critical identity mismatch that aff
 
 **Primary action items for the mobile team:** (1) do not pass `user.id` as `appAccountToken` unless you have verified it is a UUID v4 — generate your own UUID v4 and store it; (2) always send `signedTransactionInfo` (the JWS string from StoreKit 2) to `POST /api/v1/apple/verify`; (3) treat any non-200 response from that endpoint as a hard failure. **Primary action items for the backend team:** flip `APPLE_APP_STORE_ENVIRONMENT` to `production`, add `APPLE_APP_APPLE_ID` to the IAP configuration check, and expand product ID validation to accept annual/quarterly plans.
 
-> **Implementation plan for multi-plan pricing and gated trial:** See [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) (addresses audit item **RC-2** / **A-9** — quarterly and annual product IDs).
+> **Implementation plan for multi-plan pricing and gated trial:** See [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md) (addresses audit item **RC-2** / **A-9** — quarterly and annual product IDs).
 
 ---
 
