@@ -8,11 +8,12 @@
 
 | Document | Contents |
 |----------|----------|
-| [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) | Stripe env vars, webhook forwarding |
-| [stripe-implementation.md](./stripe-implementation.md) | Current Stripe checkout, portal, webhooks |
-| [APPLE_IAP_IOS_IMPLEMENTATION.md](./APPLE_IAP_IOS_IMPLEMENTATION.md) | StoreKit, App Store Connect, Apple webhooks |
-| [MOBILE_EXPO_BILLING.md](./MOBILE_EXPO_BILLING.md) | Platform matrix, mobile API contracts |
-| [IOS_PAYMENT_AUDIT.md](./IOS_PAYMENT_AUDIT.md) | iOS payment audit and outstanding items |
+| [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) | Stripe-only phased implementation (Phase 1 ✅) |
+| [docs/STRIPE_PAYMENTS_AND_KEYS.md](./docs/STRIPE_PAYMENTS_AND_KEYS.md) | Stripe env vars, webhook forwarding |
+| [docs/stripe-implementation.md](./docs/stripe-implementation.md) | Current Stripe checkout, portal, webhooks |
+| [docs/APPLE_IAP_IOS_IMPLEMENTATION.md](./docs/APPLE_IAP_IOS_IMPLEMENTATION.md) | StoreKit, App Store Connect, Apple webhooks |
+| [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md) | Platform matrix, mobile API contracts |
+| [docs/IOS_PAYMENT_AUDIT.md](./docs/IOS_PAYMENT_AUDIT.md) | iOS payment audit and outstanding items |
 
 ---
 
@@ -201,7 +202,7 @@ Complete in **test mode first**, then mirror in **live**.
 | [`src/lib/api/config.ts`](src/lib/api/config.ts) | Add quarterly, annual, legacy monthly Price IDs; `SUBSCRIPTION_TRIAL_LAUNCH_AT`; Apple quarterly/annual product IDs |
 | [`.env.example`](.env.example) | Document new env vars |
 | [`src/lib/api/stripe-billing-period.ts`](src/lib/api/stripe-billing-period.ts) | Map **both** legacy and new monthly Price IDs → `'monthly'` |
-| [`STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md) | Link to this doc |
+| [`docs/STRIPE_PAYMENTS_AND_KEYS.md`](./docs/STRIPE_PAYMENTS_AND_KEYS.md) | Link to this doc |
 
 ### `billingPeriodFromStripePriceId` update
 
@@ -216,7 +217,9 @@ const envMap: Array<[string | undefined, BillingPeriod]> = [
 
 ### Deploy effect
 
-Safe to deploy. Checkout remains monthly-only until PR 2.
+Safe to deploy. Checkout remains monthly-only until PR 2 / Phase 3.
+
+**Status:** ✅ Shipped — `config.ts`, `stripe-billing-period.ts`, and `.env.example` updated.
 
 ---
 
@@ -284,7 +287,7 @@ In `handleCheckoutSessionCompleted` and `handleSubscriptionUpdated`:
 
 ### 5.5 Android mobile
 
-Update [`MOBILE_EXPO_BILLING.md`](./MOBILE_EXPO_BILLING.md): `POST /api/v1/stripe/checkout` accepts `{ billingPeriod }`; trial copy gated by server eligibility flag.
+Update [`docs/MOBILE_EXPO_BILLING.md`](./docs/MOBILE_EXPO_BILLING.md): `POST /api/v1/stripe/checkout` accepts `{ billingPeriod }`; trial copy gated by server eligibility flag.
 
 ### Deploy effect
 

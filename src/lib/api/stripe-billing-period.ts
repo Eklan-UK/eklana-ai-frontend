@@ -16,6 +16,7 @@ export function billingPeriodFromStripePriceId(
   // Exact match against configured price IDs
   const envMap: Array<[string | undefined, BillingPeriod]> = [
     [process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID, 'monthly'],
+    [process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY, 'monthly'],
     [process.env.STRIPE_PREMIUM_QUARTERLY_PRICE_ID, 'quarterly'],
     [process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID, 'annual'],
   ];
@@ -39,4 +40,15 @@ export function billingPeriodFromStripePriceId(
   }
 
   return undefined;
+}
+
+/** Assign `subscriptionBillingPeriod` from a Stripe price ID when mappable. */
+export function applyBillingPeriodFromPriceId(
+  user: { subscriptionBillingPeriod?: BillingPeriod | null },
+  priceId: string | null | undefined
+): void {
+  const billingPeriod = billingPeriodFromStripePriceId(priceId);
+  if (billingPeriod) {
+    user.subscriptionBillingPeriod = billingPeriod;
+  }
 }

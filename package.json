@@ -13,7 +13,10 @@
     "generate-icons": "node scripts/generate-icons.js",
     "test:gates": "node scripts/test-subscription-gates.mjs",
     "test:subscription": "node --import tsx --test src/lib/api/user-subscription.test.ts",
+    "test:trial-eligibility": "node --import tsx --test src/lib/api/stripe-trial-eligibility.test.ts",
+    "test:phase8": "node --import tsx --test src/lib/api/stripe-billing-period.test.ts src/lib/api/stripe-trial-eligibility.test.ts src/lib/api/stripe-checkout-session.test.ts src/lib/api/stripe-price-migration.test.ts src/lib/api/user-subscription.test.ts src/lib/api/subscription-trial-ui.test.ts",
     "diagnose:subscription": "tsx scripts/diagnose-subscription.ts",
+    "migrate:legacy-monthly": "tsx scripts/stripe-migrate-legacy-monthly.ts",
     "test:notification": "node scripts/local-test-notification.mjs"
   },
   "dependencies": {
