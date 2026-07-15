@@ -8,6 +8,7 @@ import Tutor from "@/models/tutor";
 import Profile from "@/models/profile";
 import { logger } from "@/lib/api/logger";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
+import { isEligibleForTrial } from "@/lib/api/stripe-trial-eligibility";
 
 async function handler(
   req: NextRequest,
@@ -57,6 +58,7 @@ async function handler(
       stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,
       appleSubscriptionStatus: (user as any).appleSubscriptionStatus ?? null,
       isSubscribed: subscribed,
+      eligibleForTrial: isEligibleForTrial(user as any),
       iapAccountToken,
     };
 

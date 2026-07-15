@@ -33,6 +33,18 @@ describe('isUserSubscribed', () => {
     );
   });
 
+  it('returns true for trialing stripe with future expiry', () => {
+    assert.equal(
+      isUserSubscribed({
+        subscriptionPlan: 'premium',
+        subscriptionPaymentMethod: 'stripe',
+        stripeSubscriptionStatus: 'trialing',
+        subscriptionExpiresAt: future,
+      }),
+      true
+    );
+  });
+
   it('returns false for active stripe with expired expiry (stale status)', () => {
     assert.equal(
       isUserSubscribed({

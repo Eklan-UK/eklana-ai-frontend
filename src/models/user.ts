@@ -127,6 +127,8 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionUpdatedBy?: Types.ObjectId | null;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  /** Active Stripe Subscription Schedule id (Phase 7 price migration). */
+  stripeScheduleId?: string;
   stripeSubscriptionStatus?: string;
   subscriptionProvider?: string | null;
   appleOriginalTransactionId?: string;
@@ -341,6 +343,11 @@ const userSchema = new Schema<IUser>(
       sparse: true,
     },
     stripeSubscriptionId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    stripeScheduleId: {
       type: String,
       index: true,
       sparse: true,
