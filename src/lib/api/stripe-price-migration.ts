@@ -31,6 +31,26 @@ function scheduleIdFromSubscription(
 }
 
 /**
+ * When updating schedule phases on a trialing subscription, Stripe requires
+ * `trial_end` on the current phase. Omitting it can end the trial immediately.
+ * Prefer the entire-phase-is-trial pattern when `trial_end` already matches
+ * period end (set phase `end_date` ≥ `trial_end`).
+ */
+function phase1TrialPreserve(
+  subscription: Pick<Stripe.Subscription, 'status' | 'trial_end'>,
+  currentPeriodEnd: number
+): { end_date: number; trial_end?: number } {
+  if (
+    subscription.status === 'trialing' &&
+    typeof subscription.trial_end === 'number'
+  ) {
+    const end_date = Math.max(currentPeriodEnd, subscription.trial_end);
+    return { end_date, trial_end: subscription.trial_end };
+  }
+  return { end_date: currentPeriodEnd };
+}
+
+/**
  * Soft-switch any current price onto `targetPriceId` at `current_period_end`
  * via Subscription Schedules (`proration_behavior: 'none'`).
  *
@@ -75,6 +95,7 @@ export async function schedulePriceChangeAtRenewal(
 
   const currentPeriodStart = item.current_period_start;
   const currentPeriodEnd = item.current_period_end;
+  const phase1Trial = phase1TrialPreserve(subscription, currentPeriodEnd);
   const idempotencyKey =
     options?.idempotencyKey ??
     `price-change-${subscriptionId}-${targetPriceId}-${randomUUID()}`;
@@ -90,8 +111,11 @@ export async function schedulePriceChangeAtRenewal(
       {
         items: [{ price: currentPriceId, quantity: 1 }],
         start_date: currentPeriodStart,
-        end_date: currentPeriodEnd,
+        end_date: phase1Trial.end_date,
         proration_behavior: 'none',
+        ...(phase1Trial.trial_end != null
+          ? { trial_end: phase1Trial.trial_end }
+          : {}),
       },
       {
         items: [{ price: targetPriceId, quantity: 1 }],
@@ -134,6 +158,7 @@ export async function schedulePriceMigrationAtRenewal(
 
   const currentPeriodStart = item.current_period_start;
   const currentPeriodEnd = item.current_period_end;
+  const phase1Trial = phase1TrialPreserve(subscription, currentPeriodEnd);
 
   if (item.price.id === newPriceId) {
     return { status: 'skipped', reason: 'already_new_price' };
@@ -156,8 +181,11 @@ export async function schedulePriceMigrationAtRenewal(
       {
         items: [{ price: legacyPriceId, quantity: 1 }],
         start_date: currentPeriodStart,
-        end_date: currentPeriodEnd,
+        end_date: phase1Trial.end_date,
         proration_behavior: 'none',
+        ...(phase1Trial.trial_end != null
+          ? { trial_end: phase1Trial.trial_end }
+          : {}),
       },
       {
         items: [{ price: newPriceId, quantity: 1 }],

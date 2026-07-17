@@ -156,7 +156,7 @@ export function formatZeroPauseProducts(
   products: ZeroPauseProduct[] | string[] | null | undefined
 ): string {
   if (!products?.length) return "—";
-  const labels = products
+  const labels = (products as string[])
     .filter(isZeroPauseProduct)
     .map((p) => ZERO_PAUSE_PRODUCT_LABELS[p]);
   if (!labels.length) return "—";
