@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type Stripe from 'stripe';
 
 export type PriceMigrationSkipReason =
@@ -8,17 +9,118 @@ export type PriceMigrationResult =
   | { status: 'scheduled'; scheduleId: string }
   | { status: 'skipped'; reason: PriceMigrationSkipReason };
 
+export type PriceChangeAtRenewalSkipReason = 'already_on_target_price';
+
+export type PriceChangeAtRenewalResult =
+  | {
+      status: 'scheduled';
+      scheduleId: string;
+      releasedScheduleId?: string;
+    }
+  | {
+      status: 'skipped';
+      reason: PriceChangeAtRenewalSkipReason;
+      releasedScheduleId?: string;
+    };
+
+function scheduleIdFromSubscription(
+  schedule: string | Stripe.SubscriptionSchedule | null | undefined
+): string | null {
+  if (!schedule) return null;
+  return typeof schedule === 'string' ? schedule : schedule.id;
+}
+
+/**
+ * Soft-switch any current price onto `targetPriceId` at `current_period_end`
+ * via Subscription Schedules (`proration_behavior: 'none'`).
+ *
+ * Releases an existing schedule first when present. Phase 1 keeps the
+ * **current** item price until period end; phase 2 is the target.
+ *
+ * Prefer a unique `idempotencyKey` per admin/cohort sync so Stripe does not
+ * replay a cached create from an earlier toggle.
+ */
+export async function schedulePriceChangeAtRenewal(
+  stripe: Stripe,
+  subscriptionId: string,
+  targetPriceId: string,
+  options?: { idempotencyKey?: string }
+): Promise<PriceChangeAtRenewalResult> {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ['items.data'],
+  });
+  const item = subscription.items.data[0];
+  if (!item) {
+    throw new Error(
+      `Subscription ${subscriptionId} has no items; cannot schedule price change`
+    );
+  }
+
+  const currentPriceId = item.price.id;
+  const existingScheduleId = scheduleIdFromSubscription(subscription.schedule);
+  let releasedScheduleId: string | undefined;
+
+  if (existingScheduleId) {
+    await stripe.subscriptionSchedules.release(existingScheduleId);
+    releasedScheduleId = existingScheduleId;
+  }
+
+  if (currentPriceId === targetPriceId) {
+    return {
+      status: 'skipped',
+      reason: 'already_on_target_price',
+      ...(releasedScheduleId ? { releasedScheduleId } : {}),
+    };
+  }
+
+  const currentPeriodStart = item.current_period_start;
+  const currentPeriodEnd = item.current_period_end;
+  const idempotencyKey =
+    options?.idempotencyKey ??
+    `price-change-${subscriptionId}-${targetPriceId}-${randomUUID()}`;
+
+  const schedule = await stripe.subscriptionSchedules.create(
+    { from_subscription: subscriptionId },
+    { idempotencyKey }
+  );
+
+  await stripe.subscriptionSchedules.update(schedule.id, {
+    proration_behavior: 'none',
+    phases: [
+      {
+        items: [{ price: currentPriceId, quantity: 1 }],
+        start_date: currentPeriodStart,
+        end_date: currentPeriodEnd,
+        proration_behavior: 'none',
+      },
+      {
+        items: [{ price: targetPriceId, quantity: 1 }],
+        proration_behavior: 'none',
+      },
+    ],
+    end_behavior: 'release',
+  });
+
+  return {
+    status: 'scheduled',
+    scheduleId: schedule.id,
+    ...(releasedScheduleId ? { releasedScheduleId } : {}),
+  };
+}
+
 /**
  * Soft-grandfather a legacy monthly subscription onto `newPriceId` at
  * `current_period_end` via Subscription Schedules (`proration_behavior: 'none'`).
  *
  * Do not mid-cycle `subscriptions.update` with default proration.
+ * Kept for Phase 7 bulk migrate CLI (skips when a schedule already exists).
  */
 export async function schedulePriceMigrationAtRenewal(
   stripe: Stripe,
   subscriptionId: string,
   legacyPriceId: string,
-  newPriceId: string
+  newPriceId: string,
+  options?: { idempotencyKey?: string }
 ): Promise<PriceMigrationResult> {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
     expand: ['items.data'],
@@ -42,7 +144,10 @@ export async function schedulePriceMigrationAtRenewal(
 
   const schedule = await stripe.subscriptionSchedules.create(
     { from_subscription: subscriptionId },
-    { idempotencyKey: `migration-2026-${subscriptionId}` }
+    {
+      idempotencyKey:
+        options?.idempotencyKey ?? `migration-2026-${subscriptionId}`,
+    }
   );
 
   await stripe.subscriptionSchedules.update(schedule.id, {

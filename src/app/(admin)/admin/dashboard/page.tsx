@@ -13,7 +13,7 @@ interface DashboardStats {
   subscribedUsers: number;
   totalActiveLearners: number;
   zeroPauseChallengeUsers: number;
-  zeroPauseMasteryUsers: number;
+  zeroPauseMaintainerUsers: number;
   newSignupsThisWeek: number;
   discoveryCallsToday: number;
   videosAwaitingReview: number;
@@ -37,7 +37,7 @@ const Dashboard: React.FC = () => {
       subscribedUsers: stats.subscribedUsers || 0,
       totalActiveLearners: stats.totalActiveLearners || 0,
       zeroPauseChallengeUsers: stats.zeroPauseChallengeUsers || 0,
-      zeroPauseMasteryUsers: stats.zeroPauseMasteryUsers || 0,
+      zeroPauseMaintainerUsers: stats.zeroPauseMaintainerUsers || 0,
       newSignupsThisWeek: stats.newSignupsThisWeek || 0,
       discoveryCallsToday: stats.discoveryCallsToday || 0,
       videosAwaitingReview: stats.videosAwaitingReview || 0,
@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
       subscribedUsers: 0,
       totalActiveLearners: 0,
       zeroPauseChallengeUsers: 0,
-      zeroPauseMasteryUsers: 0,
+      zeroPauseMaintainerUsers: 0,
       newSignupsThisWeek: 0,
       discoveryCallsToday: 0,
       videosAwaitingReview: 0,
@@ -81,10 +81,10 @@ const Dashboard: React.FC = () => {
       color: "bg-white border border-violet-200 dark:border-border dark:bg-violet-950/30",
     },
     {
-      title: `${ZERO_PAUSE_PRODUCT_LABELS.mastery} Subscribers`,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.maintainer} Subscribers`,
       value: loading
         ? "..."
-        : statsWithDefaults.zeroPauseMasteryUsers.toString(),
+        : statsWithDefaults.zeroPauseMaintainerUsers.toString(),
       change: "",
       color: "bg-white border border-indigo-200 dark:border-border dark:bg-indigo-950/30",
     },

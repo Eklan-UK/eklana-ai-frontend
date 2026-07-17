@@ -433,8 +433,9 @@ export function useUpdateUserSubscription() {
       plan: "free" | "premium";
       months?: number;
       billingPeriod?: "monthly" | "quarterly" | "annual";
-      zeroPauseProducts?: ("challenge" | "mastery")[];
+      zeroPauseProducts?: ("challenge" | "maintainer")[];
       zeroPauseDate?: string | null;
+      zeroPauseEndDate?: string | null;
       amount?: number;
       paymentMethod?: string;
       note?: string;
@@ -458,6 +459,7 @@ export function useUpdateUserSubscription() {
                       subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
                       zeroPauseProducts: updated.zeroPauseProducts,
                       zeroPauseDate: updated.zeroPauseDate,
+                      zeroPauseEndDate: updated.zeroPauseEndDate,
                       subscriptionActivatedAt: updated.subscriptionActivatedAt,
                       subscriptionExpiresAt: updated.subscriptionExpiresAt,
                     }
