@@ -41,6 +41,13 @@ const BILLING_OPTIONS: {
   { period: "annual", label: "1 year", price: "$200" },
 ];
 
+/** Challenge cohort: legacy monthly only (STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY). */
+const CHALLENGE_BILLING_OPTIONS: {
+  period: BillingPeriod;
+  label: string;
+  price: string;
+}[] = [{ period: "monthly", label: "Monthly", price: "US$1.99" }];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function createCheckoutSession(billingPeriod: BillingPeriod): Promise<string> {
@@ -80,12 +87,23 @@ export default function SubscriptionsPage() {
   const user = me?.user;
   const isSubscribed: boolean = user?.isSubscribed === true;
   const eligibleForTrial: boolean = user?.eligibleForTrial === true;
+  const challengePricingActive: boolean =
+    user?.challengePricingActive === true;
   const planTitle = planTitleFromUser(user);
   const planMessage = getPlanCardMessage(isSubscribed);
+  const billingOptions = challengePricingActive
+    ? CHALLENGE_BILLING_OPTIONS
+    : BILLING_OPTIONS;
 
   const [selectedPeriod, setSelectedPeriod] = useState<BillingPeriod>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    if (challengePricingActive && selectedPeriod !== "monthly") {
+      setSelectedPeriod("monthly");
+    }
+  }, [challengePricingActive, selectedPeriod]);
 
   // ── Handle ?checkout=success param ──────────────────────────────────────────
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -258,7 +276,7 @@ export default function SubscriptionsPage() {
                       </p>
                     )}
                     <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="Billing period">
-                      {BILLING_OPTIONS.map((option) => {
+                      {billingOptions.map((option) => {
                         const selected = selectedPeriod === option.period;
                         return (
                           <button

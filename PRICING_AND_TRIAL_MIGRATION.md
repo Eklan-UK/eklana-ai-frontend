@@ -2,13 +2,13 @@
 
 > **Audience:** Backend, web, mobile (Expo), and ops teams.  
 > **Scope:** Launch Monthly **US$20**, 3-month **US$60**, 1-year **$200**, with a **2-week (14-day) free trial** for post-launch new accounts only, while grandfathering existing monthly payers until their next renewal.  
-> **Status:** Planning document — implementation PRs described below are **not yet shipped** in code.
+> **Status:** Stripe Phases 1–8 and **Phase 10** (Zero Pause cohorts) largely **shipped** (see [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md)); Phase 9 go-live ops may still be pending. Apple IAP (PR 4) remains separate. Cardless signup trial remains **out of scope**.
 
 **Related docs:**
 
 | Document | Contents |
 |----------|----------|
-| [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) | Stripe-only phased implementation (Phase 1 ✅) |
+| [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) | Stripe-only phased implementation (Phases 1–8 ✅; Phase 10 Zero Pause ✅) |
 | [docs/STRIPE_PAYMENTS_AND_KEYS.md](./docs/STRIPE_PAYMENTS_AND_KEYS.md) | Stripe env vars, webhook forwarding |
 | [docs/stripe-implementation.md](./docs/stripe-implementation.md) | Current Stripe checkout, portal, webhooks |
 | [docs/APPLE_IAP_IOS_IMPLEMENTATION.md](./docs/APPLE_IAP_IOS_IMPLEMENTATION.md) | StoreKit, App Store Connect, Apple webhooks |
@@ -20,6 +20,7 @@
 ## Table of Contents
 
 1. [Locked business rules](#1-locked-business-rules)
+   - [Zero Pause pricing cohorts](#zero-pause-pricing-cohorts)
 2. [Architecture](#2-architecture)
 3. [Phase 0 — Dashboard setup (no code)](#3-phase-0--dashboard-setup-no-code)
 4. [PR 1 — Config + price/product mapping](#4-pr-1--config--priceproduct-mapping)
@@ -40,14 +41,18 @@ These rules are **confirmed** and must not change without product sign-off.
 
 | Rule | Behavior |
 |------|----------|
-| **Monthly price** | **US$20** / month (new subscribers) |
-| **Quarterly price** | **US$60** / 3 months |
-| **Annual price** | **$200** / year |
-| **Free trial** | **2 weeks (14 days)**, only for **brand-new accounts** created **on or after** `SUBSCRIPTION_TRIAL_LAUNCH_AT` who have **never** had any subscription (Stripe or Apple) |
+| **Monthly price** | **US$20** / month (new subscribers / Maintainer / public) |
+| **Quarterly price** | **US$60** / 3 months (Maintainer / public) |
+| **Annual price** | **$200** / year (Maintainer / public) |
+| **Legacy monthly (“one ninety-nine”)** | Existing Stripe price `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY` (~US$1.99) — **not** a new $199 price |
+| **Free trial** | **2 weeks (14 days)**, only for **brand-new accounts** created **on or after** `SUBSCRIPTION_TRIAL_LAUNCH_AT` who have **never** had any subscription (Stripe or Apple). Applies to **Maintainer** on new pricing; unchanged Checkout trial for Maintainer. **Cardless signup trial** remains **out of scope** |
 | **Old free accounts** (created before launch date) | **No trial** — pay from day one |
 | **Former / current subscribers** | **No trial** — pay from day one |
 | **Existing monthly Stripe payers** | Keep **current price** until `current_period_end`; new price at **next renewal** (no proration) |
 | **Existing monthly Apple payers** | Use App Store Connect **"Preserve current price for existing subscribers"** when scheduling the monthly increase |
+| **Zero Pause Maintainer** (default) | Every new registrant; no date window → new pricing (US$20 / US$60 / $200) + existing trial rules |
+| **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date**. During `[start, end]` inclusive: Checkout is **legacy monthly only** (no quarterly/annual). Not on the new pricing system for that window |
+| **Zero Pause Mastery** | Admin assign (badge/add-on label only). **Does not** by itself change Pro Stripe price — price follows Challenge window vs Maintainer/public rules above |
 
 ### Trial eligibility (authoritative server-side predicate)
 
@@ -66,6 +71,39 @@ function isEligibleForTrial(user: IUser): boolean {
 ```
 
 **Belt-and-suspenders:** before granting trial in checkout, also check Stripe subscription history for the customer (`subscriptions.list({ status: 'all', limit: 1 })`). Stripe has no visibility into Apple IAP — the DB check above is the source of truth for cross-platform eligibility.
+
+### Zero Pause pricing cohorts
+
+Zero Pause products are `challenge` | `mastery` | `maintainer`. Challenge uses `zeroPauseDate` (start) and `zeroPauseEndDate` (end); Maintainer has **no dates**. Phase 10 (Stripe) uses these for cohort-aware Checkout pricing.
+
+| Cohort | Who | What they see / pay |
+|--------|-----|---------------------|
+| **Zero Pause Maintainer** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility rules |
+| **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date** | During `[start, end]` inclusive: **only** legacy monthly Checkout (`STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`, ~US$1.99). No quarterly/annual for that user |
+| **Zero Pause Mastery** | Admin assign (unchanged role) | Badge/add-on label; Pro price follows Challenge vs Maintainer rules above |
+
+**Lifecycle example:**
+
+1. Student signs up → default **Maintainer** → sees trial (if eligible) + new prices.
+2. Admin sets **Challenge** + start/end → while the window is active, Checkout uses **legacy monthly only** (~US$1.99).
+3. When **end date** passes → student is treated as **Maintainer** again.
+4. If they still have a legacy monthly subscription, **next renewal** restores the prior public plan (reuse Phase 7 / PR 3 schedule pattern). No mid-cycle proration.
+
+```mermaid
+flowchart LR
+  Signup[New signup] --> Maintainer[ZeroPauseMaintainer]
+  Maintainer --> NewPrices[Checkout 20/60/200]
+  Admin[Admin sets Challenge window] --> Challenge[ZeroPauseChallenge]
+  Challenge --> Legacy[Checkout legacy monthly only]
+  EndDate[endDate passes] --> Maintainer
+  Challenge -->|active legacy sub| Renew[Next renewal public plan via schedule]
+```
+
+**Data migration:** after deploying the Challenge ↔ Maintainer role correction, run `npm run migrate:swap-zero-pause-cohorts` (dry-run) then with `--execute` once per environment so existing product keys keep the correct Stripe behavior. If `migrate:swap-zero-pause-cohorts` was already executed under the **incorrect** (swapped) mapping, run dry-run then `--execute` **once more** — the script only swaps `challenge` ↔ `maintainer`, so a second run corrects a prior wrong flip.
+
+**Implementation detail:** See [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) **Phase 10 — Zero Pause Challenge community pricing**.
+
+**Apple:** Challenge legacy monthly is **Stripe-first**. Do not invent Apple StoreKit SKUs for Challenge pricing unless/until a separate App Store product is product-approved. Mastery/Maintainer labels on Apple remain add-ons only. Nightingale stays tied to product key `challenge`.
 
 ---
 

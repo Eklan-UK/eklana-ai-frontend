@@ -13,10 +13,12 @@ import {
   isEligibleForTrial,
   hasPriorStripeSubscriptions,
 } from '@/lib/api/stripe-trial-eligibility';
+import { subscriptionDataForCheckout } from '@/lib/api/stripe-checkout-session';
 import {
-  resolveStripePriceId,
-  subscriptionDataForCheckout,
-} from '@/lib/api/stripe-checkout-session';
+  applyZeroPauseChallengeExpiry,
+  resolveCheckoutPriceForUser,
+} from '@/lib/api/zero-pause-pricing';
+import { syncStripeForZeroPauseMaintainerPricing } from '@/lib/api/stripe-challenge-pricing-sync';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -33,6 +35,36 @@ function getAppUrl(): string {
     process.env.NEXT_PUBLIC_API_URL ||
     'http://localhost:3000'
   );
+}
+
+async function restorePublicPricingAfterChallengeExpiry(
+  stripe: Stripe,
+  user: {
+    _id: unknown;
+    stripeSubscriptionId?: string | null;
+    stripeCustomerId?: string | null;
+    stripeScheduleId?: string | null;
+    subscriptionBillingPeriod?: 'monthly' | 'quarterly' | 'annual' | null;
+    zeroPausePriorStripePriceId?: string | null;
+    zeroPausePriorBillingPeriod?: 'monthly' | 'quarterly' | 'annual' | null;
+    save: () => Promise<unknown>;
+  }
+): Promise<void> {
+  if (!user.stripeSubscriptionId && !user.stripeCustomerId) return;
+  try {
+    const result = await syncStripeForZeroPauseMaintainerPricing(stripe, user);
+    await user.save();
+    logger.info('Challenge expiry: restored public pricing at renewal', {
+      userId: String(user._id),
+      result,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('Challenge expiry: failed to restore public pricing', {
+      userId: String(user._id),
+      error: message,
+    });
+  }
 }
 
 async function handler(
@@ -63,21 +95,10 @@ async function handler(
       // empty / invalid JSON body → default monthly (current UI posts empty body)
     }
 
-    const priceId = resolveStripePriceId(billingPeriod);
-    if (!priceId) {
-      return NextResponse.json(
-        {
-          code: 'ConfigError',
-          message: `Subscription price is not configured for billing period: ${billingPeriod}.`,
-        },
-        { status: 500 }
-      );
-    }
-
     await connectToDatabase();
     const user = await User.findById(context.userId)
       .select(
-        'email firstName lastName stripeCustomerId createdAt subscriptionActivatedAt subscriptionProvider stripeSubscriptionId appleOriginalTransactionId'
+        'email firstName lastName stripeCustomerId createdAt subscriptionActivatedAt subscriptionProvider stripeSubscriptionId stripeScheduleId subscriptionBillingPeriod appleOriginalTransactionId zeroPauseProducts zeroPauseDate zeroPauseEndDate zeroPausePriorStripePriceId zeroPausePriorBillingPeriod'
       )
       .exec();
 
@@ -89,6 +110,35 @@ async function handler(
     }
 
     const stripe = getStripe();
+
+    const { expired } = applyZeroPauseChallengeExpiry(user);
+    if (expired) {
+      await user.save();
+      await restorePublicPricingAfterChallengeExpiry(stripe, user);
+    }
+
+    const priceResolution = resolveCheckoutPriceForUser(user, billingPeriod);
+    if (priceResolution.status === 'challenge_period_not_allowed') {
+      return NextResponse.json(
+        {
+          code: 'ValidationError',
+          message: priceResolution.message,
+        },
+        { status: 400 }
+      );
+    }
+    if (priceResolution.status === 'price_not_configured') {
+      return NextResponse.json(
+        {
+          code: 'ConfigError',
+          message: priceResolution.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    const { priceId, billingPeriod: resolvedPeriod, challengePricing } =
+      priceResolution;
 
     // Create or reuse Stripe Customer — persist before session create
     let stripeCustomerId = user.stripeCustomerId;
@@ -132,9 +182,10 @@ async function handler(
     logger.info('Stripe Checkout Session created', {
       userId: String(user._id),
       sessionId: session.id,
-      billingPeriod,
+      billingPeriod: resolvedPeriod,
       priceId,
       eligibleForTrial,
+      challengePricing,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });

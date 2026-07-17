@@ -394,12 +394,22 @@ async function evaluateHandoverHero(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateNightingaleAward(userId: string): Promise<EvalResult> {
-  const user = await User.findById(userId).select('zeroPauseProducts').lean().exec();
+  // Award if currently on Challenge, or completed a Challenge window (end date in the past
+  // with start set) — keeps the badge after expiry without a separate history field.
+  const user = await User.findById(userId)
+    .select('zeroPauseProducts zeroPauseDate zeroPauseEndDate')
+    .lean()
+    .exec();
   const products = user?.zeroPauseProducts ?? [];
   const hasChallenge = products.includes('challenge');
+  const completedWindow =
+    Boolean(user?.zeroPauseDate) &&
+    Boolean(user?.zeroPauseEndDate) &&
+    new Date() > new Date(user!.zeroPauseEndDate as Date);
+  const earned = hasChallenge || completedWindow;
   return {
-    earned: hasChallenge,
-    progress: hasChallenge ? null : { current: 0, target: 1 },
+    earned,
+    progress: earned ? null : { current: 0, target: 1 },
   };
 }
 

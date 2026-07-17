@@ -3,7 +3,7 @@
 > **Audience:** Backend, web, Android (Expo), and ops teams.  
 > **Scope:** Stripe only — multi-plan pricing, gated trial, grandfathering, webhooks, and go-live.  
 > **Out of scope:** Apple IAP / StoreKit (see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) § PR 4 when ready).  
-> **Status:** Phases 1–6 **complete**; Phase 7 **code complete** (ops test-clock verification pending); Phase 8 **automated suite complete** (live Stripe checklist ops); Phase 9 pending. See [progress tracker](#progress-tracker).
+> **Status:** Phases 1–6 **complete**; Phase 7 **code complete** (ops test-clock verification pending); Phase 8 **automated suite complete** (live Stripe checklist ops); Phase 9 pending; **Phase 10** (Zero Pause cohort pricing) **complete**. See [progress tracker](#progress-tracker).
 
 **Parent plan:** [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md)  
 **Current Stripe reference:** [docs/stripe-implementation.md](./docs/stripe-implementation.md)  
@@ -33,6 +33,7 @@ Use this table to track where you are. Complete phases **in order** unless noted
 | **7** | [Grandfather existing monthly payers](#phase-7--grandfather-existing-monthly-payers)        | **Higher** | Existing subs at renewal | ☑      |
 | **8** | [Testing (all phases)](#phase-8--testing)                                                   | —          | QA only                  | ☑      |
 | **9** | [Production deploy & go-live](#phase-9--production-deploy--go-live)                         | Medium     | Everyone on Stripe       | ☐      |
+| **10** | [Zero Pause Challenge community pricing](#phase-10--zero-pause-challenge-community-pricing) | Medium     | Maintainer default (public $) + Challenge ~$1.99 windows | ☑      |
 
 
 **Recommended PR mapping:**
@@ -43,6 +44,7 @@ Use this table to track where you are. Complete phases **in order** unless noted
 | PR 1 (config)                | 0 → 1 → 2     |
 | PR 2 (checkout + trial + UI) | 3 → 4 → 5 → 6 |
 | PR 3 (migration)             | 7             |
+| PR 4 (Zero Pause cohorts)    | 10            |
 
 
 ---
@@ -56,16 +58,30 @@ These are confirmed product rules. Do not change without sign-off.
 
 | Rule                               | Behavior                                                                                                                              |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **New monthly**                    | US$20 / month                                                                                                                         |
-| **Quarterly**                      | US$60 / 3 months                                                                                                                      |
-| **Annual**                         | $200 / year                                                                                                                           |
-| **Free trial**                     | **14 days**, only for accounts created **on or after** `SUBSCRIPTION_TRIAL_LAUNCH_AT` who have **never** subscribed (Stripe or Apple) |
+| **New monthly**                    | US$20 / month (Maintainer / default)                                                                                                  |
+| **Quarterly**                      | US$60 / 3 months (Maintainer / public)                                                                                                |
+| **Annual**                         | $200 / year (Maintainer / public)                                                                                                     |
+| **Legacy monthly (“one ninety-nine”)** | Existing Price `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY` (~US$1.99) — **not** a new $199 price                                      |
+| **Free trial**                     | **14 days**, only for accounts created **on or after** `SUBSCRIPTION_TRIAL_LAUNCH_AT` who have **never** subscribed (Stripe or Apple). Maintainer Checkout trial unchanged. **Cardless signup trial** is **out of scope** |
 | **Pre-launch free accounts**       | No trial — pay from day one                                                                                                           |
 | **Former / current subscribers**   | No trial — pay from day one                                                                                                           |
 | **Existing Stripe monthly payers** | Keep **legacy price** until `current_period_end`; US$20 at **next renewal** (no mid-cycle proration)                                  |
+| **Zero Pause Maintainer** (default)| Every new registrant; no date window → new pricing + existing trial rules                                                             |
+| **Zero Pause Challenge**           | Admin assigns Challenge + **start + end** dates. During `[start, end]` inclusive: Checkout **legacy monthly only** (no quarterly/annual) |
+| **Zero Pause Mastery**             | Badge/add-on only — **does not** switch Pro price by itself; price follows Challenge window vs Maintainer/public                      |
 
 
+### Zero Pause pricing cohorts
 
+| Cohort | Who | What they see / pay |
+| ------ | --- | ------------------- |
+| **Zero Pause Maintainer** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility |
+| **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date** | During `[start, end]` inclusive: **only** legacy monthly Checkout (~US$1.99). Not on the new pricing system for that window |
+| **Zero Pause Mastery** | Admin assign (unchanged) | Label/add-on; Pro price follows Challenge vs Maintainer rules above |
+
+**Lifecycle:** signup → Maintainer (new prices) → admin sets Challenge window → legacy monthly only → window ends → Maintainer again → if still on legacy Price, schedule prior public plan at next renewal (Phase 7 helper). See [Phase 10](#phase-10--zero-pause-challenge-community-pricing).
+
+**Data migration:** after deploying this role correction, run `npm run migrate:swap-zero-pause-cohorts` (dry-run) then `--execute` once per environment to flip existing `challenge` ↔ `maintainer` product keys. If that script was already executed under the **swapped** (incorrect) mapping, run dry-run then `--execute` **once more** — the flip is an involution and corrects a prior wrong flip.
 
 ### Trial eligibility (authoritative server-side)
 
@@ -1038,6 +1054,107 @@ flowchart LR
 
 Archive legacy monthly Price in Stripe Dashboard (`active: false`).
 
+**Note:** Do **not** archive the legacy monthly Price while Phase 10 Challenge windows still need `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY` for Checkout. Archive only after Challenge pricing no longer depends on that Price ID (product decision).
+
+---
+
+
+
+## Phase 10 — Zero Pause Challenge community pricing
+
+**Goal:** New users default to **Zero Pause Maintainer** (new US$20 / US$60 / $200 + existing trial rules, **no dates**). Students in an admin-set **Challenge** date window Checkout **only** at legacy monthly (`STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`, ~US$1.99). When the window ends they return to Maintainer; if still on legacy Price, schedule the prior public plan at next renewal (reuse Phase 7 helper). **Mastery** is a label only and does not switch Pro price. Nightingale stays tied to product key `challenge`. Cardless signup trial remains **out of scope**.
+
+**Depends on:** Phases 3–5 (checkout + UI), Phase 7 helper (`schedulePriceMigrationAtRenewal` / `stripe-price-migration.ts`). Can ship after or alongside Phase 9 go-live; does not require rewriting Phases 1–8.
+
+**Parent plan:** [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) § Zero Pause pricing cohorts.
+
+
+
+### 1. Model
+
+- Extend `ZeroPauseProduct` with `"maintainer"` (today: `"challenge" | "mastery"` in `src/domain/subscriptions/subscription.types.ts`).
+- Add `zeroPauseEndDate` (Date). Keep `zeroPauseDate` as **start** — both apply **only** to Challenge windows.
+- Document mutual exclusivity: a user is either in an **active Challenge window** (legacy ~US$1.99) or treated as **Maintainer/public** for Pro price resolution. Mastery may coexist as a badge; it must not override Challenge/Maintainer price rules.
+- Prefer storing explicit `maintainer` so admin UI can show the label (vs deriving only when not Challenge).
+
+
+
+### 2. Signup default
+
+- On new student create, set Zero Pause product to `maintainer` (public prices, no dates).
+- Alternative acceptable if product prefers: derive “Maintainer/public” when not in an active Challenge window — still prefer explicit `maintainer` for admin clarity.
+
+
+
+### 3. Admin UI / API
+
+- [`src/app/(admin)/admin/subscriptions/page.tsx`](src/app/(admin)/admin/subscriptions/page.tsx): Challenge requires **start + end** date; validate `end >= start`. Maintainer clears/hides dates. Challenge ↔ Maintainer mutually exclusive; Mastery independent.
+- [`src/app/api/v1/admin/users/subscription/route.ts`](src/app/api/v1/admin/users/subscription/route.ts): accept/persist `challenge`, `zeroPauseEndDate`; reject invalid Challenge windows; clear dates when assigning Maintainer.
+- UI labels `zeroPauseDate` as “Start date” — Challenge-window only.
+- **Stripe next-invoice sync (dynamic every toggle):** assigning Challenge (window end ≥ today) for a user with an active Stripe sub **always** syncs Stripe on each admin save — from **monthly, quarterly, or annual** current price → legacy monthly (~US$1.99) at `current_period_end` (`proration_behavior: 'none'`, unique idempotency key per request). Prior public price is stored on the user (`zeroPausePriorStripePriceId` / `zeroPausePriorBillingPeriod`). Switching Challenge → Maintainer (or Challenge expiry) restores that prior plan (US$20 / US$60 / $200) at next renewal via `schedulePriceChangeAtRenewal` (not monthly-only). See `syncStripeForZeroPauseChallengePricing` (→ legacy) / `syncStripeForZeroPauseMaintainerPricing` (→ public restore) in [`src/lib/api/stripe-challenge-pricing-sync.ts`](src/lib/api/stripe-challenge-pricing-sync.ts). Stripe failures return **502**.
+
+
+
+### 4. Checkout price resolution
+
+Server resolves price before creating the Checkout Session:
+
+1. If user has `challenge` and **today** is within `[zeroPauseDate, zeroPauseEndDate]` inclusive → force `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`; reject or ignore quarterly/annual (`challenge_period_not_allowed`).
+2. Else → existing new price map (monthly / quarterly / annual) + existing trial gating (Phases 2–3).
+
+Do not invent a second legacy Price ID. “One ninety-nine” = existing legacy monthly env var.
+
+
+
+### 5. Student UI
+
+- Subscriptions page: when Challenge-active (`challengePricingActive`), hide or disable quarterly/annual; show legacy monthly amount (US$1.99).
+- Maintainer / public cohort keeps the three-plan UI from Phase 5.
+
+
+
+### 6. Window expiry
+
+On Checkout and a cron/webhook path:
+
+1. If `now > zeroPauseEndDate` and user still has `challenge` → remove `challenge`, ensure `maintainer` (dates kept as history).
+2. Cron calls `syncStripeForZeroPauseMaintainerPricing` so **next renewal** restores the prior public plan (US$20 / US$60 / $200 from `zeroPausePriorStripePriceId`, else billing-period map / new monthly). No mid-cycle proration.
+
+
+
+### 7. Tests
+
+Extend Phase 8-style unit tests for:
+
+- Cohort → price resolution (Maintainer/public vs Challenge-active vs Mastery-only)
+- Window boundaries (`start`, `end`, day before/after end)
+- Expiry path schedules migration when still on legacy Price
+
+
+
+### 8. Ops
+
+- Product flip after role correction: `npm run migrate:swap-zero-pause-cohorts` (dry-run) then `--execute` — swaps `challenge` ↔ `maintainer` on existing users; leaves `mastery` alone. If already executed under the incorrect mapping, run dry-run + `--execute` **once more** to invert.
+- Challenge users already on legacy stay until the window ends, then schedule restore to public prices.
+- Do not archive legacy monthly Price while Challenge Checkout still needs it.
+
+
+
+### Phase 10 exit criteria
+
+- [x] `ZeroPauseProduct` includes `maintainer`; `zeroPauseEndDate` persisted and validated for Challenge (`end >= start`)
+- [x] New signups default to Maintainer (explicit or equivalent)
+- [x] Admin can assign Challenge (+ start/end) / Maintainer (no dates) / Mastery per locked rules
+- [x] Challenge-active Checkout uses **only** `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`; quarterly/annual rejected or ignored
+- [x] Maintainer Checkout uses new US$20 / US$60 / $200 + existing trial gating
+- [x] Mastery alone does **not** change Pro price
+- [x] Student UI hides/disables quarterly/annual while Challenge-active (`challengePricingActive`)
+- [x] After end date: cohort returns to Maintainer; legacy subs get renewal schedule to prior public plan
+- [x] Unit tests cover cohort resolution and window boundaries
+- [x] No cardless signup trial introduced
+- [x] Admin Challenge ↔ Maintainer toggles are **dynamic every save** (unique Stripe idempotency); quarterly/annual supported via prior-price restore
+- [x] One-time Mongo swap script available for existing `challenge` ↔ `maintainer` assignments
+
 ---
 
 
@@ -1054,8 +1171,11 @@ Archive legacy monthly Price in Stripe Dashboard (`active: false`).
 | Webhook user lookup     | `src/lib/api/stripe-webhook-user.ts`                        |
 | Billing period map      | `src/lib/api/stripe-billing-period.ts`                      |
 | Checkout session params | `src/lib/api/stripe-checkout-session.ts`                    |
+| Zero Pause cohort pricing | `src/lib/api/zero-pause-pricing.ts`                       |
+| Challenge expiry cron   | `src/app/api/v1/cron/zero-pause-challenge-expiry/route.ts`  |
 | Trial eligibility (new) | `src/lib/api/stripe-trial-eligibility.ts`                   |
 | Price migration helper  | `src/lib/api/stripe-price-migration.ts`                     |
+| Challenge Stripe sync   | `src/lib/api/stripe-challenge-pricing-sync.ts`              |
 | Trial UI gating         | `src/lib/api/subscription-trial-ui.ts`                      |
 | Subscription apply      | `src/lib/api/stripe-subscription-apply.ts`                  |
 | Entitlement             | `src/lib/api/user-subscription.ts`                          |
@@ -1105,4 +1225,5 @@ Archive legacy monthly Price in Stripe Dashboard (`active: false`).
 
 ## What's next after Stripe
 
-When Stripe phases 0–9 are complete, continue with Apple IAP in [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) § PR 4 (StoreKit, App Store Connect, three products, intro offers).
+1. **Phase 9** — Production deploy & go-live (ops), if not already done.
+2. Continue with Apple IAP in [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) § PR 4 (StoreKit, App Store Connect, three products, intro offers). Challenge legacy monthly remains Stripe-first unless a separate StoreKit product is approved.

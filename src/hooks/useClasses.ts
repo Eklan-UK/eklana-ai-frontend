@@ -1,7 +1,13 @@
 /**
  * React Query hooks for admin Classes (Phase 1).
  */
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { classesAPI, tutorAPI } from '@/lib/api';
 import { queryKeys } from '@/lib/react-query';
@@ -180,6 +186,34 @@ export function useAdminClasses(filters?: {
   });
 }
 
+/** Bucket-scoped admin list with offset paging (Load more). */
+export function useAdminClassesInfinite(filters: {
+  bucket: import('@/domain/classes/class.api.types').ClassBucket;
+  limit?: number;
+}) {
+  const limit = filters.limit ?? 100;
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.classes.list({ bucket: filters.bucket, limit }), 'infinite'] as const,
+    queryFn: async ({ pageParam }) => {
+      const res = await classesAPI.list({
+        bucket: filters.bucket,
+        limit,
+        offset: pageParam,
+      });
+      return res.data;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const { offset, limit: pageLimit, total, hasMore } = lastPage.pagination;
+      if (hasMore === false) return undefined;
+      const nextOffset = offset + pageLimit;
+      return nextOffset < total ? nextOffset : undefined;
+    },
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
+  });
+}
+
 export function useAdminClassDetail(classSeriesId: string | null) {
   return useQuery({
     queryKey: queryKeys.classes.detail(classSeriesId ?? ''),
@@ -239,6 +273,37 @@ export function useTutorClasses(filters?: {
     queryFn: async () => {
       const res = await classesAPI.tutorList(filters);
       return res.data;
+    },
+    staleTime: 1000 * 60,
+    refetchInterval: 1000 * 60,
+  });
+}
+
+/** Bucket-scoped tutor list with offset paging (Load more). */
+export function useTutorClassesInfinite(filters: {
+  bucket: import('@/domain/classes/class.api.types').ClassBucket;
+  limit?: number;
+}) {
+  const limit = filters.limit ?? 100;
+  return useInfiniteQuery({
+    queryKey: [
+      ...queryKeys.classes.tutorList({ bucket: filters.bucket, limit }),
+      'infinite',
+    ] as const,
+    queryFn: async ({ pageParam }) => {
+      const res = await classesAPI.tutorList({
+        bucket: filters.bucket,
+        limit,
+        offset: pageParam,
+      });
+      return res.data;
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const { offset, limit: pageLimit, total, hasMore } = lastPage.pagination;
+      if (hasMore === false) return undefined;
+      const nextOffset = offset + pageLimit;
+      return nextOffset < total ? nextOffset : undefined;
     },
     staleTime: 1000 * 60,
     refetchInterval: 1000 * 60,
