@@ -29,6 +29,7 @@ import {
   parseEndsOnDisplayToLocalDate,
 } from "@/lib/classes/first-session";
 import type { CreateAdminClassBody } from "@/domain/classes/class.api.types";
+import { isUserSubscribed } from "@/lib/api/user-subscription";
 
 const STEP_LABELS = ["Students", "Tutor", "Schedule", "Review"] as const;
 
@@ -121,6 +122,8 @@ interface PickerStudent {
   name: string;
   initials: string;
   level: string;
+  email: string;
+  isPro: boolean;
   sessionsLeft: number;
   avatarClass: string;
 }
@@ -130,10 +133,17 @@ function userToPickerStudent(u: {
   firstName?: string;
   lastName?: string;
   email?: string;
+  subscriptionPlan?: "free" | "premium";
+  subscriptionExpiresAt?: Date | string | null;
+  stripeSubscriptionStatus?: string | null;
+  subscriptionPaymentMethod?: string | null;
+  appleSubscriptionStatus?: string | null;
+  appleOriginalTransactionId?: string | null;
 }): PickerStudent {
   const id = u._id != null ? String(u._id) : "";
+  const email = u.email ?? "";
   const name =
-    `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "User";
+    `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || email || "User";
   const parts = name.split(/\s+/).filter(Boolean);
   const initials =
     parts.length >= 2
@@ -144,6 +154,8 @@ function userToPickerStudent(u: {
     name,
     initials,
     level: "—",
+    email,
+    isPro: isUserSubscribed(u),
     sessionsLeft: 0,
     avatarClass: "bg-[#2d6a32]",
   };
@@ -314,7 +326,7 @@ export function ScheduleClassModal({
     if (!q) return apiLearners;
     return apiLearners.filter(
       (s) =>
-        s.name.toLowerCase().includes(q) || s.level.toLowerCase().includes(q),
+        s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q),
     );
   }, [search, apiLearners]);
 
@@ -695,7 +707,7 @@ export function ScheduleClassModal({
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search students..."
+                    placeholder="Search students by name or email…"
                     className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#3d8c40]/50 focus:outline-none focus:ring-2 focus:ring-[#3d8c40]/15"
                   />
                 </div>
@@ -736,10 +748,15 @@ export function ScheduleClassModal({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-slate-900">{s.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatLevelLabel(s.level)}
+                            <p className="truncate text-xs text-gray-500">
+                              {s.email || "—"}
                             </p>
                           </div>
+                          {s.isPro ? (
+                            <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                              Pro
+                            </span>
+                          ) : null}
                           <span
                             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
                               lowSessions

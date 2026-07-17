@@ -131,7 +131,7 @@ export const adminService = {
     totalActiveLearners: number;
     totalDrills: number;
     zeroPauseChallengeUsers: number;
-    zeroPauseMasteryUsers: number;
+    zeroPauseMaintainerUsers: number;
     newSignupsThisWeek: number;
     discoveryCallsToday: number;
     videosAwaitingReview: number;
@@ -143,7 +143,7 @@ export const adminService = {
       totalActiveLearners: 0,
       totalDrills: 0,
       zeroPauseChallengeUsers: 0,
-      zeroPauseMasteryUsers: 0,
+      zeroPauseMaintainerUsers: 0,
       newSignupsThisWeek: 0,
       discoveryCallsToday: 0,
       videosAwaitingReview: 0,

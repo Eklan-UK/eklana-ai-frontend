@@ -11,6 +11,7 @@ import {
   billingPeriodFromMonths,
   formatBillingPeriodLabel,
   formatZeroPauseProductWithDate,
+  isZeroPauseProduct,
   resolveSubscriptionExpiry,
   type BillingPeriod,
   type ZeroPauseProduct,
@@ -49,6 +50,7 @@ type SubscriptionForm = {
   billingPeriod: BillingPeriod;
   zeroPauseProducts: ZeroPauseProduct[];
   zeroPauseDate: string;
+  zeroPauseEndDate: string;
   amount?: number;
   paymentMethod?: string;
   note?: string;
@@ -90,12 +92,15 @@ const SubscriptionsPage: React.FC = () => {
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [savedDates, setSavedDates] = useState<Record<string, string>>({});
+  const [savedDates, setSavedDates] = useState<
+    Record<string, { start: string; end: string }>
+  >({});
   const [form, setForm] = useState<SubscriptionForm>({
     plan: "free",
     billingPeriod: "monthly",
     zeroPauseProducts: [],
     zeroPauseDate: "",
+    zeroPauseEndDate: "",
   });
 
   const filteredLearners = useMemo(() => {
@@ -126,9 +131,10 @@ const SubscriptionsPage: React.FC = () => {
         l.subscriptionBillingPeriod ||
         billingPeriodFromMonths(l.subscriptionMonthsPaidFor),
       zeroPauseProducts: Array.isArray(l.zeroPauseProducts)
-        ? l.zeroPauseProducts
+        ? l.zeroPauseProducts.filter(isZeroPauseProduct)
         : [],
       zeroPauseDate: toDateInput(l.zeroPauseDate),
+      zeroPauseEndDate: toDateInput(l.zeroPauseEndDate),
       amount: l.subscriptionAmountPaid || undefined,
       paymentMethod: l.subscriptionPaymentMethod || "",
       note: l.subscriptionAdminNote || "",
@@ -142,37 +148,64 @@ const SubscriptionsPage: React.FC = () => {
   const toggleZeroPauseProduct = (product: ZeroPauseProduct) => {
     setForm((f) => {
       const has = f.zeroPauseProducts.includes(product);
-      const nextProducts = has
+      let nextProducts = has
         ? f.zeroPauseProducts.filter((p) => p !== product)
         : [...f.zeroPauseProducts, product];
+
+      // Challenge and Maintainer are mutually exclusive.
+      if (!has && product === "challenge") {
+        nextProducts = nextProducts.filter((p) => p !== "maintainer");
+      }
+      if (!has && product === "maintainer") {
+        nextProducts = nextProducts.filter((p) => p !== "challenge");
+      }
+
+      const hasChallenge = nextProducts.includes("challenge");
+      const cleared = nextProducts.length === 0;
       return {
         ...f,
         zeroPauseProducts: nextProducts,
-        // Clear the shared date when all products are deselected
-        zeroPauseDate: nextProducts.length === 0 ? "" : f.zeroPauseDate,
+        // Dates are Challenge-window only; clear when Challenge is off.
+        zeroPauseDate: cleared || !hasChallenge ? "" : f.zeroPauseDate,
+        zeroPauseEndDate: cleared || !hasChallenge ? "" : f.zeroPauseEndDate,
       };
     });
   };
 
   const save = async (userId: string) => {
-    if (form.zeroPauseProducts.length > 0 && !form.zeroPauseDate) {
-      toast.error("Please set a date for the Zero Pause product(s)");
-      return;
+    const hasChallenge = form.zeroPauseProducts.includes("challenge");
+    if (hasChallenge) {
+      if (!form.zeroPauseDate || !form.zeroPauseEndDate) {
+        toast.error("Challenge requires both start and end dates");
+        return;
+      }
+      if (form.zeroPauseEndDate < form.zeroPauseDate) {
+        toast.error("Challenge end date must be on or after the start date");
+        return;
+      }
     }
+
     await mutateAsync({
       userId,
       plan: form.plan,
       billingPeriod: form.plan === "premium" ? form.billingPeriod : undefined,
       zeroPauseProducts: form.zeroPauseProducts,
-      zeroPauseDate: form.zeroPauseProducts.length > 0 ? form.zeroPauseDate : null,
+      zeroPauseDate: hasChallenge ? form.zeroPauseDate || null : null,
+      zeroPauseEndDate: hasChallenge ? form.zeroPauseEndDate || null : null,
       amount: form.amount,
       paymentMethod: form.paymentMethod,
       note: form.note,
     });
-    // Keep a local record of the saved date so the badge renders immediately,
+    // Keep a local record of the saved dates so the badge renders immediately,
     // regardless of React Query cache timing after invalidation.
-    if (form.zeroPauseProducts.length > 0 && form.zeroPauseDate) {
-      setSavedDates((prev) => ({ ...prev, [userId]: form.zeroPauseDate }));
+    if (hasChallenge && form.zeroPauseDate) {
+      setSavedDates((prev) => ({
+        ...prev,
+        [userId]: {
+          start: form.zeroPauseDate,
+          end: form.zeroPauseEndDate,
+        },
+      }));
     } else {
       setSavedDates((prev) => {
         const next = { ...prev };
@@ -262,7 +295,7 @@ const SubscriptionsPage: React.FC = () => {
                   const zeroPause: ZeroPauseProduct[] = Array.isArray(
                     l.zeroPauseProducts
                   )
-                    ? l.zeroPauseProducts
+                    ? l.zeroPauseProducts.filter(isZeroPauseProduct)
                     : [];
                   const planDisplay = getSubscriptionPlanDisplay(l);
                   const isActivePremium = planDisplay.label === "premium";
@@ -295,17 +328,22 @@ const SubscriptionsPage: React.FC = () => {
                           <span className="text-gray-400">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {zeroPause.map((product) => (
-                              <span
-                                key={product}
-                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
-                              >
-                                {formatZeroPauseProductWithDate(
-                                  product,
-                                  savedDates[l._id] ?? l.zeroPauseDate
-                                )}
-                              </span>
-                            ))}
+                            {zeroPause.map((product) => {
+                              const label = formatZeroPauseProductWithDate(
+                                product,
+                                savedDates[l._id]?.start ?? l.zeroPauseDate,
+                                savedDates[l._id]?.end ?? l.zeroPauseEndDate
+                              );
+                              if (!label) return null;
+                              return (
+                                <span
+                                  key={product}
+                                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </td>
@@ -479,22 +517,40 @@ const SubscriptionsPage: React.FC = () => {
                     </label>
                   ))}
                 </div>
-                {form.zeroPauseProducts.length > 0 && (
-                  <div className="space-y-1 pt-1">
-                    <label className="text-xs font-medium text-gray-600">
-                      Start date
-                    </label>
-                    <input
-                      type="date"
-                      value={form.zeroPauseDate}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          zeroPauseDate: e.target.value,
-                        }))
-                      }
-                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
-                    />
+                {form.zeroPauseProducts.includes("challenge") && (
+                  <div className="space-y-2 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        Start date (required for Challenge)
+                      </label>
+                      <input
+                        type="date"
+                        value={form.zeroPauseDate}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            zeroPauseDate: e.target.value,
+                          }))
+                        }
+                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        End date (required for Challenge)
+                      </label>
+                      <input
+                        type="date"
+                        value={form.zeroPauseEndDate}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            zeroPauseEndDate: e.target.value,
+                          }))
+                        }
+                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

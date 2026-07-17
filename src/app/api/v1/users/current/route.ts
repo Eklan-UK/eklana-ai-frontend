@@ -9,6 +9,7 @@ import Profile from "@/models/profile";
 import { logger } from "@/lib/api/logger";
 import { isUserSubscribed } from "@/lib/api/user-subscription";
 import { isEligibleForTrial } from "@/lib/api/stripe-trial-eligibility";
+import { isZeroPauseChallengePricingActive } from "@/lib/api/zero-pause-pricing";
 
 async function handler(
   req: NextRequest,
@@ -59,6 +60,7 @@ async function handler(
       appleSubscriptionStatus: (user as any).appleSubscriptionStatus ?? null,
       isSubscribed: subscribed,
       eligibleForTrial: isEligibleForTrial(user as any),
+      challengePricingActive: isZeroPauseChallengePricingActive(user as any),
       iapAccountToken,
     };
 

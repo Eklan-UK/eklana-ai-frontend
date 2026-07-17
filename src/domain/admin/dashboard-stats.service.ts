@@ -9,7 +9,7 @@ export interface AdminDashboardStats {
 	totalActiveLearners: number;
 	totalDrills: number;
 	zeroPauseChallengeUsers: number;
-	zeroPauseMasteryUsers: number;
+	zeroPauseMaintainerUsers: number;
 	newSignupsThisWeek: number;
 	discoveryCallsToday: number;
 	videosAwaitingReview: number;
@@ -60,7 +60,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
 	let subscribedUsers = 0;
 	let zeroPauseChallengeUsers = 0;
-	let zeroPauseMasteryUsers = 0;
+	let zeroPauseMaintainerUsers = 0;
 	let newSignupsThisWeek = 0;
 
 	for (const user of learnerSubscriptionRows) {
@@ -69,7 +69,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 		const products = user.zeroPauseProducts;
 		if (Array.isArray(products)) {
 			if (products.includes('challenge')) zeroPauseChallengeUsers += 1;
-			if (products.includes('mastery')) zeroPauseMasteryUsers += 1;
+			if (products.includes('maintainer')) zeroPauseMaintainerUsers += 1;
 		}
 
 		if (user.createdAt && new Date(user.createdAt) >= oneWeekAgo) {
@@ -83,7 +83,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 		totalActiveLearners,
 		totalDrills,
 		zeroPauseChallengeUsers,
-		zeroPauseMasteryUsers,
+		zeroPauseMaintainerUsers,
 		newSignupsThisWeek,
 		discoveryCallsToday,
 		videosAwaitingReview: 0,

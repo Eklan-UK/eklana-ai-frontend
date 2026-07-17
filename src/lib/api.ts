@@ -1023,7 +1023,7 @@ export const adminAPI = {
         totalActiveLearners: number;
         totalDrills: number;
         zeroPauseChallengeUsers: number;
-        zeroPauseMasteryUsers: number;
+        zeroPauseMaintainerUsers: number;
         newSignupsThisWeek: number;
         discoveryCallsToday: number;
         videosAwaitingReview: number;
@@ -1040,8 +1040,9 @@ export const adminAPI = {
     plan: "free" | "premium";
     months?: number;
     billingPeriod?: "monthly" | "quarterly" | "annual";
-    zeroPauseProducts?: ("challenge" | "mastery")[];
+    zeroPauseProducts?: ("challenge" | "maintainer")[];
     zeroPauseDate?: string | null;
+    zeroPauseEndDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -1053,8 +1054,9 @@ export const adminAPI = {
         userId: string;
         subscriptionPlan: "free" | "premium";
         subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
-        zeroPauseProducts: ("challenge" | "mastery")[];
+        zeroPauseProducts: ("challenge" | "maintainer")[];
         zeroPauseDate: string | null;
+        zeroPauseEndDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };

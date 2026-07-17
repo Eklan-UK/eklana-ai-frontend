@@ -106,11 +106,14 @@ export const queryKeys = {
   },
   classes: {
     all: ["admin", "classes"] as const,
-    list: (filters?: { bucket?: string; limit?: number }) =>
+    list: (filters?: { bucket?: string; limit?: number; offset?: number }) =>
       [...queryKeys.classes.all, "list", filters] as const,
     detail: (id: string) => [...queryKeys.classes.all, "detail", id] as const,
-    tutorList: (filters?: { bucket?: string; limit?: number }) =>
-      ["tutor", "classes", "list", filters] as const,
+    tutorList: (filters?: {
+      bucket?: string;
+      limit?: number;
+      offset?: number;
+    }) => ["tutor", "classes", "list", filters] as const,
     learnerList: (filters?: { bucket?: string; limit?: number }) =>
       ["learner", "classes", "list", filters] as const,
     learnerPastSessions: (filters?: { limit?: number; offset?: number }) =>
