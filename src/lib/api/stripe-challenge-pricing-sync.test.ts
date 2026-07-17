@@ -39,6 +39,8 @@ function createCallLog(): CallLog {
 function createStripeStub(options: {
   priceId?: string;
   schedule?: string | null;
+  status?: string;
+  trial_end?: number | null;
   callLog: CallLog;
   /** After release, subsequent retrieves have no schedule. */
   clearScheduleOnRelease?: boolean;
@@ -51,6 +53,8 @@ function createStripeStub(options: {
   };
   const { callLog } = options;
   const clearOnRelease = options.clearScheduleOnRelease ?? true;
+  const status = options.status ?? 'active';
+  const trial_end = options.trial_end ?? null;
   let scheduleCreateCount = 0;
 
   return {
@@ -61,6 +65,8 @@ function createStripeStub(options: {
         return {
           id,
           schedule: mutable.schedule,
+          status,
+          trial_end,
           items: {
             data: [
               {
@@ -216,6 +222,56 @@ describe('schedulePriceChangeAtRenewal', () => {
     assert.equal(result.status, 'scheduled');
     assert.deepEqual(callLog.schedulesRelease, [{ id: 'sub_sched_phase7' }]);
     assert.equal(callLog.schedulesCreate.length, 1);
+  });
+});
+
+describe('syncStripeForZeroPauseChallengePricing while trialing', () => {
+  it('schedules legacy at renewal with trial_end on phase 1', async () => {
+    await withPriceConfig(async () => {
+      const callLog = createCallLog();
+      const stripe = createStripeStub({
+        priceId: NEW,
+        status: 'trialing',
+        trial_end: PERIOD_END,
+        callLog,
+      });
+      const user = {
+        stripeSubscriptionId: SUB_ID,
+        stripeScheduleId: null as string | null,
+        zeroPauseEndDate: CHALLENGE_END,
+        zeroPausePriorStripePriceId: null as string | null,
+        zeroPausePriorBillingPeriod: null as 'monthly' | null,
+      };
+
+      const result = await syncStripeForZeroPauseChallengePricing(
+        stripe as never,
+        user,
+        { enteringFromNonChallenge: true }
+      );
+
+      assert.equal(result.status, 'scheduled_legacy');
+      assert.deepEqual(callLog.schedulesUpdate[0], {
+        id: 'sub_sched_challenge_1',
+        params: {
+          proration_behavior: 'none',
+          phases: [
+            {
+              items: [{ price: NEW, quantity: 1 }],
+              start_date: PERIOD_START,
+              end_date: PERIOD_END,
+              proration_behavior: 'none',
+              trial_end: PERIOD_END,
+            },
+            {
+              items: [{ price: LEGACY, quantity: 1 }],
+              proration_behavior: 'none',
+            },
+          ],
+          end_behavior: 'release',
+        },
+      });
+      assert.equal(callLog.subscriptionsUpdate.length, 0);
+    });
   });
 });
 

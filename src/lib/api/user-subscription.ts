@@ -4,7 +4,10 @@ import {
   STRIPE_NON_ENTITLED_STATUSES,
 } from "@/lib/api/stripe-subscription-apply";
 
-type SubscriptionUser = Pick<IUser, "subscriptionPlan" | "subscriptionExpiresAt"> & {
+type SubscriptionUser = {
+  subscriptionPlan?: IUser["subscriptionPlan"] | null;
+  /** Mongo Date or JSON-serialized ISO string from API responses. */
+  subscriptionExpiresAt?: Date | string | null;
   stripeSubscriptionStatus?: string | null;
   subscriptionPaymentMethod?: string | null;
   appleSubscriptionStatus?: string | null;
@@ -12,13 +15,13 @@ type SubscriptionUser = Pick<IUser, "subscriptionPlan" | "subscriptionExpiresAt"
 };
 
 function expiresAtInFuture(
-  subscriptionExpiresAt: IUser["subscriptionExpiresAt"]
+  subscriptionExpiresAt: SubscriptionUser["subscriptionExpiresAt"]
 ): boolean {
   if (!subscriptionExpiresAt) return false;
   const expiresAt =
     subscriptionExpiresAt instanceof Date
       ? subscriptionExpiresAt
-      : new Date(subscriptionExpiresAt as unknown as string);
+      : new Date(subscriptionExpiresAt);
   return expiresAt.getTime() > Date.now();
 }
 
