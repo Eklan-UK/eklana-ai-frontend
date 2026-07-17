@@ -29,18 +29,53 @@ jobs:
                 "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$id?teamId=$VERCEL_ORG_ID" >/dev/null
               echo "Deleted env id $id"
             done
+          else
+            echo "No existing $KEY entries"
           fi
 
           echo "Creating $KEY=$VALUE for production, preview, development…"
-          curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
+          CREATE_RESP=$(curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
             "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" \
             -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" '{
               key: $k,
               value: $v,
-              type: "encrypted",
+              type: "plain",
               target: ["production", "preview", "development"]
-            }')" | jq '{key:.key, target:.target, id:.id, type:.type, error:.error}'
+            }')")
+          echo "$CREATE_RESP" | jq .
+          # Accept either object or array response shapes
+          CREATED_KEY=$(echo "$CREATE_RESP" | jq -r 'if type=="array" then .[0].key else .key end // empty')
+          if [ "$CREATED_KEY" != "$KEY" ]; then
+            echo "Create failed — retrying per-target…"
+            for target in production preview development; do
+              ONE=$(curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" \
+                -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" --arg t "$target" '{
+                  key: $k,
+                  value: $v,
+                  type: "plain",
+                  target: [$t]
+                }')")
+              echo "target=$target => $(echo "$ONE" | jq -c '{key:(.key // .[0].key), id:(.id // .[0].id), error}')"
+              ONE_KEY=$(echo "$ONE" | jq -r 'if type=="array" then .[0].key else .key end // empty')
+              if [ "$ONE_KEY" != "$KEY" ]; then
+                echo "Failed to create $KEY for $target"
+                exit 1
+              fi
+            done
+          fi
+
+          # Verify
+          VERIFY=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID")
+          echo "$VERIFY" | jq -r --arg k "$KEY" '.envs[]? | select(.key==$k) | "verified: \(.key) targets=\(.target|join(",")) id=\(.id)"'
+          COUNT=$(echo "$VERIFY" | jq -r --arg k "$KEY" '[.envs[]? | select(.key==$k)] | length')
+          if [ "$COUNT" -lt 1 ]; then
+            echo "APPLE_BUNDLE_ID missing after create"
+            exit 1
+          fi
 
           echo "Finding latest production deployment…"
           LATEST=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
@@ -56,6 +91,6 @@ jobs:
 
           npm install -g vercel@latest
           echo "Redeploying https://$DEPLOY_URL …"
-          vercel redeploy "https://$DEPLOY_URL" --target production --yes \
+          vercel redeploy "https://$DEPLOY_URL" --target production \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
