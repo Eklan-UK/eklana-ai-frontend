@@ -23,10 +23,14 @@ type CallLog = {
 function createStripeStub(options: {
   priceId?: string;
   schedule?: string | null;
+  status?: string;
+  trial_end?: number | null;
   callLog: CallLog;
 }) {
   const priceId = options.priceId ?? LEGACY;
   let schedule = options.schedule ?? null;
+  const status = options.status ?? 'active';
+  const trial_end = options.trial_end ?? null;
   const { callLog } = options;
 
   return {
@@ -36,6 +40,8 @@ function createStripeStub(options: {
         return {
           id,
           schedule,
+          status,
+          trial_end,
           items: {
             data: [
               {
@@ -139,6 +145,48 @@ describe('schedulePriceChangeAtRenewal', () => {
     assert.deepEqual(callLog.schedulesRelease, [{ id: 'sub_sched_old' }]);
     assert.equal(callLog.schedulesCreate.length, 1);
   });
+
+  it('preserves trial_end on phase 1 when subscription is trialing', async () => {
+    const callLog = emptyCallLog();
+    const stripe = createStripeStub({
+      priceId: NEW,
+      status: 'trialing',
+      trial_end: PERIOD_END,
+      callLog,
+    });
+
+    const result = await schedulePriceChangeAtRenewal(
+      stripe as never,
+      SUB_ID,
+      LEGACY
+    );
+
+    assert.deepEqual(result, {
+      status: 'scheduled',
+      scheduleId: 'sub_sched_1',
+    });
+    assert.deepEqual(callLog.schedulesUpdate[0], {
+      id: 'sub_sched_1',
+      params: {
+        proration_behavior: 'none',
+        phases: [
+          {
+            items: [{ price: NEW, quantity: 1 }],
+            start_date: PERIOD_START,
+            end_date: PERIOD_END,
+            proration_behavior: 'none',
+            trial_end: PERIOD_END,
+          },
+          {
+            items: [{ price: LEGACY, quantity: 1 }],
+            proration_behavior: 'none',
+          },
+        ],
+        end_behavior: 'release',
+      },
+    });
+    assert.equal(callLog.subscriptionsUpdate.length, 0);
+  });
 });
 
 describe('schedulePriceMigrationAtRenewal', () => {
@@ -173,6 +221,48 @@ describe('schedulePriceMigrationAtRenewal', () => {
             start_date: PERIOD_START,
             end_date: PERIOD_END,
             proration_behavior: 'none',
+          },
+          {
+            items: [{ price: NEW, quantity: 1 }],
+            proration_behavior: 'none',
+          },
+        ],
+        end_behavior: 'release',
+      },
+    });
+    assert.equal(callLog.subscriptionsUpdate.length, 0);
+  });
+
+  it('preserves trial_end on phase 1 when subscription is trialing', async () => {
+    const callLog = emptyCallLog();
+    const stripe = createStripeStub({
+      status: 'trialing',
+      trial_end: PERIOD_END,
+      callLog,
+    });
+
+    const result = await schedulePriceMigrationAtRenewal(
+      stripe as never,
+      SUB_ID,
+      LEGACY,
+      NEW
+    );
+
+    assert.deepEqual(result, {
+      status: 'scheduled',
+      scheduleId: 'sub_sched_1',
+    });
+    assert.deepEqual(callLog.schedulesUpdate[0], {
+      id: 'sub_sched_1',
+      params: {
+        proration_behavior: 'none',
+        phases: [
+          {
+            items: [{ price: LEGACY, quantity: 1 }],
+            start_date: PERIOD_START,
+            end_date: PERIOD_END,
+            proration_behavior: 'none',
+            trial_end: PERIOD_END,
           },
           {
             items: [{ price: NEW, quantity: 1 }],
