@@ -66,7 +66,7 @@ These are confirmed product rules. Do not change without sign-off.
 | **Pre-launch free accounts**       | No trial — pay from day one                                                                                                           |
 | **Former / current subscribers**   | No trial — pay from day one                                                                                                           |
 | **Existing Stripe monthly payers** | Keep **legacy price** until `current_period_end`; US$20 at **next renewal** (no mid-cycle proration)                                  |
-| **Zero Pause Maintainer** (default)| Every new registrant; no date window → new pricing + existing trial rules                                                             |
+| **Zero Pause maintenance** (default)| Every new registrant; no date window → new pricing + existing trial rules                                                             |
 | **Zero Pause Challenge**           | Admin assigns Challenge + **start + end** dates. During `[start, end]` inclusive: Checkout **legacy monthly only** (no quarterly/annual) |
 | **Zero Pause Mastery**             | Badge/add-on only — **does not** switch Pro price by itself; price follows Challenge window vs Maintainer/public                      |
 
@@ -75,7 +75,7 @@ These are confirmed product rules. Do not change without sign-off.
 
 | Cohort | Who | What they see / pay |
 | ------ | --- | ------------------- |
-| **Zero Pause Maintainer** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility |
+| **Zero Pause maintenance** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility |
 | **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date** | During `[start, end]` inclusive: **only** legacy monthly Checkout (~US$1.99). Not on the new pricing system for that window |
 | **Zero Pause Mastery** | Admin assign (unchanged) | Label/add-on; Pro price follows Challenge vs Maintainer rules above |
 
@@ -1062,7 +1062,7 @@ Archive legacy monthly Price in Stripe Dashboard (`active: false`).
 
 ## Phase 10 — Zero Pause Challenge community pricing
 
-**Goal:** New users default to **Zero Pause Maintainer** (new US$20 / US$60 / $200 + existing trial rules, **no dates**). Students in an admin-set **Challenge** date window Checkout **only** at legacy monthly (`STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`, ~US$1.99). When the window ends they return to Maintainer; if still on legacy Price, schedule the prior public plan at next renewal (reuse Phase 7 helper). **Mastery** is a label only and does not switch Pro price. Nightingale stays tied to product key `challenge`. Cardless signup trial remains **out of scope**.
+**Goal:** New users default to **Zero Pause maintenance** (new US$20 / US$60 / $200 + existing trial rules, **no dates**). Students in an admin-set **Challenge** date window Checkout **only** at legacy monthly (`STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`, ~US$1.99). When the window ends they return to Maintainer; if still on legacy Price, schedule the prior public plan at next renewal (reuse Phase 7 helper). **Mastery** is a label only and does not switch Pro price. Nightingale stays tied to product key `challenge`. Cardless signup trial remains **out of scope**.
 
 **Depends on:** Phases 3–5 (checkout + UI), Phase 7 helper (`schedulePriceMigrationAtRenewal` / `stripe-price-migration.ts`). Can ship after or alongside Phase 9 go-live; does not require rewriting Phases 1–8.
 

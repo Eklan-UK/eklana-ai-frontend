@@ -5,13 +5,227 @@ import { AssignmentRepository } from '../assignments/assignment.repository';
 import { AttemptRepository, CreateAttemptData } from '../attempts/attempt.repository';
 import { userService } from '@/lib/api/user.service';
 import { NotFoundError, ValidationError, ForbiddenError } from '@/lib/api/response';
+import { sendDrillAssignmentNotification } from '@/lib/api/email.service';
+import {
+  formatDrillNotificationLabel,
+  getDrillTopicTitle,
+} from '@/lib/drill-display-label';
 import { onDrillCompleted, onDrillAssigned } from '@/services/notification/triggers';
 import { toUserIdQuery } from '@/lib/api/user-id';
+import {
+  getMissionNumberLabel,
+  parseLearningJourneyPartId,
+} from '@/domain/learning-journey/learning-journey.catalog';
+import { getDrillTypeLabel } from '@/utils/drill';
 import Bookmark from '@/models/bookmark';
 import WordAnalytics from '@/models/word-analytics';
 import PronunciationAttempt from '@/models/pronunciation-attempt';
-import type { AssignDrillParams, Drill as DrillType, CreateDrillData, CompleteDrillParams } from './drill.types';
+import Profile from '@/models/profile';
+import User from '@/models/user';
+import type {
+  AssignDrillParams,
+  Drill as DrillType,
+  CreateDrillData,
+  CompleteDrillParams,
+  DrillListFilters,
+} from './drill.types';
 import type { CreateAssignmentData } from '../assignments/assignment.types';
+
+export type DrillAssignmentNotifyTarget = {
+  learnerId: Types.ObjectId | string;
+  _id?: Types.ObjectId | string;
+  dueDate?: Date | string | null;
+};
+
+export type DrillAssignmentNotifyDrill = {
+  _id: Types.ObjectId | string;
+  title?: string | null;
+  type?: string | null;
+  learning_journey_part?: number | null;
+  learning_journey_topic?: string | null;
+};
+
+export type DrillAssignmentNotifyResult = {
+  status: 'sent' | 'skipped';
+  reason?: string;
+  channels?: { email: boolean; push: boolean };
+};
+
+function formatAssignerName(assigner: {
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+}): string {
+  return (
+    assigner.name ||
+    `${assigner.firstName || ''} ${assigner.lastName || ''}`.trim() ||
+    'Your tutor'
+  );
+}
+
+export type NotifyLearnerOfAssignmentDeps = {
+  findProfile: (learnerId: string) => Promise<{
+    notificationPreferences?: { learningReminders?: boolean };
+  } | null>;
+  findLearner: (learnerId: string) => Promise<{
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+  } | null>;
+  sendEmail: typeof sendDrillAssignmentNotification;
+  sendPush: typeof onDrillAssigned;
+};
+
+async function defaultFindProfile(learnerId: string) {
+  return Profile.findOne({ userId: learnerId })
+    .select('notificationPreferences')
+    .lean() as Promise<{
+    notificationPreferences?: { learningReminders?: boolean };
+  } | null>;
+}
+
+async function defaultFindLearner(learnerId: string) {
+  return User.findById(learnerId)
+    .select('email firstName lastName name')
+    .lean() as Promise<{
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+  } | null>;
+}
+
+/**
+ * Notify one learner of a new drill assignment (prefs gate → email + in-app/push).
+ * Shared by DrillService and assign/bulk routes. Safe to await; channels fail independently.
+ */
+export async function notifyLearnerOfAssignment(
+  params: {
+    learnerId: string;
+    drill: DrillAssignmentNotifyDrill;
+    assigner: { firstName?: string; lastName?: string; name?: string };
+    dueDate?: Date | string | null;
+    assignmentId?: string;
+  },
+  deps: Partial<NotifyLearnerOfAssignmentDeps> = {}
+): Promise<DrillAssignmentNotifyResult> {
+  const { learnerId, drill, assigner, dueDate, assignmentId } = params;
+  const drillId = drill._id.toString();
+  const findProfile = deps.findProfile ?? defaultFindProfile;
+  const findLearner = deps.findLearner ?? defaultFindLearner;
+  const sendEmail = deps.sendEmail ?? sendDrillAssignmentNotification;
+  const sendPush = deps.sendPush ?? onDrillAssigned;
+
+  const profile = await findProfile(learnerId);
+  if (profile?.notificationPreferences?.learningReminders === false) {
+    return { status: 'skipped', reason: 'prefs_disabled' };
+  }
+
+  const learner = await findLearner(learnerId);
+
+  const studentName =
+    `${learner?.firstName ?? ''} ${learner?.lastName ?? ''}`.trim() ||
+    learner?.name ||
+    'Student';
+
+  const assignerName = formatAssignerName(assigner);
+  const dueDateObj =
+    dueDate == null || dueDate === ''
+      ? undefined
+      : dueDate instanceof Date
+        ? dueDate
+        : new Date(dueDate);
+
+  const displayLabel = formatDrillNotificationLabel(drill);
+  const drillTypeLabel = getDrillTypeLabel(drill.type);
+  const partId = parseLearningJourneyPartId(drill.learning_journey_part);
+  const missionLabel = partId != null ? getMissionNumberLabel(partId) : undefined;
+  const topicLabel = getDrillTopicTitle(drill) ?? undefined;
+
+  let emailSucceeded = false;
+  let pushSucceeded = false;
+
+  if (learner?.email) {
+    try {
+      await sendEmail({
+        studentEmail: learner.email,
+        studentName,
+        drillTitle: displayLabel,
+        drillType: drillTypeLabel,
+        missionLabel,
+        topicLabel,
+        dueDate: dueDateObj && !Number.isNaN(dueDateObj.getTime()) ? dueDateObj : undefined,
+        assignerName,
+        drillId,
+        assignmentId,
+      });
+      emailSucceeded = true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn('Drill assignment email failed', { learnerId, drillId, msg });
+    }
+  }
+
+  try {
+    const pushResult = await sendPush(
+      learnerId,
+      { _id: drillId, title: displayLabel, type: drill.type ?? '' },
+      {
+        firstName: assigner.firstName,
+        lastName: assigner.lastName,
+        name: assigner.name,
+      }
+    );
+    if (pushResult) {
+      pushSucceeded = true;
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn('Drill assignment push/in-app failed', { learnerId, drillId, msg });
+  }
+
+  if (emailSucceeded || pushSucceeded) {
+    return {
+      status: 'sent',
+      channels: { email: emailSucceeded, push: pushSucceeded },
+    };
+  }
+
+  return { status: 'skipped', reason: 'delivery_failed' };
+}
+
+/**
+ * Fire-and-forget notify for newly created assignments.
+ * Assignment APIs must never fail because of notification errors.
+ */
+export function notifyLearnersOfAssignment(
+  assignments: DrillAssignmentNotifyTarget[],
+  drill: DrillAssignmentNotifyDrill,
+  assigner: { firstName?: string; lastName?: string; name?: string }
+): void {
+  const drillId = drill._id.toString();
+  for (const assignment of assignments) {
+    const learnerId = assignment.learnerId.toString();
+    notifyLearnerOfAssignment({
+      learnerId,
+      drill,
+      assigner,
+      dueDate: assignment.dueDate,
+      assignmentId: assignment._id?.toString(),
+    }).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('Failed to send drill assignment notification', {
+        error: message,
+        learnerId,
+        drillId,
+      });
+    });
+  }
+}
+
+/** Alias kept for call sites that prefer a DrillService-shaped API. */
+const dispatchNotifyLearnersOfAssignment = notifyLearnersOfAssignment;
 
 /**
  * Drill Service
@@ -44,29 +258,21 @@ export class DrillService {
     );
   }
 
-  private notifyDrillAssigned(
-    assignments: Array<{ learnerId: Types.ObjectId | string }>,
-    drill: { _id: Types.ObjectId | string; title: string; type: string },
+  /** Shared notify entry used by create/update/assign paths. */
+  notifyLearnersOfAssignment(
+    assignments: DrillAssignmentNotifyTarget[],
+    drill: DrillAssignmentNotifyDrill,
     assigner: { firstName?: string; lastName?: string; name?: string }
   ): void {
-    const drillId = drill._id.toString();
-    for (const assignment of assignments) {
-      onDrillAssigned(
-        assignment.learnerId.toString(),
-        { _id: drillId, title: drill.title, type: drill.type },
-        {
-          firstName: assigner.firstName,
-          lastName: assigner.lastName,
-          name: assigner.name,
-        }
-      ).catch((err) => {
-        logger.error('Failed to send drill assignment notification', {
-          error: err.message,
-          learnerId: assignment.learnerId.toString(),
-          drillId,
-        });
-      });
-    }
+    dispatchNotifyLearnersOfAssignment(assignments, drill, assigner);
+  }
+
+  private notifyDrillAssigned(
+    assignments: DrillAssignmentNotifyTarget[],
+    drill: DrillAssignmentNotifyDrill,
+    assigner: { firstName?: string; lastName?: string; name?: string }
+  ): void {
+    dispatchNotifyLearnersOfAssignment(assignments, drill, assigner);
   }
 
   /** 
@@ -140,6 +346,10 @@ export class DrillService {
       );
     }
 
+    if (successfulAssignments.length > 0) {
+      this.notifyDrillAssigned(successfulAssignments, drill, assigner);
+    }
+
     logger.info('Drill assigned to users', {
       drillId: drill._id,
       assignedBy: assigner.email,
@@ -156,56 +366,11 @@ export class DrillService {
   /**
    * List drills with filters
    */
-  async listDrills(filters: {
-    type?: string;
-    difficulty?: string;
-    studentEmail?: string;
-    assignedToIds?: string[];
-    createdBy?: string;
-    isActive?: boolean;
-    assignmentStatus?: 'saved' | 'assigned';
-    q?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ drills: DrillType[]; total: number; limit: number; offset: number }> {
+  async listDrills(
+    filters: DrillListFilters
+  ): Promise<{ drills: DrillType[]; total: number; limit: number; offset: number }> {
     const drills = await this.drillRepo.findMany(filters);
-    const query: any = {};
-
-    if (filters.type) query.type = filters.type;
-    if (filters.difficulty) query.difficulty = filters.difficulty;
-    if (filters.isActive !== undefined) query.is_active = filters.isActive;
-    if (filters.createdBy) query.created_by = filters.createdBy;
-    if (filters.assignedToIds && filters.assignedToIds.length > 0) {
-      query.assigned_to = { $in: filters.assignedToIds };
-    } else if (filters.studentEmail) {
-      query.assigned_to = filters.studentEmail;
-    }
-    if (filters.assignmentStatus === 'saved') {
-      query.$or = [
-        { totalAssignments: 0 },
-        { totalAssignments: { $exists: false } },
-      ];
-    }
-    if (filters.assignmentStatus === 'assigned') {
-      query.$or = [
-        { totalAssignments: { $gt: 0 } },
-        {
-          $and: [
-            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
-            { assigned_to: { $exists: true, $ne: [] } },
-          ],
-        },
-      ];
-    }
-    if (filters.q) {
-      const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      query.$and = [
-        ...(query.$and ?? []),
-        { $or: [{ title: regex }, { context: regex }] },
-      ];
-    }
-
-    const total = await this.drillRepo.count(query);
+    const total = await this.drillRepo.countMany(filters);
 
     return {
       drills,
@@ -213,6 +378,42 @@ export class DrillService {
       limit: filters.limit || 20,
       offset: filters.offset || 0,
     };
+  }
+
+  /**
+   * Toggle shared admin-library bookmark on a drill (admin/tutor).
+   */
+  async setDrillBookmarked(
+    drillId: string,
+    bookmarked: boolean,
+    context: { userId: string; userRole: string }
+  ): Promise<DrillType> {
+    if (context.userRole !== 'admin' && context.userRole !== 'tutor') {
+      throw new ForbiddenError('Only admins and tutors can bookmark drills');
+    }
+
+    const existing = await this.drillRepo.findById(drillId);
+    if (!existing) {
+      throw new NotFoundError('Drill');
+    }
+
+    const updated = await this.drillRepo.update(drillId, {
+      is_bookmarked: bookmarked,
+      bookmarked_at: bookmarked ? new Date() : null,
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Drill');
+    }
+
+    logger.info('Drill bookmark updated', {
+      drillId,
+      bookmarked,
+      userId: context.userId,
+      userRole: context.userRole,
+    });
+
+    return updated;
   }
 
   /**

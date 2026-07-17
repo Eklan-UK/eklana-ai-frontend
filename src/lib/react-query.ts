@@ -26,6 +26,8 @@ export const queryKeys = {
     lists: () => [...queryKeys.drills.all, "list"] as const,
     list: (filters?: Record<string, any>) =>
       [...queryKeys.drills.lists(), filters] as const,
+    bookmarked: (filters?: Record<string, any>) =>
+      [...queryKeys.drills.all, "admin", "bookmarked", filters] as const,
     details: () => [...queryKeys.drills.all, "detail"] as const,
     detail: (id: string) => [...queryKeys.drills.details(), id] as const,
     learner: {

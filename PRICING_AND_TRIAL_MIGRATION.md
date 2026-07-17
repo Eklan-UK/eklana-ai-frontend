@@ -50,7 +50,7 @@ These rules are **confirmed** and must not change without product sign-off.
 | **Former / current subscribers** | **No trial** — pay from day one |
 | **Existing monthly Stripe payers** | Keep **current price** until `current_period_end`; new price at **next renewal** (no proration) |
 | **Existing monthly Apple payers** | Use App Store Connect **"Preserve current price for existing subscribers"** when scheduling the monthly increase |
-| **Zero Pause Maintainer** (default) | Every new registrant; no date window → new pricing (US$20 / US$60 / $200) + existing trial rules |
+| **Zero Pause maintenance** (default) | Every new registrant; no date window → new pricing (US$20 / US$60 / $200) + existing trial rules |
 | **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date**. During `[start, end]` inclusive: Checkout is **legacy monthly only** (no quarterly/annual). Not on the new pricing system for that window |
 | **Zero Pause Mastery** | Admin assign (badge/add-on label only). **Does not** by itself change Pro Stripe price — price follows Challenge window vs Maintainer/public rules above |
 
@@ -78,7 +78,7 @@ Zero Pause products are `challenge` | `mastery` | `maintainer`. Challenge uses `
 
 | Cohort | Who | What they see / pay |
 |--------|-----|---------------------|
-| **Zero Pause Maintainer** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility rules |
+| **Zero Pause maintenance** (default) | Every new registrant; anyone not in an active Challenge window | New pricing: monthly US$20 / quarterly US$60 / annual $200; existing trial eligibility rules |
 | **Zero Pause Challenge** | Admin assigns Challenge + **start date + end date** | During `[start, end]` inclusive: **only** legacy monthly Checkout (`STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY`, ~US$1.99). No quarterly/annual for that user |
 | **Zero Pause Mastery** | Admin assign (unchanged role) | Badge/add-on label; Pro price follows Challenge vs Maintainer rules above |
 

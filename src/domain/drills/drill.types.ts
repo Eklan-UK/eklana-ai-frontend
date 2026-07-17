@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 
+export type LearningJourneyPartFilter = 1 | 2 | 3 | 4 | 5;
+
 export interface Drill {
   _id: Types.ObjectId;
   title: string;
@@ -10,7 +12,27 @@ export interface Drill {
   created_by: string;
   createdById?: Types.ObjectId | string;
   is_active: boolean;
+  learning_journey_part?: LearningJourneyPartFilter;
+  learning_journey_topic?: string;
+  is_bookmarked?: boolean;
+  bookmarked_at?: Date | null;
   [key: string]: any;
+}
+
+export interface DrillListFilters {
+  type?: string;
+  difficulty?: string;
+  studentEmail?: string;
+  assignedToIds?: string[];
+  createdBy?: string;
+  isActive?: boolean;
+  assignmentStatus?: 'saved' | 'assigned';
+  q?: string;
+  isBookmarked?: boolean;
+  learningJourneyPart?: LearningJourneyPartFilter;
+  learningJourneyTopic?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface CreateDrillData {
@@ -25,6 +47,10 @@ export interface CreateDrillData {
   context?: string;
   audio_example_url?: string;
   is_active?: boolean;
+  is_bookmarked?: boolean;
+  bookmarked_at?: Date | null;
+  learning_journey_part?: LearningJourneyPartFilter;
+  learning_journey_topic?: string;
   [key: string]: any;
 }
 

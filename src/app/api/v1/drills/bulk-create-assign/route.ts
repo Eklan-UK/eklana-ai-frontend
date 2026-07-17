@@ -14,6 +14,7 @@ import {
   refineLearningJourneyFields,
 } from "@/domain/learning-journey/learning-journey.validation";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
+import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 
 interface BulkDrillInput {
   drillType: string;
@@ -212,13 +213,35 @@ async function handler(
 
           const drill = await Drill.create(drillData);
 
-          await DrillAssignment.create({
+          const assignment = await DrillAssignment.create({
             drillId: drill._id,
             learnerId: toUserIdQuery(studentId),
             assignedBy: toUserIdQuery(context.userId),
             dueDate,
             status: "pending",
           });
+
+          notifyLearnersOfAssignment(
+            [
+              {
+                learnerId: studentId,
+                _id: String(assignment._id),
+                dueDate,
+              },
+            ],
+            {
+              _id: drill._id,
+              title: drill.title ?? title ?? "",
+              type: drill.type ?? drillType,
+              learning_journey_part: drill.learning_journey_part ?? validatedPart,
+              learning_journey_topic: drill.learning_journey_topic ?? validatedTopic,
+            },
+            {
+              firstName: (creator as { firstName?: string }).firstName,
+              lastName: (creator as { lastName?: string }).lastName,
+              name: (creator as { name?: string }).name,
+            }
+          );
 
           return { success: true as const, drillId: drill._id.toString() };
         } catch (itemErr: any) {

@@ -17,8 +17,8 @@ SMTP_PASSWORD=your-app-password
 GMAIL_USER=your-email@gmail.com
 GMAIL_APP_PASSWORD=your-16-char-app-password
 
-# Email sender address
-EMAIL_FROM=noreply@elkan.com
+# Email sender (display name + address). Bare addresses are wrapped as "Eklan" <addr>.
+EMAIL_FROM="Eklan <hello@eklan.ai>"
 ```
 
 ### Application URL (for email links)

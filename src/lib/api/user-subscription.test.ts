@@ -125,4 +125,47 @@ describe('isUserSubscribed', () => {
       false
     );
   });
+
+  it('returns true for allowlisted email with free plan', () => {
+    assert.equal(
+      isUserSubscribed({
+        email: 'dv@eklan.ai',
+        subscriptionPlan: 'free',
+      }),
+      true
+    );
+  });
+
+  it('returns true for allowlisted email with expired stripe', () => {
+    assert.equal(
+      isUserSubscribed({
+        email: 'afolabi.aanu@gmail.com',
+        subscriptionPlan: 'premium',
+        subscriptionPaymentMethod: 'stripe',
+        stripeSubscriptionStatus: 'active',
+        subscriptionExpiresAt: past,
+      }),
+      true
+    );
+  });
+
+  it('returns false for non-allowlisted free user', () => {
+    assert.equal(
+      isUserSubscribed({
+        email: 'other@example.com',
+        subscriptionPlan: 'free',
+      }),
+      false
+    );
+  });
+
+  it('matches allowlisted email case-insensitively', () => {
+    assert.equal(
+      isUserSubscribed({
+        email: 'SA@EKLAN.AI',
+        subscriptionPlan: 'free',
+      }),
+      true
+    );
+  });
 });

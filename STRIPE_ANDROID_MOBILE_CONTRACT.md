@@ -26,6 +26,7 @@ Do not duplicate StoreKit flows here.
 | Doc | Why |
 |-----|-----|
 | [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) | Parent phased plan (Phase 6) |
+| [MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md](./MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md) | Phase 10 cohort UI — Challenge (~US$1.99) vs Maintainer/public paywall |
 | [docs/stripe-implementation.md](./docs/stripe-implementation.md) | Stripe endpoints, webhooks, server behavior |
 | [docs/STRIPE_WEB_CHECKOUT_UI.md](./docs/STRIPE_WEB_CHECKOUT_UI.md) | Phase 5 web paywall / CTA alignment |
 | [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md) | Legacy dual-rail (iOS + Android) guide — iOS / StoreKit |

@@ -14,8 +14,19 @@ import { StreakService } from "@/services/streak.service";
 import { sendUnifiedWithFcmFallback } from "@/services/notification/delivery";
 import { encodeWeekStartDate } from "@/lib/challenges/weekly-challenge-url";
 
+export type OnDrillAssignedDeps = {
+  connect?: typeof connectToDatabase;
+  sendUnified?: typeof sendUnifiedWithFcmFallback;
+};
+
 /**
- * Trigger when a drill is assigned to a student
+ * Trigger when a drill is assigned to a student.
+ * In-app inbox + Expo / web push / legacy FCM fallback (no early return on missing FCM).
+ *
+ * Mobile payload contract:
+ *   data.screen = 'DrillDetail'
+ *   data.resourceId = drillId
+ *   data.url = '/account/drills/{id}'
  */
 export async function onDrillAssigned(
   studentId: string,
@@ -29,11 +40,24 @@ export async function onDrillAssigned(
     firstName?: string;
     lastName?: string;
   },
+  deps: OnDrillAssignedDeps = {},
 ) {
   const tutorName =
     tutor.name ||
     `${tutor.firstName || ""} ${tutor.lastName || ""}`.trim() ||
     "Your tutor";
+
+  const title = "New Drill Assigned! 📚";
+  const body = `${tutorName} assigned you "${drill.title}"`;
+  const drillPath = `/account/drills/${drill._id}`;
+  const notifData = {
+    screen: "DrillDetail",
+    resourceId: drill._id,
+    resourceType: "drill",
+    url: drillPath,
+  };
+  const connect = deps.connect ?? connectToDatabase;
+  const sendUnified = deps.sendUnified ?? sendUnifiedWithFcmFallback;
 
   console.log("[Notification Trigger] onDrillAssigned called:", {
     studentId,
@@ -43,38 +67,34 @@ export async function onDrillAssigned(
   });
 
   try {
-    await connectToDatabase();
+    await connect();
 
-    // Get student's FCM tokens
-    const fcmTokens = await FCMToken.find({
+    const delivery = await sendUnified({
       userId: studentId,
-      isActive: true,
-    })
-      .select("token")
-      .lean()
-      .exec();
-
-    if (fcmTokens.length === 0) {
-      console.warn(
-        "[Notification Trigger] No active FCM tokens found for student:",
-        studentId,
-      );
-      return null;
-    }
-
-    const tokens = fcmTokens.map((t) => t.token);
-
-    const result = await sendNotificationToUsers([studentId], tokens, {
-      title: "New Drill Assigned! 📚",
-      body: `${tutorName} assigned you "${drill.title}"`,
-      type: NotificationType.ASSIGNMENT_DUE,
-      data: {
+      title,
+      body,
+      type: "drill_assigned",
+      data: notifData,
+      fcmType: NotificationType.ASSIGNMENT_DUE,
+      fcmData: {
         screen: "DrillDetail",
         resourceId: drill._id,
         resourceType: "drill",
-        url: `/account/drills/${drill._id}`,
+        url: drillPath,
       },
+      actionUrl: drillPath,
     });
+
+    const result = delivery.delivered
+      ? { unified: delivery.unified, fcm: delivery.fcm, pushDelivered: delivery.pushDelivered }
+      : null;
+
+    if (!delivery.pushDelivered) {
+      console.warn(
+        "[Notification Trigger] No push delivery for student (in-app may still exist):",
+        studentId,
+      );
+    }
 
     console.log("[Notification Trigger] onDrillAssigned result:", result);
     return result;

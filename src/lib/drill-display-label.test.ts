@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getDrillTopicTitle } from './drill-display-label';
+import {
+	formatDrillNotificationLabel,
+	getDrillTopicTitle,
+	resolveRealDrillTitle,
+} from './drill-display-label';
 
 describe('getDrillTopicTitle', () => {
 	it('resolves topic title from learning_journey_topic slug', () => {
@@ -41,5 +45,84 @@ describe('getDrillTopicTitle', () => {
 
 	it('returns null for unknown scenarioType', () => {
 		assert.equal(getDrillTopicTitle({ scenarioType: 'unknown_scenario' }), null);
+	});
+});
+
+describe('resolveRealDrillTitle', () => {
+	it('returns trimmed real titles', () => {
+		assert.equal(resolveRealDrillTitle(' Soft palate practice '), 'Soft palate practice');
+	});
+
+	it('treats blank and Untitled* as absent', () => {
+		assert.equal(resolveRealDrillTitle(''), null);
+		assert.equal(resolveRealDrillTitle('   '), null);
+		assert.equal(resolveRealDrillTitle(null), null);
+		assert.equal(resolveRealDrillTitle('Untitled'), null);
+		assert.equal(resolveRealDrillTitle('untitled drill'), null);
+		assert.equal(resolveRealDrillTitle('Untitled Drill'), null);
+	});
+});
+
+describe('formatDrillNotificationLabel', () => {
+	it('joins type, mission, and topic when title is empty', () => {
+		assert.equal(
+			formatDrillNotificationLabel({
+				title: '',
+				type: 'vocabulary',
+				learning_journey_part: 1,
+				learning_journey_topic: 'patient_follow_up',
+			}),
+			'Vocabulary · Mission 1 · Follow-up with Patients',
+		);
+	});
+
+	it('appends a real title when present', () => {
+		assert.equal(
+			formatDrillNotificationLabel({
+				title: 'Soft palate practice',
+				type: 'vocabulary',
+				learning_journey_part: 1,
+				learning_journey_topic: 'patient_follow_up',
+			}),
+			'Vocabulary · Mission 1 · Follow-up with Patients · Soft palate practice',
+		);
+	});
+
+	it('ignores Untitled titles', () => {
+		assert.equal(
+			formatDrillNotificationLabel({
+				title: 'Untitled Drill',
+				type: 'pronunciation',
+				learning_journey_part: 2,
+				learning_journey_topic: 'giving_handover',
+			}),
+			'Pronunciation · Mission 2 · Giving an Handover',
+		);
+	});
+
+	it('falls back to type only when mission/topic/title are missing', () => {
+		assert.equal(
+			formatDrillNotificationLabel({ type: 'pronunciation' }),
+			'Pronunciation',
+		);
+		assert.equal(formatDrillNotificationLabel({}), 'Practice');
+		assert.equal(formatDrillNotificationLabel(null), 'Practice');
+	});
+
+	it('omits mission or topic when absent or unknown', () => {
+		assert.equal(
+			formatDrillNotificationLabel({
+				type: 'grammar',
+				learning_journey_part: 3,
+			}),
+			'Grammar · Mission 3',
+		);
+		assert.equal(
+			formatDrillNotificationLabel({
+				type: 'grammar',
+				learning_journey_topic: 'unknown_topic_slug',
+			}),
+			'Grammar',
+		);
 	});
 });

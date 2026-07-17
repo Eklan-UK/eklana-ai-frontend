@@ -492,6 +492,11 @@ export interface IDrill extends Document {
   /** Learning journey topic slug within the mission */
   learning_journey_topic?: string;
 
+  /** Shared admin library bookmark (global for all admins/tutors) */
+  is_bookmarked: boolean;
+  /** When the drill was bookmarked; null when not bookmarked */
+  bookmarked_at?: Date | null;
+
   // Analytics (aggregated - updated by background jobs)
   totalAssignments?: number;
   totalCompletions?: number;
@@ -773,6 +778,20 @@ const drillSchema = new Schema<IDrill>(
       description: "Learning journey topic slug within the mission",
     },
 
+    is_bookmarked: {
+      type: Boolean,
+      default: false,
+      description: "Whether this drill is bookmarked in the shared admin library",
+      index: true,
+    },
+
+    bookmarked_at: {
+      type: Date,
+      default: null,
+      required: false,
+      description: "Timestamp when the drill was bookmarked (null when not bookmarked)",
+    },
+
     // Analytics fields (updated by background jobs)
     totalAssignments: {
       type: Number,
@@ -809,6 +828,7 @@ drillSchema.index({ createdById: 1, created_date: -1 }); // New preferred index
 drillSchema.index({ type: 1 });
 drillSchema.index({ is_active: 1, date: 1 });
 drillSchema.index({ learning_journey_part: 1, learning_journey_topic: 1 });
+drillSchema.index({ is_bookmarked: 1, bookmarked_at: -1 });
 
 // Pre-save middleware to update updated_date
 drillSchema.pre("save", function () {
