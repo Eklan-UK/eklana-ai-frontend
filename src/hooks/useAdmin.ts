@@ -16,7 +16,7 @@ export type AdminDrillListFilters = {
   assignmentStatus?: 'saved' | 'assigned';
   assignedToIds?: string[];
   isBookmarked?: boolean;
-  learningJourneyPart?: number;
+  learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
   learningJourneyTopic?: string;
 };
 
