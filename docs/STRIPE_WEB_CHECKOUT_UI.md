@@ -2,9 +2,10 @@
 
 > **Related docs:**
 > - [`STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md) — API keys, webhook contracts, environment variables, backend responsibilities.
-> - [`STRIPE_PRICING_UPGRADE.md`](../STRIPE_PRICING_UPGRADE.md) — multi-plan pricing, trial gating, phased rollout (Phase 5 = this UI).
+> - [`MOBILE_STRIPE_CHECKOUT_ROLLBACK.md`](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) — current mobile / API checkout contract after rollback.
+> - [`STRIPE_PRICING_UPGRADE.md`](../STRIPE_PRICING_UPGRADE.md) — **historical** multi-plan / trial plan (rolled back).
 
-This document specifies how the **student-facing web UI** integrates with Stripe: plan picker, gated trial copy, checkout with `billingPeriod`, and post-payment access unlock.
+This document specifies how the **student-facing web UI** integrates with Stripe: single monthly Pro (~US$1.99), no trial, and post-payment access unlock.
 
 ---
 
@@ -13,30 +14,29 @@ This document specifies how the **student-facing web UI** integrates with Stripe
 The student side of the web app is the entry point for purchasing AI feature access. This doc covers:
 
 - What the **subscriptions page** and **profile plan card** should display.
-- The **three billing periods** and how checkout POSTs `billingPeriod`.
-- When to show **"2-week free trial"** (`user.eligibleForTrial`).
+- Single **monthly** checkout (empty body → `STRIPE_PREMIUM_MONTHLY_PRICE_ID`).
 - How the **UI updates** after a successful payment.
 
-Backend webhook handling, environment variables, and Stripe key management are in [`STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md). Mobile UI is out of scope here (see Phase 6 / `MOBILE_EXPO_BILLING.md`).
+Backend webhook handling, environment variables, and Stripe key management are in [`STRIPE_PAYMENTS_AND_KEYS.md`](./STRIPE_PAYMENTS_AND_KEYS.md). Mobile: see [`MOBILE_STRIPE_CHECKOUT_ROLLBACK.md`](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md).
 
 ---
 
 ## 2. Product Positioning — Pro Only
 
-There is **one purchasable tier: Pro**, sold as three Stripe Prices (billing periods).
+There is **one purchasable tier: Pro**, sold as a single monthly Stripe Price (~US$1.99).
 
 ### Naming alignment
 
 | Layer | Label | Notes |
 |---|---|---|
 | Stripe Dashboard (Product) | **Pro** | Name it "Eklan Pro" or "Pro" |
-| Stripe Dashboard (Prices) | Monthly / Quarterly / Annual | Env: `STRIPE_PREMIUM_MONTHLY_PRICE_ID`, `STRIPE_PREMIUM_QUARTERLY_PRICE_ID`, `STRIPE_PREMIUM_ANNUAL_PRICE_ID` |
+| Stripe Dashboard (Price) | Monthly ~US$1.99 | Env: `STRIPE_PREMIUM_MONTHLY_PRICE_ID` |
 | MongoDB `subscriptionPlan` | `"premium"` | Backend maps Stripe Pro → `premium` |
 | UI display (`planTitleFromUser`) | `"Pro"` | Marketing label for `subscriptionPlan === "premium"` |
 
 ### Subscriptions page layout
 
-**Two-column** Free vs Pro comparison, plus a **billing period picker** on the Pro card for unsubscribed users:
+**Two-column** Free vs Pro comparison. Unsubscribed users see a single **Upgrade to Pro** CTA (no period picker, no trial banner).
 
 | Free | Pro |
 |---|---|
@@ -44,15 +44,13 @@ There is **one purchasable tier: Pro**, sold as three Stripe Prices (billing per
 
 ---
 
-## 3. Billing periods & prices
+## 3. Price
 
-Unsubscribed users select one period before checkout (default: **monthly**):
-
-| `billingPeriod` | Label | Price |
+| Period | Label | Price |
 |---|---|---|
-| `monthly` | Monthly | US$20 |
-| `quarterly` | 3 months | US$60 |
-| `annual` | 1 year | $200 |
+| monthly | Monthly | ~US$1.99 |
+
+Existing subscribers on older Prices (US$20 / US$60 / $200) are left as-is.
 
 ---
 
@@ -60,7 +58,7 @@ Unsubscribed users select one period before checkout (default: **monthly**):
 
 **Heading:** Pro
 
-**Tagline:** Unlock the full AI experience
+**Tagline:** US$1.99 / month — unlock the full AI experience
 
 **Feature bullets:**
 - Eklan Free Talk — unlimited AI conversation practice sessions
@@ -68,11 +66,11 @@ Unsubscribed users select one period before checkout (default: **monthly**):
 - AI-driven feedback and scoring on every session
 - Personalised difficulty that adapts as you improve
 
-**Trial copy (gated):** Show **"2-week free trial"** **only** when `user.eligibleForTrial === true` (from `GET /api/v1/users/current`). Ineligible users (pre-launch accounts, former/current subscribers) see prices + Subscribe only — no trial language.
-
-**CTA button (for non-subscribers):** `Start free trial` when eligible; otherwise `Subscribe`
+**CTA button (for non-subscribers):** `Upgrade to Pro`
 
 **CTA button (for subscribers):** `Manage subscription`
+
+No trial copy.
 
 ---
 
@@ -82,15 +80,10 @@ Driven by `useUserCurrent` → `GET /api/v1/users/current`:
 
 | User state | UI | On click |
 |---|---|---|
-| `isSubscribed === false` | Period picker + Subscribe / Start free trial | `POST /api/v1/stripe/checkout` with `{ billingPeriod }` → redirect |
+| `isSubscribed === false` | Upgrade to Pro | `POST /api/v1/stripe/checkout` with `{}` → redirect |
 | `isSubscribed === true` | Manage subscription | `POST /api/v1/stripe/portal` → redirect |
 
-Also exposed on the same user object:
-
-| Field | Use |
-|---|---|
-| `eligibleForTrial` | Gate "2-week free trial" badge/copy (DB-only `isEligibleForTrial`; no Stripe list on every fetch) |
-| `subscriptionBillingPeriod` | Current period when subscribed (`monthly` / `quarterly` / `annual`) |
+Do **not** use `eligibleForTrial` or `challengePricingActive` (removed).
 
 Loading state: spinner inside the button while the API call is in flight; disable to prevent double-clicks.
 
@@ -106,9 +99,9 @@ sequenceDiagram
   participant Stripe
   participant Webhook
 
-  User->>WebApp: Select billingPeriod, click Subscribe
-  WebApp->>NextAPI: POST /api/v1/stripe/checkout JSON billingPeriod
-  NextAPI->>Stripe: checkout_sessions_create price plus optional trial
+  User->>WebApp: Click Upgrade to Pro
+  WebApp->>NextAPI: POST /api/v1/stripe/checkout empty body
+  NextAPI->>Stripe: checkout_sessions_create monthly price
   Stripe-->>NextAPI: session_url
   NextAPI-->>WebApp: { url }
   WebApp->>Stripe: Redirect_browser to url
@@ -122,18 +115,18 @@ sequenceDiagram
 
 ### Step-by-step
 
-1. User selects a billing period and clicks Subscribe / Start free trial.
+1. User clicks Upgrade to Pro.
 2. Client calls:
 
 ```ts
 fetch("/api/v1/stripe/checkout", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ billingPeriod }), // "monthly" | "quarterly" | "annual"
+  body: JSON.stringify({}),
 })
 ```
 
-3. Backend resolves the Price ID for `billingPeriod`, applies trial only when eligible (DB + Stripe prior-sub check), returns `{ url }`.
+3. Backend uses `STRIPE_PREMIUM_MONTHLY_PRICE_ID`, returns `{ url }`. No trial.
 4. Client sets `window.location.href = url`.
 5. Access is granted via webhook, not by the browser redirect.
 6. Stripe redirects to `success_url` (e.g. `/account/settings/subscriptions?checkout=success`).
@@ -168,8 +161,7 @@ https://app.eklan.ai/account/settings/subscriptions?checkout=success
 
 **File:** `src/app/(student)/account/payment/modal/page.tsx`
 
-- Does **not** advertise a free trial (eligibility is not loaded here).
-- CTA label: **View plans** → navigates to `/account/settings/subscriptions` (canonical picker + gated trial).
+- CTA label: **View plans** → navigates to `/account/settings/subscriptions`.
 
 ---
 
@@ -187,24 +179,19 @@ https://app.eklan.ai/account/settings/subscriptions?checkout=success
 ## 10. Accessibility and Layout
 
 - Mobile-first: Pro card full-width below `md`.
-- Billing options: `role="radiogroup"` with `aria-checked` on each option.
 - Loading: `Loader2` + `disabled` on CTA.
 - Keep "Questions about subscriptions?" → Contact support.
 
 ---
 
-## 11. Implementation checklist (Phase 5)
+## 11. Implementation checklist (post-rollback)
 
 **[`src/app/api/v1/users/current/route.ts`](../src/app/api/v1/users/current/route.ts)**
-- [x] `eligibleForTrial: isEligibleForTrial(user)` on `safeUser` (DB-only).
+- [x] No `eligibleForTrial` / `challengePricingActive` on `safeUser`.
 
 **[`src/app/(student)/account/settings/subscriptions/page.tsx`](../src/app/(student)/account/settings/subscriptions/page.tsx)**
 - [x] Free vs Pro layout + current-plan summary.
-- [x] Three billing options (monthly / quarterly / annual); default monthly.
-- [x] "2-week free trial" only when `eligibleForTrial === true`.
-- [x] Checkout POST `{ billingPeriod }`.
+- [x] Single monthly Pro (~US$1.99); Upgrade to Pro CTA.
+- [x] Checkout POST `{}`.
 - [x] Portal for subscribed users.
 - [x] `?checkout=success` polling (5× / 2s).
-
-**[`src/app/(student)/account/payment/modal/page.tsx`](../src/app/(student)/account/payment/modal/page.tsx)**
-- [x] Remove 7-day / fake setTimeout stub; CTA **View plans** → subscriptions.
