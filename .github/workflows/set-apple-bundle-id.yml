@@ -59,3 +59,66 @@ jobs:
           vercel redeploy "https://$DEPLOY_URL" --target production --yes \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
+            echo "Patching existing $KEY to $VALUE…"
+            for id in $EXISTING_IDS; do
+              PATCH=$(curl -sS -X PATCH -H "Authorization: Bearer $VERCEL_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$id?teamId=$VERCEL_ORG_ID" \
+                -d "$(jq -n --arg v "$VALUE" '{value:$v, type:"plain"}')")
+              echo "$PATCH" | jq '{id:.id, key:.key, value:.value, target:.target, error:.error}'
+            done
+          else
+            echo "Creating $KEY=$VALUE…"
+            CREATE_RESP=$(curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" \
+              -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" '{
+                key: $k, value: $v, type: "plain",
+                target: ["production", "preview", "development"]
+              }')")
+            echo "$CREATE_RESP" | jq .
+            CREATED_KEY=$(echo "$CREATE_RESP" | jq -r '.created.key // .key // empty')
+            test "$CREATED_KEY" = "$KEY"
+          fi
+
+          VERIFY=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID")
+          echo "$VERIFY" | jq -r --arg k "$KEY" '.envs[]? | select(.key==$k) | "verified: \(.key) value=\(.value) targets=\(.target|join(","))"'
+          VALUE_OK=$(echo "$VERIFY" | jq -r --arg k "$KEY" --arg v "$VALUE" '[.envs[]? | select(.key==$k and .value==$v)] | length')
+          test "$VALUE_OK" -ge 1
+
+          LATEST=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=1&teamId=$VERCEL_ORG_ID")
+          DEPLOY_ID=$(echo "$LATEST" | jq -r '.deployments[0].uid // empty')
+          echo "Redeploying deployment $DEPLOY_ID via API…"
+          test -n "$DEPLOY_ID"
+
+          REDEPLOY=$(curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.vercel.com/v13/deployments?teamId=$VERCEL_ORG_ID&forceNew=1" \
+            -d "$(jq -n --arg id "$DEPLOY_ID" --arg name "eklana-ai-frontend" '{
+              name: $name,
+              deploymentId: $id,
+              target: "production"
+            }')")
+          echo "$REDEPLOY" | jq '{id:.id, url:.url, readyState:.readyState, errorMessage:.errorMessage, error:.error}'
+          NEW_ID=$(echo "$REDEPLOY" | jq -r '.id // empty')
+          test -n "$NEW_ID"
+
+          for i in $(seq 1 90); do
+            INFO=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v13/deployments/$NEW_ID?teamId=$VERCEL_ORG_ID")
+            STATE=$(echo "$INFO" | jq -r '.readyState // empty')
+            echo "poll $i: readyState=$STATE"
+            if [ "$STATE" = "READY" ]; then
+              echo "Production redeploy READY: https://$(echo "$INFO" | jq -r '.url')"
+              exit 0
+            fi
+            if [ "$STATE" = "ERROR" ] || [ "$STATE" = "CANCELED" ]; then
+              echo "$INFO" | jq '{readyState, errorMessage}'
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for redeploy"
+          exit 1
