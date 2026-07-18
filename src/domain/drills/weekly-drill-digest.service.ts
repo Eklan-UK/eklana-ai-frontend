@@ -5,6 +5,7 @@ import User from '@/models/user';
 import WeeklyDrillDigestDispatch from '@/models/weekly-drill-digest-dispatch';
 import { logger } from '@/lib/api/logger';
 import { sendWeeklyDrillDigestEmail } from '@/lib/api/email.service';
+import { formatDrillNotificationLabel } from '@/lib/drill-display-label';
 import { onWeeklyDrillDigest } from '@/services/notification/triggers';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -163,11 +164,18 @@ export class WeeklyDrillDigestService {
       }
 
       const drills = await Drill.find({ _id: { $in: drillIds } })
-        .select('title')
+        .select('title type learning_journey_part learning_journey_topic')
         .lean()
         .exec();
       const drillTitles = drills
-        .map((d) => (d.title?.trim() ? d.title.trim() : 'Untitled drill'))
+        .map((d) =>
+          formatDrillNotificationLabel({
+            title: d.title,
+            type: d.type,
+            learning_journey_part: d.learning_journey_part,
+            learning_journey_topic: d.learning_journey_topic,
+          }),
+        )
         .slice(0, 20);
 
       const learner = await User.findById(learnerId)

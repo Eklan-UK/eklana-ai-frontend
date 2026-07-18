@@ -66,6 +66,8 @@ export const emailTemplates = {
     studentName: string;
     drillTitle: string;
     drillType: string;
+    missionLabel?: string;
+    topicLabel?: string;
     dueDate?: string;
     assignerName: string;
     drillId?: string;
@@ -77,6 +79,16 @@ export const emailTemplates = {
       data.drillId && data.assignmentId
         ? `${appUrl}/account/drills/${data.drillId}?assignmentId=${data.assignmentId}`
         : `${appUrl}/account/drills`;
+
+    const infoRow = (label: string, value: string, badge = false) => `
+									<div style="flex: 1; min-width: 120px;">
+										<span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${label}</span>
+										${
+                      badge
+                        ? `<span style="display: inline-block; background-color: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">${value}</span>`
+                        : `<span style="font-size: 14px; font-weight: 500; color: #1f2937;">${value}</span>`
+                    }
+									</div>`;
 
     return {
       subject: `📚 New Drill Assigned: ${data.drillTitle}`,
@@ -121,22 +133,10 @@ export const emailTemplates = {
                   data.drillTitle
                 }</h2>
 								<div style="display: flex; flex-wrap: wrap; gap: 15px;">
-									<div style="flex: 1; min-width: 120px;">
-										<span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Type</span>
-										<span style="display: inline-block; background-color: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 500; text-transform: capitalize;">${
-                      data.drillType
-                    }</span>
-									</div>
-									${
-                    data.dueDate
-                      ? `
-									<div style="flex: 1; min-width: 120px;">
-										<span style="display: block; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Due Date</span>
-										<span style="font-size: 14px; font-weight: 500; color: #1f2937;">${data.dueDate}</span>
-									</div>
-									`
-                      : ""
-                  }
+									${infoRow("Type", data.drillType, true)}
+									${data.missionLabel ? infoRow("Mission", data.missionLabel) : ""}
+									${data.topicLabel ? infoRow("Topic", data.topicLabel) : ""}
+									${data.dueDate ? infoRow("Due Date", data.dueDate) : ""}
 								</div>
 							</div>
 							
@@ -167,6 +167,8 @@ ${data.assignerName} has assigned you a new practice drill.
 
 Drill: ${data.drillTitle}
 Type: ${data.drillType}
+${data.missionLabel ? `Mission: ${data.missionLabel}` : ""}
+${data.topicLabel ? `Topic: ${data.topicLabel}` : ""}
 ${data.dueDate ? `Due Date: ${data.dueDate}` : ""}
 
 Start practicing now:
@@ -380,6 +382,17 @@ This is an automated notification from Eklan.
   }),
 };
 
+const EMAIL_FROM_DISPLAY_NAME = "Eklan";
+
+/** Ensure From has a display name so inboxes show "Eklan" instead of the local-part (e.g. "hello"). */
+function formatFromAddress(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.includes("<") && trimmed.includes(">")) {
+    return trimmed;
+  }
+  return `"${EMAIL_FROM_DISPLAY_NAME}" <${trimmed}>`;
+}
+
 // Send email function
 export const sendEmail = async (options: {
   to: string;
@@ -388,9 +401,13 @@ export const sendEmail = async (options: {
   text?: string;
 }): Promise<void> => {
   try {
+    const rawFrom =
+      process.env.EMAIL_FROM ||
+      process.env.SMTP_USER ||
+      process.env.GMAIL_USER ||
+      "noreply@elkan.com";
     const mailOptions = {
-      from:
-        process.env.EMAIL_FROM || process.env.SMTP_USER || "noreply@elkan.com",
+      from: formatFromAddress(rawFrom),
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -417,6 +434,8 @@ export const sendDrillAssignmentNotification = async (data: {
   studentName: string;
   drillTitle: string;
   drillType: string;
+  missionLabel?: string;
+  topicLabel?: string;
   dueDate?: Date;
   assignerName: string;
   drillId?: string;
@@ -427,6 +446,8 @@ export const sendDrillAssignmentNotification = async (data: {
       studentName: data.studentName,
       drillTitle: data.drillTitle,
       drillType: data.drillType,
+      missionLabel: data.missionLabel,
+      topicLabel: data.topicLabel,
       dueDate: data.dueDate ? data.dueDate.toLocaleDateString() : undefined,
       assignerName: data.assignerName,
       drillId: data.drillId,
@@ -736,6 +757,8 @@ export const sendClassReminderEmail = async (data: {
   meetingUrl?: string;
   /** Tracked link that records attendance before redirecting to Meet */
   emailJoinUrl?: string;
+  /** IANA timezone used to render `sessionStart` in the learner's local time. */
+  timeZone: string;
 }): Promise<void> => {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -750,6 +773,7 @@ export const sendClassReminderEmail = async (data: {
       hour: 'numeric',
       minute: '2-digit',
       timeZoneName: 'short',
+      timeZone: data.timeZone,
     });
 
     const html = `

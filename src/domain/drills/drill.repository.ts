@@ -1,7 +1,66 @@
 import Drill from '@/models/drill';
 import { logger } from '@/lib/api/logger';
 import { toUserIdQuery } from '@/lib/api/user-id';
-import type { Drill as DrillType, CreateDrillData } from './drill.types';
+import type { Drill as DrillType, CreateDrillData, DrillListFilters } from './drill.types';
+
+const DRILL_LIST_PROJECTION =
+  'title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById created_by learning_journey_part learning_journey_topic is_bookmarked bookmarked_at';
+
+/**
+ * Build Mongo query for drill list/count. Exported for unit tests.
+ */
+export function buildDrillListQuery(filters: DrillListFilters): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+
+  if (filters.type) query.type = filters.type;
+  if (filters.difficulty) query.difficulty = filters.difficulty;
+  if (filters.isActive !== undefined) query.is_active = filters.isActive;
+  if (filters.createdBy) query.created_by = filters.createdBy;
+  if (filters.assignedToIds && filters.assignedToIds.length > 0) {
+    query.assigned_to = { $in: filters.assignedToIds };
+  } else if (filters.studentEmail) {
+    query.assigned_to = filters.studentEmail;
+  }
+  if (filters.assignmentStatus === 'saved') {
+    query.$or = [
+      { totalAssignments: 0 },
+      { totalAssignments: { $exists: false } },
+    ];
+  }
+  if (filters.assignmentStatus === 'assigned') {
+    query.$or = [
+      { totalAssignments: { $gt: 0 } },
+      {
+        $and: [
+          { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
+          { assigned_to: { $exists: true, $ne: [] } },
+        ],
+      },
+    ];
+  }
+  if (filters.isBookmarked === true) {
+    query.is_bookmarked = true;
+  } else if (filters.isBookmarked === false) {
+    // Treat missing field as not bookmarked (legacy docs)
+    query.is_bookmarked = { $ne: true };
+  }
+  if (filters.learningJourneyPart !== undefined) {
+    query.learning_journey_part = filters.learningJourneyPart;
+  }
+  if (filters.learningJourneyTopic) {
+    query.learning_journey_topic = filters.learningJourneyTopic;
+  }
+  if (filters.q) {
+    const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const andClause = (query.$and as unknown[] | undefined) ?? [];
+    query.$and = [
+      ...andClause,
+      { $or: [{ title: regex }, { context: regex }] },
+    ];
+  }
+
+  return query;
+}
 
 /**
  * Repository for drill data access
@@ -80,57 +139,16 @@ export class DrillRepository {
   /**
    * Find drills with filters
    */
-  async findMany(filters: {
-    type?: string;
-    difficulty?: string;
-    studentEmail?: string;
-    assignedToIds?: string[];
-    createdBy?: string;
-    isActive?: boolean;
-    assignmentStatus?: 'saved' | 'assigned';
-    q?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<DrillType[]> {
-    const query: any = {};
-
-    if (filters.type) query.type = filters.type;
-    if (filters.difficulty) query.difficulty = filters.difficulty;
-    if (filters.isActive !== undefined) query.is_active = filters.isActive;
-    if (filters.createdBy) query.created_by = filters.createdBy;
-    if (filters.assignedToIds && filters.assignedToIds.length > 0) {
-      query.assigned_to = { $in: filters.assignedToIds };
-    } else if (filters.studentEmail) {
-      query.assigned_to = filters.studentEmail;
-    }
-    if (filters.assignmentStatus === 'saved') {
-      query.$or = [
-        { totalAssignments: 0 },
-        { totalAssignments: { $exists: false } },
-      ];
-    }
-    if (filters.assignmentStatus === 'assigned') {
-      query.$or = [
-        { totalAssignments: { $gt: 0 } },
-        {
-          $and: [
-            { $or: [{ totalAssignments: 0 }, { totalAssignments: { $exists: false } }] },
-            { assigned_to: { $exists: true, $ne: [] } },
-          ],
-        },
-      ];
-    }
-    if (filters.q) {
-      const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      query.$and = [
-        ...(query.$and ?? []),
-        { $or: [{ title: regex }, { context: regex }] },
-      ];
-    }
+  async findMany(filters: DrillListFilters): Promise<DrillType[]> {
+    const query = buildDrillListQuery(filters);
 
     const queryBuilder = Drill.find(query)
-      .select('title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById created_by')
-      .sort({ created_date: -1 });
+      .select(DRILL_LIST_PROJECTION)
+      .sort(
+        filters.isBookmarked === true
+          ? { bookmarked_at: -1, created_date: -1 }
+          : { created_date: -1 }
+      );
 
     if (filters.limit) {
       queryBuilder.limit(filters.limit);
@@ -219,5 +237,11 @@ export class DrillRepository {
   async count(filter?: any): Promise<number> {
     return Drill.countDocuments(filter || {}).exec();
   }
-}
 
+  /**
+   * Count drills using the same filters as findMany
+   */
+  async countMany(filters: DrillListFilters): Promise<number> {
+    return this.count(buildDrillListQuery(filters));
+  }
+}

@@ -7,17 +7,22 @@ import { queryKeys } from "@/lib/react-query";
 import { toast } from "sonner";
 import { adminService } from "@/services/admin.service";
 
+export type AdminDrillListFilters = {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  type?: string;
+  difficulty?: string;
+  assignmentStatus?: 'saved' | 'assigned';
+  assignedToIds?: string[];
+  isBookmarked?: boolean;
+  learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+  learningJourneyTopic?: string;
+};
+
 // Get all drills (admin) — paginated, 50 per page by default
 export function useAllDrills(
-  filters?: {
-    limit?: number;
-    offset?: number;
-    q?: string;
-    type?: string;
-    difficulty?: string;
-    assignmentStatus?: 'saved' | 'assigned';
-    assignedToIds?: string[];
-  },
+  filters?: AdminDrillListFilters,
   options?: { enabled?: boolean }
 ) {
   return useQuery({
@@ -34,6 +39,9 @@ export function useAllDrills(
         difficulty: filters?.difficulty,
         assignmentStatus: filters?.assignmentStatus,
         assignedToIds: joinedIds,
+        isBookmarked: filters?.isBookmarked,
+        learningJourneyPart: filters?.learningJourneyPart,
+        learningJourneyTopic: filters?.learningJourneyTopic,
       });
       const drills =
         response.data?.drills ??
@@ -50,6 +58,73 @@ export function useAllDrills(
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
     enabled: options?.enabled !== false,
+  });
+}
+
+/** Bookmarked drills for the admin library page. */
+export function useBookmarkedDrills(
+  filters?: Omit<AdminDrillListFilters, 'isBookmarked'>,
+  options?: { enabled?: boolean }
+) {
+  const listFilters: AdminDrillListFilters = {
+    ...filters,
+    isBookmarked: true,
+  };
+  return useQuery({
+    queryKey: queryKeys.drills.bookmarked(listFilters),
+    queryFn: async () => {
+      const response = await drillAPI.getAll({
+        limit: filters?.limit ?? 50,
+        offset: filters?.offset ?? 0,
+        q: filters?.q,
+        type: filters?.type,
+        difficulty: filters?.difficulty,
+        isBookmarked: true,
+        learningJourneyPart: filters?.learningJourneyPart,
+        learningJourneyTopic: filters?.learningJourneyTopic,
+      });
+      const drills = response.data?.drills ?? response.drills ?? [];
+      const total = response.data?.total ?? response.total ?? 0;
+      return {
+        drills: Array.isArray(drills) ? drills : [],
+        total: typeof total === 'number' ? total : 0,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
+    enabled: options?.enabled !== false,
+  });
+}
+
+/** Toggle admin library bookmark on a drill; invalidates drill lists + bookmarked query. */
+export function useToggleAdminDrillBookmark() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      drillId,
+      bookmarked,
+    }: {
+      drillId: string;
+      bookmarked: boolean;
+    }) => {
+      if (bookmarked) {
+        return await drillAPI.unbookmark(drillId);
+      }
+      return await drillAPI.bookmark(drillId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.drills.all });
+      toast.success(
+        variables.bookmarked
+          ? "Removed from Bookmark Drills"
+          : "Added to Bookmark Drills"
+      );
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to update bookmark";
+      toast.error(message);
+    },
   });
 }
 

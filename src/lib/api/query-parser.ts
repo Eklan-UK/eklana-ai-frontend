@@ -11,6 +11,9 @@ export interface ParsedQueryParams {
   difficulty?: string;
   isActive?: boolean;
   assignmentStatus?: 'saved' | 'assigned';
+  isBookmarked?: boolean;
+  learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+  learningJourneyTopic?: string;
   [key: string]: any;
 }
 
@@ -27,7 +30,16 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
   };
   
   // Optional string parameters
-  const stringParams = ['search', 'q', 'role', 'status', 'type', 'difficulty', 'assignmentStatus'];
+  const stringParams = [
+    'search',
+    'q',
+    'role',
+    'status',
+    'type',
+    'difficulty',
+    'assignmentStatus',
+    'learningJourneyTopic',
+  ];
   stringParams.forEach(param => {
     const value = searchParams.get(param);
     if (value) {
@@ -41,9 +53,22 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
     params.isActive = isActive === 'true';
   }
 
+  const isBookmarked = searchParams.get('isBookmarked');
+  if (isBookmarked === 'true' || isBookmarked === 'false') {
+    params.isBookmarked = isBookmarked === 'true';
+  }
+
   const assignmentStatus = searchParams.get('assignmentStatus');
   if (assignmentStatus === 'saved' || assignmentStatus === 'assigned') {
     params.assignmentStatus = assignmentStatus;
+  }
+
+  const learningJourneyPartRaw = searchParams.get('learningJourneyPart');
+  if (learningJourneyPartRaw) {
+    const part = Number(learningJourneyPartRaw);
+    if (part === 1 || part === 2 || part === 3 || part === 4 || part === 5) {
+      params.learningJourneyPart = part;
+    }
   }
   
   return params;

@@ -69,6 +69,10 @@ export const drillAPI = {
     createdBy?: string;
     isActive?: boolean;
     assignmentStatus?: 'saved' | 'assigned';
+    /** Admin library bookmark filter */
+    isBookmarked?: boolean;
+    learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+    learningJourneyTopic?: string;
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -77,6 +81,8 @@ export const drillAPI = {
         drills: any[]; 
         pagination: any;
         total?: number;
+        limit?: number;
+        offset?: number;
       };
       drills?: any[];
       total?: number;
@@ -85,6 +91,56 @@ export const drillAPI = {
     }>('/drills', {
       method: 'GET',
       params,
+    });
+  },
+
+  /** List drills bookmarked in the shared admin library. */
+  getBookmarked: (params?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    type?: string;
+    difficulty?: string;
+    isActive?: boolean;
+    learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+    learningJourneyTopic?: string;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        drills: any[];
+        total?: number;
+        limit?: number;
+        offset?: number;
+      };
+    }>('/drills/bookmarked', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  /** Mark drill as bookmarked in the admin library (is_bookmarked on Drill). */
+  bookmark: (drillId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/drills/${drillId}/bookmark`, {
+      method: 'POST',
+    });
+  },
+
+  /** Remove admin library bookmark from a drill. */
+  unbookmark: (drillId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/drills/${drillId}/bookmark`, {
+      method: 'DELETE',
     });
   },
 

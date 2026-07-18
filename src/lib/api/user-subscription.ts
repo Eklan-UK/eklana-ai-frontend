@@ -3,8 +3,11 @@ import {
   isStripeStatusEntitled,
   STRIPE_NON_ENTITLED_STATUSES,
 } from "@/lib/api/stripe-subscription-apply";
+import { config } from "@/lib/api/config";
 
 type SubscriptionUser = {
+  _id?: unknown;
+  email?: string | null;
   subscriptionPlan?: IUser["subscriptionPlan"] | null;
   /** Mongo Date or JSON-serialized ISO string from API responses. */
   subscriptionExpiresAt?: Date | string | null;
@@ -63,10 +66,19 @@ function isStripeSubscriptionActive(user: SubscriptionUser): boolean {
   return false;
 }
 
+export function isForeverPremiumUser(
+  user: SubscriptionUser | null | undefined
+): boolean {
+  const email = user?.email?.trim().toLowerCase();
+  if (!email) return false;
+  return config.FOREVER_PREMIUM_EMAILS.includes(email);
+}
+
 export function isUserSubscribed(
   user: SubscriptionUser | null | undefined
 ): boolean {
   if (!user) return false;
+  if (isForeverPremiumUser(user)) return true;
   if (user.subscriptionPlan !== "premium") return false;
 
   if (isAppleSubscriptionActive(user)) {

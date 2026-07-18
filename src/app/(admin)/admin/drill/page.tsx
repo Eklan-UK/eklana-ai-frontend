@@ -21,6 +21,7 @@ import { useDeleteDrill, useDeleteDrills } from "@/hooks/useDrills";
 import { useDrillSelection } from "@/hooks/useDrillSelection";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
+import { AdminDrillBookmarkButton } from "@/components/admin/AdminDrillBookmarkButton";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   appendReturnTo,
@@ -44,6 +45,7 @@ interface Drill {
   is_active: boolean;
   totalAssignments?: number;
   context?: string;
+  is_bookmarked?: boolean;
 }
 
 const PAGE_SIZE = 50;
@@ -486,6 +488,10 @@ function AdminDrillPageContent() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
+                        <AdminDrillBookmarkButton
+                          drillId={drill._id}
+                          isBookmarked={Boolean(drill.is_bookmarked)}
+                        />
                         <button
                           onClick={() => setViewStudentsDrill(drill)}
                           className="p-2 text-gray-600 hover:text-[#418b43] hover:bg-emerald-50 rounded-lg transition-colors"
