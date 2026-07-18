@@ -1,4 +1,4 @@
-// Server Component - Home Page with ISR + streaming Suspense
+// Server Component - Home Page with streaming Suspense (dynamic: user-specific data)
 import { Suspense } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { generateMetadata } from "@/utils/seo";
@@ -14,8 +14,7 @@ import { AssignedDrillsSectionClient } from "./assigned-drills-section-client";
 import { AccountHomeContentClient } from "./account-home-content-client";
 import { AmplitudeScreenTracker } from "@/components/analytics/AmplitudeScreenTracker";
 
-// Revalidate every 30 seconds (ISR)
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 // SEO Metadata
 export const metadata = generateMetadata({
