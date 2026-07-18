@@ -1,8 +1,12 @@
 # Pricing Update + Gated Trial — Implementation Plan (Stripe + Apple)
 
+> **ROLLED BACK**  
+> Stripe payments reverted to **single monthly Pro (~US$1.99)**, **no free trial**, no multi-plan checkout, no Challenge price switching.  
+> See [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md). This plan is **historical**.
+
 > **Audience:** Backend, web, mobile (Expo), and ops teams.  
 > **Scope:** Launch Monthly **US$20**, 3-month **US$60**, 1-year **$200**, with a **2-week (14-day) free trial** for post-launch new accounts only, while grandfathering existing monthly payers until their next renewal.  
-> **Status:** Stripe Phases 1–8 and **Phase 10** (Zero Pause cohorts) largely **shipped** (see [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md)); Phase 9 go-live ops may still be pending. Apple IAP (PR 4) remains separate. Cardless signup trial remains **out of scope**.
+> **Status:** **ROLLED BACK** — previously shipped multi-plan + trial + Zero Pause pricing; superseded by monthly $1.99 rollback.
 
 **Related docs:**
 

@@ -1,9 +1,14 @@
 # Stripe Payment System Upgrade — Phased Implementation Guide
 
+> **ROLLED BACK**  
+> Payments reverted to **single monthly Pro (~US$1.99)** with **no free trial** and **no Zero Pause Stripe price sync**.  
+> Current mobile contract: [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md).  
+> This document is **historical** — do not follow Phases 2–10 for new work.
+
 > **Audience:** Backend, web, Android (Expo), and ops teams.  
 > **Scope:** Stripe only — multi-plan pricing, gated trial, grandfathering, webhooks, and go-live.  
 > **Out of scope:** Apple IAP / StoreKit (see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) § PR 4 when ready).  
-> **Status:** Phases 1–6 **complete**; Phase 7 **code complete** (ops test-clock verification pending); Phase 8 **automated suite complete** (live Stripe checklist ops); Phase 9 pending; **Phase 10** (Zero Pause cohort pricing) **complete**. See [progress tracker](#progress-tracker).
+> **Status:** **ROLLED BACK** — previously Phases 1–10 shipped; superseded by monthly $1.99 rollback.
 
 **Parent plan:** [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md)  
 **Current Stripe reference:** [docs/stripe-implementation.md](./docs/stripe-implementation.md)  
