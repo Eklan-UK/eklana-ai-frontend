@@ -7,7 +7,12 @@ import User from "@/models/user";
 import Tutor from "@/models/tutor";
 import Profile from "@/models/profile";
 import { logger } from "@/lib/api/logger";
-import { isUserSubscribed } from "@/lib/api/user-subscription";
+import {
+  isForeverPremiumUser,
+  isUserSubscribed,
+} from "@/lib/api/user-subscription";
+import { isEligibleForTrial } from "@/lib/api/stripe-trial-eligibility";
+import { isZeroPauseChallengePricingActive } from "@/lib/api/zero-pause-pricing";
 
 async function handler(
   req: NextRequest,
@@ -34,6 +39,7 @@ async function handler(
     // Use role from context (already validated) or fallback to DB value
     const effectiveRole = (user as any).role || context.userRole || "user";
     const subscribed = isUserSubscribed(user as any);
+    const foreverPremium = isForeverPremiumUser(user as any);
 
     // Lazily backfill a purpose-built UUID identifier for use as StoreKit's
     // appAccountToken, for users who signed up/logged in before this field
@@ -51,12 +57,16 @@ async function handler(
     const safeUser: any = {
       ...user,
       role: effectiveRole,
-      subscriptionPlan: user.subscriptionPlan || "free",
+      subscriptionPlan: foreverPremium
+        ? "premium"
+        : user.subscriptionPlan || "free",
       subscriptionActivatedAt: user.subscriptionActivatedAt || null,
       subscriptionExpiresAt: user.subscriptionExpiresAt || null,
       stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,
       appleSubscriptionStatus: (user as any).appleSubscriptionStatus ?? null,
       isSubscribed: subscribed,
+      eligibleForTrial: isEligibleForTrial(user as any),
+      challengePricingActive: isZeroPauseChallengePricingActive(user as any),
       iapAccountToken,
     };
 

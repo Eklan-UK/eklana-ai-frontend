@@ -15,7 +15,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { ClassStatus, ClassType } from "@/app/(admin)/admin/classes/types";
-import { useTutorClasses } from "@/hooks/useClasses";
+import {
+  useTutorClasses,
+  useTutorClassesInfinite,
+} from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
@@ -74,30 +77,37 @@ function ClassTypeBadge({ type }: { type: ClassType }) {
 
 export function TutorClassesClient() {
   const [tab, setTab] = useState<"today" | "upcoming" | "completed">("today");
-  const { data, isLoading, error } = useTutorClasses({ limit: 100 });
+  const { data: todayMeta } = useTutorClasses({ bucket: "today", limit: 1 });
+  const { data: upcomingMeta } = useTutorClasses({
+    bucket: "upcoming",
+    limit: 1,
+  });
+  const { data: completedMeta } = useTutorClasses({
+    bucket: "completed",
+    limit: 1,
+  });
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useTutorClassesInfinite({ bucket: tab, limit: 100 });
 
   const classes = useMemo(() => {
-    const rows = data?.classes ?? [];
+    const rows = data?.pages.flatMap((page) => page.classes) ?? [];
     return rows.map(adminDtoToTeachingClass);
-  }, [data?.classes]);
+  }, [data?.pages]);
 
-  const todayCount = useMemo(
-    () => classes.filter((c) => c.bucket === "today").length,
-    [classes],
-  );
-  const upcomingCount = useMemo(
-    () => classes.filter((c) => c.bucket === "upcoming").length,
-    [classes],
-  );
-  const completedCount = useMemo(
-    () => classes.filter((c) => c.bucket === "completed").length,
-    [classes],
-  );
+  const todayCount = todayMeta?.pagination.total ?? 0;
+  const upcomingCount = upcomingMeta?.pagination.total ?? 0;
+  const completedCount = completedMeta?.pagination.total ?? 0;
 
-  const visibleClasses = useMemo(() => {
-    const filtered = classes.filter((c) => c.bucket === tab);
-    return sortTeachingClassesByTab(tab, filtered);
-  }, [classes, tab]);
+  const visibleClasses = useMemo(
+    () => sortTeachingClassesByTab(tab, classes),
+    [classes, tab],
+  );
 
   const headerDate = formatHeaderDate();
 
@@ -376,6 +386,21 @@ export function TutorClassesClient() {
             );
           })}
       </div>
+
+      {!isLoading && hasNextPage ? (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            disabled={isFetchingNextPage}
+            onClick={() => {
+              void fetchNextPage();
+            }}
+            className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isFetchingNextPage ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

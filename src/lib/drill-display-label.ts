@@ -1,7 +1,10 @@
 import {
 	LEARNING_JOURNEY_PARTS,
+	getMissionNumberLabel,
 	getTopicById,
+	parseLearningJourneyPartId,
 } from '@/domain/learning-journey/learning-journey.catalog';
+import { getDrillTypeLabel } from '@/utils/drill';
 
 interface DrillLike {
 	learning_journey_part?: number | null;
@@ -11,6 +14,22 @@ interface DrillLike {
 export interface DrillTopicLike {
 	learning_journey_topic?: string | null;
 	scenarioType?: string | null;
+}
+
+export interface DrillNotificationLabelInput {
+	title?: string | null;
+	type?: string | null;
+	learning_journey_part?: number | null;
+	learning_journey_topic?: string | null;
+	scenarioType?: string | null;
+}
+
+/** Treat blank titles and "Untitled*" placeholders as absent. */
+export function resolveRealDrillTitle(title?: string | null): string | null {
+	const trimmed = title?.trim();
+	if (!trimmed) return null;
+	if (/^untitled/i.test(trimmed)) return null;
+	return trimmed;
 }
 
 /**
@@ -67,4 +86,31 @@ export function drillDisplayLabel(drill: DrillLike | null | undefined): string |
 	}
 
 	return `Part ${partNum} — ${topicTitle}`;
+}
+
+/**
+ * Student-facing notification label: type · mission · topic · title?
+ * Never returns "Untitled"; falls back to type label only when needed.
+ */
+export function formatDrillNotificationLabel(
+	drill: DrillNotificationLabelInput | null | undefined,
+): string {
+	const parts: string[] = [getDrillTypeLabel(drill?.type)];
+
+	const partId = parseLearningJourneyPartId(drill?.learning_journey_part);
+	if (partId != null) {
+		parts.push(getMissionNumberLabel(partId));
+	}
+
+	const topicTitle = getDrillTopicTitle(drill);
+	if (topicTitle) {
+		parts.push(topicTitle);
+	}
+
+	const realTitle = resolveRealDrillTitle(drill?.title);
+	if (realTitle) {
+		parts.push(realTitle);
+	}
+
+	return parts.join(' · ');
 }

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   formatZeroPauseProductWithDate,
+  isZeroPauseProduct,
   type ZeroPauseProduct,
 } from '@/domain/subscriptions/subscription.types';
 
@@ -307,7 +308,7 @@ const Learners: React.FC = () => {
                   const name = `${l.firstName || ""} ${l.lastName || ""}`.trim() || "Unknown";
                   const status = l.isActive === false ? 'Inactive' : 'Active';
                   const zeroPause: ZeroPauseProduct[] = Array.isArray(l.zeroPauseProducts)
-                    ? l.zeroPauseProducts
+                    ? l.zeroPauseProducts.filter(isZeroPauseProduct)
                     : [];
                   return (
                     <tr key={l._id} className="hover:bg-gray-50/50 transition-colors">
@@ -319,14 +320,22 @@ const Learners: React.FC = () => {
                           <span className="text-sm text-gray-400">—</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {zeroPause.map((product) => (
-                              <span
-                                key={product}
-                                className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
-                              >
-                                {formatZeroPauseProductWithDate(product, l.zeroPauseDate)}
-                              </span>
-                            ))}
+                            {zeroPause.map((product) => {
+                              const label = formatZeroPauseProductWithDate(
+                                product,
+                                l.zeroPauseDate,
+                                l.zeroPauseEndDate
+                              );
+                              if (!label) return null;
+                              return (
+                                <span
+                                  key={product}
+                                  className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </td>

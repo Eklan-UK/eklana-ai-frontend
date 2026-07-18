@@ -1,6 +1,6 @@
 export type BillingPeriod = "monthly" | "quarterly" | "annual";
 
-export type ZeroPauseProduct = "challenge" | "mastery";
+export type ZeroPauseProduct = "challenge" | "maintainer";
 
 export const BILLING_PERIODS: BillingPeriod[] = [
   "monthly",
@@ -22,13 +22,19 @@ export const BILLING_PERIOD_LABELS: Record<BillingPeriod, string> = {
 
 export const ZERO_PAUSE_PRODUCTS: ZeroPauseProduct[] = [
   "challenge",
-  "mastery",
+  "maintainer",
 ];
 
 export const ZERO_PAUSE_PRODUCT_LABELS: Record<ZeroPauseProduct, string> = {
   challenge: "Zero Pause Challenge",
-  mastery: "Zero Pause Mastery",
+  maintainer: "Zero Pause maintenance",
 };
+
+export function isZeroPauseProduct(
+  value: string
+): value is ZeroPauseProduct {
+  return (ZERO_PAUSE_PRODUCTS as string[]).includes(value);
+}
 
 export function billingPeriodToMonths(period: BillingPeriod): number {
   return BILLING_PERIOD_MONTHS[period];
@@ -150,24 +156,33 @@ export function formatZeroPauseProducts(
   products: ZeroPauseProduct[] | string[] | null | undefined
 ): string {
   if (!products?.length) return "—";
-  return products
-    .map((p) => ZERO_PAUSE_PRODUCT_LABELS[p as ZeroPauseProduct] ?? p)
-    .join(", ");
+  const labels = (products as string[])
+    .filter(isZeroPauseProduct)
+    .map((p) => ZERO_PAUSE_PRODUCT_LABELS[p]);
+  if (!labels.length) return "—";
+  return labels.join(", ");
 }
 
 export function formatZeroPauseProductWithDate(
-  product: ZeroPauseProduct,
-  date?: string | Date | null
-): string {
+  product: ZeroPauseProduct | string,
+  date?: string | Date | null,
+  endDate?: string | Date | null
+): string | null {
+  if (!isZeroPauseProduct(product)) return null;
   const label = ZERO_PAUSE_PRODUCT_LABELS[product];
   if (!date) return label;
   try {
-    const formatted = new Date(date).toLocaleDateString("en-US", {
+    const opts: Intl.DateTimeFormatOptions = {
       month: "short",
       day: "numeric",
       year: "numeric",
-    });
-    return `${label} · ${formatted}`;
+    };
+    const startFormatted = new Date(date).toLocaleDateString("en-US", opts);
+    if (endDate) {
+      const endFormatted = new Date(endDate).toLocaleDateString("en-US", opts);
+      return `${label} · ${startFormatted} – ${endFormatted}`;
+    }
+    return `${label} · ${startFormatted}`;
   } catch {
     return label;
   }

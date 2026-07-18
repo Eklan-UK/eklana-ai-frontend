@@ -180,7 +180,9 @@ export default function KeyPhrasesDrill({
         audio.setAttribute("playsinline", "true");
         audio.load();
       } else {
-        void preloadTTSAudio(prompt);
+        void preloadTTSAudio(prompt).catch((error) => {
+          console.warn("TTS preload failed:", error);
+        });
       }
     }
   }, [items]);

@@ -1,4 +1,5 @@
 import DrillAttempt from '@/models/drill-attempt';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 import {
   getZonedWeekdayAndMinutes,
   zonedDateKey,
@@ -24,7 +25,7 @@ export async function hasQualifyingDrillTodayLocal(
   const since = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   const attempts = await DrillAttempt.find({
-    learnerId,
+    learnerId: { $in: toUserIdCandidates(learnerId) },
     score: { $gte: 70 },
     completedAt: { $gte: since },
   })

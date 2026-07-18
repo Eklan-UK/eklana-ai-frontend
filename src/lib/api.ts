@@ -69,6 +69,10 @@ export const drillAPI = {
     createdBy?: string;
     isActive?: boolean;
     assignmentStatus?: 'saved' | 'assigned';
+    /** Admin library bookmark filter */
+    isBookmarked?: boolean;
+    learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+    learningJourneyTopic?: string;
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -77,6 +81,8 @@ export const drillAPI = {
         drills: any[]; 
         pagination: any;
         total?: number;
+        limit?: number;
+        offset?: number;
       };
       drills?: any[];
       total?: number;
@@ -85,6 +91,56 @@ export const drillAPI = {
     }>('/drills', {
       method: 'GET',
       params,
+    });
+  },
+
+  /** List drills bookmarked in the shared admin library. */
+  getBookmarked: (params?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    type?: string;
+    difficulty?: string;
+    isActive?: boolean;
+    learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
+    learningJourneyTopic?: string;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        drills: any[];
+        total?: number;
+        limit?: number;
+        offset?: number;
+      };
+    }>('/drills/bookmarked', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  /** Mark drill as bookmarked in the admin library (is_bookmarked on Drill). */
+  bookmark: (drillId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/drills/${drillId}/bookmark`, {
+      method: 'POST',
+    });
+  },
+
+  /** Remove admin library bookmark from a drill. */
+  unbookmark: (drillId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/drills/${drillId}/bookmark`, {
+      method: 'DELETE',
     });
   },
 
@@ -1023,7 +1079,7 @@ export const adminAPI = {
         totalActiveLearners: number;
         totalDrills: number;
         zeroPauseChallengeUsers: number;
-        zeroPauseMasteryUsers: number;
+        zeroPauseMaintainerUsers: number;
         newSignupsThisWeek: number;
         discoveryCallsToday: number;
         videosAwaitingReview: number;
@@ -1040,8 +1096,9 @@ export const adminAPI = {
     plan: "free" | "premium";
     months?: number;
     billingPeriod?: "monthly" | "quarterly" | "annual";
-    zeroPauseProducts?: ("challenge" | "mastery")[];
+    zeroPauseProducts?: ("challenge" | "maintainer")[];
     zeroPauseDate?: string | null;
+    zeroPauseEndDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -1053,8 +1110,9 @@ export const adminAPI = {
         userId: string;
         subscriptionPlan: "free" | "premium";
         subscriptionBillingPeriod: "monthly" | "quarterly" | "annual" | null;
-        zeroPauseProducts: ("challenge" | "mastery")[];
+        zeroPauseProducts: ("challenge" | "maintainer")[];
         zeroPauseDate: string | null;
+        zeroPauseEndDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };

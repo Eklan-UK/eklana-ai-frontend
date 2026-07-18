@@ -116,9 +116,19 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionBillingPeriod?: "monthly" | "quarterly" | "annual" | null;
   subscriptionActivatedAt?: Date | null;
   subscriptionExpiresAt?: Date | null;
-  // Zero Pause add-on products (admin-assigned)
-  zeroPauseProducts?: ("challenge" | "mastery")[];
+  // Zero Pause add-on products (admin-assigned). `mastery` is legacy storage only.
+  zeroPauseProducts?: ("challenge" | "maintainer" | "mastery")[];
+  /** Maintainer (community) / cohort window start (admin “Start date”). */
   zeroPauseDate?: Date | null;
+  /** Maintainer window end (inclusive). Kept as history after expiry. */
+  zeroPauseEndDate?: Date | null;
+  /**
+   * Public Stripe Price ID to restore when leaving Maintainer (→ Challenge).
+   * Snapshotted when entering Maintainer from a non-Maintainer cohort.
+   */
+  zeroPausePriorStripePriceId?: string | null;
+  /** Billing period matching `zeroPausePriorStripePriceId`. */
+  zeroPausePriorBillingPeriod?: "monthly" | "quarterly" | "annual" | null;
   // Admin-only bookkeeping
   subscriptionMonthsPaidFor?: number | null;
   subscriptionAmountPaid?: number | null;
@@ -127,6 +137,8 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionUpdatedBy?: Types.ObjectId | null;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  /** Active Stripe Subscription Schedule id (Phase 7 price migration). */
+  stripeScheduleId?: string;
   stripeSubscriptionStatus?: string;
   subscriptionProvider?: string | null;
   appleOriginalTransactionId?: string;
@@ -298,12 +310,26 @@ const userSchema = new Schema<IUser>(
       enum: ["monthly", "quarterly", "annual"],
       default: null,
     },
+    // `mastery` kept in enum so legacy docs still load; not assignable via admin API/UI.
     zeroPauseProducts: {
-      type: [{ type: String, enum: ["challenge", "mastery"] }],
+      type: [{ type: String, enum: ["challenge", "mastery", "maintainer"] }],
       default: [],
     },
     zeroPauseDate: {
       type: Date,
+      default: null,
+    },
+    zeroPauseEndDate: {
+      type: Date,
+      default: null,
+    },
+    zeroPausePriorStripePriceId: {
+      type: String,
+      default: null,
+    },
+    zeroPausePriorBillingPeriod: {
+      type: String,
+      enum: ["monthly", "quarterly", "annual"],
       default: null,
     },
     subscriptionActivatedAt: {
@@ -341,6 +367,11 @@ const userSchema = new Schema<IUser>(
       sparse: true,
     },
     stripeSubscriptionId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
+    stripeScheduleId: {
       type: String,
       index: true,
       sparse: true,

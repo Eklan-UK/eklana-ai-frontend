@@ -3,8 +3,14 @@ import {
   isStripeStatusEntitled,
   STRIPE_NON_ENTITLED_STATUSES,
 } from "@/lib/api/stripe-subscription-apply";
+import { config } from "@/lib/api/config";
 
-type SubscriptionUser = Pick<IUser, "subscriptionPlan" | "subscriptionExpiresAt"> & {
+type SubscriptionUser = {
+  _id?: unknown;
+  email?: string | null;
+  subscriptionPlan?: IUser["subscriptionPlan"] | null;
+  /** Mongo Date or JSON-serialized ISO string from API responses. */
+  subscriptionExpiresAt?: Date | string | null;
   stripeSubscriptionStatus?: string | null;
   subscriptionPaymentMethod?: string | null;
   appleSubscriptionStatus?: string | null;
@@ -12,13 +18,13 @@ type SubscriptionUser = Pick<IUser, "subscriptionPlan" | "subscriptionExpiresAt"
 };
 
 function expiresAtInFuture(
-  subscriptionExpiresAt: IUser["subscriptionExpiresAt"]
+  subscriptionExpiresAt: SubscriptionUser["subscriptionExpiresAt"]
 ): boolean {
   if (!subscriptionExpiresAt) return false;
   const expiresAt =
     subscriptionExpiresAt instanceof Date
       ? subscriptionExpiresAt
-      : new Date(subscriptionExpiresAt as unknown as string);
+      : new Date(subscriptionExpiresAt);
   return expiresAt.getTime() > Date.now();
 }
 
@@ -60,10 +66,19 @@ function isStripeSubscriptionActive(user: SubscriptionUser): boolean {
   return false;
 }
 
+export function isForeverPremiumUser(
+  user: SubscriptionUser | null | undefined
+): boolean {
+  const email = user?.email?.trim().toLowerCase();
+  if (!email) return false;
+  return config.FOREVER_PREMIUM_EMAILS.includes(email);
+}
+
 export function isUserSubscribed(
   user: SubscriptionUser | null | undefined
 ): boolean {
   if (!user) return false;
+  if (isForeverPremiumUser(user)) return true;
   if (user.subscriptionPlan !== "premium") return false;
 
   if (isAppleSubscriptionActive(user)) {

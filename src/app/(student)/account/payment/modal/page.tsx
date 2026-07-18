@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { X, Check, Crown } from "lucide-react";
@@ -8,15 +7,6 @@ import { useRouter } from "next/navigation";
 
 export default function PaymentModalPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleTryFree = () => {
-    setIsLoading(true);
-    // In a real app, this would initiate payment/subscription
-    setTimeout(() => {
-      router.push("/settings/subscriptions");
-    }, 1000);
-  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -88,16 +78,15 @@ export default function PaymentModalPage() {
             </div>
           </div>
 
-          {/* CTA Button */}
+          {/* CTA Button — plans & gated trial live on subscriptions page */}
           <Button
             variant="primary"
             size="lg"
             fullWidth
-            onClick={handleTryFree}
-            disabled={isLoading}
+            onClick={() => router.push("/account/settings/subscriptions")}
             className="mb-3"
           >
-            {isLoading ? "Processing..." : "Try 7 days for free"}
+            View plans
           </Button>
 
           {/* Skip Link */}

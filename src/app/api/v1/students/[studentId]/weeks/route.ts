@@ -46,7 +46,7 @@ async function handler(
     const assignments = await DrillAssignment.find({ learnerId: learnerObjectId })
       .populate(
         "drillId",
-        "title type difficulty learning_journey_topic learning_journey_part is_active",
+        "title type difficulty learning_journey_topic learning_journey_part is_active is_bookmarked",
       )
       .lean();
 
@@ -74,6 +74,7 @@ async function handler(
         // A drill saved with `is_active: false` still needs a tutor/admin to
         // select users and update/assign it before learners can act on it.
         isActive: drill?.is_active ?? true,
+        isBookmarked: Boolean(drill?.is_bookmarked),
         assignedAt: (assignment as any).assignedAt,
         dueDate: (assignment as any).dueDate ?? null,
         completedAt: (assignment as any).completedAt ?? null,

@@ -186,6 +186,8 @@ async function createOrFindUser(
         avatar: userInfo.picture,
         role: "user",
         isActive: true,
+        // Phase 10: new users default to Zero Pause maintenance (public prices).
+        zeroPauseProducts: ["maintainer"],
         createdAt: new Date(),
         updatedAt: new Date(),
         lastLoginAt: new Date(),

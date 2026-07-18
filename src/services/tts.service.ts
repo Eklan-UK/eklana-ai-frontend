@@ -10,8 +10,37 @@ interface TTSOptions {
   apiPath?: string;
 }
 
+export class TTSRequestError extends Error {
+  public readonly code?: string;
+  public readonly status: number;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'TTSRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 // In-memory blob cache — avoids any network call when the same phrase is replayed in-session.
 const sessionBlobCache = new Map<string, Blob>();
+
+async function throwForFailedTTSResponse(response: Response): Promise<never> {
+  let message = 'Backend TTS failed';
+  let code: string | undefined;
+  try {
+    const data = (await response.json()) as { code?: string; message?: string };
+    if (typeof data.message === 'string' && data.message.trim()) {
+      message = data.message;
+    }
+    if (typeof data.code === 'string' && data.code.trim()) {
+      code = data.code;
+    }
+  } catch {
+    // non-JSON body — keep generic message
+  }
+  throw new TTSRequestError(message, response.status, code);
+}
 
 /**
  * Generate TTS with in-session caching.
@@ -37,7 +66,7 @@ async function generateTTSWithCache(options: TTSOptions): Promise<Blob> {
   });
 
   if (!response.ok) {
-    throw new Error('Backend TTS failed');
+    await throwForFailedTTSResponse(response);
   }
 
   const contentType = response.headers.get('content-type');

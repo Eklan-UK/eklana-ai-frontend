@@ -74,6 +74,32 @@ export const parseGoogleClientIds = (): string[] => {
 	return [...new Set(ids)];
 };
 
+const DEFAULT_FOREVER_PREMIUM_EMAILS = [
+	'sa@eklan.ai',
+	'bri8kingsley@gmail.com',
+	'dv@eklan.ai',
+	'afolabi.aanu@gmail.com',
+] as const;
+
+/** Hardcoded staff QA accounts + optional FOREVER_PREMIUM_EMAILS env (comma-separated). */
+export const parseForeverPremiumEmails = (): string[] => {
+	const emails = new Set(
+		DEFAULT_FOREVER_PREMIUM_EMAILS.map((email) => email.toLowerCase()),
+	);
+
+	const raw = process.env.FOREVER_PREMIUM_EMAILS?.trim();
+	if (raw) {
+		for (const email of raw
+			.split(',')
+			.map((value) => value.trim().toLowerCase())
+			.filter(Boolean)) {
+			emails.add(email);
+		}
+	}
+
+	return [...emails];
+};
+
 export const config = {
 	NODE_ENV: process.env.NODE_ENV || 'development',
 	WHITELIST_ORIGINS: parseWhitelistOrigins(),
@@ -84,6 +110,7 @@ export const config = {
 	ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY,
 	REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY,
 	WHITELIST_ADMINS_MAILS: ['gideons564@gmail.com'],
+	FOREVER_PREMIUM_EMAILS: parseForeverPremiumEmails(),
 	SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL,
 	SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456',
 	SUPER_ADMIN_FIRST_NAME: process.env.SUPER_ADMIN_FIRST_NAME || 'Super',
@@ -140,6 +167,11 @@ export const config = {
 	STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
 	STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
 	STRIPE_PREMIUM_MONTHLY_PRICE_ID: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
+	STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY:
+		process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY,
+	STRIPE_PREMIUM_QUARTERLY_PRICE_ID: process.env.STRIPE_PREMIUM_QUARTERLY_PRICE_ID,
+	STRIPE_PREMIUM_ANNUAL_PRICE_ID: process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID,
+	SUBSCRIPTION_TRIAL_LAUNCH_AT: process.env.SUBSCRIPTION_TRIAL_LAUNCH_AT,
 	// Apple In-App Purchase (App Store Server API — separate from Sign in with Apple OAuth)
 	APPLE_APP_STORE_ISSUER_ID: process.env.APPLE_APP_STORE_ISSUER_ID,
 	APPLE_APP_STORE_KEY_ID: process.env.APPLE_APP_STORE_KEY_ID,

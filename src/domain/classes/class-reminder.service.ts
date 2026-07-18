@@ -3,13 +3,18 @@ import ClassSeries from '@/models/class-series';
 import ClassEnrollment from '@/models/class-enrollment';
 import SessionReminderDispatch from '@/models/session-reminder-dispatch';
 import User from '@/models/user';
+import Profile from '@/models/profile';
 import { logger } from '@/lib/api/logger';
 import { sendClassReminderEmail } from '@/lib/api/email.service';
 import { buildClassEmailJoinUrl } from '@/lib/api/class-join-token';
 import { onClassSessionReminder } from '@/services/notification/triggers';
+import { validateTimezone } from '@/lib/timezone/validate-timezone';
 
 /** Maximum reminder offset supported (minutes). Sessions starting further out are ignored. */
 const MAX_REMINDER_MINUTES = 120;
+
+/** Fallback timezone when a learner has no valid `Profile.timezone`. */
+const DEFAULT_TIMEZONE = 'UTC';
 
 /** Tolerance window around a scheduled reminder time (±1 minute). */
 const TOLERANCE_MS = 60 * 1000;
@@ -162,6 +167,14 @@ export class ClassReminderService {
               (learner as { name?: string }).name ||
               'Student';
             try {
+              const profile = await Profile.findOne({ userId: learnerId })
+                .select('timezone')
+                .lean();
+              const rawTimeZone = profile?.timezone?.trim() || DEFAULT_TIMEZONE;
+              const timeZone = validateTimezone(rawTimeZone)
+                ? rawTimeZone
+                : DEFAULT_TIMEZONE;
+
               const emailJoinUrl =
                 session.meetingUrl?.trim()
                   ? buildClassEmailJoinUrl({
@@ -178,6 +191,7 @@ export class ClassReminderService {
                 sessionStart: new Date(session.startUtc),
                 meetingUrl: session.meetingUrl,
                 emailJoinUrl,
+                timeZone,
               });
               anySent = true;
               sent += 1;

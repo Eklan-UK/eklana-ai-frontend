@@ -182,6 +182,15 @@ export const getAuth = async () => {
                   patch.subscriptionExpiresAt = null;
                 }
 
+                // Phase 10: new users default to Zero Pause maintenance (public prices).
+                if (
+                  user.zeroPauseProducts === undefined ||
+                  (Array.isArray(user.zeroPauseProducts) &&
+                    user.zeroPauseProducts.length === 0)
+                ) {
+                  patch.zeroPauseProducts = ["maintainer"];
+                }
+
                 if (Object.keys(patch).length > 0) {
                   await UserModel.updateOne({ _id: user.id }, { $set: patch });
                   logger.info("databaseHook: set defaults for new user", {
