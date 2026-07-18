@@ -1,10 +1,10 @@
 # Stripe Payments & API Keys Guide
 
-> **Pricing upgrade (in progress):** Multi-plan pricing (US$20 / US$60 / $200), 2-week (14-day) gated trial, and grandfathering for existing monthly payers.
+> **Current pricing (post-rollback):** Single monthly Pro (~US$1.99) via `STRIPE_PREMIUM_MONTHLY_PRICE_ID`. No free trial. No multi-plan checkout.
 >
-> - **Stripe-only phased guide:** [STRIPE_PRICING_UPGRADE.md](../STRIPE_PRICING_UPGRADE.md) — start here for implementation phases.
-> - **Full cross-platform plan (Stripe + Apple):** [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md).
-> - **Implemented routes & mobile checklist:** [stripe-implementation.md](./stripe-implementation.md).
+> - **Mobile / checkout contract:** [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md).
+> - **Historical upgrade plan:** [STRIPE_PRICING_UPGRADE.md](../STRIPE_PRICING_UPGRADE.md) / [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md) (rolled back).
+> - **Implemented routes:** [stripe-implementation.md](./stripe-implementation.md).
 
 ## 1. Goals
 
@@ -109,7 +109,7 @@ For the initial launch, both keys map to the single `premium` plan. If you later
 
 Copy from [`.env.example`](../.env.example) (team template) into `.env` locally or into your hosting secret store (production). **Never commit real secrets to git.**
 
-**Phase 1 (config) — shipped in code:** all vars below are exported from `src/lib/api/config.ts`. Checkout still uses monthly-only until [Phase 3](../STRIPE_PRICING_UPGRADE.md#phase-3--checkout-api-upgrade).
+**Config:** vars below are exported from `src/lib/api/config.ts`. Checkout always uses the monthly Price ID.
 
 ```bash
 # ── Server-only (never expose to client) ─────────────────────────────────────
@@ -122,15 +122,12 @@ STRIPE_SECRET_KEY=sk_test_...
 # Dashboard endpoint OR `whsec_` printed by `stripe listen` during local dev.
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Price IDs — always `price_...`, never `prod_...` (Stripe Dashboard → Products → Prices).
+# Price ID — always `price_...`, never `prod_...` (Stripe Dashboard → Products → Prices).
 # Test vs live Price IDs must match STRIPE_SECRET_KEY mode.
-STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...        # NEW US$20 monthly (new checkouts after Phase 3)
-STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY=price_... # OLD monthly (grandfathered subs + billing-period map)
-STRIPE_PREMIUM_QUARTERLY_PRICE_ID=price_...      # US$60 / 3 months
-STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_...         # $200 / year
+# Monthly Pro (~US$1.99) — all new Checkouts use this Price.
+STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
 
-# Trial gate (Phase 2+ logic) — ISO 8601 UTC; accounts created before this date get no trial
-SUBSCRIPTION_TRIAL_LAUNCH_AT=2026-08-01T00:00:00.000Z
+# Unused after rollback (do not set): LEGACY / QUARTERLY / ANNUAL Price IDs, SUBSCRIPTION_TRIAL_LAUNCH_AT.
 
 # ── App URL (checkout success/cancel redirects) ──────────────────────────────
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -139,7 +136,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-Until Phase 3 ships, you may set `STRIPE_PREMIUM_MONTHLY_PRICE_ID` to the **legacy** price so new checkouts keep the old amount.
+Set `STRIPE_PREMIUM_MONTHLY_PRICE_ID` to the Stripe Price ID for ~US$1.99 monthly. Existing $20 / $60 / $200 subscribers are left on their Prices.
 
 ### Which key does what?
 
@@ -147,11 +144,7 @@ Until Phase 3 ships, you may set `STRIPE_PREMIUM_MONTHLY_PRICE_ID` to the **lega
 |---|---|---|---|
 | `STRIPE_SECRET_KEY` | `sk_` / `rk_` + `_test_` / `_live_` | Server env only | Backend API routes |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_` | Server env only | Webhook route (one secret per endpoint) |
-| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout (today: monthly only) |
-| `STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY` | `price_` | Server env only | Billing-period map; Phase 7 migration |
-| `STRIPE_PREMIUM_QUARTERLY_PRICE_ID` | `price_` | Server env only | Phase 3+ checkout; billing-period map |
-| `STRIPE_PREMIUM_ANNUAL_PRICE_ID` | `price_` | Server env only | Phase 3+ checkout; billing-period map |
-| `SUBSCRIPTION_TRIAL_LAUNCH_AT` | ISO 8601 UTC | Server env only | Phase 2+ trial eligibility |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout (monthly ~US$1.99) |
 | `NEXT_PUBLIC_APP_URL` | URL | Client + server | Checkout / portal redirect URLs |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_` / `pk_live_` | Client bundle | Only if using Stripe.js |
 
@@ -247,34 +240,23 @@ This endpoint **should remain** after Stripe is integrated:
 
 ## 9. Implementation status
 
-See [stripe-implementation.md](./stripe-implementation.md) for route contracts and [STRIPE_PRICING_UPGRADE.md](../STRIPE_PRICING_UPGRADE.md) for phased rollout.
+See [stripe-implementation.md](./stripe-implementation.md) for route contracts and [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) for the current checkout contract.
 
-### Shipped (baseline + Phase 1 config)
+### Shipped (post-rollback)
 
 | Item | Status |
 |------|--------|
 | User model Stripe fields (`stripeCustomerId`, `stripeSubscriptionId`, `stripeSubscriptionStatus`, …) | ✅ |
-| Webhook route `POST /api/v1/webhooks/stripe` (signature verify, five event types) | ✅ |
-| Checkout `POST /api/v1/stripe/checkout` (monthly-only today) | ✅ |
+| Webhook route `POST /api/v1/webhooks/stripe` (signature verify, core entitlement events) | ✅ |
+| Checkout `POST /api/v1/stripe/checkout` (monthly ~US$1.99 only; body ignored) | ✅ |
 | Billing Portal `POST /api/v1/stripe/portal` | ✅ |
 | `withPremium` middleware → HTTP 402 `SubscriptionRequired` | ✅ |
 | Premium gating on Free Talk / Pressure Test routes | ✅ |
-| Phase 1 env vars in `config.ts` + `.env.example` | ✅ |
-| `billingPeriodFromStripePriceId` (legacy + new monthly, quarterly, annual) | ✅ |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` in `config.ts` + `.env.example` | ✅ |
+| `billingPeriodFromStripePriceId` (monthly + keyword fallback for grandfathered prices) | ✅ |
 | Admin Stripe sync `POST /api/v1/admin/users/stripe-sync` | ✅ |
-
-### Remaining ([STRIPE_PRICING_UPGRADE.md](../STRIPE_PRICING_UPGRADE.md))
-
-| Phase | Work |
-|-------|------|
-| 2 | `isEligibleForTrial()` + unit tests |
-| 3 | Multi-plan checkout + gated 14-day trial |
-| 4 | Webhook billing-period sync + hardening |
-| 5 | Web UI plan picker + `eligibleForTrial` on `/users/current` |
-| 6 | Android/mobile contract updates |
-| 7 | Subscription Schedules — legacy monthly → US$20 at each subscriber's next renewal |
-| 8–9 | Test checklist + production go-live |
+| No free trial / no multi-plan / no Zero Pause Stripe price sync | ✅ |
 
 ### Go-live checklist
 
-Review [Stripe's go-live checklist](https://docs.stripe.com/get-started/checklist/go-live): live restricted key, live Price IDs, live webhook endpoint + matching `STRIPE_WEBHOOK_SECRET`, smoke-test checkout, verify webhook delivery in Dashboard.
+Review [Stripe's go-live checklist](https://docs.stripe.com/get-started/checklist/go-live): live restricted key, live monthly Price ID (~US$1.99), live webhook endpoint + matching `STRIPE_WEBHOOK_SECRET`, smoke-test checkout, verify webhook delivery in Dashboard.

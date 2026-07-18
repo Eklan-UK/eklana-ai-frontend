@@ -10,11 +10,6 @@ import { Check, Crown, Zap, Calendar, Loader2 } from "lucide-react";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { planTitleFromUser, getPlanCardMessage } from "@/lib/learner-learning-goals";
 import { toast } from "sonner";
-import type { BillingPeriod } from "@/domain/subscriptions/subscription.types";
-import {
-  showTrialBanner,
-  subscribeCtaLabel,
-} from "@/lib/api/subscription-trial-ui";
 
 // ── Plan data ─────────────────────────────────────────────────────────────────
 
@@ -31,30 +26,13 @@ const PRO_FEATURES = [
   "Personalised difficulty that adapts as you improve",
 ];
 
-const BILLING_OPTIONS: {
-  period: BillingPeriod;
-  label: string;
-  price: string;
-}[] = [
-  { period: "monthly", label: "Monthly", price: "US$20" },
-  { period: "quarterly", label: "3 months", price: "US$60" },
-  { period: "annual", label: "1 year", price: "$200" },
-];
-
-/** Challenge cohort: legacy monthly only (STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY). */
-const CHALLENGE_BILLING_OPTIONS: {
-  period: BillingPeriod;
-  label: string;
-  price: string;
-}[] = [{ period: "monthly", label: "Monthly", price: "US$1.99" }];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function createCheckoutSession(billingPeriod: BillingPeriod): Promise<string> {
+async function createCheckoutSession(): Promise<string> {
   const res = await fetch("/api/v1/stripe/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ billingPeriod }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -86,24 +64,11 @@ export default function SubscriptionsPage() {
 
   const user = me?.user;
   const isSubscribed: boolean = user?.isSubscribed === true;
-  const eligibleForTrial: boolean = user?.eligibleForTrial === true;
-  const challengePricingActive: boolean =
-    user?.challengePricingActive === true;
   const planTitle = planTitleFromUser(user);
   const planMessage = getPlanCardMessage(isSubscribed);
-  const billingOptions = challengePricingActive
-    ? CHALLENGE_BILLING_OPTIONS
-    : BILLING_OPTIONS;
 
-  const [selectedPeriod, setSelectedPeriod] = useState<BillingPeriod>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-
-  useEffect(() => {
-    if (challengePricingActive && selectedPeriod !== "monthly") {
-      setSelectedPeriod("monthly");
-    }
-  }, [challengePricingActive, selectedPeriod]);
 
   // ── Handle ?checkout=success param ──────────────────────────────────────────
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -154,7 +119,7 @@ export default function SubscriptionsPage() {
   async function handleUpgrade() {
     setCheckoutLoading(true);
     try {
-      const url = await createCheckoutSession(selectedPeriod);
+      const url = await createCheckoutSession();
       window.location.href = url;
     } catch (err: any) {
       toast.error(
@@ -255,7 +220,9 @@ export default function SubscriptionsPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-foreground">Pro</h3>
-                    <p className="text-xs text-muted-foreground">Unlock the full AI experience</p>
+                    <p className="text-xs text-muted-foreground">
+                      US$1.99 / month — unlock the full AI experience
+                    </p>
                   </div>
                 </div>
                 <ul className="space-y-2 mb-5 mt-4">
@@ -266,43 +233,6 @@ export default function SubscriptionsPage() {
                     </li>
                   ))}
                 </ul>
-
-                {/* Billing period picker (unsubscribed only) */}
-                {!isSubscribed && (
-                  <div className="mb-4 space-y-2">
-                    {showTrialBanner(eligibleForTrial) && (
-                      <p className="text-sm font-semibold text-green-600 text-center mb-3">
-                        2-week free trial
-                      </p>
-                    )}
-                    <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="Billing period">
-                      {billingOptions.map((option) => {
-                        const selected = selectedPeriod === option.period;
-                        return (
-                          <button
-                            key={option.period}
-                            type="button"
-                            role="radio"
-                            aria-checked={selected}
-                            onClick={() => setSelectedPeriod(option.period)}
-                            className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                              selected
-                                ? "border-green-600 bg-green-500/10 ring-1 ring-green-600"
-                                : "border-border hover:border-green-600/50"
-                            }`}
-                          >
-                            <span className="text-sm font-semibold text-foreground">
-                              {option.label}
-                            </span>
-                            <span className="text-sm font-medium text-muted-foreground">
-                              {option.price}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 {/* CTA button */}
                 {isSubscribed ? (
@@ -320,12 +250,10 @@ export default function SubscriptionsPage() {
                     onClick={handleUpgrade}
                     disabled={checkoutLoading || userLoading}
                     className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-semibold rounded-lg py-2.5 px-4 text-sm hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="Subscribe to Pro"
+                    aria-label="Upgrade to Pro"
                   >
                     {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {checkoutLoading
-                      ? "Preparing checkout…"
-                      : subscribeCtaLabel(eligibleForTrial)}
+                    {checkoutLoading ? "Preparing checkout…" : "Upgrade to Pro"}
                   </button>
                 )}
               </div>

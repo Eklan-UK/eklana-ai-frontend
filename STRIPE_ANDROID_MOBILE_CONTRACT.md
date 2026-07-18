@@ -2,14 +2,14 @@
 
 > **Audience:** Android / Expo team.  
 > **Scope:** Android Stripe only — same API as web. **No StoreKit. No app code in this repo.**  
-> **Parent:** [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) (Phase 6)  
-> **Status:** Documentation complete. Android team confirmation checklist below is external sign-off.
+> **Current pricing:** [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) — single monthly Pro (~US$1.99), no trial, no multi-plan.  
+> **Status:** Aligned with payment rollback. Prefer the rollback doc for paywall implementation.
 
 ---
 
 ## Scope
 
-This document is the Phase 6 contract for **Android** Pro billing via Stripe (hosted Checkout + Billing Portal).
+This document is the Android contract for Pro billing via Stripe (hosted Checkout + Billing Portal).
 
 | Platform | Payment rail | This doc |
 |----------|--------------|----------|
@@ -25,11 +25,11 @@ Do not duplicate StoreKit flows here.
 
 | Doc | Why |
 |-----|-----|
-| [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) | Parent phased plan (Phase 6) |
-| [MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md](./MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md) | Phase 10 cohort UI — Challenge (~US$1.99) vs Maintainer/public paywall |
+| [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) | **Authoritative** paywall after rollback |
+| [MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md](./MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md) | **Superseded** — Challenge pricing no longer applicable |
 | [docs/stripe-implementation.md](./docs/stripe-implementation.md) | Stripe endpoints, webhooks, server behavior |
-| [docs/STRIPE_WEB_CHECKOUT_UI.md](./docs/STRIPE_WEB_CHECKOUT_UI.md) | Phase 5 web paywall / CTA alignment |
-| [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md) | Legacy dual-rail (iOS + Android) guide — iOS / StoreKit |
+| [docs/STRIPE_WEB_CHECKOUT_UI.md](./docs/STRIPE_WEB_CHECKOUT_UI.md) | Web paywall (monthly-only) |
+| [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md) | Dual-rail (iOS + Android) guide — iOS / StoreKit |
 | [docs/STRIPE_PAYMENTS_AND_KEYS.md](./docs/STRIPE_PAYMENTS_AND_KEYS.md) | Keys & env safety (no secrets in the app) |
 
 ---
@@ -40,24 +40,21 @@ Do not change without product sign-off.
 
 | Rule | Value |
 |------|--------|
-| Monthly | US$20 / month |
-| Quarterly (3-month) | US$60 / 3 months |
-| Annual | $200 / year |
-| Trial | **14 days**, only when the user is trial-eligible |
-| Who grants trial | **Server only** — Checkout adds `trial_period_days: 14` when eligible; never invent trial locally |
+| Plan | Single **monthly** Pro |
+| Price | ~**US$1.99** / month (`STRIPE_PREMIUM_MONTHLY_PRICE_ID` on server) |
+| Trial | **None** — no `trial_period_days`, no trial UI |
+| Checkout body | Empty / ignored — do not send `billingPeriod` |
 
-Client shows prices and trial copy from product rules + `eligibleForTrial`. Client never sends Stripe price IDs.
+Client never sends Stripe price IDs. Existing $20 / $60 / $200 subscribers are left on their Prices.
 
 ---
 
 ## API summary
 
-
 | Step | Call |
 |------|------|
 | Check access | `GET /api/v1/users/current` → `user.isSubscribed` |
-| Check trial UI | `user.eligibleForTrial` |
-| Start checkout | `POST /api/v1/stripe/checkout` body `{ billingPeriod }` |
+| Start checkout | `POST /api/v1/stripe/checkout` body `{}` (or empty) |
 | Open payment | `Linking.openURL` / `expo-web-browser` |
 | Poll | Re-fetch `/users/current` until `isSubscribed` |
 | Paywall | HTTP **402** `SubscriptionRequired` |
@@ -75,16 +72,21 @@ Base path: `{API_HOST}/api/v1`.
 
 ### Fields Android must use
 
-
 | Field | Type | Use |
 |-------|------|-----|
 | `user.isSubscribed` | `boolean` | **Only** gate for Pro features. Do not recompute from expiry locally. |
-| `user.eligibleForTrial` | `boolean` | Show **"2-week free trial"** and **"Start free trial"** CTA only when `true`. |
-| `user.subscriptionBillingPeriod` | `"monthly" \| "quarterly" \| "annual" \| null` | Display current period when subscribed (if present). |
+| `user.subscriptionBillingPeriod` | `"monthly" \| "quarterly" \| "annual" \| null` | Optional display when subscribed (grandfathered periods may still appear). |
 | `user.subscriptionPlan` | string (e.g. `"free"` / plan id) | Display / diagnostics; not the access gate. |
 | `user.subscriptionExpiresAt` | date \| null | Optional display only. |
 | `user.stripeSubscriptionStatus` | string \| null | Optional diagnostics; do not gate on this. |
 | `user.appleSubscriptionStatus` | string \| null | iOS diagnostics; ignore for Android gating. |
+
+### Do not use
+
+| Field | Why |
+|-------|-----|
+| `eligibleForTrial` | Removed — trial rolled back |
+| `challengePricingActive` | Removed — Challenge pricing sync rolled back |
 
 Response shape (relevant slice):
 
@@ -92,7 +94,6 @@ Response shape (relevant slice):
 {
   "user": {
     "isSubscribed": false,
-    "eligibleForTrial": true,
     "subscriptionPlan": "free",
     "subscriptionBillingPeriod": null,
     "subscriptionActivatedAt": null,
@@ -101,12 +102,6 @@ Response shape (relevant slice):
   }
 }
 ```
-
-### Trial eligibility note
-
-- `eligibleForTrial` on this endpoint is computed server-side (`isEligibleForTrial`).
-- At **checkout**, the server re-checks eligibility **and** whether the Stripe customer already has any prior subscription before attaching the 14-day trial.
-- Treat UI flags as hints; **server owns the trial grant**.
 
 ---
 
@@ -121,14 +116,10 @@ POST /api/v1/stripe/checkout
 Authorization: Bearer <sessionToken>
 Content-Type: application/json
 
-{ "billingPeriod": "monthly" }
+{}
 ```
 
-| Body field | Type | Required | Notes |
-|------------|------|----------|--------|
-| `billingPeriod` | `"monthly" \| "quarterly" \| "annual"` | No | Defaults to **`monthly`** if omitted or body is empty/invalid JSON. Invalid value → **400** `{ code: "ValidationError", message: "Invalid billingPeriod." }`. |
-
-Android must send an explicit `billingPeriod` matching the user’s picker selection.
+Body is optional. Legacy `billingPeriod` is ignored. Server always uses `STRIPE_PREMIUM_MONTHLY_PRICE_ID` (~US$1.99).
 
 ### Success response — **200**
 
@@ -142,16 +133,15 @@ Open `url` with `WebBrowser.openBrowserAsync` / Chrome Custom Tabs / `Linking.op
 
 | Status | `code` | When |
 |--------|--------|------|
-| 400 | `ValidationError` | Invalid `billingPeriod` |
 | 404 | `NotFoundError` | User not found |
-| 500 | `ConfigError` | Stripe or price ID for period not configured |
+| 500 | `ConfigError` | Stripe or monthly price ID not configured |
 | 500 | `ServerError` | Checkout session creation failed |
 
 ### What the server does (do not reimplement)
 
-1. Resolves Stripe price from env for `billingPeriod` (`STRIPE_PREMIUM_*_PRICE_ID`).
+1. Resolves monthly Price from `STRIPE_PREMIUM_MONTHLY_PRICE_ID`.
 2. Creates/reuses Stripe Customer; persists `stripeCustomerId`.
-3. If eligible, sets `subscription_data.trial_period_days: 14`.
+3. Does **not** attach a trial.
 4. Sets web return URLs from `NEXT_PUBLIC_APP_URL` (see [Deep links](#deep-links--return-urls)).
 
 ---
@@ -160,16 +150,11 @@ Open `url` with `WebBrowser.openBrowserAsync` / Chrome Custom Tabs / `Linking.op
 
 Align with web ([docs/STRIPE_WEB_CHECKOUT_UI.md](./docs/STRIPE_WEB_CHECKOUT_UI.md)):
 
-1. Show **three** periods with locked prices:
-   - Monthly — **US$20**
-   - Quarterly — **US$60**
-   - Annual — **$200**
-2. Show **"2-week free trial"** only when `user.eligibleForTrial === true`.
-3. Primary CTA:
-   - Eligible → **"Start free trial"**
-   - Not eligible → **"Subscribe"** (or equivalent non-trial wording)
-4. On CTA: `POST /api/v1/stripe/checkout` with selected `billingPeriod` → open `{ url }`.
-5. Gate Pro with `user.isSubscribed` only after refresh/poll — never invent local entitlement.
+1. Single Pro offer: **US$1.99 / month**.
+2. CTA: **"Upgrade to Pro"** (or **"Subscribe"**) — no trial copy.
+3. On CTA: `POST /api/v1/stripe/checkout` with empty body → open `{ url }`.
+4. Gate Pro with `user.isSubscribed` only after refresh/poll — never invent local entitlement.
+5. Do **not** show three-plan picker, trial banner, or Challenge vs Maintainer pricing.
 
 ---
 
@@ -180,18 +165,14 @@ Checkout + browser + poll (same pattern as web: **2 s × 5** attempts ≈ 10 s):
 ```typescript
 import * as WebBrowser from 'expo-web-browser';
 
-async function startAndroidCheckout(
-  apiBase: string,
-  sessionToken: string,
-  billingPeriod: 'monthly' | 'quarterly' | 'annual'
-) {
+async function startAndroidCheckout(apiBase: string, sessionToken: string) {
   const res = await fetch(`${apiBase}/api/v1/stripe/checkout`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${sessionToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ billingPeriod }),
+    body: JSON.stringify({}),
   });
 
   if (!res.ok) {
@@ -204,7 +185,6 @@ async function startAndroidCheckout(
 
   await WebBrowser.openBrowserAsync(url);
 
-  // After return / app foreground: poll until subscribed
   await pollUntilSubscribed(apiBase, sessionToken);
 }
 
@@ -217,7 +197,6 @@ async function pollUntilSubscribed(apiBase: string, sessionToken: string) {
     }).then((r) => r.json());
 
     if (me?.user?.isSubscribed === true) {
-      // Unlock Pro UI
       return;
     }
   }
@@ -282,10 +261,7 @@ Today, Checkout and Portal return URLs are **web-oriented**, built from `NEXT_PU
 | Checkout cancel | `{appUrl}/account/settings/subscriptions` |
 | Portal return | `{appUrl}/account/settings/subscriptions` |
 
-**Android implication:** After Checkout, the user may land in a web page, not the app. Coordinate mobile deep links with backend/env if you need in-app return (same caveat as [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md)), e.g.:
-
-- `eklan://subscription/success?checkout=success`
-- Register scheme / intent filters in Expo config
+**Android implication:** After Checkout, the user may land in a web page, not the app. Coordinate mobile deep links with backend/env if you need in-app return (same caveat as [docs/MOBILE_EXPO_BILLING.md](./docs/MOBILE_EXPO_BILLING.md)).
 
 Until deep links exist: on app **foreground** after browser close, start the **2 s × 5** poll of `/users/current`. If still not subscribed after 5 attempts, show: payment confirmed; access should appear shortly — refresh / retry.
 
@@ -298,24 +274,21 @@ Until deep links exist: on app **foreground** after browser close, start the **2
 | Integrate **Play Billing** / Google Play IAP for this Pro SKU | Product decision: Android = Stripe rail only |
 | Call `POST /api/v1/apple/verify` on Android | Apple rail is iOS-only |
 | Open Stripe Checkout / Portal on **iOS** for Pro | iOS must use StoreKit |
-| Send Stripe **price IDs** from the client | Server maps `billingPeriod` → env price |
-| Invent local `isSubscribed` or local trial | Server entitlement + Checkout trial grant only |
+| Send Stripe **price IDs** from the client | Server uses env monthly Price only |
+| Invent local `isSubscribed` or local trial | Server entitlement only; trial removed |
+| Show multi-plan or Challenge pricing UI | Rolled back |
 | Embed `STRIPE_SECRET_KEY` or other secrets in the app | Public API host + auth credentials only |
 
 ---
 
 ## Confirmation checklist (Android team)
 
-Track human confirmation for Phase 6 exit. Leave unchecked until the mobile team signs off.
-
 - [ ] App uses `GET /api/v1/users/current` → `isSubscribed` as the only Pro gate
-- [ ] Paywall shows three periods (US$20 / US$60 / $200) and sends `billingPeriod` on checkout
-- [ ] Trial badge / “Start free trial” CTA only when `eligibleForTrial === true`
-- [ ] `POST /api/v1/stripe/checkout` → open `{ url }` via WebBrowser / Custom Tabs
+- [ ] Paywall shows single monthly Pro (~US$1.99); no three-plan picker
+- [ ] No trial badge / CTA; ignore any leftover `eligibleForTrial` if present in old builds
+- [ ] `POST /api/v1/stripe/checkout` with empty body → open `{ url }` via WebBrowser / Custom Tabs
 - [ ] After checkout return / foreground: poll `/users/current` **2 s × 5** until `isSubscribed`
 - [ ] On HTTP **402** `SubscriptionRequired`, navigate to paywall / subscriptions (no local entitlement invent)
 - [ ] Manage flow: `POST /api/v1/stripe/portal` → open URL; handle **400** when no Stripe customer
 - [ ] No Play Billing for Pro; no Apple verify on Android; no Stripe Checkout on iOS
 - [ ] Deep-link / return-URL strategy agreed with backend (or foreground-poll workaround documented)
-
-**External sign-off:** Android team confirms 402 handling + checkout flow against this contract.

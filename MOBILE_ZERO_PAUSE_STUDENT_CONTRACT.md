@@ -1,10 +1,17 @@
 # Mobile Zero Pause Student Contract
 
+> **ROLLED BACK — DO NOT IMPLEMENT**  
+> Challenge / Maintainer **pricing** and `challengePricingActive` are no longer part of the payment system.  
+> Use **[MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md)** and the updated [STRIPE_ANDROID_MOBILE_CONTRACT.md](./STRIPE_ANDROID_MOBILE_CONTRACT.md).  
+> This file is kept only as a historical record of the Phase 10 contract.
+
+---
+
 > **Audience:** Android / Expo team (Stripe Checkout — same API as web).  
 > **Scope:** Student-facing paywall cohort UI for Zero Pause Challenge vs Maintainer/public pricing. **No admin screens. No app code in this repo.**  
 > **Parent:** [STRIPE_PRICING_UPGRADE.md](./STRIPE_PRICING_UPGRADE.md) (Phase 10)  
 > **Companion:** [STRIPE_ANDROID_MOBILE_CONTRACT.md](./STRIPE_ANDROID_MOBILE_CONTRACT.md) (base checkout / portal / 402)  
-> **Status:** Documentation contract for mobile sync. Implementation lives in the Expo app.
+> **Status:** **Superseded** — pricing sync removed; admin Zero Pause labels may remain without price effects.
 
 ---
 

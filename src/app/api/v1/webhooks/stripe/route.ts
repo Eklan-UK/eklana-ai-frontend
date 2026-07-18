@@ -84,19 +84,6 @@ function isDuplicateKeyError(err: unknown): boolean {
   );
 }
 
-/** Price id on a Dahlia invoice line (`pricing.price_details.price`), with legacy `price` fallback. */
-function invoiceLinePriceId(line: Stripe.InvoiceLineItem): string | undefined {
-  const fromPricing = line.pricing?.price_details?.price;
-  if (fromPricing) {
-    return typeof fromPricing === 'string' ? fromPricing : fromPricing.id;
-  }
-  const legacy = (
-    line as Stripe.InvoiceLineItem & { price?: string | Stripe.Price | null }
-  ).price;
-  if (!legacy) return undefined;
-  return typeof legacy === 'string' ? legacy : legacy.id;
-}
-
 function scheduleCustomerId(
   schedule: Stripe.SubscriptionSchedule
 ): string | null {
@@ -425,24 +412,6 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, stripe: Stripe): Promi
     user.stripeSubscriptionStatus = 'active';
   }
   await user.save();
-
-  const newMonthlyPriceId = config.STRIPE_PREMIUM_MONTHLY_PRICE_ID;
-  if (user.stripeScheduleId && newMonthlyPriceId) {
-    const billedNewMonthly = (invoice.lines?.data ?? []).some(
-      (line) => invoiceLinePriceId(line) === newMonthlyPriceId
-    );
-    if (billedNewMonthly) {
-      logger.info(
-        '[Stripe Webhook] invoice.paid — Phase 7 price migration confirmed (new monthly price)',
-        {
-          userId: String(user._id),
-          invoiceId: invoice.id,
-          priceId: newMonthlyPriceId,
-          stripeScheduleId: user.stripeScheduleId,
-        }
-      );
-    }
-  }
 
   logger.info('[Stripe Webhook] invoice.paid — expiry extended', {
     userId: String(user._id),
