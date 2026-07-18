@@ -11,6 +11,7 @@ import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
+import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 
 async function handler(
   req: NextRequest,
@@ -45,7 +46,7 @@ async function handler(
 
   // Verify drill exists
   const drill = await Drill.findById(drillObjectId)
-    .select("_id assigned_to learning_journey_part")
+    .select("_id title type assigned_to learning_journey_part learning_journey_topic")
     .lean()
     .exec();
   if (!drill) {
@@ -54,6 +55,11 @@ async function handler(
       { status: 404 }
     );
   }
+
+  const assigner = await User.findById(context.userId)
+    .select("firstName lastName name")
+    .lean()
+    .exec();
 
   // Validate all userIds belong to learners (role: user)
   const learners = await User.find({
@@ -89,6 +95,11 @@ async function handler(
     status: string;
     dueDate?: string;
   }> = [];
+  const newlyCreated: Array<{
+    learnerId: string;
+    _id: string;
+    dueDate?: Date;
+  }> = [];
 
   for (const uid of userIds as string[]) {
     // learnerId is stored as-is: Types.ObjectId for ObjectId-format users,
@@ -117,6 +128,11 @@ async function handler(
         status: assignment.status,
         dueDate: assignment.dueDate?.toISOString(),
       });
+      newlyCreated.push({
+        learnerId: uid,
+        _id: String(assignment._id),
+        dueDate: assignment.dueDate,
+      });
     } catch (err: any) {
       if (err.code === 11000) {
         // Duplicate key — assignment already exists, return the existing row
@@ -139,6 +155,26 @@ async function handler(
         throw err;
       }
     }
+  }
+
+  if (newlyCreated.length > 0) {
+    notifyLearnersOfAssignment(
+      newlyCreated,
+      {
+        _id: String(drill._id),
+        title: (drill as { title?: string }).title ?? "",
+        type: (drill as { type?: string }).type ?? "",
+        learning_journey_part: (drill as { learning_journey_part?: number | null })
+          .learning_journey_part,
+        learning_journey_topic: (drill as { learning_journey_topic?: string | null })
+          .learning_journey_topic,
+      },
+      {
+        firstName: (assigner as { firstName?: string } | null)?.firstName,
+        lastName: (assigner as { lastName?: string } | null)?.lastName,
+        name: (assigner as { name?: string } | null)?.name,
+      }
+    );
   }
 
   return apiResponse.success({ assignments });

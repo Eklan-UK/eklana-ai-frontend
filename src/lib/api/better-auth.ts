@@ -182,7 +182,7 @@ export const getAuth = async () => {
                   patch.subscriptionExpiresAt = null;
                 }
 
-                // Phase 10: new users default to Zero Pause Maintainer (public prices).
+                // Phase 10: new users default to Zero Pause maintenance (public prices).
                 if (
                   user.zeroPauseProducts === undefined ||
                   (Array.isArray(user.zeroPauseProducts) &&

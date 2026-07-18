@@ -10,6 +10,7 @@ import { getDrillIcon } from "@/utils/drill";
 import { appendReturnTo } from "@/lib/drill-list-filters";
 import { invalidateStudentWeeks } from "@/hooks/useStudentWeeks";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
+import { AdminDrillBookmarkButton } from "@/components/admin/AdminDrillBookmarkButton";
 import type { WeekDrillItem } from "@/lib/ai-drill-builder/week-utils";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -142,6 +143,13 @@ export function WeekDrillList({
 
             {drillId && (
               <div className="flex items-center gap-1 shrink-0">
+                <AdminDrillBookmarkButton
+                  drillId={drillId}
+                  isBookmarked={Boolean(drill.isBookmarked)}
+                  onToggled={() => {
+                    void invalidateStudentWeeks(queryClient, studentId);
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() =>

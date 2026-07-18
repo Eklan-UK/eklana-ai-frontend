@@ -77,6 +77,8 @@ export interface WeekDrillItem {
    * users and update/assign it.
    */
   isActive?: boolean;
+  /** Admin library bookmark on the underlying drill. */
+  isBookmarked?: boolean;
   assignedAt?: string;
   dueDate?: string | null;
   completedAt?: string | null;

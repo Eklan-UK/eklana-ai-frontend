@@ -27,7 +27,7 @@ export const ZERO_PAUSE_PRODUCTS: ZeroPauseProduct[] = [
 
 export const ZERO_PAUSE_PRODUCT_LABELS: Record<ZeroPauseProduct, string> = {
   challenge: "Zero Pause Challenge",
-  maintainer: "Zero Pause Maintainer",
+  maintainer: "Zero Pause maintenance",
 };
 
 export function isZeroPauseProduct(
