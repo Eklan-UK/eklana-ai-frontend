@@ -11,8 +11,6 @@ import {
   isForeverPremiumUser,
   isUserSubscribed,
 } from "@/lib/api/user-subscription";
-import { isEligibleForTrial } from "@/lib/api/stripe-trial-eligibility";
-import { isZeroPauseChallengePricingActive } from "@/lib/api/zero-pause-pricing";
 
 async function handler(
   req: NextRequest,
@@ -65,8 +63,6 @@ async function handler(
       stripeSubscriptionStatus: (user as any).stripeSubscriptionStatus ?? null,
       appleSubscriptionStatus: (user as any).appleSubscriptionStatus ?? null,
       isSubscribed: subscribed,
-      eligibleForTrial: isEligibleForTrial(user as any),
-      challengePricingActive: isZeroPauseChallengePricingActive(user as any),
       iapAccountToken,
     };
 
