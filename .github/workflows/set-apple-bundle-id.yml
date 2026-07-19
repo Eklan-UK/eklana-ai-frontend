@@ -1,0 +1,61 @@
+name: Set APPLE_BUNDLE_ID
+
+# Ops workflow: set Vercel APPLE_BUNDLE_ID to the iOS bundle used by native Sign in with Apple.
+on:
+  workflow_dispatch:
+
+jobs:
+  set-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upsert APPLE_BUNDLE_ID and redeploy production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          VALUE="com.eklan.ai"
+          KEY="APPLE_BUNDLE_ID"
+
+          ENVS=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID")
+          EXISTING_IDS=$(echo "$ENVS" | jq -r --arg k "$KEY" '.envs[]? | select(.key==$k) | .id')
+
+          if [ -n "$EXISTING_IDS" ]; then
+            echo "Removing existing $KEY entries…"
+            for id in $EXISTING_IDS; do
+              curl -sS -X DELETE -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$id?teamId=$VERCEL_ORG_ID" >/dev/null
+              echo "Deleted env id $id"
+            done
+          fi
+
+          echo "Creating $KEY=$VALUE for production, preview, development…"
+          curl -sS -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" \
+            -d "$(jq -n --arg k "$KEY" --arg v "$VALUE" '{
+              key: $k,
+              value: $v,
+              type: "encrypted",
+              target: ["production", "preview", "development"]
+            }')" | jq '{key:.key, target:.target, id:.id, type:.type, error:.error}'
+
+          echo "Finding latest production deployment…"
+          LATEST=$(curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=1&teamId=$VERCEL_ORG_ID")
+          DEPLOY_URL=$(echo "$LATEST" | jq -r '.deployments[0].url // empty')
+          DEPLOY_ID=$(echo "$LATEST" | jq -r '.deployments[0].uid // empty')
+          echo "Latest production: id=$DEPLOY_ID url=$DEPLOY_URL"
+
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "No production deployment found; env updated for next deploy."
+            exit 0
+          fi
+
+          npm install -g vercel@latest
+          echo "Redeploying https://$DEPLOY_URL …"
+          vercel redeploy "https://$DEPLOY_URL" --target production --yes \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"

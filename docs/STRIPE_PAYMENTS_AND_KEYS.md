@@ -1,6 +1,10 @@
 # Stripe Payments & API Keys Guide
 
-> **Planned pricing update:** Multi-plan pricing (US$20 / US$60 / $200), 2-week (14-day) gated trial, and grandfathering for existing monthly payers — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
+> **Current pricing (post-rollback):** Single monthly Pro (~US$1.99) via `STRIPE_PREMIUM_MONTHLY_PRICE_ID`. No free trial. No multi-plan checkout.
+>
+> - **Mobile / checkout contract:** [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md).
+> - **Historical upgrade plan:** [STRIPE_PRICING_UPGRADE.md](../STRIPE_PRICING_UPGRADE.md) / [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md) (rolled back).
+> - **Implemented routes:** [stripe-implementation.md](./stripe-implementation.md).
 
 ## 1. Goals
 
@@ -26,8 +30,8 @@ Stripe fires a webhook event
 Backend verifies signature, updates MongoDB
   user.subscriptionPlan      = "premium"
   user.subscriptionExpiresAt = <period end>
-  user.stripeCustomerId      = "cus_..."      ← to be added
-  user.stripeSubscriptionId  = "sub_..."      ← to be added
+  user.stripeCustomerId      = "cus_..."
+  user.stripeSubscriptionId  = "sub_..."
         │
         ▼
 Any API call to a premium route
@@ -87,7 +91,7 @@ For the initial launch, both keys map to the single `premium` plan. If you later
 | **Billing Portal Session** | Short-lived; URL returned to client so user can cancel, swap plan, update card |
 | **Webhook Endpoint** | One endpoint per environment (test / live) registered in Stripe Dashboard |
 
-**Planned webhook route:** `POST /api/v1/webhooks/stripe`
+**Webhook route (implemented):** `POST /api/v1/webhooks/stripe` — **one endpoint for all price IDs** (monthly, legacy monthly, quarterly, annual). Stripe sends events by type (`checkout.session.completed`, `invoice.paid`, etc.); the handler reads `subscription.items.data[0].price.id` from the payload to distinguish plans.
 
 **Webhook events to handle at minimum:**
 
@@ -103,47 +107,45 @@ For the initial launch, both keys map to the single `premium` plan. If you later
 
 ## 5. Environment Variables
 
-Add these to `.env.local` (development) and to your hosting provider's secret store (production). **Never commit them to git.**
+Copy from [`.env.example`](../.env.example) (team template) into `.env` locally or into your hosting secret store (production). **Never commit real secrets to git.**
+
+**Config:** vars below are exported from `src/lib/api/config.ts`. Checkout always uses the monthly Price ID.
 
 ```bash
 # ── Server-only (never expose to client) ─────────────────────────────────────
 
-# Stripe secret key — use a Restricted API Key in production (see §6).
-# Prefix: sk_test_ (test mode) or sk_live_ (live mode)
+# Stripe secret key — Restricted API Key recommended in production (see §6).
+# Prefix: sk_test_ / rk_test_ (dev) or sk_live_ / rk_live_ (production)
 STRIPE_SECRET_KEY=sk_test_...
 
-# Webhook signing secret — obtained from the Stripe Dashboard webhook endpoint
-# or from `stripe listen` output during local development.
-# One secret per registered endpoint and per mode (test/live).
+# Webhook signing secret — one per webhook endpoint and per mode (test/live).
+# Dashboard endpoint OR `whsec_` printed by `stripe listen` during local dev.
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Price ID for the premium subscription (from Stripe Dashboard → Products).
-# Use a test-mode Price ID while in development.
+# Price ID — always `price_...`, never `prod_...` (Stripe Dashboard → Products → Prices).
+# Test vs live Price IDs must match STRIPE_SECRET_KEY mode.
+# Monthly Pro (~US$1.99) — all new Checkouts use this Price.
 STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
 
-# Optional: annual Price ID if you offer it
-# STRIPE_PREMIUM_ANNUAL_PRICE_ID=price_...
+# Unused after rollback (do not set): LEGACY / QUARTERLY / ANNUAL Price IDs, SUBSCRIPTION_TRIAL_LAUNCH_AT.
 
-# Planned (see PRICING_AND_TRIAL_MIGRATION.md):
-# STRIPE_PREMIUM_MONTHLY_PRICE_ID_LEGACY=price_...
-# STRIPE_PREMIUM_QUARTERLY_PRICE_ID=price_...
-# SUBSCRIPTION_TRIAL_LAUNCH_AT=2026-08-01T00:00:00.000Z
+# ── App URL (checkout success/cancel redirects) ──────────────────────────────
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-
-# ── Client-safe (safe to expose in browser / mobile bundle) ──────────────────
-
-# Only needed if you add Stripe.js / Payment Element later.
-# Not required for the Checkout Session redirect flow.
+# ── Client-safe (optional — not used by Checkout redirect flow today) ────────
 # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
+
+Set `STRIPE_PREMIUM_MONTHLY_PRICE_ID` to the Stripe Price ID for ~US$1.99 monthly. Existing $20 / $60 / $200 subscribers are left on their Prices.
 
 ### Which key does what?
 
 | Variable | Prefix | Where it goes | Who needs it |
 |---|---|---|---|
-| `STRIPE_SECRET_KEY` | `sk_test_` / `sk_live_` | Server env only | Backend API routes |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_` | Server env only | Webhook route |
-| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout Session creation |
+| `STRIPE_SECRET_KEY` | `sk_` / `rk_` + `_test_` / `_live_` | Server env only | Backend API routes |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_` | Server env only | Webhook route (one secret per endpoint) |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` | `price_` | Server env only | Checkout (monthly ~US$1.99) |
+| `NEXT_PUBLIC_APP_URL` | URL | Client + server | Checkout / portal redirect URLs |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_` / `pk_live_` | Client bundle | Only if using Stripe.js |
 
 ---
@@ -152,9 +154,10 @@ STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_...
 
 ### For local development
 
-1. Copy `.env.local.example` (or create `.env.local` if it does not exist).
-2. Paste the **test-mode** keys only (`sk_test_`, `pk_test_`).
-3. Verify `.env.local` is in `.gitignore` (it already is in this project).
+1. Copy [`.env.example`](../.env.example) to `.env` (or merge Stripe vars into your existing `.env`).
+2. Prefer **test-mode** keys (`sk_test_`, `rk_test_`) and test Price IDs — avoid live keys locally unless intentional.
+3. Verify `.env` is in `.gitignore` (it already is in this project).
+4. For webhook testing: `stripe listen --forward-to localhost:3000/api/v1/webhooks/stripe` — use the CLI-printed `whsec_...` as `STRIPE_WEBHOOK_SECRET` while the listener runs.
 
 ### For giving keys to a teammate or this AI assistant
 
@@ -235,18 +238,25 @@ This endpoint **should remain** after Stripe is integrated:
 
 ---
 
-## 9. Future Implementation Steps
+## 9. Implementation status
 
-These will be separate pull requests, done after this document is reviewed:
+See [stripe-implementation.md](./stripe-implementation.md) for route contracts and [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](../MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) for the current checkout contract.
 
-1. **Add Stripe fields to the User model** — `stripeCustomerId` (string), `stripeSubscriptionId` (string), `stripeSubscriptionStatus` (string enum).
-2. **Add webhook route** — `POST /api/v1/webhooks/stripe` with signature verification using `stripe.webhooks.constructEvent` and the `STRIPE_WEBHOOK_SECRET`. Handle the five events listed in §4.
-3. **Add Checkout Session route** — `POST /api/v1/stripe/checkout` — creates or retrieves the Stripe Customer for the user, then creates a Checkout Session with `mode: 'subscription'` and the premium Price ID. Returns `{ url }` to the client.
-4. **Add Billing Portal route** — `POST /api/v1/stripe/portal` — returns a portal session URL for the authenticated user's Stripe Customer.
-5. **Add `requirePremium` middleware helper** — wraps `withAuth` + `isUserSubscribed` check; returns `{ code: "SubscriptionRequired", status: 402 }` if not subscribed.
-6. **Apply `requirePremium` to feature routes** — starting with:
-   - All routes under `/api/v1/ai/free-talk/`
-   - All routes under `/api/v1/pressure-test/`
-7. **Mobile app integration** — handle `402` responses to show the upgrade paywall; open the Checkout Session URL in `SFSafariViewController` (iOS) / `CustomTabsIntent` (Android) / `expo-web-browser`.
-8. **Optional: Billing Portal link in profile** — `POST /api/v1/stripe/portal` → open returned URL.
-9. **Go-live checklist** — review [Stripe's go-live checklist](https://docs.stripe.com/get-started/checklist/go-live), swap env vars to live-mode values, re-register webhook endpoint in live Dashboard, smoke-test with a real card.
+### Shipped (post-rollback)
+
+| Item | Status |
+|------|--------|
+| User model Stripe fields (`stripeCustomerId`, `stripeSubscriptionId`, `stripeSubscriptionStatus`, …) | ✅ |
+| Webhook route `POST /api/v1/webhooks/stripe` (signature verify, core entitlement events) | ✅ |
+| Checkout `POST /api/v1/stripe/checkout` (monthly ~US$1.99 only; body ignored) | ✅ |
+| Billing Portal `POST /api/v1/stripe/portal` | ✅ |
+| `withPremium` middleware → HTTP 402 `SubscriptionRequired` | ✅ |
+| Premium gating on Free Talk / Pressure Test routes | ✅ |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` in `config.ts` + `.env.example` | ✅ |
+| `billingPeriodFromStripePriceId` (monthly + keyword fallback for grandfathered prices) | ✅ |
+| Admin Stripe sync `POST /api/v1/admin/users/stripe-sync` | ✅ |
+| No free trial / no multi-plan / no Zero Pause Stripe price sync | ✅ |
+
+### Go-live checklist
+
+Review [Stripe's go-live checklist](https://docs.stripe.com/get-started/checklist/go-live): live restricted key, live monthly Price ID (~US$1.99), live webhook endpoint + matching `STRIPE_WEBHOOK_SECRET`, smoke-test checkout, verify webhook delivery in Dashboard.

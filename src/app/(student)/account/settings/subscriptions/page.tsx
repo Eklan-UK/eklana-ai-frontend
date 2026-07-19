@@ -28,8 +28,23 @@ const PRO_FEATURES = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function callStripeEndpoint(path: string): Promise<string> {
-  const res = await fetch(path, { method: "POST" });
+async function createCheckoutSession(): Promise<string> {
+  const res = await fetch("/api/v1/stripe/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.message || "Request failed");
+  }
+  const data = await res.json();
+  if (!data.url) throw new Error("No redirect URL returned");
+  return data.url;
+}
+
+async function openBillingPortal(): Promise<string> {
+  const res = await fetch("/api/v1/stripe/portal", { method: "POST" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.message || "Request failed");
@@ -104,7 +119,7 @@ export default function SubscriptionsPage() {
   async function handleUpgrade() {
     setCheckoutLoading(true);
     try {
-      const url = await callStripeEndpoint("/api/v1/stripe/checkout");
+      const url = await createCheckoutSession();
       window.location.href = url;
     } catch (err: any) {
       toast.error(
@@ -117,7 +132,7 @@ export default function SubscriptionsPage() {
   async function handleManage() {
     setPortalLoading(true);
     try {
-      const url = await callStripeEndpoint("/api/v1/stripe/portal");
+      const url = await openBillingPortal();
       window.location.href = url;
     } catch (err: any) {
       toast.error(err?.message || "Could not open billing portal. Please try again.");
@@ -205,7 +220,9 @@ export default function SubscriptionsPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-foreground">Pro</h3>
-                    <p className="text-xs text-muted-foreground">Unlock the full AI experience</p>
+                    <p className="text-xs text-muted-foreground">
+                      US$1.99 / month — unlock the full AI experience
+                    </p>
                   </div>
                 </div>
                 <ul className="space-y-2 mb-5 mt-4">
@@ -233,7 +250,7 @@ export default function SubscriptionsPage() {
                     onClick={handleUpgrade}
                     disabled={checkoutLoading || userLoading}
                     className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-semibold rounded-lg py-2.5 px-4 text-sm hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="Upgrade to Pro to access AI features"
+                    aria-label="Upgrade to Pro"
                   >
                     {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                     {checkoutLoading ? "Preparing checkout…" : "Upgrade to Pro"}

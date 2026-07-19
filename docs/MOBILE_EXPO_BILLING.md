@@ -4,7 +4,7 @@
 > **Backend:** This Next.js repo (`/api/v1/*`). The mobile app lives in a separate repo.  
 > **Rule:** One account, one server-side entitlement (`isSubscribed`). Two payment rails by platform.
 >
-> **Planned pricing update:** Three subscription durations (US$20 / US$60 / $200), 2-week (14-day) gated trial, and price migration — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
+> **Planned pricing update:** Three subscription durations (US$20 / US$60 / $200), 2-week (14-day) gated trial, and price migration — see [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md).
 
 ---
 
@@ -372,7 +372,7 @@ Backend Apple IAP routes are live in this repo; the Expo app and App Store Conne
 | [APPLE_IAP_IOS_IMPLEMENTATION.md](./APPLE_IAP_IOS_IMPLEMENTATION.md) | Path A, platform matrix, verify/webhook design, App Store Connect, sandbox testing §9, checklist 12–16 |
 | [stripe-implementation.md](./stripe-implementation.md) | Stripe endpoints, polling, deep links, Android mobile checklist §16 |
 | [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) | Stripe env vars, webhook forwarding |
-| [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) | Multi-plan pricing (US$20 / US$60 / $200), 2-week gated trial, grandfathering |
+| [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md) | Multi-plan pricing (US$20 / US$60 / $200), 2-week gated trial, grandfathering |
 | [`.env.example`](.env.example) | `APPLE_*`, `STRIPE_*` templates (server only) |
 
 Backend implementation references:

@@ -4,7 +4,7 @@
 >
 > For Stripe keys, webhooks, and Android/web checkout, see [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) and [stripe-implementation.md](./stripe-implementation.md).
 >
-> **Planned pricing update:** Three durations (US$20 / US$60 / $200), 2-week (14-day) gated intro offer, and monthly price increase with subscriber preservation — see [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md).
+> **Planned pricing update:** Three durations (US$20 / US$60 / $200), 2-week (14-day) gated intro offer, and monthly price increase with subscriber preservation — see [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md).
 
 ---
 
@@ -457,5 +457,5 @@ If requirements change (e.g. unified analytics dashboard across stores), revisit
 - [MOBILE_EXPO_BILLING.md](./MOBILE_EXPO_BILLING.md) — Expo team: platform matrix, API reference, iOS/Android checklists, sandbox testing
 - [STRIPE_PAYMENTS_AND_KEYS.md](./STRIPE_PAYMENTS_AND_KEYS.md) — Stripe env vars, webhook forwarding, restricted keys
 - [stripe-implementation.md](./stripe-implementation.md) — Implemented Stripe routes, `isUserSubscribed`, mobile Stripe checklist
-- [PRICING_AND_TRIAL_MIGRATION.md](./PRICING_AND_TRIAL_MIGRATION.md) — Multi-plan pricing, gated trial, grandfathering (Stripe + Apple)
+- [PRICING_AND_TRIAL_MIGRATION.md](../PRICING_AND_TRIAL_MIGRATION.md) — Multi-plan pricing, gated trial, grandfathering (Stripe + Apple)
 - [`.env.example`](.env.example) — Apple IAP and Stripe variable templates

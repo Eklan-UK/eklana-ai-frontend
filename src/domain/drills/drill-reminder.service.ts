@@ -9,6 +9,7 @@ import {
   onStreakReminder,
 } from '@/services/notification/triggers';
 import { logger } from '@/lib/api/logger';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 import { zonedDateKey } from '@/domain/tutor-availability/availability-window';
 import {
   hasQualifyingDrillTodayLocal,
@@ -120,7 +121,7 @@ export class DrillReminderService {
           const localDateKey = zonedDateKey(now, timeZone);
 
           const alreadySent = await DailyPracticeReminderDispatch.findOne({
-            learnerId,
+            learnerId: { $in: toUserIdCandidates(learnerId) },
             localDateKey,
           }).lean();
           if (alreadySent) {

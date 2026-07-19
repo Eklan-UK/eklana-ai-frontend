@@ -22,7 +22,12 @@ export interface ProviderErrorInfo {
   status: number;
 }
 
-function parseProviderError(
+/**
+ * Map ElevenLabs HTTP failures to app-facing error info.
+ * Provider 401/402 are remapped to 502 so clients never confuse
+ * upstream key/plan failures with Better Auth session 401s.
+ */
+export function parseProviderError(
   status: number,
   statusText: string,
   errorText: string
@@ -39,7 +44,7 @@ function parseProviderError(
     return {
       code: 'TTSProviderAuthError',
       message: 'ElevenLabs API key is invalid or expired',
-      status,
+      status: 502,
     };
   }
   if (status === 402) {
@@ -47,14 +52,14 @@ function parseProviderError(
       code: 'TTSProviderPlanError',
       message:
         'ElevenLabs blocked this request for your account plan. Use an owned voice ID or upgrade plan.',
-      status,
+      status: 502,
     };
   }
   if (status === 429) {
     return {
       code: 'TTSProviderRateLimit',
       message: 'ElevenLabs rate limit reached. Please retry shortly.',
-      status,
+      status: 429,
     };
   }
   return {

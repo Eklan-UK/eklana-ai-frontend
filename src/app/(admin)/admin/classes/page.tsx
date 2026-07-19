@@ -18,7 +18,11 @@ import {
 import type { ClassStatus, ClassType, TeachingClass } from "./types";
 import { ClassDetailDrawer } from "./class-detail-drawer";
 import { ScheduleClassModal } from "./schedule-class-modal";
-import { useAdminClasses, useDeleteAdminClass } from "@/hooks/useClasses";
+import {
+  useAdminClasses,
+  useAdminClassesInfinite,
+  useDeleteAdminClass,
+} from "@/hooks/useClasses";
 import { adminDtoToTeachingClass } from "@/lib/classes/admin-dto-to-teaching";
 import { getClassCardScheduleBlock } from "@/lib/classes/class-card-schedule-display";
 import { sortTeachingClassesByTab } from "@/lib/classes/sort-teaching-classes";
@@ -137,7 +141,23 @@ export default function AdminClassesPage() {
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [filtersOpen]);
 
-  const { data, isLoading, error } = useAdminClasses({ limit: 100 });
+  const { data: todayMeta } = useAdminClasses({ bucket: "today", limit: 1 });
+  const { data: upcomingMeta } = useAdminClasses({
+    bucket: "upcoming",
+    limit: 1,
+  });
+  const { data: completedMeta } = useAdminClasses({
+    bucket: "completed",
+    limit: 1,
+  });
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAdminClassesInfinite({ bucket: tab, limit: 100 });
   const deleteClass = useDeleteAdminClass();
 
   const handleRemoveSchedule = (classSeriesId: string) => {
@@ -156,9 +176,9 @@ export default function AdminClassesPage() {
   };
 
   const classes = useMemo(() => {
-    const rows = data?.classes ?? [];
+    const rows = data?.pages.flatMap((page) => page.classes) ?? [];
     return rows.map(adminDtoToTeachingClass);
-  }, [data?.classes]);
+  }, [data?.pages]);
 
   const detailId = detailSession?.id;
   useEffect(() => {
@@ -169,25 +189,14 @@ export default function AdminClassesPage() {
     }
   }, [classes, detailId]);
 
-  const todayCount = useMemo(
-    () => classes.filter((c) => c.bucket === "today").length,
-    [classes],
-  );
-  const upcomingCount = useMemo(
-    () => classes.filter((c) => c.bucket === "upcoming").length,
-    [classes],
-  );
-  const completedCount = useMemo(
-    () => classes.filter((c) => c.bucket === "completed").length,
-    [classes],
-  );
+  const todayCount = todayMeta?.pagination.total ?? 0;
+  const upcomingCount = upcomingMeta?.pagination.total ?? 0;
+  const completedCount = completedMeta?.pagination.total ?? 0;
 
   const visibleClasses = useMemo(() => {
-    const filtered = classes.filter((c) => {
-      if (c.bucket !== tab) return false;
-      if (!filterDate) return true;
-      return getScheduledDateKey(c) === filterDate;
-    });
+    const filtered = filterDate
+      ? classes.filter((c) => getScheduledDateKey(c) === filterDate)
+      : classes;
     return sortTeachingClassesByTab(tab, filtered);
   }, [classes, tab, filterDate]);
 
@@ -633,6 +642,21 @@ export default function AdminClassesPage() {
           );
         })}
       </div>
+
+      {!isLoading && hasNextPage ? (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            disabled={isFetchingNextPage}
+            onClick={() => {
+              void fetchNextPage();
+            }}
+            className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isFetchingNextPage ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

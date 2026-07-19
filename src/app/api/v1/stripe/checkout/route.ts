@@ -1,5 +1,6 @@
 // POST /api/v1/stripe/checkout
-// Creates a Stripe Checkout Session for the Pro subscription.
+// Creates a Stripe Checkout Session for the Pro subscription (monthly ~US$1.99).
+// Body is ignored; always uses STRIPE_PREMIUM_MONTHLY_PRICE_ID.
 // Returns { url } — the client redirects the browser to this URL.
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
@@ -37,11 +38,23 @@ async function handler(
         { status: 500 }
       );
     }
-    if (!config.STRIPE_PREMIUM_MONTHLY_PRICE_ID) {
+
+    const priceId = config.STRIPE_PREMIUM_MONTHLY_PRICE_ID;
+    if (!priceId) {
       return NextResponse.json(
-        { code: 'ConfigError', message: 'Subscription price is not configured.' },
+        {
+          code: 'ConfigError',
+          message: 'Monthly Pro price is not configured.',
+        },
         { status: 500 }
       );
+    }
+
+    // Body is optional and ignored (mobile/web may POST empty or legacy billingPeriod).
+    try {
+      await req.json();
+    } catch {
+      // empty / invalid JSON body is fine
     }
 
     await connectToDatabase();
@@ -58,7 +71,7 @@ async function handler(
 
     const stripe = getStripe();
 
-    // Create or reuse Stripe Customer
+    // Create or reuse Stripe Customer — persist before session create
     let stripeCustomerId = user.stripeCustomerId;
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
@@ -75,12 +88,17 @@ async function handler(
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
+      client_reference_id: String(user._id),
+      metadata: { userId: String(user._id) },
       line_items: [
         {
-          price: config.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],
+      subscription_data: {
+        metadata: { userId: String(user._id) },
+      },
       success_url: `${appUrl}/account/settings/subscriptions?checkout=success`,
       cancel_url: `${appUrl}/account/settings/subscriptions`,
       allow_promotion_codes: true,
@@ -89,6 +107,7 @@ async function handler(
     logger.info('Stripe Checkout Session created', {
       userId: String(user._id),
       sessionId: session.id,
+      priceId,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });

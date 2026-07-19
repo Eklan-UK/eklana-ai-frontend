@@ -216,6 +216,9 @@ async function getHandler(
 		isActive: queryParams.isActive,
 		assignmentStatus,
 		q: queryParams.q,
+		isBookmarked: queryParams.isBookmarked,
+		learningJourneyPart: queryParams.learningJourneyPart,
+		learningJourneyTopic: queryParams.learningJourneyTopic,
 		limit: queryParams.limit,
 		offset: queryParams.offset,
 	});

@@ -1,5 +1,6 @@
 // POST /api/v1/admin/users/subscription
-// Manually create/update a user's subscription (offline payment)
+// Manually create/update a user's subscription (offline payment).
+// Zero Pause Challenge/Maintainer labels may be persisted; they do not change Stripe prices.
 import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
@@ -23,12 +24,44 @@ const updateSubscriptionSchema = z.object({
   plan: z.enum(["free", "premium"]),
   months: z.number().int().min(0).optional(),
   billingPeriod: z.enum(["monthly", "quarterly", "annual"]).optional(),
-  zeroPauseProducts: z.array(z.enum(["challenge", "mastery"])).optional(),
+  zeroPauseProducts: z
+    .array(z.enum(["challenge", "maintainer"]))
+    .optional(),
   zeroPauseDate: z.string().nullable().optional(),
+  zeroPauseEndDate: z.string().nullable().optional(),
   amount: z.number().nonnegative().optional(),
   paymentMethod: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
 });
+
+/** UTC calendar day at 00:00:00.000Z for Challenge date validation. */
+function toUtcDayStart(value: Date | string): Date {
+  const d = value instanceof Date ? value : new Date(value);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
+}
+
+/** Challenge and Maintainer are mutually exclusive labels. */
+function normalizeZeroPauseProducts(
+  products: ZeroPauseProduct[]
+): ZeroPauseProduct[] {
+  const allowed = products.filter(
+    (p): p is ZeroPauseProduct => p === "challenge" || p === "maintainer"
+  );
+  if (allowed.includes("challenge") && allowed.includes("maintainer")) {
+    return allowed.filter((p) => p !== "maintainer");
+  }
+  return allowed;
+}
+
+function parseOptionalDate(
+  value: string | null | undefined
+): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return toUtcDayStart(value);
+}
 
 async function handler(
   req: NextRequest,
@@ -49,12 +82,95 @@ async function handler(
     }
 
     if (input.zeroPauseProducts !== undefined) {
-      user.zeroPauseProducts = input.zeroPauseProducts as ZeroPauseProduct[];
-      // Clear the shared date when no products are selected
-      if (input.zeroPauseProducts.length === 0) {
+      const products = normalizeZeroPauseProducts(
+        input.zeroPauseProducts as ZeroPauseProduct[]
+      );
+
+      if (products.length === 0) {
+        user.zeroPauseProducts = [];
         user.zeroPauseDate = null;
-      } else if (input.zeroPauseDate !== undefined) {
-        user.zeroPauseDate = input.zeroPauseDate ? new Date(input.zeroPauseDate) : null;
+        user.zeroPauseEndDate = null;
+      } else if (products.includes("challenge")) {
+        const start =
+          parseOptionalDate(input.zeroPauseDate) ??
+          (user.zeroPauseDate ? toUtcDayStart(user.zeroPauseDate) : null);
+        const end =
+          parseOptionalDate(input.zeroPauseEndDate) ??
+          (user.zeroPauseEndDate ? toUtcDayStart(user.zeroPauseEndDate) : null);
+
+        if (!start || !end) {
+          return NextResponse.json(
+            {
+              code: "ValidationError",
+              message:
+                "Challenge requires both start date and end date (zeroPauseDate and zeroPauseEndDate).",
+            },
+            { status: 400 }
+          );
+        }
+        if (end.getTime() < start.getTime()) {
+          return NextResponse.json(
+            {
+              code: "ValidationError",
+              message: "Challenge end date must be on or after the start date.",
+            },
+            { status: 400 }
+          );
+        }
+
+        user.zeroPauseProducts = products;
+        user.zeroPauseDate = start;
+        user.zeroPauseEndDate = end;
+      } else {
+        // Maintainer (no Challenge) — clear Challenge window dates.
+        user.zeroPauseProducts = products;
+        if (products.includes("maintainer")) {
+          user.zeroPauseDate = null;
+          user.zeroPauseEndDate = null;
+        } else {
+          if (input.zeroPauseDate !== undefined) {
+            user.zeroPauseDate = parseOptionalDate(input.zeroPauseDate) ?? null;
+          }
+          if (input.zeroPauseEndDate !== undefined) {
+            user.zeroPauseEndDate =
+              parseOptionalDate(input.zeroPauseEndDate) ?? null;
+          }
+        }
+      }
+    } else if (
+      input.zeroPauseDate !== undefined ||
+      input.zeroPauseEndDate !== undefined
+    ) {
+      if (input.zeroPauseDate !== undefined) {
+        user.zeroPauseDate = parseOptionalDate(input.zeroPauseDate) ?? null;
+      }
+      if (input.zeroPauseEndDate !== undefined) {
+        user.zeroPauseEndDate =
+          parseOptionalDate(input.zeroPauseEndDate) ?? null;
+      }
+      if ((user.zeroPauseProducts ?? []).includes("challenge")) {
+        if (!user.zeroPauseDate || !user.zeroPauseEndDate) {
+          return NextResponse.json(
+            {
+              code: "ValidationError",
+              message:
+                "Challenge requires both start date and end date (zeroPauseDate and zeroPauseEndDate).",
+            },
+            { status: 400 }
+          );
+        }
+        if (
+          toUtcDayStart(user.zeroPauseEndDate).getTime() <
+          toUtcDayStart(user.zeroPauseDate).getTime()
+        ) {
+          return NextResponse.json(
+            {
+              code: "ValidationError",
+              message: "Challenge end date must be on or after the start date.",
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -128,6 +244,7 @@ async function handler(
           subscriptionBillingPeriod: user.subscriptionBillingPeriod,
           zeroPauseProducts: user.zeroPauseProducts ?? [],
           zeroPauseDate: user.zeroPauseDate ?? null,
+          zeroPauseEndDate: user.zeroPauseEndDate ?? null,
           subscriptionActivatedAt: user.subscriptionActivatedAt,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
         },
@@ -163,8 +280,3 @@ async function handler(
 }
 
 export const POST = withRole(["admin"], handler);
-
-
-
-
-

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { connectToDatabase } from '@/lib/api/db';
 import User from '@/models/user';
+import StripeWebhookEvent from '@/models/stripe-webhook-event';
 import config from '@/lib/api/config';
 import { logger } from '@/lib/api/logger';
 import {
@@ -30,6 +31,7 @@ import {
   findEntitledStripeSubscription,
   getInvoiceSubscriptionId,
 } from '@/lib/api/stripe-customer-subscriptions';
+import { applyBillingPeriodFromPriceId } from '@/lib/api/stripe-billing-period';
 
 function getStripe(): Stripe {
   if (!config.STRIPE_SECRET_KEY) {
@@ -56,11 +58,78 @@ function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date | nul
   return typeof ts === 'number' ? fromUnix(ts) : null;
 }
 
+type UserDoc = Awaited<ReturnType<typeof User.findById>>;
+
+/** Set user.subscriptionBillingPeriod from the subscription's first price ID. */
+function applyBillingPeriodFromSubscription(
+  user: NonNullable<UserDoc>,
+  subscription: Stripe.Subscription
+): void {
+  const price = subscription.items?.data?.[0]?.price;
+  const priceId =
+    typeof price === 'string'
+      ? price
+      : price && typeof price === 'object' && 'id' in price
+        ? price.id
+        : undefined;
+  applyBillingPeriodFromPriceId(user, priceId);
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code: unknown }).code === 11000
+  );
+}
+
+function scheduleCustomerId(
+  schedule: Stripe.SubscriptionSchedule
+): string | null {
+  if (!schedule.customer) return null;
+  return typeof schedule.customer === 'string'
+    ? schedule.customer
+    : schedule.customer.id;
+}
+
+function scheduleSubscriptionId(
+  schedule: Stripe.SubscriptionSchedule
+): string | null {
+  if (schedule.subscription) {
+    return typeof schedule.subscription === 'string'
+      ? schedule.subscription
+      : schedule.subscription.id;
+  }
+  if (schedule.released_subscription) {
+    return schedule.released_subscription;
+  }
+  return null;
+}
+
+/** Resolve user for a subscription schedule via customer, then stripeSubscriptionId. */
+async function findUserForSubscriptionSchedule(
+  schedule: Stripe.SubscriptionSchedule,
+  stripe: Stripe
+) {
+  const customerId = scheduleCustomerId(schedule);
+  if (customerId) {
+    const byCustomer = await findUserByStripeCustomer(stripe, customerId);
+    if (byCustomer) return byCustomer;
+  }
+  const subscriptionId = scheduleSubscriptionId(schedule);
+  if (subscriptionId) {
+    return User.findOne({ stripeSubscriptionId: subscriptionId }).exec();
+  }
+  return null;
+}
+
 // ── Event handlers ────────────────────────────────────────────────────────────
 
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
-  stripe: Stripe
+  stripe: Stripe,
+  eventId?: string
 ): Promise<void> {
   if (session.mode !== 'subscription' || !session.customer) {
     return;
@@ -100,14 +169,39 @@ async function handleCheckoutSessionCompleted(
   const status = subscription.status;
 
   await connectToDatabase();
-  const user = await findUserByStripeCustomer(stripe, customerId);
+  let user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
-    logger.warn('[Stripe Webhook] checkout.session.completed — user not found for customer', { customerId });
+    const userId = session.client_reference_id ?? session.metadata?.userId;
+    if (userId) {
+      user = await User.findById(userId).exec();
+      if (user) {
+        user.stripeCustomerId = customerId;
+      }
+    }
+  }
+  if (!user) {
+    if (status === 'active' || status === 'trialing') {
+      logger.error(
+        '[Stripe Webhook] checkout.session.completed — user not found for entitled subscription',
+        {
+          eventId,
+          customerId,
+          subscriptionId,
+          sessionId: session.id,
+        }
+      );
+    } else {
+      logger.warn(
+        '[Stripe Webhook] checkout.session.completed — user not found for customer',
+        { customerId, sessionId: session.id }
+      );
+    }
     return;
   }
 
   user.stripeSubscriptionId = subscriptionId;
   user.stripeSubscriptionStatus = status;
+  applyBillingPeriodFromSubscription(user, subscription);
 
   if (shouldSkipStripeDowngrade(user)) {
     extendSubscriptionExpiresAt(user, periodEnd);
@@ -133,7 +227,11 @@ async function handleCheckoutSessionCompleted(
   });
 }
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stripe: Stripe): Promise<void> {
+async function handleSubscriptionUpdated(
+  subscription: Stripe.Subscription,
+  stripe: Stripe,
+  eventId?: string
+): Promise<void> {
   const customerId = String(subscription.customer);
 
   // Re-retrieve with expanded items to ensure current_period_end is available.
@@ -146,12 +244,26 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
   await connectToDatabase();
   const user = await findUserByStripeCustomer(stripe, customerId);
   if (!user) {
-    logger.warn('[Stripe Webhook] subscription.updated — user not found', { customerId });
+    if (status === 'active' || status === 'trialing') {
+      logger.error(
+        '[Stripe Webhook] subscription.updated — user not found for entitled subscription',
+        {
+          eventId,
+          customerId,
+          subscriptionId: subscription.id,
+        }
+      );
+    } else {
+      logger.warn('[Stripe Webhook] subscription.updated — user not found', {
+        customerId,
+      });
+    }
     return;
   }
 
   user.stripeSubscriptionId = subscription.id;
   user.stripeSubscriptionStatus = status;
+  applyBillingPeriodFromSubscription(user, expandedSub);
 
   if (periodEnd !== null) {
     extendSubscriptionExpiresAt(user, periodEnd);
@@ -182,6 +294,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription, stri
       );
       if (otherSub) {
         applyEntitledStripeSubscription(user, otherSub);
+        applyBillingPeriodFromSubscription(user, otherSub);
         logger.info(
           '[Stripe Webhook] subscription.updated — retained premium via another active subscription',
           { userId: String(user._id), failedSubId: subscription.id, activeSubId: otherSub.id }
@@ -233,6 +346,7 @@ async function handleSubscriptionDeleted(
   );
   if (otherSub) {
     applyEntitledStripeSubscription(user, otherSub);
+    applyBillingPeriodFromSubscription(user, otherSub);
     await user.save();
     logger.info(
       '[Stripe Webhook] subscription.deleted — retained premium via another active subscription',
@@ -305,6 +419,69 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, stripe: Stripe): Promi
   });
 }
 
+async function handleSubscriptionScheduleCreated(
+  schedule: Stripe.SubscriptionSchedule,
+  stripe: Stripe
+): Promise<void> {
+  await connectToDatabase();
+  const user = await findUserForSubscriptionSchedule(schedule, stripe);
+  if (!user) {
+    logger.warn(
+      '[Stripe Webhook] subscription_schedule.created — user not found',
+      {
+        scheduleId: schedule.id,
+        customerId: scheduleCustomerId(schedule),
+        subscriptionId: scheduleSubscriptionId(schedule),
+      }
+    );
+    return;
+  }
+
+  user.stripeScheduleId = schedule.id;
+  await user.save();
+
+  logger.info('[Stripe Webhook] subscription_schedule.created — stripeScheduleId set', {
+    userId: String(user._id),
+    scheduleId: schedule.id,
+  });
+}
+
+async function handleSubscriptionScheduleCleared(
+  schedule: Stripe.SubscriptionSchedule,
+  stripe: Stripe,
+  eventType: string
+): Promise<void> {
+  await connectToDatabase();
+  const user = await findUserForSubscriptionSchedule(schedule, stripe);
+  if (!user) {
+    // Fall back: clear by schedule id if customer/sub lookup missed.
+    const bySchedule = await User.findOne({ stripeScheduleId: schedule.id }).exec();
+    if (!bySchedule) {
+      logger.warn(`[Stripe Webhook] ${eventType} — user not found`, {
+        scheduleId: schedule.id,
+        customerId: scheduleCustomerId(schedule),
+        subscriptionId: scheduleSubscriptionId(schedule),
+      });
+      return;
+    }
+    bySchedule.stripeScheduleId = undefined;
+    await bySchedule.save();
+    logger.info(`[Stripe Webhook] ${eventType} — stripeScheduleId cleared`, {
+      userId: String(bySchedule._id),
+      scheduleId: schedule.id,
+    });
+    return;
+  }
+
+  user.stripeScheduleId = undefined;
+  await user.save();
+
+  logger.info(`[Stripe Webhook] ${eventType} — stripeScheduleId cleared`, {
+    userId: String(user._id),
+    scheduleId: schedule.id,
+  });
+}
+
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, stripe: Stripe): Promise<void> {
   if (!invoice.customer) return;
 
@@ -322,6 +499,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, stripe: Strip
   );
   if (otherSub) {
     applyEntitledStripeSubscription(user, otherSub);
+    applyBillingPeriodFromSubscription(user, otherSub);
     await user.save();
     logger.info(
       '[Stripe Webhook] invoice.payment_failed — retained premium via another active subscription',
@@ -386,18 +564,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    await connectToDatabase();
+
+    const alreadyProcessed = await StripeWebhookEvent.findOne({
+      eventId: event.id,
+    }).exec();
+    if (alreadyProcessed) {
+      return NextResponse.json(
+        { received: true, duplicate: true },
+        { status: 200 }
+      );
+    }
+
     const stripe = getStripe();
 
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(
           event.data.object as Stripe.Checkout.Session,
-          stripe
+          stripe,
+          event.id
         );
         break;
 
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription, stripe);
+        await handleSubscriptionUpdated(
+          event.data.object as Stripe.Subscription,
+          stripe,
+          event.id
+        );
         break;
 
       case 'customer.subscription.deleted':
@@ -412,17 +608,52 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, stripe);
         break;
 
+      case 'subscription_schedule.created':
+        await handleSubscriptionScheduleCreated(
+          event.data.object as Stripe.SubscriptionSchedule,
+          stripe
+        );
+        break;
+
+      case 'subscription_schedule.released':
+      case 'subscription_schedule.canceled':
+      case 'subscription_schedule.completed':
+        await handleSubscriptionScheduleCleared(
+          event.data.object as Stripe.SubscriptionSchedule,
+          stripe,
+          event.type
+        );
+        break;
+
       default:
         logger.info('[Stripe Webhook] Unhandled event type', { type: event.type });
+    }
+
+    // Record after successful handler so Stripe can retry on 500.
+    try {
+      await StripeWebhookEvent.create({
+        eventId: event.id,
+        type: event.type,
+        processedAt: new Date(),
+      });
+    } catch (insertErr: unknown) {
+      if (isDuplicateKeyError(insertErr)) {
+        return NextResponse.json(
+          { received: true, duplicate: true },
+          { status: 200 }
+        );
+      }
+      throw insertErr;
     }
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));
     logger.error('[Stripe Webhook] Error processing event', {
       type: event.type,
+      eventId: event.id,
       error: e.message,
       stack: e.stack,
     });
-    // Return 500 so Stripe retries the event.
+    // Return 500 so Stripe retries the event (do not insert idempotency record).
     return NextResponse.json({ code: 'ServerError' }, { status: 500 });
   }
 

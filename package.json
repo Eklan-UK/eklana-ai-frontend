@@ -13,7 +13,9 @@
     "generate-icons": "node scripts/generate-icons.js",
     "test:gates": "node scripts/test-subscription-gates.mjs",
     "test:subscription": "node --import tsx --test src/lib/api/user-subscription.test.ts",
+    "test:stripe-checkout": "node --import tsx --test src/lib/api/stripe-billing-period.test.ts src/lib/api/stripe-checkout-session.test.ts src/lib/api/user-subscription.test.ts",
     "diagnose:subscription": "tsx scripts/diagnose-subscription.ts",
+    "migrate:to-monthly-199": "tsx scripts/stripe-migrate-to-monthly-199.ts",
     "test:notification": "node scripts/local-test-notification.mjs"
   },
   "dependencies": {

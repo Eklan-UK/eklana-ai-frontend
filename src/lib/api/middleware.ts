@@ -330,7 +330,7 @@ export const withPremium = <T = any>(
 		// findById works unmodified for both legacy ObjectId and UUID ids.
 		const user = await User.findById(context.userId)
 			.select(
-				'subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId'
+				'email subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId'
 			)
 			.lean()
 			.exec();

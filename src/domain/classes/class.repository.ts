@@ -326,13 +326,13 @@ export class ClassRepository {
     offset: number;
   }): Promise<{ items: AdminClassListItemDTO[]; total: number }> {
     const query = { isActive: true };
-    /** Cap for MVP: map + optional bucket filter before slice (Phase 1). */
+    /** Cap for MVP today/upcoming; completed scans all active series for true totals. */
     const MAX_SERIES_SCAN = 500;
-    const seriesList = await ClassSeries.find(query)
-      .sort({ updatedAt: -1 })
-      .limit(MAX_SERIES_SCAN)
-      .lean()
-      .exec();
+    const seriesQuery = ClassSeries.find(query).sort({ updatedAt: -1 });
+    if (params.bucket !== 'completed') {
+      seriesQuery.limit(MAX_SERIES_SCAN);
+    }
+    const seriesList = await seriesQuery.lean().exec();
 
     if (seriesList.length === 0) {
       return { items: [], total: 0 };
@@ -421,15 +421,16 @@ export class ClassRepository {
     limit: number;
     offset: number;
   }): Promise<{ items: AdminClassListItemDTO[]; total: number }> {
+    /** Cap for MVP today/upcoming; completed scans all active series for true totals. */
     const MAX_SERIES_SCAN = 500;
-    const seriesList = await ClassSeries.find({
+    const seriesQuery = ClassSeries.find({
       isActive: true,
       tutorId: params.tutorId,
-    })
-      .sort({ updatedAt: -1 })
-      .limit(MAX_SERIES_SCAN)
-      .lean()
-      .exec();
+    }).sort({ updatedAt: -1 });
+    if (params.bucket !== 'completed') {
+      seriesQuery.limit(MAX_SERIES_SCAN);
+    }
+    const seriesList = await seriesQuery.lean().exec();
 
     if (seriesList.length === 0) {
       return { items: [], total: 0 };
