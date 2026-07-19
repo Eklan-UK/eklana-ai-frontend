@@ -65,77 +65,83 @@ export async function GET(req: NextRequest) {
     contexts.map((c) => [String(c.studentId), c.country]),
   );
 
-  for (const learner of learners) {
-    try {
-      if (!isWeeklyChallengeDayUtc(now, learner.subscriptionActivatedAt as Date)) {
-        skipped++;
-        continue;
-      }
+  const BATCH_SIZE = 5;
 
-      const existing = await WeeklyChallengeModel.findOne({
-        learnerId: learner._id,
-        weekStartDate,
-      }).lean();
+  for (let i = 0; i < learners.length; i += BATCH_SIZE) {
+    const batch = learners.slice(i, i + BATCH_SIZE);
 
-      if (
-        existing &&
-        Array.isArray(existing.content?.drillSequence) &&
-        existing.content.drillSequence.length > 0
-      ) {
-        skipped++;
-        continue;
-      }
-
-      const profile = await aggregateWeaknesses(learner._id, weekStartDate);
-      const country = countryByStudentId.get(String(learner._id));
-      const content = await generateWeeklyChallenge(profile, { country });
-
-      const saved = await WeeklyChallengeModel.findOneAndUpdate(
-        { learnerId: learner._id, weekStartDate },
-        {
-          $set: {
-            learnerId: learner._id,
-            weekStartDate,
-            weaknessProfile: profile,
-            challengeType: 'structured_drill_sequence',
-            content,
-            status: 'ready',
-            generatedAt: now,
-          },
-        },
-        { upsert: true, new: true },
-      );
-
-      generated++;
-
-      if (
-        saved &&
-        Array.isArray(saved.content?.drillSequence) &&
-        saved.content.drillSequence.length > 0
-      ) {
-        try {
-          const notifyResult = await notifyWeeklyChallengeReadyFromDoc(saved);
-          if (notifyResult.status === 'sent') {
-            notified++;
-          } else {
-            notifySkipped++;
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          notifyErrors.push(`${String(learner._id)}: ${msg}`);
-          logger.warn('[weekly-challenge cron] notification failed', {
-            learnerId: String(learner._id),
-            error: msg,
-          });
+    await Promise.all(batch.map(async (learner) => {
+      try {
+        if (!isWeeklyChallengeDayUtc(now, learner.subscriptionActivatedAt as Date)) {
+          skipped++;
+          return;
         }
+
+        const existing = await WeeklyChallengeModel.findOne({
+          learnerId: learner._id,
+          weekStartDate,
+        }).lean();
+
+        if (
+          existing &&
+          Array.isArray(existing.content?.drillSequence) &&
+          existing.content.drillSequence.length > 0
+        ) {
+          skipped++;
+          return;
+        }
+
+        const profile = await aggregateWeaknesses(learner._id, weekStartDate);
+        const country = countryByStudentId.get(String(learner._id));
+        const content = await generateWeeklyChallenge(profile, { country });
+
+        const saved = await WeeklyChallengeModel.findOneAndUpdate(
+          { learnerId: learner._id, weekStartDate },
+          {
+            $set: {
+              learnerId: learner._id,
+              weekStartDate,
+              weaknessProfile: profile,
+              challengeType: 'structured_drill_sequence',
+              content,
+              status: 'ready',
+              generatedAt: now,
+            },
+          },
+          { upsert: true, new: true },
+        );
+
+        generated++;
+
+        if (
+          saved &&
+          Array.isArray(saved.content?.drillSequence) &&
+          saved.content.drillSequence.length > 0
+        ) {
+          try {
+            const notifyResult = await notifyWeeklyChallengeReadyFromDoc(saved);
+            if (notifyResult.status === 'sent') {
+              notified++;
+            } else {
+              notifySkipped++;
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            notifyErrors.push(`${String(learner._id)}: ${msg}`);
+            logger.warn('[weekly-challenge cron] notification failed', {
+              learnerId: String(learner._id),
+              error: msg,
+            });
+          }
+        }
+      } catch (err: any) {
+        logger.error('[weekly-challenge cron] error processing learner', {
+          learnerId: String(learner._id),
+          error: err.message,
+        });
+        errors++;
       }
-    } catch (err: any) {
-      logger.error('[weekly-challenge cron] error processing learner', {
-        learnerId: String(learner._id),
-        error: err.message,
-      });
-      errors++;
-    }
+    }));
   }
 
   return NextResponse.json({ generated, skipped, errors, notified, notifySkipped, notifyErrors });
