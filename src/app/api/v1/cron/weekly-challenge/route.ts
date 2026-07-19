@@ -15,6 +15,7 @@ import '@/models/pronunciation-attempt';
 import '@/models/free-talk-attempt';
 import '@/models/weekly-challenge-dispatch';
 import { notifyWeeklyChallengeReadyFromDoc } from '@/domain/challenges/weekly-challenge-notification.service';
+import '@/models/drill';
 
 const ROUTE_SECRET_ENV = 'WEEKLY_CHALLENGE_CRON_SECRET';
 

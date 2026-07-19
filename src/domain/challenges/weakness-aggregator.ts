@@ -5,6 +5,7 @@ import FreeTalkAttempt from '@/models/free-talk-attempt';
 import Bookmark from '@/models/bookmark';
 import Drill from '@/models/drill';
 import StudentContext from '@/models/studentContext';
+import UserModel from '@/models/user';
 import type { IDrillAttempt } from '@/models/drill-attempt';
 import type { IPronunciationAttempt } from '@/models/pronunciation-attempt';
 import type { IFreeTalkAttempt } from '@/models/free-talk-attempt';
@@ -505,6 +506,22 @@ async function fetchCountry(learnerId: Types.ObjectId): Promise<string | null> {
 	return context?.country ?? null;
 }
 
+async function fetchStudentIdentity(
+	learnerId: Types.ObjectId
+): Promise<{ studentName: string; studentRole: string }> {
+	const [user, context] = await Promise.all([
+		UserModel.findById(learnerId).select('firstName').lean<{ firstName?: string } | null>(),
+		StudentContext.findOne({ studentId: learnerId })
+			.select('professionalRole')
+			.lean<{ professionalRole?: string } | null>(),
+	]);
+
+	return {
+		studentName: user?.firstName ?? '',
+		studentRole: context?.professionalRole ?? '',
+	};
+}
+
 export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
 	weekStartDate: Date
@@ -530,6 +547,7 @@ export async function aggregateWeaknesses(
 		allTimeAnalysis,
 		missionAndTopic,
 		country,
+		studentIdentity,
 	] = await Promise.all([
 		DrillAttempt.find({ learnerId, completedAt: dateFilter }).lean() as Promise<IDrillAttempt[]>,
 		PronunciationAttemptModel.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IPronunciationAttempt[]>,
@@ -543,6 +561,7 @@ export async function aggregateWeaknesses(
 		computeAllTimePhonemeAnalysis(learnerId, tenDaysAgo),
 		computePrimaryMissionAndTopic(learnerId, tenDaysAgo),
 		fetchCountry(learnerId),
+		fetchStudentIdentity(learnerId),
 	]);
 
 	// Group drill attempts by type
@@ -588,6 +607,8 @@ export async function aggregateWeaknesses(
 		primaryMission: missionAndTopic.primaryMission,
 		primaryTopic: missionAndTopic.primaryTopic,
 		country,
+		studentName: studentIdentity.studentName,
+		studentRole: studentIdentity.studentRole,
 		generatedAt: new Date(),
 	};
 }
