@@ -12,7 +12,8 @@ interface DashboardStats {
   totalUsers: number;
   subscribedUsers: number;
   totalActiveLearners: number;
-  zeroPauseChallengeUsers: number;
+  zeroPauseChallengeTrialUsers: number;
+  zeroPauseChallengePostTrialUsers: number;
   zeroPauseMaintainerUsers: number;
   newSignupsThisWeek: number;
   discoveryCallsToday: number;
@@ -36,7 +37,9 @@ const Dashboard: React.FC = () => {
       totalUsers: stats.totalUsers || 0,
       subscribedUsers: stats.subscribedUsers || 0,
       totalActiveLearners: stats.totalActiveLearners || 0,
-      zeroPauseChallengeUsers: stats.zeroPauseChallengeUsers || 0,
+      zeroPauseChallengeTrialUsers: stats.zeroPauseChallengeTrialUsers || 0,
+      zeroPauseChallengePostTrialUsers:
+        stats.zeroPauseChallengePostTrialUsers || 0,
       zeroPauseMaintainerUsers: stats.zeroPauseMaintainerUsers || 0,
       newSignupsThisWeek: stats.newSignupsThisWeek || 0,
       discoveryCallsToday: stats.discoveryCallsToday || 0,
@@ -46,7 +49,8 @@ const Dashboard: React.FC = () => {
       totalUsers: 0,
       subscribedUsers: 0,
       totalActiveLearners: 0,
-      zeroPauseChallengeUsers: 0,
+      zeroPauseChallengeTrialUsers: 0,
+      zeroPauseChallengePostTrialUsers: 0,
       zeroPauseMaintainerUsers: 0,
       newSignupsThisWeek: 0,
       discoveryCallsToday: 0,
@@ -59,26 +63,39 @@ const Dashboard: React.FC = () => {
       value: loading ? "..." : statsWithDefaults.totalUsers.toString(),
       change: "",
       color: "bg-white border border-emerald-200 dark:border-border dark:bg-emerald-950/30",
+      href: "/admin/Learners",
     },
     {
       title: "Eklan Pro Subscribers",
       value: loading ? "..." : statsWithDefaults.subscribedUsers.toString(),
       change: "",
       color: "bg-white border border-blue-200 dark:border-border dark:bg-blue-950/30",
+      href: "/admin/subscriptions",
     },
     {
       title: "Total Active Users",
       value: loading ? "..." : statsWithDefaults.totalActiveLearners.toString(),
       change: "",
       color: "bg-white border border-primary-200 dark:border-border dark:bg-primary-950/30",
+      href: "/admin/Learners",
     },
     {
-      title: `${ZERO_PAUSE_PRODUCT_LABELS.challenge} Subscribers`,
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.challenge} Subscribers (Trial)`,
       value: loading
         ? "..."
-        : statsWithDefaults.zeroPauseChallengeUsers.toString(),
+        : statsWithDefaults.zeroPauseChallengeTrialUsers.toString(),
       change: "",
       color: "bg-white border border-violet-200 dark:border-border dark:bg-violet-950/30",
+      href: "/admin/subscriptions",
+    },
+    {
+      title: `${ZERO_PAUSE_PRODUCT_LABELS.challenge} Subscribers (Post-Trial)`,
+      value: loading
+        ? "..."
+        : statsWithDefaults.zeroPauseChallengePostTrialUsers.toString(),
+      change: "",
+      color: "bg-white border border-purple-200 dark:border-border dark:bg-purple-950/30",
+      href: "/admin/subscriptions",
     },
     {
       title: `${ZERO_PAUSE_PRODUCT_LABELS.maintainer} Subscribers`,
@@ -87,6 +104,7 @@ const Dashboard: React.FC = () => {
         : statsWithDefaults.zeroPauseMaintainerUsers.toString(),
       change: "",
       color: "bg-white border border-indigo-200 dark:border-border dark:bg-indigo-950/30",
+      href: "/admin/subscriptions",
     },
   ];
 
@@ -118,12 +136,14 @@ const Dashboard: React.FC = () => {
               value: string;
               change: string;
               color: string;
+              href: string;
             },
             idx: number,
           ) => (
-            <div
+            <Link
               key={idx}
-              className={`p-6 rounded-2xl ${stat.color} relative overflow-hidden`}
+              href={stat.href}
+              className={`block p-6 rounded-2xl ${stat.color} relative overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-gray-300`}
             >
               <div className="flex justify-between items-start mb-4">
                 <p className="text-sm font-medium text-gray-600 max-w-[120px]">
@@ -137,7 +157,7 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
               <p className="text-4xl font-bold text-gray-900">{stat.value}</p>
-            </div>
+            </Link>
           ),
         )}
       </div>

@@ -1,9 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/api/logger';
 import { withAuth } from '@/lib/api/middleware';
+import { connectToDatabase } from '@/lib/api/db';
+import ProfileModel from '@/models/profile';
 import { findCachedTTS, findCachedTTSReadOnly, persistTTSInCache } from '@/services/tts-cache.service';
 import { generateElevenLabsAudio, TTSProviderError } from '@/services/tts-provider.service';
 import { resolveVoiceId } from '@/services/tts-config';
+import { resolveAccentVoiceId } from '@/services/tts-accent-voices';
+
+async function resolveDefaultVoiceForUser(userId: string): Promise<string> {
+  try {
+    await connectToDatabase();
+    const profile = await ProfileModel.findOne({ userId })
+      .select('lessonPreferences.englishAccent')
+      .lean()
+      .exec();
+    const accentVoiceId = resolveAccentVoiceId(
+      profile?.lessonPreferences?.englishAccent,
+    );
+    return resolveVoiceId(accentVoiceId);
+  } catch (error: any) {
+    logger.warn('Failed to resolve TTS voice from user accent; using env default', {
+      userId,
+      error: error?.message,
+    });
+    return resolveVoiceId();
+  }
+}
 
 const requestWindowMs = 60_000;
 const maxRequestsPerWindow = 30;
@@ -39,7 +62,10 @@ async function postHandler(
     const startedAt = Date.now();
     const body = await req.json();
     const { text, voice: rawVoice } = body;
-    const voice = resolveVoiceId(rawVoice);
+    const voice =
+      !rawVoice || rawVoice === 'default'
+        ? await resolveDefaultVoiceForUser(context.userId?.toString() || '')
+        : resolveVoiceId(rawVoice);
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json(

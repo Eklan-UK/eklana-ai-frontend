@@ -2,13 +2,15 @@ import User from '@/models/user';
 import Drill from '@/models/drill';
 import { DiscoveryCall } from '@/models/discovery-call';
 import { isUserSubscribed } from '@/lib/api/user-subscription';
+import { getZeroPauseChallengePhase } from '@/domain/subscriptions/subscription.types';
 
 export interface AdminDashboardStats {
 	totalUsers: number;
 	subscribedUsers: number;
 	totalActiveLearners: number;
 	totalDrills: number;
-	zeroPauseChallengeUsers: number;
+	zeroPauseChallengeTrialUsers: number;
+	zeroPauseChallengePostTrialUsers: number;
 	zeroPauseMaintainerUsers: number;
 	newSignupsThisWeek: number;
 	discoveryCallsToday: number;
@@ -52,14 +54,15 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 		}).exec(),
 		User.find(learnerBaseQuery)
 			.select(
-				'subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId zeroPauseProducts createdAt'
+				'subscriptionPlan subscriptionExpiresAt stripeSubscriptionStatus subscriptionPaymentMethod appleSubscriptionStatus appleOriginalTransactionId zeroPauseProducts zeroPauseDate zeroPauseEndDate createdAt'
 			)
 			.lean()
 			.exec(),
 	]);
 
 	let subscribedUsers = 0;
-	let zeroPauseChallengeUsers = 0;
+	let zeroPauseChallengeTrialUsers = 0;
+	let zeroPauseChallengePostTrialUsers = 0;
 	let zeroPauseMaintainerUsers = 0;
 	let newSignupsThisWeek = 0;
 
@@ -68,7 +71,14 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
 		const products = user.zeroPauseProducts;
 		if (Array.isArray(products)) {
-			if (products.includes('challenge')) zeroPauseChallengeUsers += 1;
+			const challengePhase = getZeroPauseChallengePhase({
+				zeroPauseProducts: products,
+				zeroPauseEndDate: user.zeroPauseEndDate,
+			});
+			if (challengePhase === 'trial') zeroPauseChallengeTrialUsers += 1;
+			if (challengePhase === 'post_trial') {
+				zeroPauseChallengePostTrialUsers += 1;
+			}
 			if (products.includes('maintainer')) zeroPauseMaintainerUsers += 1;
 		}
 
@@ -82,7 +92,8 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 		subscribedUsers,
 		totalActiveLearners,
 		totalDrills,
-		zeroPauseChallengeUsers,
+		zeroPauseChallengeTrialUsers,
+		zeroPauseChallengePostTrialUsers,
 		zeroPauseMaintainerUsers,
 		newSignupsThisWeek,
 		discoveryCallsToday,

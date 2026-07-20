@@ -130,7 +130,8 @@ export const adminService = {
     subscribedUsers: number;
     totalActiveLearners: number;
     totalDrills: number;
-    zeroPauseChallengeUsers: number;
+    zeroPauseChallengeTrialUsers: number;
+    zeroPauseChallengePostTrialUsers: number;
     zeroPauseMaintainerUsers: number;
     newSignupsThisWeek: number;
     discoveryCallsToday: number;
@@ -142,7 +143,8 @@ export const adminService = {
       subscribedUsers: 0,
       totalActiveLearners: 0,
       totalDrills: 0,
-      zeroPauseChallengeUsers: 0,
+      zeroPauseChallengeTrialUsers: 0,
+      zeroPauseChallengePostTrialUsers: 0,
       zeroPauseMaintainerUsers: 0,
       newSignupsThisWeek: 0,
       discoveryCallsToday: 0,

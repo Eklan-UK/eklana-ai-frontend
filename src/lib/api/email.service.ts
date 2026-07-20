@@ -2,6 +2,7 @@
 import nodemailer from "nodemailer";
 import config from "./config";
 import { logger } from "./logger";
+import { buildDrillOpenUrl } from "@/lib/drill-open-url";
 
 // Create transporter
 const createTransporter = () => {
@@ -74,11 +75,11 @@ export const emailTemplates = {
     assignmentId?: string;
   }) => {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    // Deep link to specific drill if IDs are provided
-    const drillUrl =
-      data.drillId && data.assignmentId
-        ? `${appUrl}/account/drills/${data.drillId}?assignmentId=${data.assignmentId}`
-        : `${appUrl}/account/drills`;
+    const drillUrl = buildDrillOpenUrl(
+      appUrl,
+      data.drillId,
+      data.assignmentId,
+    );
 
     const infoRow = (label: string, value: string, badge = false) => `
 									<div style="flex: 1; min-width: 120px;">

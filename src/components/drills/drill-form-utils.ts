@@ -10,6 +10,7 @@ import type { DrillDraft } from "@/components/drills/drill-draft.types";
 import { getDefaultDrillDraft } from "@/components/drills/drill-draft.types";
 import type { AIDrillBulkPendingItem } from "@/hooks/useAIDrillCreationWorkflow";
 import { AI_DRILL_TYPES } from "@/constants/ai-drill";
+import { parseDrillCompletionDateInput } from "@/lib/drill-completion-date";
 
 export function applyParsedContentToDraft(
   draft: DrillDraft,
@@ -324,10 +325,11 @@ export function buildDrillPayloadFromDraft(
     title: draft.drillTitle.trim(),
     type: draft.drillType,
     difficulty: draft.difficulty.toLowerCase(),
-    date: new Date(draft.completionDate).toISOString(),
+    date: parseDrillCompletionDateInput(draft.completionDate).toISOString(),
     duration_days: draft.durationDays,
     context: draft.context || undefined,
     audio_example_url: draft.audioExampleUrl || undefined,
+    tts_voice_key: draft.ttsVoiceKey || undefined,
     learning_journey_part: draft.journeyPart,
     learning_journey_topic: draft.journeyTopic,
   };

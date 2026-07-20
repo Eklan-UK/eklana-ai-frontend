@@ -3,6 +3,7 @@ import { Schema, model, models, Document, Types } from 'mongoose';
 // Import User and Drill models so populate() can resolve refs
 import '@/models/user';
 import '@/models/drill';
+import { isDrillCompletionOverdue } from '@/lib/drill-completion-date';
 
 export interface IDrillAssignment extends Document {
 	_id: Types.ObjectId;
@@ -94,14 +95,16 @@ drillAssignmentSchema.virtual('isOverdue').get(function () {
 	if (!this.dueDate || this.status === 'completed' || this.status === 'skipped') {
 		return false;
 	}
-	const now = new Date();
-	const due = new Date(this.dueDate);
-	return now > due;
+	return isDrillCompletionOverdue(this.dueDate);
 });
 
 // Pre-save middleware to update status if overdue
 drillAssignmentSchema.pre('save', function () {
-	if (this.dueDate && new Date() > this.dueDate && this.status === 'pending') {
+	if (
+		this.dueDate &&
+		this.status === 'pending' &&
+		isDrillCompletionOverdue(this.dueDate)
+	) {
 		this.status = 'overdue';
 	}
 });

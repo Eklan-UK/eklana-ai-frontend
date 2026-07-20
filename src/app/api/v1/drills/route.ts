@@ -133,6 +133,7 @@ const createDrillSchema = z.object({
 	})).min(0),
 	context: z.string().optional(),
 	audio_example_url: z.string().url().optional(),
+	tts_voice_key: z.string().optional(),
 	target_sentences: z.array(targetSentenceSchema).optional(),
 	pronunciation_items: z.array(pronunciationItemSchema).optional(),
 	roleplay_dialogue: z.array(dialogueTurnSchema).optional(),
@@ -278,6 +279,7 @@ async function postHandler(
 	// Add optional fields
 	if (validated.context !== undefined) drillData.context = validated.context;
 	if (validated.audio_example_url !== undefined) drillData.audio_example_url = validated.audio_example_url;
+	if (validated.tts_voice_key !== undefined) drillData.tts_voice_key = validated.tts_voice_key || null;
 	if (validated.type === 'vocabulary') {
 		if (validated.target_sentences !== undefined) drillData.target_sentences = validated.target_sentences;
 		drillData.pronunciation_items = [];
