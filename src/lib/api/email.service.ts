@@ -777,6 +777,10 @@ export const sendClassReminderEmail = async (data: {
       timeZone: data.timeZone,
     });
 
+    // #region agent log
+    fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'C',location:'email.service.ts:sendClassReminderEmail',message:'Formatted class reminder time',data:{timeZone:data.timeZone,sessionStartIso:data.sessionStart.toISOString(),formattedTime,looksLikeUtc:/UTC|GMT$/i.test(formattedTime)&&!/\+/.test(formattedTime)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     const html = `
 <!DOCTYPE html>
 <html>
