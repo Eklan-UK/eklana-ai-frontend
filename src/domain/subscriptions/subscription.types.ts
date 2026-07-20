@@ -163,12 +163,85 @@ export function formatZeroPauseProducts(
   return labels.join(", ");
 }
 
+export type ZeroPauseChallengePhase = "trial" | "post_trial";
+
+/** UTC calendar day at 00:00:00.000Z — matches admin subscription route validation. */
+export function toUtcDayStart(value: Date | string): Date {
+  const d = value instanceof Date ? value : new Date(value);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
+}
+
+export function getZeroPauseChallengePhase(user: {
+  zeroPauseProducts?: ZeroPauseProduct[] | string[] | null;
+  zeroPauseEndDate?: string | Date | null;
+}): ZeroPauseChallengePhase | null {
+  const products = user.zeroPauseProducts;
+  if (!Array.isArray(products) || !products.includes("challenge")) {
+    return null;
+  }
+  if (!user.zeroPauseEndDate) {
+    return "trial";
+  }
+  const today = toUtcDayStart(new Date());
+  const end = toUtcDayStart(user.zeroPauseEndDate);
+  return today.getTime() <= end.getTime() ? "trial" : "post_trial";
+}
+
+const TRIAL_DATE_OPTS: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+};
+
+function formatChallengeTrialDateRange(
+  startDate: string | Date,
+  endDate: string | Date
+): string {
+  const startFormatted = new Date(startDate).toLocaleDateString(
+    "en-US",
+    TRIAL_DATE_OPTS
+  );
+  const endFormatted = new Date(endDate).toLocaleDateString(
+    "en-US",
+    TRIAL_DATE_OPTS
+  );
+  return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Trial) · ${startFormatted} – ${endFormatted}`;
+}
+
+export function formatZeroPauseChallengePhaseLabel(
+  phase: ZeroPauseChallengePhase,
+  startDate?: string | Date | null,
+  endDate?: string | Date | null
+): string {
+  if (phase === "post_trial") {
+    return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Post Trial)`;
+  }
+  if (startDate && endDate) {
+    try {
+      return formatChallengeTrialDateRange(startDate, endDate);
+    } catch {
+      return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Trial)`;
+    }
+  }
+  return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Trial)`;
+}
+
 export function formatZeroPauseProductWithDate(
   product: ZeroPauseProduct | string,
   date?: string | Date | null,
   endDate?: string | Date | null
 ): string | null {
   if (!isZeroPauseProduct(product)) return null;
+
+  if (product === "challenge") {
+    const phase = getZeroPauseChallengePhase({
+      zeroPauseProducts: ["challenge"],
+      zeroPauseEndDate: endDate,
+    });
+    return formatZeroPauseChallengePhaseLabel(phase ?? "trial", date, endDate);
+  }
+
   const label = ZERO_PAUSE_PRODUCT_LABELS[product];
   if (!date) return label;
   try {

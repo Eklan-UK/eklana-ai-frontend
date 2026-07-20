@@ -1078,7 +1078,8 @@ export const adminAPI = {
         subscribedUsers: number;
         totalActiveLearners: number;
         totalDrills: number;
-        zeroPauseChallengeUsers: number;
+        zeroPauseChallengeTrialUsers: number;
+        zeroPauseChallengePostTrialUsers: number;
         zeroPauseMaintainerUsers: number;
         newSignupsThisWeek: number;
         discoveryCallsToday: number;

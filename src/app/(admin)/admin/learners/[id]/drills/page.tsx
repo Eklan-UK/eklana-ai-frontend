@@ -25,6 +25,10 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useEffect } from 'react';
 import { appendReturnTo } from '@/lib/drill-list-filters';
+import {
+  drillCompletionDateEnd,
+  isDrillCompletionOverdue,
+} from '@/lib/drill-completion-date';
 
 export default function StudentDrillsPage() {
   const params = useParams();
@@ -48,7 +52,7 @@ export default function StudentDrillsPage() {
 
   const formatDate = (dateString: string | Date): string => {
     try {
-      const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+      const date = drillCompletionDateEnd(dateString);
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -202,8 +206,13 @@ export default function StudentDrillsPage() {
                 {assignments.map((assignment: any) => {
                   const drill = assignment.drill || assignment;
                   const status = assignment.status || 'pending';
-                  const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-                  const isOverdue = dueDate && dueDate < new Date() && status !== 'completed';
+                  const dueDate = assignment.dueDate
+                    ? drillCompletionDateEnd(assignment.dueDate)
+                    : null;
+                  const isOverdue =
+                    status !== 'completed' &&
+                    status !== 'skipped' &&
+                    isDrillCompletionOverdue(assignment.dueDate);
                   const score = assignment.bestScore ?? assignment.latestAttempt?.score ?? assignment.score;
 
                   return (

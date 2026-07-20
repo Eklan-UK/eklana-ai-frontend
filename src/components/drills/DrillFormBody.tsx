@@ -24,6 +24,7 @@ import type {
   RoleplayScene,
   KeyPhraseItem,
 } from "@/components/drills/drill-draft.types";
+import { ACCENT_VOICE_OPTIONS } from "@/services/tts-accent-voices";
 
 export interface DrillFormBodyProps {
   draft: DrillDraft;
@@ -1672,7 +1673,7 @@ export function DrillFormBody({
               </div>
 
               {/* Pre-generate TTS Audio Option */}
-              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="flex items-center h-6">
                     <input
@@ -1683,7 +1684,7 @@ export function DrillFormBody({
                       className="w-5 h-5 rounded text-green-600 focus:ring-green-500 accent-green-600"
                     />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <label htmlFor="generateTTS" className="text-sm font-bold text-gray-900 cursor-pointer flex items-center gap-2">
                       <Volume2 className="w-4 h-4 text-green-600" />
                       Pre-generate Audio (Recommended)
@@ -1699,6 +1700,33 @@ export function DrillFormBody({
                       </div>
                     )}
                   </div>
+                </div>
+                <div>
+                  <label
+                    htmlFor="ttsVoiceKey"
+                    className="block text-xs font-bold text-gray-700 mb-1.5"
+                  >
+                    Accent / voice
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="ttsVoiceKey"
+                      value={draft.ttsVoiceKey}
+                      onChange={(e) => patchDraft({ ttsVoiceKey: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-white border border-green-200 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
+                    >
+                      <option value="">Default voice</option>
+                      {ACCENT_VOICE_OPTIONS.map((opt) => (
+                        <option key={opt.key} value={opt.key}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Used for pre-generated ElevenLabs audio. Leave as default to use the system voice.
+                  </p>
                 </div>
               </div>
             </div>

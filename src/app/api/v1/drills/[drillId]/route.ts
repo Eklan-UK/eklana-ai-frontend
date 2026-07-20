@@ -45,6 +45,7 @@ const updateDrillSchema = z.object({
 	is_active: z.boolean().optional(),
 	context: z.string().optional(),
 	audio_example_url: z.string().url().optional(),
+	tts_voice_key: z.string().optional(),
 	target_sentences: z.array(z.object({
 		word: z.string().optional(),
 		wordTranslation: z.string().optional(),
@@ -218,6 +219,7 @@ async function putHandler(
 	if (validated.is_active !== undefined) updateData.is_active = validated.is_active;
 	if (validated.context !== undefined) updateData.context = validated.context;
 	if (validated.audio_example_url !== undefined) updateData.audio_example_url = validated.audio_example_url;
+	if (validated.tts_voice_key !== undefined) updateData.tts_voice_key = validated.tts_voice_key || null;
 	if (validated.target_sentences !== undefined) updateData.target_sentences = validated.target_sentences;
 	if (validated.pronunciation_items !== undefined) updateData.pronunciation_items = validated.pronunciation_items;
 	if (validated.student_character_name !== undefined) updateData.student_character_name = validated.student_character_name;

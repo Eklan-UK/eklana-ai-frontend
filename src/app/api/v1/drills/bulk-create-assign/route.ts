@@ -16,6 +16,7 @@ import {
 import { parseLearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
+import { parseDrillCompletionDateInput } from "@/lib/drill-completion-date";
 
 interface BulkDrillInput {
   drillType: string;
@@ -82,22 +83,28 @@ const journeyFieldsSchema = z
   });
 
 // Maps the AI-generated/provided content object onto the type-specific Drill schema fields
-function mapContentFields(drillType: string, content: Record<string, any>): Record<string, any> {
+function mapContentFields(
+  drillType: string,
+  content: Record<string, any>,
+  studentCharacterNameOverride?: string
+): Record<string, any> {
   switch (drillType) {
     case "vocabulary":
       return { target_sentences: content.target_sentences ?? [] };
     case "pronunciation":
       return { pronunciation_items: content.pronunciation_items ?? [] };
     case "roleplay": {
-      const studentCharacterName = content.student_character_name ?? "Student";
+      const originalStudentCharacterName = content.student_character_name ?? "Student";
+      const displayStudentCharacterName =
+        studentCharacterNameOverride ?? originalStudentCharacterName;
       const aiCharacterNames = content.ai_character_names ?? [];
       return {
         roleplay_scenes: normalizeRoleplayScenes(
           content.roleplay_scenes ?? [],
-          studentCharacterName,
+          originalStudentCharacterName,
           aiCharacterNames
         ),
-        student_character_name: studentCharacterName,
+        student_character_name: displayStudentCharacterName,
         ai_character_names: aiCharacterNames,
         drill_intro: content.drill_intro ?? "",
       };
@@ -166,8 +173,10 @@ async function handler(
             throw new Error(`Invalid studentId: ${studentId}`);
           }
 
-          const dueDate = new Date(completionDate);
-          if (Number.isNaN(dueDate.getTime())) {
+          let dueDate: Date;
+          try {
+            dueDate = parseDrillCompletionDateInput(completionDate);
+          } catch {
             throw new Error(`Invalid completionDate: ${completionDate}`);
           }
 
@@ -194,6 +203,14 @@ async function handler(
             });
           }
 
+          let studentCharacterNameOverride: string | undefined;
+          if (drillType === "roleplay") {
+            const student = await User.findById(studentId).lean();
+            if (student && (student as any).firstName) {
+              studentCharacterNameOverride = `Nurse ${(student as any).firstName}`;
+            }
+          }
+
           const drillData: any = {
             title: title ?? "",
             type: drillType,
@@ -209,7 +226,7 @@ async function handler(
             totalCompletions: 0,
             averageScore: 0,
             averageCompletionTime: 0,
-            ...mapContentFields(drillType, content),
+            ...mapContentFields(drillType, content, studentCharacterNameOverride),
           };
 
           if (validatedPart !== undefined) drillData.learning_journey_part = validatedPart;

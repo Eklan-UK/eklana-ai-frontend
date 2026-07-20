@@ -70,6 +70,9 @@ function buildPrompt(profile: WeaknessProfile, context?: ChallengeGenerationCont
 		? `\nThe learner practices nursing in ${context.country} — use clinical terminology, medication names, and healthcare-system conventions appropriate to that country.\n`
 		: '';
 
+	const studentName = profile.studentName;
+	const studentRole = profile.studentRole;
+
 	return `
 The learner has the following top weaknesses (up to 4), ranked by severity (1 = worst):
 
@@ -158,6 +161,7 @@ CONSTRAINT: Use words/phrases from the student's evidence field.
 CONSTRAINT: Do not repeat the same correct answer across multiple questions. Each vocabulary_item must test a DIFFERENT word.
 CONSTRAINT: If the student's evidence contains only a few weak words, supplement with other relevant vocabulary that a nurse at this level should know — words related to patient assessment, medication, handover, and clinical procedures. The weak words from evidence should appear first, but the remaining items should introduce varied clinical vocabulary, not repeat the same words.
 CONSTRAINT: correctAnswer must exactly match one of the options.
+CONSTRAINT: If any question references the student by name or professional role, use only the real values: '${studentName}' and '${studentRole}'. Do not invent a different name or role for the student.
 
 "key_phrases" → {
   "key_phrase_items": [
@@ -172,6 +176,7 @@ CONSTRAINT: correctAnswer must exactly match one of the options.
 CONSTRAINT: key_phrase_items must contain 15–20 items.
 CONSTRAINT: correctAnswer must be a string that exactly matches one element of options[].
 CONSTRAINT: This is a professional nursing exam. ALL 4 options must be things a qualified nurse might genuinely say in that situation. Options like 'Hey, what's up?', 'See ya later', 'How's it going?' are unacceptable — they are too casual for a clinical setting. Wrong answers must be professional but subtly incorrect — for example, using the wrong clinical term, giving information in the wrong order, or being technically accurate but inappropriate for the situation. A senior nurse reviewing the options should not be able to immediately eliminate 3 of the 4 as obviously wrong.
+CONSTRAINT: If any question references the student by name or professional role, use only the real values: '${studentName}' and '${studentRole}'. Do not invent a different name or role for the student.
 
 "roleplay" → {
   "student_character_name": "<e.g. 'Nurse'>",
@@ -188,6 +193,7 @@ CONSTRAINT: This is a professional nursing exam. ALL 4 options must be things a 
 }
 CONSTRAINT: speaker must be "student" or "ai_<n>" where n is a 0-based index into ai_character_names[]. Never use the character's name as the speaker value.
 CONSTRAINT: ai_character_names must use real, concrete names that match the characters' roles in the scenario. Never use placeholders like [Name] or [Nurse Name].
+CONSTRAINT: If you assign a name to the student character, it must be exactly '${studentName}'. Do not invent a different name for the student. If you assign a professional role or title to the student character, it must be '${studentRole}'. You are not required to name the student character, but if you do, use only the real name and role provided.
 
 Examples:
 - Nurse handover scenario → ai_character_names: ['Nurse Sarah Chen']

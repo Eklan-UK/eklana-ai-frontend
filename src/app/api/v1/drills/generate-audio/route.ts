@@ -13,6 +13,8 @@ interface GenerateAudioRequest {
   }>;
   drillType: string;
   drillId?: string;
+  /** Applied when an item omits voiceId */
+  voiceId?: string;
 }
 
 interface AudioResult {
@@ -41,7 +43,7 @@ async function postHandler(request: NextRequest) {
   try {
     const startedAt = Date.now();
     const body: GenerateAudioRequest = await request.json();
-    const { texts, drillType, drillId } = body;
+    const { texts, drillType, drillId, voiceId: requestVoiceId } = body;
 
     if (!texts || !Array.isArray(texts) || texts.length === 0) {
       return NextResponse.json(
@@ -54,6 +56,7 @@ async function postHandler(request: NextRequest) {
       drillType,
       drillId,
       textCount: texts.length,
+      voiceId: requestVoiceId || "default",
     });
 
     const results: AudioResult[] = [];
@@ -72,8 +75,11 @@ async function postHandler(request: NextRequest) {
           continue;
         }
 
-        // Generate TTS audio
-        const audioBuffer = await generateTTSAudio(item.text, item.voiceId);
+        // Generate TTS audio (item-level voice overrides request-level)
+        const audioBuffer = await generateTTSAudio(
+          item.text,
+          item.voiceId || requestVoiceId
+        );
 
         // Upload to Cloudinary
         const uploadResult = await uploadToCloudinary(audioBuffer, {
