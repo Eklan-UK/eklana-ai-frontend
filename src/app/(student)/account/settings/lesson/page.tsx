@@ -16,8 +16,7 @@ import {
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
 const ACCENT_FLAGS: Record<string, string> = {
-  indian_male: "🇮🇳",
-  indian_female: "🇮🇳",
+  aanu_afolabi: "🇳🇬",
   american_male: "🇺🇸",
   american_female: "🇺🇸",
   british_male: "🇬🇧",

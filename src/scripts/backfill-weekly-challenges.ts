@@ -8,6 +8,7 @@ import { generateWeeklyChallenge } from '@/domain/challenges/challenge-generator
 import { currentWeekStartUtc } from '@/lib/challenges/utc-week-challenge';
 import '@/models/pronunciation-attempt';
 import '@/models/free-talk-attempt';
+import '@/models/drill';
 
 async function main() {
   await connectToDatabase();

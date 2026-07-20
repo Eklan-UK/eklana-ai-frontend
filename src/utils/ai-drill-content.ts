@@ -20,17 +20,34 @@ export function normalizeAiGeneratedToParsedContent(
     case "pronunciation":
       items = (aiData.pronunciation_items as unknown[]) ?? [];
       break;
-    case "roleplay":
+    case "roleplay": {
+      const studentCharacterName = (aiData.student_character_name as string) ?? "";
+      const aiCharacterNames = (aiData.ai_character_names as string[]) ?? [""];
+
+      const speakerKeyMap: Record<string, string> = { [studentCharacterName]: "student" };
+      aiCharacterNames.forEach((name, index) => {
+        speakerKeyMap[name] = `ai_${index}`;
+      });
+
+      const normalizedScenes = ((aiData.roleplay_scenes as unknown[]) ?? []).map((scene: any) => ({
+        ...scene,
+        dialogue: (scene?.dialogue ?? []).map((turn: any) => {
+          const normalizedSpeaker = speakerKeyMap[turn.speaker];
+          return normalizedSpeaker === undefined ? turn : { ...turn, speaker: normalizedSpeaker };
+        }),
+      }));
+
       items = [
         {
-          roleplay_scenes: aiData.roleplay_scenes ?? [],
-          student_character_name: aiData.student_character_name ?? "",
-          ai_character_names: aiData.ai_character_names ?? [""],
+          roleplay_scenes: normalizedScenes,
+          student_character_name: studentCharacterName,
+          ai_character_names: aiCharacterNames,
           drill_intro: aiData.drill_intro ?? "",
           context: aiData.context ?? "",
         },
       ];
       break;
+    }
     case "matching":
       items = (aiData.matching_pairs as unknown[]) ?? [];
       break;

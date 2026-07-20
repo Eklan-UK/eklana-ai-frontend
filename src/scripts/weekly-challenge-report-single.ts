@@ -46,15 +46,31 @@ function summariseContent(drillType: string, content: any): string[] {
     case 'roleplay': {
       const scenes: any[] = content.roleplay_scenes ?? [];
       if (scenes.length === 0) return ['  (no scenes)'];
+
+      const studentName: string = content.student_character_name ?? 'Student';
+      const aiNames: string[] = content.ai_character_names ?? [];
+
+      const resolveSpeaker = (speaker: string): string => {
+        if (speaker === 'student') return studentName;
+        const match = speaker.match(/^ai_(\d+)$/);
+        if (match) return aiNames[Number(match[1])] ?? speaker;
+        return speaker;
+      };
+
       const lines: string[] = [];
-      for (const scene of scenes) {
-        const name = scene.scene_name ? `Scene: ${scene.scene_name}` : 'Scene';
-        const firstLine = scene.dialogue?.[0];
-        const preview = firstLine
-          ? `${firstLine.speaker}: "${firstLine.text}"`
-          : '(no dialogue)';
-        lines.push(`  • ${name} — ${preview}`);
-      }
+      scenes.forEach((scene, i) => {
+        const title = scene.scene_name || scene.scene_title || `Scene ${i + 1}`;
+        lines.push(`  SCENE ${i + 1}: ${title}`);
+        const dialogue: any[] = scene.dialogue ?? [];
+        if (dialogue.length === 0) {
+          lines.push('    (no dialogue)');
+        } else {
+          for (const turn of dialogue) {
+            const speakerName = resolveSpeaker(turn.speaker);
+            lines.push(`    ${speakerName}: "${turn.text}"`);
+          }
+        }
+      });
       return lines;
     }
 
