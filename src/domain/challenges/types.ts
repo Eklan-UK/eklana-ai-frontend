@@ -69,6 +69,8 @@ export interface WeaknessProfile {
 	primaryMission?: number | null;
 	primaryTopic?: string | null;
 	country?: string | null;
+	studentName: string;
+	studentRole: string;
 	generatedAt: Date;
 }
 
