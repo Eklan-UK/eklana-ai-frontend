@@ -61,6 +61,7 @@ async function handler(
 
     let studentContext: object | undefined;
     let drillWeaknesses: object[] | undefined;
+    let studentName: string | undefined;
 
     if (studentId && Types.ObjectId.isValid(studentId)) {
       try {
@@ -77,6 +78,14 @@ async function handler(
         }
 
         if (user) {
+          const fullName = [(user as any).firstName, (user as any).lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          if (fullName) {
+            studentName = fullName;
+          }
+
           const weekStartDate =
             (user as any).subscriptionActivatedAt ??
             new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
@@ -191,6 +200,7 @@ async function handler(
           templatePrompt: templatePromptByDrillType.get(dt),
           drillHistory,
           competencyFramework,
+          studentName,
         });
         return { drillType: dt, content };
       })
