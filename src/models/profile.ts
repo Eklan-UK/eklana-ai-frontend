@@ -170,7 +170,7 @@ const profileSchema = new Schema<IProfile>(
 		lessonPreferences: {
 			eklanTalks: { type: Boolean, default: true },
 			chatTranslation: { type: Boolean, default: false },
-			englishAccent: { type: String, default: 'british' },
+			englishAccent: { type: String, default: 'british_female' },
 			voiceTone: { type: String, default: 'warm' },
 			speakingSpeed: { type: String, default: 'normal' },
 		},

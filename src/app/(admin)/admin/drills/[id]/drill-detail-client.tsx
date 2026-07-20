@@ -28,6 +28,10 @@ import { toast } from "sonner";
 import { useDrillAssignments } from "@/hooks/useAdmin";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
 import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
+import {
+  drillCompletionDateEnd,
+  isDrillCompletionOverdue,
+} from "@/lib/drill-completion-date";
 
 interface DrillDetailClientProps {
   drill: any;
@@ -635,9 +639,11 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       user?._id ||
                       assignment.learnerId?._id ||
                       assignment.learnerId;
+                    const status = assignment.status || "pending";
                     const isOverdue =
-                      assignment.dueDate &&
-                      new Date(assignment.dueDate) < new Date();
+                      status !== "completed" &&
+                      status !== "skipped" &&
+                      isDrillCompletionOverdue(assignment.dueDate);
 
                     return (
                       <Link
@@ -664,7 +670,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                                   }`}
                               >
                                 Due:{" "}
-                                {new Date(
+                                {drillCompletionDateEnd(
                                   assignment.dueDate
                                 ).toLocaleDateString()}
                                 {isOverdue && " (Overdue)"}

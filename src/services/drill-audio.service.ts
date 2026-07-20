@@ -34,11 +34,13 @@ interface GenerateAudioResponse {
  * @param texts - Array of texts to convert to audio
  * @param drillType - Type of drill for organization
  * @param drillId - Optional drill ID for folder organization
+ * @param voiceId - Optional ElevenLabs voice applied when items omit voiceId
  */
 export async function generateDrillAudio(
   texts: AudioGenerationItem[],
   drillType: string,
-  drillId?: string
+  drillId?: string,
+  voiceId?: string
 ): Promise<GenerateAudioResponse> {
   try {
     const response = await fetch("/api/v1/drills/generate-audio", {
@@ -51,6 +53,7 @@ export async function generateDrillAudio(
         texts,
         drillType,
         drillId,
+        voiceId,
       }),
     });
 

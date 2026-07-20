@@ -367,6 +367,8 @@ export interface IDrill extends Document {
   assigned_to: string[]; // Array of user IDs (for counting purposes only, use DrillAssignment for analytics)
   context?: string;
   audio_example_url?: string;
+  /** Accent/gender key for ElevenLabs pre-gen TTS (see tts-accent-voices). */
+  tts_voice_key?: string;
 
   // Vocabulary Drill Fields (word + sentence practice)
   target_sentences: Array<{
@@ -586,6 +588,13 @@ const drillSchema = new Schema<IDrill>(
       type: String,
       default: null,
       description: "URL to audio file with teacher's example pronunciation",
+    },
+
+    tts_voice_key: {
+      type: String,
+      default: null,
+      description:
+        "Accent/gender key for ElevenLabs pre-generated TTS (e.g. british_female)",
     },
 
     // Vocabulary Drill Fields

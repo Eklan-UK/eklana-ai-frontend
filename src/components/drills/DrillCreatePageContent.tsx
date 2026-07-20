@@ -55,6 +55,7 @@ import {
   extractTextsForDrillType,
   applyAudioUrls,
 } from "@/services/drill-audio.service";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { mergeMediaFieldsFromSource } from "@/utils/drill";
 
 type DrillAssignmentApiResult = {
@@ -401,10 +402,12 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
           );
           if (textsToGenerate.length > 0) {
             setAudioProgress(`Generating ${textsToGenerate.length} audio files...`);
+            // Regenerate whenever TTS is checked (including accent/voice key changes on update).
             const audioResponse = await generateDrillAudio(
               textsToGenerate,
               draft.drillType,
               drillId || undefined,
+              resolveAccentVoiceId(draft.ttsVoiceKey),
             );
             if (audioResponse.success && audioResponse.data) {
               drillPayload = applyAudioUrls(

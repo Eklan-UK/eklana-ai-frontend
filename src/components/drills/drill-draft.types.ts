@@ -83,6 +83,8 @@ export interface DrillDraft {
   durationDays: number;
   context: string;
   audioExampleUrl: string;
+  /** Accent/gender key for ElevenLabs; empty = env default voice */
+  ttsVoiceKey: string;
   selectedUsers: string[];
   generateTTSAudio: boolean;
   journeyPart: LearningJourneyPartId | "";
@@ -92,7 +94,10 @@ export interface DrillDraft {
 export function getDefaultCompletionDate(): string {
   const defaultDate = new Date();
   defaultDate.setDate(defaultDate.getDate() + 7);
-  return defaultDate.toISOString().split("T")[0];
+  const y = defaultDate.getFullYear();
+  const m = String(defaultDate.getMonth() + 1).padStart(2, "0");
+  const day = String(defaultDate.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraft {
@@ -148,6 +153,7 @@ export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraf
     durationDays: 7,
     context: "",
     audioExampleUrl: "",
+    ttsVoiceKey: "",
     selectedUsers: [],
     generateTTSAudio: true,
     journeyPart: "",

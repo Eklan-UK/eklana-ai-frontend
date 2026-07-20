@@ -519,9 +519,13 @@ const SubscriptionsPage: React.FC = () => {
                 </div>
                 {form.zeroPauseProducts.includes("challenge") && (
                   <div className="space-y-2 pt-1">
+                    <p className="text-xs text-gray-500">
+                      Trial period — students show as Trial until the end date,
+                      then Post-Trial automatically.
+                    </p>
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-gray-600">
-                        Start date (required for Challenge)
+                        Trial start date (required)
                       </label>
                       <input
                         type="date"
@@ -537,7 +541,7 @@ const SubscriptionsPage: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-gray-600">
-                        End date (required for Challenge)
+                        Trial end date (required)
                       </label>
                       <input
                         type="date"
@@ -551,6 +555,16 @@ const SubscriptionsPage: React.FC = () => {
                         className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
                       />
                     </div>
+                    {form.zeroPauseDate && form.zeroPauseEndDate && (
+                      <p className="text-xs font-medium text-violet-700">
+                        Currently:{" "}
+                        {formatZeroPauseProductWithDate(
+                          "challenge",
+                          form.zeroPauseDate,
+                          form.zeroPauseEndDate
+                        )}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

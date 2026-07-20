@@ -18,7 +18,15 @@ export function StreakActivityPing() {
     ran.current = true;
 
     const key = `streakActivityUtc:${utcDateString(new Date())}`;
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(key)) {
+    const streakAlreadyDone =
+      typeof sessionStorage !== "undefined" && Boolean(sessionStorage.getItem(key));
+    // #region agent log
+    fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'B',location:'StreakActivityPing.tsx:entry',message:'StreakActivityPing effect entry',data:{streakAlreadyDone,deviceTz:Intl.DateTimeFormat().resolvedOptions().timeZone||null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    if (streakAlreadyDone) {
+      // #region agent log
+      fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'B',location:'StreakActivityPing.tsx:early-return',message:'Skipped timezone bootstrap because streak sessionStorage key present',data:{key},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       return;
     }
 
@@ -38,6 +46,9 @@ export function StreakActivityPing() {
       // Bootstrap IANA timezone once per session when profile has none set.
       const tzKey = "timezoneBootstrap";
       if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(tzKey)) {
+        // #region agent log
+        fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'B',location:'StreakActivityPing.tsx:tz-bootstrap-skipped',message:'Timezone bootstrap skipped; session flag already set',data:{tzKey},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return;
       }
       const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -51,6 +62,7 @@ export function StreakActivityPing() {
 
         const prefsJson = await prefsRes.json();
         const currentTz = prefsJson?.data?.timezone as string | undefined;
+        let patched = false;
         if (!currentTz) {
           await fetch("/api/v1/users/preferences", {
             method: "PATCH",
@@ -58,7 +70,11 @@ export function StreakActivityPing() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ timezone: deviceTz }),
           });
+          patched = true;
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'A',location:'StreakActivityPing.tsx:tz-bootstrap',message:'Timezone bootstrap attempt',data:{deviceTz,currentTz:currentTz??null,patched},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         if (typeof sessionStorage !== "undefined") {
           sessionStorage.setItem(tzKey, "1");
         }

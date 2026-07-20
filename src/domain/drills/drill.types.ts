@@ -46,6 +46,7 @@ export interface CreateDrillData {
   assigned_to?: string[];
   context?: string;
   audio_example_url?: string;
+  tts_voice_key?: string;
   is_active?: boolean;
   is_bookmarked?: boolean;
   bookmarked_at?: Date | null;

@@ -175,6 +175,10 @@ export class ClassReminderService {
                 ? rawTimeZone
                 : DEFAULT_TIMEZONE;
 
+              // #region agent log
+              fetch('http://127.0.0.1:7490/ingest/eeb056aa-00bc-4885-ab3b-35bd1102faa1',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5c0476'},body:JSON.stringify({sessionId:'5c0476',runId:'pre-fix',hypothesisId:'A',location:'class-reminder.service.ts:tz-resolve',message:'Resolved learner timezone for class reminder email',data:{learnerId,profileFound:Boolean(profile),rawTimeZone:profile?.timezone ?? null,resolvedTimeZone:timeZone,usedDefault:timeZone===DEFAULT_TIMEZONE,sessionStartUtc:new Date(session.startUtc).toISOString()},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+
               const emailJoinUrl =
                 session.meetingUrl?.trim()
                   ? buildClassEmailJoinUrl({
