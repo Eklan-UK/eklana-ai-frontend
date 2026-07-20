@@ -37,24 +37,44 @@ export async function generateChallengeCompletion(
 	}
 	messages.push({ role: 'user', content: prompt });
 
-	const response = await openaiClient.chat.completions.create({
-		model: CHALLENGE_MODEL,
-		messages,
-		max_completion_tokens: maxCompletionTokens,
-		response_format: { type: 'json_object' },
-	});
+	const client = openaiClient;
 
-	const text = response.choices[0]?.message?.content;
-	if (!text) {
-		throw new Error('OpenAI returned an empty response');
+	const requestCompletion = async () => {
+		const response = await client.chat.completions.create({
+			model: CHALLENGE_MODEL,
+			messages,
+			max_completion_tokens: maxCompletionTokens,
+			response_format: { type: 'json_object' },
+		});
+
+		return {
+			text: response.choices[0]?.message?.content,
+			promptTokens: response.usage?.prompt_tokens,
+			completionTokens: response.usage?.completion_tokens,
+			finishReason: response.choices[0]?.finish_reason,
+		};
+	};
+
+	let result = await requestCompletion();
+
+	if (!result.text) {
+		logger.warn('OpenAI returned an empty response, retrying once', {
+			model: CHALLENGE_MODEL,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+		result = await requestCompletion();
+	}
+
+	if (!result.text) {
+		throw new Error('OpenAI returned empty response after retry');
 	}
 
 	logger.info('OpenAI challenge completion generated', {
 		model: CHALLENGE_MODEL,
-		promptTokens: response.usage?.prompt_tokens,
-		completionTokens: response.usage?.completion_tokens,
-		finishReason: response.choices[0]?.finish_reason,
+		promptTokens: result.promptTokens,
+		completionTokens: result.completionTokens,
+		finishReason: result.finishReason,
 	});
 
-	return text;
+	return result.text;
 }
