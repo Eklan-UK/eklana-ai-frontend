@@ -3,6 +3,11 @@
  * Centralized logic for drill-related operations
  */
 
+import {
+  drillCompletionDateEnd,
+  isDrillCompletionOverdue,
+} from "@/lib/drill-completion-date";
+
 export type DrillStatus = "active" | "ongoing" | "upcoming" | "completed" | "missed" | "pending";
 
 /** Consistent completion-time estimate shown to learners across all drill surfaces. */
@@ -24,10 +29,10 @@ export interface DrillItem {
 }
 
 /**
- * Format date to readable string
+ * Format date to readable string (calendar day of the deadline after EOD normalize)
  */
 export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = drillCompletionDateEnd(dateString);
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -41,14 +46,8 @@ export function formatDate(dateString: string): string {
  * Drills become active immediately upon assignment
  */
 export function getDrillStatus(drill: any): DrillStatus {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
   // Use assignment dueDate if available, otherwise use drill.date as completion date
-  const completionDate = drill.dueDate
-    ? new Date(drill.dueDate)
-    : new Date(drill.date || drill.drill?.date);
-  completionDate.setHours(23, 59, 59, 999);
+  const completionDate = drill.dueDate ?? drill.date ?? drill.drill?.date;
 
   const assignmentStatus = drill.assignmentStatus ?? drill.status;
 
@@ -63,7 +62,7 @@ export function getDrillStatus(drill: any): DrillStatus {
 
   // Check if drill is missed (completion date has passed and not completed)
   if (
-    now > completionDate &&
+    isDrillCompletionOverdue(completionDate) &&
     !drill.completedAt &&
     assignmentStatus !== "completed" &&
     !drill.latestAttempt?.completedAt

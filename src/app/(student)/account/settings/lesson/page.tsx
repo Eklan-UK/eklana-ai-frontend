@@ -7,13 +7,31 @@ import { ChevronRight, X } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { userAPI } from "@/lib/api";
+import {
+  ACCENT_VOICE_OPTIONS,
+  DEFAULT_ENGLISH_ACCENT,
+  normalizeEnglishAccent,
+} from "@/services/tts-accent-voices";
 
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
-const ACCENT_OPTIONS = [
-  { id: "british", label: "British English", flag: "🇬🇧", display: "British" },
-  { id: "american", label: "American English", flag: "🇺🇸", display: "American" },
-];
+const ACCENT_FLAGS: Record<string, string> = {
+  indian_male: "🇮🇳",
+  indian_female: "🇮🇳",
+  american_male: "🇺🇸",
+  american_female: "🇺🇸",
+  british_male: "🇬🇧",
+  british_female: "🇬🇧",
+  australian_male: "🇦🇺",
+  australian_female: "🇦🇺",
+};
+
+const ACCENT_OPTIONS = ACCENT_VOICE_OPTIONS.map((opt) => ({
+  id: opt.key,
+  label: opt.label,
+  flag: ACCENT_FLAGS[opt.key] ?? "",
+  display: opt.label,
+}));
 
 const VOICE_OPTIONS = [
   { id: "eklan_confident", label: "eklan Confident" },
@@ -42,7 +60,7 @@ interface LessonPrefs {
 const DEFAULTS: LessonPrefs = {
   eklanTalks: true,
   chatTranslation: false,
-  englishAccent: "british",
+  englishAccent: DEFAULT_ENGLISH_ACCENT,
   voiceTone: "warm",
   speakingSpeed: "normal",
 };
@@ -242,7 +260,8 @@ export default function LessonSettingsPage() {
     setPrefs({
       eklanTalks: stored?.eklanTalks ?? DEFAULTS.eklanTalks,
       chatTranslation: stored?.chatTranslation ?? DEFAULTS.chatTranslation,
-      englishAccent: stored?.englishAccent ?? DEFAULTS.englishAccent,
+      englishAccent:
+        normalizeEnglishAccent(stored?.englishAccent) ?? DEFAULTS.englishAccent,
       voiceTone: stored?.voiceTone ?? DEFAULTS.voiceTone,
       speakingSpeed: stored?.speakingSpeed ?? DEFAULTS.speakingSpeed,
     });

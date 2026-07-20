@@ -16,6 +16,7 @@ import {
 import { parseLearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
+import { parseDrillCompletionDateInput } from "@/lib/drill-completion-date";
 
 interface BulkDrillInput {
   drillType: string;
@@ -166,8 +167,10 @@ async function handler(
             throw new Error(`Invalid studentId: ${studentId}`);
           }
 
-          const dueDate = new Date(completionDate);
-          if (Number.isNaN(dueDate.getTime())) {
+          let dueDate: Date;
+          try {
+            dueDate = parseDrillCompletionDateInput(completionDate);
+          } catch {
             throw new Error(`Invalid completionDate: ${completionDate}`);
           }
 

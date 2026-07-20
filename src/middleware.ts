@@ -25,6 +25,7 @@ const publicRoutes = [
   '/terms',
   '/privacy',
   '/contact',
+  '/open',
 ];
 
 export async function middleware(request: NextRequest) {

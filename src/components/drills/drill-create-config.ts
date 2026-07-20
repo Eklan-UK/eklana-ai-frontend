@@ -4,6 +4,7 @@ import {
   getDefaultCompletionDate,
   getDefaultDrillDraft,
 } from "@/components/drills/drill-draft.types";
+import { formatDrillCompletionDateForInput } from "@/lib/drill-completion-date";
 
 const DRAFT_KEYS = {
   admin: "admin_drill_draft",
@@ -52,11 +53,12 @@ export function drillRecordToDraft(
     drillType: String(drill.type || "vocabulary"),
     difficulty: String(drill.difficulty || "intermediate"),
     completionDate: drill.date
-      ? new Date(String(drill.date)).toISOString().split("T")[0]
+      ? formatDrillCompletionDateForInput(String(drill.date))
       : getDefaultCompletionDate(),
     durationDays: Number(drill.duration_days) || 7,
     context: String(drill.context || ""),
     audioExampleUrl: String(drill.audio_example_url || ""),
+    ttsVoiceKey: String(drill.tts_voice_key || ""),
     journeyPart:
       drill.learning_journey_part != null
         ? (drill.learning_journey_part as LearningJourneyPartId)

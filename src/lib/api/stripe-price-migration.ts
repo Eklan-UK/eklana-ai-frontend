@@ -8,11 +8,53 @@ export type PriceMigrationResult =
   | { status: 'scheduled'; scheduleId: string }
   | { status: 'skipped'; reason: PriceMigrationSkipReason };
 
+function priceIdFromPhaseItem(
+  item: Stripe.SubscriptionSchedule.Phase.Item
+): string | null {
+  const price = item.price;
+  if (typeof price === 'string') return price;
+  if (price && typeof price === 'object' && 'id' in price) {
+    return (price as { id: string }).id;
+  }
+  return null;
+}
+
+/**
+ * Price that will apply after the current schedule phases finish
+ * (last phase item). Used to detect Phase 7 “upgrade to $20” schedules.
+ */
+export function terminalPhasePriceId(
+  schedule: Stripe.SubscriptionSchedule
+): string | null {
+  const phases = schedule.phases ?? [];
+  if (phases.length === 0) return null;
+  const last = phases[phases.length - 1];
+  const item = last.items?.[0];
+  if (!item) return null;
+  return priceIdFromPhaseItem(item);
+}
+
+export function scheduleIdFromSubscription(
+  schedule: Stripe.Subscription['schedule']
+): string | null {
+  if (!schedule) return null;
+  return typeof schedule === 'string' ? schedule : schedule.id;
+}
+
+/** Release a subscription schedule so the sub keeps its current Price with no planned change. */
+export async function releaseSubscriptionSchedule(
+  stripe: Stripe,
+  scheduleId: string
+): Promise<void> {
+  await stripe.subscriptionSchedules.release(scheduleId);
+}
+
 /**
  * Soft-migrate a subscription onto `targetPriceId` at `current_period_end`
  * via Subscription Schedules (`proration_behavior: 'none'`).
  *
- * Skips when already on the target price or when a schedule already exists.
+ * Skips when already on the target price or when a schedule already exists
+ * (caller should release bad schedules first).
  */
 export async function schedulePriceMigrationAtRenewal(
   stripe: Stripe,
@@ -42,7 +84,8 @@ export async function schedulePriceMigrationAtRenewal(
   }
 
   const idempotencyKey =
-    options?.idempotencyKey ?? `price-migration-${subscriptionId}-${targetPriceId}`;
+    options?.idempotencyKey ??
+    `price-migration-${subscriptionId}-${targetPriceId}`;
 
   const schedule = await stripe.subscriptionSchedules.create(
     { from_subscription: subscriptionId },

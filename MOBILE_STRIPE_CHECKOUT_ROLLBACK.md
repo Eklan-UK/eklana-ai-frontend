@@ -1,9 +1,9 @@
 # Mobile Stripe Checkout Rollback
 
 > **Audience:** Android / Expo team.  
-> **Scope:** Revert the Stripe paywall to a **single monthly Pro** plan (~US$1.99). No multi-plan picker, no free trial, no Challenge pricing UI.  
-> **Supersedes for pricing:** [STRIPE_ANDROID_MOBILE_CONTRACT.md](./STRIPE_ANDROID_MOBILE_CONTRACT.md) (update that file to match) and [MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md](./MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md) (no longer applicable for pricing).  
-> **Status:** Current payment contract after rollback. Hand this doc to the mobile team.
+> **Hand mobile this instead for day-to-day implementation:** [MOBILE_STRIPE_PRO_BILLING.md](./MOBILE_STRIPE_PRO_BILLING.md) (authoritative endpoints).  
+> **Scope:** History of the rollback to a **single monthly Pro** (~US$1.99). No multi-plan, no trial, no Challenge pricing UI.  
+> **Status:** Historical / context. Prefer [MOBILE_STRIPE_PRO_BILLING.md](./MOBILE_STRIPE_PRO_BILLING.md).
 
 ---
 

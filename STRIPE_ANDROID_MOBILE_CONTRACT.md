@@ -2,8 +2,8 @@
 
 > **Audience:** Android / Expo team.  
 > **Scope:** Android Stripe only — same API as web. **No StoreKit. No app code in this repo.**  
-> **Current pricing:** [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) — single monthly Pro (~US$1.99), no trial, no multi-plan.  
-> **Status:** Aligned with payment rollback. Prefer the rollback doc for paywall implementation.
+> **Authoritative endpoints:** [MOBILE_STRIPE_PRO_BILLING.md](./MOBILE_STRIPE_PRO_BILLING.md) — single monthly Pro (~US$1.99), no trial, no multi-plan.  
+> **Status:** Aligned. Prefer [MOBILE_STRIPE_PRO_BILLING.md](./MOBILE_STRIPE_PRO_BILLING.md) for implementation.
 
 ---
 
@@ -25,7 +25,8 @@ Do not duplicate StoreKit flows here.
 
 | Doc | Why |
 |-----|-----|
-| [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) | **Authoritative** paywall after rollback |
+| [MOBILE_STRIPE_PRO_BILLING.md](./MOBILE_STRIPE_PRO_BILLING.md) | **Authoritative** endpoints + paywall |
+| [MOBILE_STRIPE_CHECKOUT_ROLLBACK.md](./MOBILE_STRIPE_CHECKOUT_ROLLBACK.md) | Rollback history |
 | [MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md](./MOBILE_ZERO_PAUSE_STUDENT_CONTRACT.md) | **Superseded** — Challenge pricing no longer applicable |
 | [docs/stripe-implementation.md](./docs/stripe-implementation.md) | Stripe endpoints, webhooks, server behavior |
 | [docs/STRIPE_WEB_CHECKOUT_UI.md](./docs/STRIPE_WEB_CHECKOUT_UI.md) | Web paywall (monthly-only) |

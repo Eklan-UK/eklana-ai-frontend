@@ -1,29 +1,23 @@
 /**
- * Soft-migrate Stripe subscriptions on the former public prices
- * (US$20 monthly / US$60 quarterly / $200 annual) onto monthly ~US$1.99
- * at each sub's current_period_end via Subscription Schedules.
+ * Ensure every active/trialing Stripe subscription’s NEXT bill is monthly ~US$1.99.
  *
- * No mid-cycle proration. Default is dry-run. Pass --execute to apply.
+ * Fixes two cases:
+ * 1) Sub still on $20 / $60 / $200 → schedule switch to $1.99 at period end
+ * 2) Sub already on $1.99 but has an old Phase 7 schedule → next Portal payment
+ *    shows US$20 → RELEASE that schedule so next bill stays $1.99
  *
- * Usage (from repo root, env in .env):
- *   npx tsx scripts/stripe-migrate-to-monthly-199.ts
- *   npx tsx scripts/stripe-migrate-to-monthly-199.ts --execute
+ * Default is dry-run. Pass --execute to apply.
+ *
+ * Usage:
  *   npm run migrate:to-monthly-199
  *   npm run migrate:to-monthly-199 -- --execute
  *
  * Requires:
  *   STRIPE_SECRET_KEY
- *   STRIPE_PREMIUM_MONTHLY_PRICE_ID   (= target ~US$1.99, real id like price_1ABC…)
+ *   STRIPE_PREMIUM_MONTHLY_PRICE_ID   (= target ~US$1.99)
  *
- * Source Price IDs (real Stripe ids — not placeholders like price_20):
- *   1) --from=price_1…,price_1…,price_1…
- *   2) STRIPE_MIGRATE_FROM_PRICE_IDS=price_1…,price_1…
- *   3) Or leave those empty and the script uses (when set):
- *        STRIPE_PREMIUM_QUARTERLY_PRICE_ID
- *        STRIPE_PREMIUM_ANNUAL_PRICE_ID
- *        STRIPE_MIGRATE_FROM_MONTHLY_PRICE_ID  (former US$20 monthly Price)
- *
- * Get IDs from Stripe Dashboard → Product catalog → Prices.
+ * Optional:
+ *   --only-price=price_1…   Only process subs currently on this Price
  */
 import 'dotenv/config';
 import Stripe from 'stripe';
@@ -31,75 +25,50 @@ import mongoose from 'mongoose';
 import { connectToDatabase } from '../src/lib/api/db';
 import User from '../src/models/user';
 import { findUserByStripeCustomer } from '../src/lib/api/stripe-webhook-user';
-import { schedulePriceMigrationAtRenewal } from '../src/lib/api/stripe-price-migration';
+import {
+  releaseSubscriptionSchedule,
+  scheduleIdFromSubscription,
+  schedulePriceMigrationAtRenewal,
+  terminalPhasePriceId,
+} from '../src/lib/api/stripe-price-migration';
 
 const STATUSES: Array<'active' | 'trialing'> = ['active', 'trialing'];
+
+type Action =
+  | 'noop'
+  | 'release_bad_schedule'
+  | 'schedule_to_199'
+  | 'release_then_schedule_to_199';
 
 function customerIdOf(sub: Stripe.Subscription): string {
   return typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
 }
 
-/** Real Stripe Price ids look like price_1TX3NUBFBiNiR6gZEMcK3Cjd — not price_20. */
 function isLikelyStripePriceId(id: string): boolean {
   return /^price_[A-Za-z0-9]{10,}$/.test(id);
 }
 
-function parseFromPriceIds(targetPriceId: string): string[] {
-  const fromArg = process.argv.find((a) => a.startsWith('--from='));
-  const explicitRaw =
-    fromArg?.slice('--from='.length) ??
-    process.env.STRIPE_MIGRATE_FROM_PRICE_IDS ??
-    '';
-  const explicit = explicitRaw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const fallback = [
-    process.env.STRIPE_MIGRATE_FROM_MONTHLY_PRICE_ID,
-    process.env.STRIPE_PREMIUM_QUARTERLY_PRICE_ID,
-    process.env.STRIPE_PREMIUM_ANNUAL_PRICE_ID,
-  ]
-    .map((s) => s?.trim())
-    .filter((s): s is string => Boolean(s));
-
-  const preferred =
-    explicit.length > 0 && explicit.every(isLikelyStripePriceId)
-      ? explicit
-      : explicit.length > 0
-        ? [] // explicit but invalid — handled below
-        : fallback;
-
-  if (explicit.length > 0 && preferred.length === 0) {
-    const bad = explicit.filter((id) => !isLikelyStripePriceId(id));
+function parseOnlyPriceFilter(): string | null {
+  const arg = process.argv.find((a) => a.startsWith('--only-price='));
+  if (!arg) return null;
+  const id = arg.slice('--only-price='.length).trim();
+  if (!isLikelyStripePriceId(id)) {
     console.error(
-      'STRIPE_MIGRATE_FROM_PRICE_IDS has invalid placeholder(s): ' +
-        bad.join(', ') +
-        '\nUse real Stripe Price IDs from the Dashboard (e.g. price_1TX3NUBFBiNiR6gZEMcK3Cjd), ' +
-        'or unset STRIPE_MIGRATE_FROM_PRICE_IDS and set:\n' +
-        '  STRIPE_MIGRATE_FROM_MONTHLY_PRICE_ID  (former US$20)\n' +
-        '  STRIPE_PREMIUM_QUARTERLY_PRICE_ID\n' +
-        '  STRIPE_PREMIUM_ANNUAL_PRICE_ID'
+      `--only-price must be a real Stripe Price ID (price_1…), got: ${id}`
     );
     process.exit(1);
   }
-
-  const ids = preferred.filter(
-    (id) => isLikelyStripePriceId(id) && id !== targetPriceId
-  );
-  return [...new Set(ids)];
+  return id;
 }
 
-async function listSubscriptionsOnPrice(
-  stripe: Stripe,
-  priceId: string
+async function listAllEntitledSubscriptions(
+  stripe: Stripe
 ): Promise<Stripe.Subscription[]> {
   const out: Stripe.Subscription[] = [];
   const seen = new Set<string>();
 
   for (const status of STATUSES) {
     for await (const sub of stripe.subscriptions.list({
-      price: priceId,
       status,
       limit: 100,
       expand: ['data.items.data'],
@@ -113,10 +82,19 @@ async function listSubscriptionsOnPrice(
   return out;
 }
 
+async function loadSchedule(
+  stripe: Stripe,
+  sub: Stripe.Subscription
+): Promise<Stripe.SubscriptionSchedule | null> {
+  const id = scheduleIdFromSubscription(sub.schedule);
+  if (!id) return null;
+  return stripe.subscriptionSchedules.retrieve(id);
+}
+
 async function bestEffortSetScheduleId(
   stripe: Stripe,
   sub: Stripe.Subscription,
-  scheduleId: string
+  scheduleId: string | null
 ): Promise<string | null> {
   let user = await User.findOne({ stripeSubscriptionId: sub.id }).exec();
   if (!user) {
@@ -124,7 +102,7 @@ async function bestEffortSetScheduleId(
   }
   if (!user) return null;
 
-  user.stripeScheduleId = scheduleId;
+  user.stripeScheduleId = scheduleId ?? undefined;
   if (!user.stripeSubscriptionId) {
     user.stripeSubscriptionId = sub.id;
   }
@@ -135,8 +113,29 @@ async function bestEffortSetScheduleId(
   return String(user._id);
 }
 
+function decideAction(
+  currentPriceId: string,
+  targetPriceId: string,
+  nextPhasePriceId: string | null
+): Action {
+  const hasBadNext =
+    nextPhasePriceId != null && nextPhasePriceId !== targetPriceId;
+  const onTarget = currentPriceId === targetPriceId;
+
+  if (hasBadNext && onTarget) return 'release_bad_schedule';
+  if (hasBadNext && !onTarget) return 'release_then_schedule_to_199';
+  if (!hasBadNext && !onTarget && nextPhasePriceId === targetPriceId) {
+    return 'noop';
+  }
+  if (!hasBadNext && !onTarget && nextPhasePriceId == null) {
+    return 'schedule_to_199';
+  }
+  return 'noop';
+}
+
 async function main() {
   const execute = process.argv.includes('--execute');
+  const onlyPrice = parseOnlyPriceFilter();
 
   const secret = process.env.STRIPE_SECRET_KEY?.trim();
   const targetPriceId = process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID?.trim();
@@ -155,158 +154,180 @@ async function main() {
     process.exit(1);
   }
 
-  const fromPriceIds = parseFromPriceIds(targetPriceId);
-
-  if (fromPriceIds.length === 0) {
-    console.error(
-      'No source Price IDs. Either:\n' +
-        '  - Set STRIPE_MIGRATE_FROM_PRICE_IDS to real ids (comma-separated), or\n' +
-        '  - Set STRIPE_MIGRATE_FROM_MONTHLY_PRICE_ID + STRIPE_PREMIUM_QUARTERLY_PRICE_ID + STRIPE_PREMIUM_ANNUAL_PRICE_ID\n' +
-        'Find them in Stripe Dashboard → Product catalog → each Price → copy ID (price_1…).'
-    );
-    process.exit(1);
-  }
-
   const stripe = new Stripe(secret, { apiVersion: '2026-04-22.dahlia' });
 
   await connectToDatabase();
 
   console.log(
     execute
-      ? 'Mode: EXECUTE — will create Subscription Schedules → monthly ~US$1.99'
+      ? 'Mode: EXECUTE — release bad $20 schedules + ensure next bill is ~US$1.99'
       : 'Mode: DRY-RUN — no Stripe writes (pass --execute to apply)'
   );
-  console.log({ targetPriceId, fromPriceIds });
+  console.log({
+    targetPriceId,
+    discovery: onlyPrice
+      ? `scan active/trialing where current price === ${onlyPrice}`
+      : 'scan all active/trialing; fix next-phase ≠ $1.99 and current ≠ $1.99',
+  });
 
-  const subs: Stripe.Subscription[] = [];
-  const seen = new Set<string>();
-  for (const priceId of fromPriceIds) {
-    try {
-      const found = await listSubscriptionsOnPrice(stripe, priceId);
-      console.log(`  ${priceId}: ${found.length} active/trialing sub(s)`);
-      for (const sub of found) {
-        if (seen.has(sub.id)) continue;
-        seen.add(sub.id);
-        subs.push(sub);
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`  ${priceId}: SKIPPED (Stripe error: ${message})`);
-    }
-  }
-
+  const allSubs = await listAllEntitledSubscriptions(stripe);
   console.log(
-    `Found ${subs.length} active/trialing subscription(s) on source price(s)`
+    `Scanned ${allSubs.length} active/trialing subscription(s) in Stripe`
   );
 
-  let scheduled = 0;
-  let skipped = 0;
-  let errors = 0;
-  const skipReasons: Record<string, number> = {};
+  const byPrice: Record<string, number> = {};
+  for (const sub of allSubs) {
+    const priceId = sub.items.data[0]?.price?.id ?? '(unknown)';
+    byPrice[priceId] = (byPrice[priceId] ?? 0) + 1;
+  }
+  console.log('Current price breakdown:', byPrice);
 
-  for (const sub of subs) {
+  const toProcess = onlyPrice
+    ? allSubs.filter((s) => s.items.data[0]?.price?.id === onlyPrice)
+    : allSubs;
+
+  let released = 0;
+  let scheduled = 0;
+  let noop = 0;
+  let errors = 0;
+  const actionCounts: Record<string, number> = {};
+
+  for (const sub of toProcess) {
     const item = sub.items.data[0];
-    const priceId = item?.price?.id ?? '(unknown)';
+    const currentPriceId = item?.price?.id ?? '(unknown)';
     const periodEnd = item?.current_period_end
       ? new Date(item.current_period_end * 1000).toISOString()
       : null;
 
     try {
-      if (!execute) {
-        if (priceId === targetPriceId) {
-          skipped += 1;
-          skipReasons.already_on_target_price =
-            (skipReasons.already_on_target_price ?? 0) + 1;
-          console.log(
-            JSON.stringify({
-              dryRun: true,
-              subscriptionId: sub.id,
-              status: sub.status,
-              priceId,
-              periodEnd,
-              result: 'skipped',
-              reason: 'already_on_target_price',
-            })
-          );
-          continue;
-        }
-        if (sub.schedule) {
-          skipped += 1;
-          skipReasons.already_has_schedule =
-            (skipReasons.already_has_schedule ?? 0) + 1;
-          console.log(
-            JSON.stringify({
-              dryRun: true,
-              subscriptionId: sub.id,
-              status: sub.status,
-              priceId,
-              periodEnd,
-              result: 'skipped',
-              reason: 'already_has_schedule',
-              existingSchedule:
-                typeof sub.schedule === 'string'
-                  ? sub.schedule
-                  : sub.schedule.id,
-            })
-          );
-          continue;
-        }
+      const schedule = await loadSchedule(stripe, sub);
+      const scheduleId = schedule?.id ?? null;
+      const nextPhasePriceId = schedule
+        ? terminalPhasePriceId(schedule)
+        : null;
+      const action = decideAction(
+        currentPriceId,
+        targetPriceId,
+        nextPhasePriceId
+      );
+      actionCounts[action] = (actionCounts[action] ?? 0) + 1;
 
-        scheduled += 1;
+      if (action === 'noop') {
+        noop += 1;
+        console.log(
+          JSON.stringify({
+            dryRun: !execute,
+            subscriptionId: sub.id,
+            status: sub.status,
+            currentPriceId,
+            nextPhasePriceId,
+            periodEnd,
+            action: 'noop',
+            scheduleId,
+          })
+        );
+        continue;
+      }
+
+      if (!execute) {
         console.log(
           JSON.stringify({
             dryRun: true,
             subscriptionId: sub.id,
             status: sub.status,
-            priceId,
+            currentPriceId,
+            nextPhasePriceId,
             periodEnd,
-            result: 'would_schedule',
+            action:
+              action === 'release_bad_schedule'
+                ? 'would_release_bad_schedule'
+                : action === 'release_then_schedule_to_199'
+                  ? 'would_release_then_schedule_to_199'
+                  : 'would_schedule_to_199',
+            scheduleId,
             targetPriceId,
           })
         );
+        if (
+          action === 'release_bad_schedule' ||
+          action === 'release_then_schedule_to_199'
+        ) {
+          released += 1;
+        }
+        if (
+          action === 'schedule_to_199' ||
+          action === 'release_then_schedule_to_199'
+        ) {
+          scheduled += 1;
+        }
         continue;
       }
 
-      const result = await schedulePriceMigrationAtRenewal(
-        stripe,
-        sub.id,
-        priceId,
-        targetPriceId,
-        { idempotencyKey: `migrate-to-199-${sub.id}` }
-      );
+      if (
+        (action === 'release_bad_schedule' ||
+          action === 'release_then_schedule_to_199') &&
+        scheduleId
+      ) {
+        await releaseSubscriptionSchedule(stripe, scheduleId);
+        await bestEffortSetScheduleId(stripe, sub, null);
+        released += 1;
+      }
 
-      if (result.status === 'skipped') {
-        skipped += 1;
-        skipReasons[result.reason] = (skipReasons[result.reason] ?? 0) + 1;
-        console.log(
-          JSON.stringify({
-            subscriptionId: sub.id,
-            status: sub.status,
-            priceId,
-            periodEnd,
-            result: 'skipped',
-            reason: result.reason,
-          })
+      if (
+        action === 'schedule_to_199' ||
+        action === 'release_then_schedule_to_199'
+      ) {
+        const result = await schedulePriceMigrationAtRenewal(
+          stripe,
+          sub.id,
+          currentPriceId,
+          targetPriceId,
+          { idempotencyKey: `migrate-to-199-${sub.id}-${Date.now()}` }
         );
+        if (result.status === 'scheduled') {
+          await bestEffortSetScheduleId(stripe, sub, result.scheduleId);
+          scheduled += 1;
+          console.log(
+            JSON.stringify({
+              subscriptionId: sub.id,
+              status: sub.status,
+              currentPriceId,
+              nextPhasePriceId,
+              periodEnd,
+              action,
+              result: 'scheduled',
+              scheduleId: result.scheduleId,
+              targetPriceId,
+            })
+          );
+        } else {
+          console.log(
+            JSON.stringify({
+              subscriptionId: sub.id,
+              status: sub.status,
+              currentPriceId,
+              nextPhasePriceId,
+              periodEnd,
+              action,
+              result: 'skipped_after_release',
+              reason: result.reason,
+            })
+          );
+        }
         continue;
       }
 
-      const userId = await bestEffortSetScheduleId(
-        stripe,
-        sub,
-        result.scheduleId
-      );
-      scheduled += 1;
       console.log(
         JSON.stringify({
           subscriptionId: sub.id,
           status: sub.status,
-          priceId,
+          currentPriceId,
+          nextPhasePriceId,
           periodEnd,
-          result: 'scheduled',
-          scheduleId: result.scheduleId,
-          targetPriceId,
-          userId,
+          action: 'release_bad_schedule',
+          result: 'released',
+          releasedScheduleId: scheduleId,
+          note: 'Next bill stays on current ~US$1.99 Price',
         })
       );
     } catch (err: unknown) {
@@ -326,11 +347,13 @@ async function main() {
     JSON.stringify(
       {
         mode: execute ? 'execute' : 'dry-run',
-        total: subs.length,
+        scanned: allSubs.length,
+        processed: toProcess.length,
+        noop,
+        released,
         scheduled,
-        skipped,
         errors,
-        skipReasons,
+        actionCounts,
       },
       null,
       2
