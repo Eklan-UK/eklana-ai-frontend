@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Bookmark, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import {
+  BookOpen,
+  Bookmark,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useSavedDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useDrillBookmarkToggle } from "@/hooks/useDrillBookmarkToggle";
@@ -17,6 +23,8 @@ export interface SavedDrillsSectionProps {
   /** Expand on mount (e.g. My Plan with #saved-drills) */
   defaultExpanded?: boolean;
   showTopicLabel?: boolean;
+  /** Optional section heading above the Saved Drills card (Figma: "Your Progress") */
+  sectionHeading?: string;
 }
 
 export function SavedDrillsSection({
@@ -24,6 +32,7 @@ export function SavedDrillsSection({
   title = "Saved Drills",
   defaultExpanded = false,
   showTopicLabel = false,
+  sectionHeading,
 }: SavedDrillsSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { data: bookmarked = [], isLoading } = useSavedDrills();
@@ -39,37 +48,55 @@ export function SavedDrillsSection({
 
   const toggle = () => setExpanded((open) => !open);
 
+  const savedCountLabel =
+    bookmarked.length === 1
+      ? "1 saved"
+      : `${bookmarked.length} saved`;
+
   return (
-    <section id={id}>
+    <section id={id} aria-labelledby={sectionHeading ? `${id}-heading` : undefined}>
+      {sectionHeading ? (
+        <h2
+          id={`${id}-heading`}
+          className="text-lg font-bold font-nunito text-foreground mb-3"
+        >
+          {sectionHeading}
+        </h2>
+      ) : null}
+
       <button
         type="button"
         onClick={toggle}
         aria-expanded={expanded}
         aria-controls={`${id}-panel`}
-        className="w-full flex items-center gap-3 rounded-2xl bg-card border border-border p-4 shadow-sm hover:shadow-md transition-shadow text-left"
+        className="w-full flex items-start gap-3 rounded-2xl bg-card border border-[rgba(224,224,224,0.5)] dark:border-border p-[17px] shadow-[0px_4px_10px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow text-left"
       >
-        <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-          <Bookmark className="w-5 h-5 text-orange-600 dark:text-orange-400" aria-hidden />
+        <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 mt-0.5">
+          <Bookmark className="w-5 h-5 text-foreground" aria-hidden />
         </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-foreground">{title}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {isLoading
-              ? "Loading…"
-              : bookmarked.length === 0
-                ? "No saved drills yet"
-                : `${bookmarked.length} saved drill${bookmarked.length === 1 ? "" : "s"}`}
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <h3 className="text-base font-bold font-nunito text-foreground">
+            {title}
+          </h3>
+          <p className="text-xs font-satoshi text-muted-foreground">
+            Quick access to your bookmarked exercises.
           </p>
+          {!isLoading && bookmarked.length > 0 ? (
+            <span className="inline-flex shrink-0 px-2 py-0.5 rounded-lg bg-[#f3f4f6] dark:bg-muted text-[11px] font-medium text-muted-foreground">
+              {savedCountLabel}
+            </span>
+          ) : null}
         </div>
-        {!isLoading && bookmarked.length > 0 ? (
-          <span className="shrink-0 px-2 py-0.5 rounded-full bg-muted text-xs font-medium text-muted-foreground">
-            {bookmarked.length}
-          </span>
-        ) : null}
         {expanded ? (
-          <ChevronUp className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+          <ChevronDown
+            className="w-5 h-5 text-muted-foreground shrink-0 mt-1"
+            aria-hidden
+          />
         ) : (
-          <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+          <ChevronRight
+            className="w-5 h-5 text-muted-foreground shrink-0 mt-1"
+            aria-hidden
+          />
         )}
       </button>
 
@@ -108,7 +135,8 @@ export function SavedDrillsSection({
                     completedAt={item.completedAt}
                     showTopicLabel={showTopicLabel}
                     topicTitle={
-                      typeof (drill as { topicTitle?: string })?.topicTitle === "string"
+                      typeof (drill as { topicTitle?: string })?.topicTitle ===
+                      "string"
                         ? (drill as { topicTitle: string }).topicTitle
                         : null
                     }
@@ -129,11 +157,17 @@ export function SavedDrillsSection({
                   key={key}
                   drill={drill}
                   assignmentId={
-                    item.assignmentId != null ? String(item.assignmentId) : undefined
+                    item.assignmentId != null
+                      ? String(item.assignmentId)
+                      : undefined
                   }
-                  dueDate={item.dueDate != null ? String(item.dueDate) : undefined}
+                  dueDate={
+                    item.dueDate != null ? String(item.dueDate) : undefined
+                  }
                   completedAt={
-                    item.completedAt != null ? String(item.completedAt) : undefined
+                    item.completedAt != null
+                      ? String(item.completedAt)
+                      : undefined
                   }
                   status={item.status}
                   hasBookmarks={item.hasBookmarks === true}

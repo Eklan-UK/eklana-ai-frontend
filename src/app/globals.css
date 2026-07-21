@@ -335,3 +335,69 @@ h1, h2, h3, h4, h5, h6 {
 .dark [data-admin-shell] thead.sticky {
   background-color: color-mix(in srgb, var(--muted) 80%, transparent);
 }
+
+/* ===== Learning Journey roadmap transitions ===== */
+@keyframes journey-unlock-node {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.4;
+  }
+  55% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes journey-unlock-card {
+  0% {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+  }
+  100% {
+    opacity: 1;
+    filter: grayscale(0);
+  }
+}
+
+.journey-node-unlock {
+  animation: journey-unlock-node 0.55s ease-out;
+}
+
+.journey-card-just-unlocked {
+  animation: journey-unlock-card 0.5s ease-out;
+}
+
+.journey-card-unlock {
+  transition:
+    opacity 0.4s ease,
+    border-color 0.4s ease,
+    background-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.journey-progress-fill {
+  transition: width 0.5s ease-out, background-color 0.35s ease;
+}
+
+.journey-rail-fill {
+  transition:
+    height 0.6s ease-out,
+    background-color 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-node-unlock,
+  .journey-card-just-unlocked {
+    animation: none;
+  }
+
+  .journey-card-unlock,
+  .journey-progress-fill,
+  .journey-rail-fill {
+    transition: none;
+  }
+}

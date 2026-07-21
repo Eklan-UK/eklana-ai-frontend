@@ -1,12 +1,26 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  deriveMissionStates,
   getTopicById,
+  getViewDetailsPart,
   isKnownLearningJourneyTopicId,
   isLearningJourneyPartId,
   isValidPartTopicPair,
   parseLearningJourneyPartId,
+  type LearningJourneyPartId,
+  type MissionProgress,
 } from "./learning-journey.catalog";
+
+function progressMap(
+  entries: Partial<Record<LearningJourneyPartId, MissionProgress>>,
+): Map<LearningJourneyPartId, MissionProgress> {
+  const map = new Map<LearningJourneyPartId, MissionProgress>();
+  for (const [key, value] of Object.entries(entries)) {
+    if (value) map.set(Number(key) as LearningJourneyPartId, value);
+  }
+  return map;
+}
 
 describe("learning-journey.catalog", () => {
   it("accepts Mission 5 as a valid part id", () => {
@@ -50,5 +64,80 @@ describe("learning-journey.catalog", () => {
     assert.equal(isKnownLearningJourneyTopicId("interview_preparation"), false);
     assert.equal(getTopicById("interview_preparation"), undefined);
     assert.equal(isValidPartTopicPair(4, "interview_preparation"), false);
+  });
+});
+
+describe("deriveMissionStates", () => {
+  it("marks all missions locked when nothing is enrolled", () => {
+    const states = deriveMissionStates([], progressMap({}));
+    assert.equal(states.length, 5);
+    assert.ok(states.every((s) => s.status === "locked"));
+    assert.ok(states.every((s) => !s.isCurrent));
+    assert.equal(getViewDetailsPart(states), null);
+  });
+
+  it("marks only the lowest incomplete enrolled mission as current", () => {
+    const states = deriveMissionStates(
+      [1, 2],
+      progressMap({
+        1: { completed: 2, total: 10 },
+        2: { completed: 1, total: 5 },
+      }),
+    );
+    assert.equal(states[0].status, "active");
+    assert.equal(states[0].isCurrent, true);
+    assert.equal(states[0].percent, 20);
+    assert.equal(states[1].status, "active");
+    assert.equal(states[1].isCurrent, false);
+    assert.equal(states[2].status, "locked");
+    assert.equal(getViewDetailsPart(states), 1);
+  });
+
+  it("advances current to next enrolled after completion", () => {
+    const states = deriveMissionStates(
+      [1, 2],
+      progressMap({
+        1: { completed: 10, total: 10 },
+        2: { completed: 3, total: 8 },
+      }),
+    );
+    assert.equal(states[0].status, "completed");
+    assert.equal(states[0].isCurrent, false);
+    assert.equal(states[0].percent, 100);
+    assert.equal(states[1].status, "active");
+    assert.equal(states[1].isCurrent, true);
+    assert.equal(getViewDetailsPart(states), 2);
+  });
+
+  it("does not treat total 0 as completed", () => {
+    const states = deriveMissionStates(
+      [1],
+      progressMap({ 1: { completed: 0, total: 0 } }),
+    );
+    assert.equal(states[0].status, "active");
+    assert.equal(states[0].isCurrent, true);
+    assert.equal(states[0].percent, 0);
+  });
+
+  it("sets M5 to journeyComplete when all five missions are done", () => {
+    const full: MissionProgress = { completed: 1, total: 1 };
+    const states = deriveMissionStates(
+      [1, 2, 3, 4, 5],
+      progressMap({ 1: full, 2: full, 3: full, 4: full, 5: full }),
+    );
+    assert.ok(
+      states.slice(0, 4).every((s) => s.status === "completed"),
+    );
+    assert.equal(states[4].status, "journeyComplete");
+    assert.ok(states.every((s) => !s.isCurrent));
+    assert.equal(getViewDetailsPart(states), 1);
+  });
+
+  it("includes mission theme accents and icons", () => {
+    const states = deriveMissionStates([1], progressMap({}));
+    assert.equal(states[0].accent, "#3b82f6");
+    assert.equal(states[0].icon, "stethoscope");
+    assert.equal(states[1].icon, "users");
+    assert.equal(states[4].icon, "star");
   });
 });
