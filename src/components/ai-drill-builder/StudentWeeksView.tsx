@@ -171,23 +171,31 @@ export function StudentWeeksView({
                         (drill, idx) => (
                           <li
                             key={drill.assignmentId ?? idx}
-                            className="text-sm text-gray-600 flex items-center gap-2"
+                            className="text-sm text-gray-600 flex items-center gap-2 min-w-0"
                           >
-                            <span className="capitalize">
+                            <span className="capitalize shrink-0">
                               {drill.drillType ?? drill.type ?? "drill"}
                             </span>
+                            {drill.topic && (
+                              <>
+                                <span className="text-gray-300 shrink-0">·</span>
+                                <span className="truncate" title={drill.topic}>
+                                  {drill.topic}
+                                </span>
+                              </>
+                            )}
                             {drill.difficulty && (
                               <>
-                                <span className="text-gray-300">·</span>
-                                <span className="capitalize">
+                                <span className="text-gray-300 shrink-0">·</span>
+                                <span className="capitalize shrink-0">
                                   {drill.difficulty}
                                 </span>
                               </>
                             )}
                             {drill.status && (
                               <>
-                                <span className="text-gray-300">·</span>
-                                <span className="capitalize">
+                                <span className="text-gray-300 shrink-0">·</span>
+                                <span className="capitalize shrink-0">
                                   {drill.status}
                                 </span>
                               </>

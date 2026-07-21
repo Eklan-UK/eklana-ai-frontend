@@ -4,8 +4,7 @@
  */
 
 export const ACCENT_VOICE_KEYS = [
-  'indian_male',
-  'indian_female',
+  'aanu_afolabi',
   'american_male',
   'american_female',
   'british_male',
@@ -26,8 +25,7 @@ export interface AccentVoiceOption {
 export const DEFAULT_ENGLISH_ACCENT: AccentVoiceKey = 'british_female';
 
 export const ACCENT_VOICE_OPTIONS: AccentVoiceOption[] = [
-  { key: 'indian_male', label: 'Indian (male)', voiceId: '0muxiGNHAVvmM1qWRtyV' },
-  { key: 'indian_female', label: 'Indian (female)', voiceId: 'Pc57DSBXmCXyEAmow7lW' },
+  { key: 'aanu_afolabi', label: 'Aanu Afolabi', voiceId: 'JXNr0OLVF2ZRyBK6ZXkK' },
   { key: 'american_male', label: 'American (male)', voiceId: 'Z2fsAwk7IblvPhYzfslC' },
   { key: 'american_female', label: 'American (female)', voiceId: 'DXFkLCBUTmvXpp2QwZjA' },
   { key: 'british_male', label: 'British (male)', voiceId: 'JZ5PEPqtr05GbBRBqPhz' },
@@ -42,10 +40,12 @@ const VOICE_ID_BY_KEY = Object.fromEntries(
 
 const KEY_SET = new Set<string>(ACCENT_VOICE_KEYS);
 
-/** Legacy lesson preference values → current 8-key map. */
+/** Legacy lesson preference values → current key map. */
 const LEGACY_ACCENT_MAP: Record<string, AccentVoiceKey> = {
   british: 'british_female',
   american: 'american_female',
+  indian_male: 'british_female',
+  indian_female: 'british_female',
 };
 
 export function isAccentVoiceKey(key: unknown): key is AccentVoiceKey {

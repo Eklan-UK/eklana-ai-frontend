@@ -98,6 +98,11 @@ export function WeekDrillList({
               <h4 className="font-medium text-gray-900 truncate">
                 {drill.title ?? "Untitled Drill"}
               </h4>
+              {drill.topic && (
+                <p className="text-sm text-gray-500 truncate mt-0.5">
+                  {drill.topic}
+                </p>
+              )}
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 capitalize">
                   {drillType}
