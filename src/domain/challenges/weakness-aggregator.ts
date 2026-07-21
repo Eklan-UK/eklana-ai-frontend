@@ -3,7 +3,8 @@ import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import Bookmark from '@/models/bookmark';
-import Drill from '@/models/drill';
+// Side-effect import: registers the Drill model so populate('drillId') can resolve ref: 'Drill'
+import '@/models/drill';
 import StudentContext from '@/models/studentContext';
 import UserModel from '@/models/user';
 import type { IDrillAttempt } from '@/models/drill-attempt';
