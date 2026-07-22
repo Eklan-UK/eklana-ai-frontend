@@ -124,10 +124,16 @@ async function createOrFindUser(
   const usersCollection = db.collection("users");
   const accountsCollection = db.collection("accounts");
 
-  // Check if account exists (by provider and providerId)
+  // Check if account exists. Match both the mobile custom schema
+  // (provider/providerAccountId, written by this route) and Better Auth's
+  // own schema (providerId/accountId, written by web OAuth/credential
+  // linking — see src/lib/api/password-account.ts) so a user who first
+  // signed up with Google/Apple on web is still recognized here.
   const existingAccount = await accountsCollection.findOne({
-    provider,
-    providerAccountId: providerId,
+    $or: [
+      { provider, providerAccountId: providerId },
+      { providerId: provider, accountId: providerId },
+    ],
   });
 
   let user: any;
@@ -146,11 +152,15 @@ async function createOrFindUser(
       throw new Error("Account found but user not found");
     }
 
-    // Update last login
+    // Update last login and mark verified — signing in via a linked
+    // Google/Apple account already proves email ownership, so this is
+    // idempotently re-asserted on every login (not just at account creation).
     await usersCollection.updateOne(
       { _id: user._id },
-      { $set: { lastLoginAt: new Date() } }
+      { $set: { lastLoginAt: new Date(), emailVerified: true, isEmailVerified: true } }
     );
+    user.emailVerified = true;
+    user.isEmailVerified = true;
   } else {
     // Normalize casing/whitespace so lookups match how the Stripe webhook
     // path already stores emails, avoiding case-mismatch account splits
@@ -161,7 +171,9 @@ async function createOrFindUser(
     const existingUser = await usersCollection.findOne({ email: normalizedEmail });
 
     if (existingUser) {
-      // User exists but account doesn't - link account
+      // User exists but account doesn't - link account. Google/Apple already
+      // proved ownership of this email, so mark it verified when linking
+      // instead of leaving the pre-existing (possibly unverified) flags.
       await accountsCollection.insertOne({
         userId: existingUser._id.toString(),
         provider,
@@ -171,7 +183,12 @@ async function createOrFindUser(
         updatedAt: new Date(),
       });
 
-      user = existingUser;
+      await usersCollection.updateOne(
+        { _id: existingUser._id },
+        { $set: { emailVerified: true, isEmailVerified: true } }
+      );
+
+      user = { ...existingUser, emailVerified: true, isEmailVerified: true };
     } else {
       // Create new user
       const newUser = {
@@ -318,7 +335,7 @@ export async function POST(req: NextRequest) {
           firstName: user.firstName || userInfo.firstName || '',
           lastName: user.lastName || userInfo.lastName || '',
           avatar: user.avatar || user.image || userInfo.picture,
-          emailVerified: user.emailVerified || user.isEmailVerified || true,
+          emailVerified: Boolean(user.emailVerified || user.isEmailVerified),
           iapAccountToken: user.iapAccountToken,
         },
         token: token,

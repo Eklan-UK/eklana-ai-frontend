@@ -1,8 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Video, Clock } from "lucide-react";
+import { Star, Video, Clock } from "lucide-react";
 import {
   mergeClassDrawerDetail,
   type TeachingClass,
@@ -12,11 +11,8 @@ import { TUTOR_JOIN_EARLY_MINUTES } from "@/domain/classes/class.mapper";
 import { formatStartsInLabel } from "@/lib/classes/pick-next-learner-session";
 import { RescheduleTag } from "@/components/classes/RescheduleTag";
 
-/** Bright cyan at bottom-right → deeper blue at top-left (see design mock). */
-const NEXT_SESSION_CARD_BG: CSSProperties = {
-  background:
-    "linear-gradient(to top left,rgb(146, 218, 229) 0%,rgb(81, 174, 217) 45%,rgb(85, 123, 205) 100%)",
-};
+const CARD_BG = "#2a602c";
+const CTA_YELLOW = "#fbd100";
 
 interface LearnerNextSessionCardProps {
   session: TeachingClass | null;
@@ -32,8 +28,8 @@ export function LearnerNextSessionCard({
   if (isLoading) {
     return (
       <div
-        className="rounded-2xl p-5 shadow-lg animate-pulse min-h-[180px]"
-        style={NEXT_SESSION_CARD_BG}
+        className="rounded-[32px] p-6 shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] animate-pulse min-h-[220px]"
+        style={{ backgroundColor: CARD_BG }}
         aria-hidden
       />
     );
@@ -55,47 +51,58 @@ export function LearnerNextSessionCard({
 
   return (
     <div
-      className="rounded-2xl p-5 shadow-lg text-white"
-      style={NEXT_SESSION_CARD_BG}
+      className="rounded-[32px] p-6 text-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)]"
+      style={{ backgroundColor: CARD_BG }}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <Video className="w-5 h-5 shrink-0 opacity-95" strokeWidth={2} />
-          <span className="font-semibold text-sm">Next Session</span>
-          {session?.nextSessionIsReschedule ? <RescheduleTag className="bg-white/25 border-white/40 text-white" /> : null}
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1">
+          <Star className="size-[11.5px] shrink-0 text-white" strokeWidth={2.25} fill="currentColor" />
+          <span className="text-[10px] font-bold uppercase tracking-[1px] font-nunito text-white leading-[15px]">
+            Upcoming Session
+          </span>
         </div>
         {startsIn ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium shrink-0">
             <Clock className="w-3.5 h-3.5" />
             {startsIn}
           </span>
-        ) : session ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium shrink-0">
-            <Clock className="w-3.5 h-3.5" />
-            Upcoming
-          </span>
         ) : null}
       </div>
 
+      {session?.nextSessionIsReschedule ? (
+        <div className="mt-2">
+          <RescheduleTag className="bg-white/25 border-white/40 text-white" />
+        </div>
+      ) : null}
+
       {session ? (
         <>
-          <p className="text-xl font-bold leading-tight mb-1">{mainLine}</p>
+          <h2 className="pt-3 text-xl font-medium font-nunito leading-7 text-white">
+            {mainLine}
+          </h2>
           {subLine ? (
-            <p className="text-sm text-white/90 mb-5">{subLine}</p>
-          ) : (
-            <div className="mb-5" />
-          )}
+            <p className="mt-0.5 text-sm font-nunito leading-[19.25px] text-white/80">
+              {subLine}
+            </p>
+          ) : null}
         </>
       ) : (
-        <p className="text-sm text-white/90 mb-5">
-          No upcoming session scheduled. When your tutor adds one, it will appear here.
-        </p>
+        <>
+          <h2 className="pt-3 text-xl font-medium font-nunito leading-7 text-white">
+            Session Status
+          </h2>
+          <p className="mt-0.5 text-sm font-nunito leading-[19.25px] text-white/80">
+            No upcoming session scheduled. When your tutor adds one, it will
+            appear here.
+          </p>
+        </>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-3 pt-7">
         <Link
           href="/account/classes"
-          className="flex-1 text-center rounded-full bg-white/20 hover:bg-white/30 py-3 text-sm font-semibold transition-colors"
+          className="flex w-full items-center justify-center rounded-full py-4 text-base font-bold font-nunito text-[#171717] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-95"
+          style={{ backgroundColor: CTA_YELLOW }}
         >
           View all Sessions
         </Link>
@@ -116,14 +123,16 @@ export function LearnerNextSessionCard({
               void recordAttendance.mutate({ sessionId: session.nextSessionId });
             }
           }}
-          className={`flex-1 inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-bold transition-colors ${
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-full border border-solid py-[17px] text-base font-bold font-nunito transition-colors ${
             session && canJoin
-              ? "bg-white text-gray-900 shadow-md hover:bg-white/95 active:bg-gray-100"
-              : "cursor-not-allowed bg-white/20 text-white/85 border border-white/30"
+              ? "cursor-pointer border-white/20 bg-white/15 text-white hover:bg-white/25"
+              : "cursor-not-allowed border-white/5 bg-white/10 text-white/40"
           }`}
         >
           <Video
-            className={`h-4 w-4 shrink-0 ${session && canJoin ? "text-gray-900" : "text-white/70"}`}
+            className={`h-[13px] w-4 shrink-0 ${
+              session && canJoin ? "text-white" : "text-white/40"
+            }`}
             strokeWidth={2}
           />
           Join Session
