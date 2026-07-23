@@ -389,8 +389,26 @@ h1, h2, h3, h4, h5, h6 {
     background-color 0.4s ease;
 }
 
+/* Sequential check-in during My Plan progression load animation */
+@keyframes journey-node-check-in {
+  0% {
+    transform: scale(0.85);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.journey-node-check-in {
+  animation: journey-node-check-in 0.45s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .journey-node-unlock,
+  .journey-node-check-in,
   .journey-card-just-unlocked {
     animation: none;
   }
