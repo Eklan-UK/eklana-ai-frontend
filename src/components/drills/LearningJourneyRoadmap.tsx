@@ -20,6 +20,7 @@ import {
   MISSION_COMPLETED_ACCENT,
   MISSION_LOCKED_RAIL,
   railSegmentColor,
+  railSegmentFillRatio,
   type DerivedMissionState,
   type LearningJourneyPartId,
   type MissionThemeIconKey,
@@ -259,9 +260,16 @@ export function LearningJourneyRoadmap({
           const checkingIn = checkingInPart === state.part;
           const hasNext = index < states.length - 1;
           const segmentColor = railSegmentColor(state.status, state.accent);
-          const segmentGrown = revealed;
+          const segmentFillPct = revealed
+            ? railSegmentFillRatio(state.status, state.percent) * 100
+            : 0;
+          // Card bar tracks real progress — never force a full bar for incomplete.
           const barPercent =
-            state.status === "locked" || !revealed ? 0 : state.percent;
+            state.status === "locked" || !revealed
+              ? 0
+              : isDoneLike
+                ? 100
+                : state.percent;
 
           return (
             <li key={state.part} className="relative flex items-stretch gap-6">
@@ -283,7 +291,7 @@ export function LearningJourneyRoadmap({
                     <div
                       className="journey-rail-fill absolute top-0 left-0 right-0 rounded-sm origin-top"
                       style={{
-                        height: segmentGrown ? "100%" : "0%",
+                        height: `${segmentFillPct}%`,
                         backgroundColor: segmentColor,
                       }}
                     />

@@ -69,6 +69,22 @@ export function railSegmentColor(
   return MISSION_LOCKED_RAIL;
 }
 
+/**
+ * How far the colored rail should grow toward the next mission (0–1).
+ * Completed = full segment; active = actual progress percent; locked = none
+ * (gray track shows through). Incomplete missions must not paint a full bar.
+ */
+export function railSegmentFillRatio(
+  status: MissionVisualStatus,
+  percent: number,
+): number {
+  if (status === "completed" || status === "journeyComplete") return 1;
+  if (status === "active") {
+    return Math.min(1, Math.max(0, percent / 100));
+  }
+  return 0;
+}
+
 export type LearningJourneyPart = {
   part: LearningJourneyPartId;
   title: string;
