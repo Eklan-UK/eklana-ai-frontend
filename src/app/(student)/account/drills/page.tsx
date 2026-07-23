@@ -13,10 +13,11 @@ import { StreakBadge } from "@/components/streak/StreakBadge";
 import { HomeBadgeButton } from "@/components/badges/HomeBadgeButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SavedDrillsSection } from "@/components/drills/SavedDrillsSection";
-import { LearningJourneyPartCard } from "@/components/drills/LearningJourneyPartCard";
+import { LearningJourneyRoadmap } from "@/components/drills/LearningJourneyRoadmap";
 import { useMyMissionEnrollments } from "@/hooks/useMissionEnrollments";
 import {
   LEARNING_JOURNEY_PARTS,
+  deriveMissionStates,
   type LearningJourneyPartId,
 } from "@/domain/learning-journey/learning-journey.catalog";
 import {
@@ -36,7 +37,8 @@ export default function DrillsPage() {
 
   // My Plans needs the learner's FULL assignment history to compute accurate
   // per-mission progress — not just a recent-window page. See assignment.repository.ts.
-  const { data: drillsData, isPending, isFetching, isError: drillsError } = useLearnerDrills({ limit: 1000 });
+  const { data: drillsData, isPending, isFetching, isError: drillsError } =
+    useLearnerDrills({ limit: 1000 });
   const drills = drillsData ?? [];
   const drillsLoading = isPending || (isFetching && drills.length === 0);
 
@@ -60,7 +62,10 @@ export default function DrillsPage() {
   const journeyDrills = drills as JourneyDrillItem[];
 
   const partProgress = useMemo(() => {
-    const map = new Map<LearningJourneyPartId, { completed: number; total: number }>();
+    const map = new Map<
+      LearningJourneyPartId,
+      { completed: number; total: number }
+    >();
     for (const partDef of LEARNING_JOURNEY_PARTS) {
       map.set(
         partDef.part,
@@ -69,6 +74,15 @@ export default function DrillsPage() {
     }
     return map;
   }, [journeyDrills]);
+
+  const missionStates = useMemo(
+    () =>
+      deriveMissionStates(
+        enrollmentsLoading ? [] : enrolledParts,
+        partProgress,
+      ),
+    [enrolledParts, enrollmentsLoading, partProgress],
+  );
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
@@ -93,9 +107,12 @@ export default function DrillsPage() {
       </div>
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-8">
-        <LearnerNextSessionCard session={nextSession} isLoading={classesLoading} />
+        <LearnerNextSessionCard
+          session={nextSession}
+          isLoading={classesLoading}
+        />
 
-        <SavedDrillsSection />
+        <SavedDrillsSection sectionHeading="Your Progress" />
 
         {drillsError && (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -103,29 +120,10 @@ export default function DrillsPage() {
           </div>
         )}
 
-        <div>
-          <h2 className="text-lg font-bold text-foreground mb-3">My Learning Journey</h2>
-          <div className="space-y-3">
-            {LEARNING_JOURNEY_PARTS.map((partDef) => {
-              const progress = partProgress.get(partDef.part) ?? {
-                completed: 0,
-                total: 0,
-              };
-              const isEnrolled =
-                !enrollmentsLoading && enrolledParts.includes(partDef.part);
-              return (
-                <LearningJourneyPartCard
-                  key={partDef.part}
-                  part={partDef.part}
-                  completedCount={progress.completed}
-                  totalCount={progress.total}
-                  isEnrolled={enrollmentsLoading ? false : isEnrolled}
-                  isLocked={enrollmentsLoading || !isEnrolled}
-                />
-              );
-            })}
-          </div>
-        </div>
+        <LearningJourneyRoadmap
+          states={missionStates}
+          isLoading={enrollmentsLoading || drillsLoading}
+        />
       </div>
 
       <BottomNav />

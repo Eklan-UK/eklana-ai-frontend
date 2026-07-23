@@ -89,10 +89,30 @@ async function handler(
 			);
 		}
 
+		const EmailVerificationOTP = getEmailVerificationOTPModel();
+
+		// DB-backed duplicate-send guard: short-circuit if a non-expired OTP
+		// was already created for this user in the last 30 seconds. This
+		// works across serverless instances (unlike the in-memory rate
+		// limiter above, which resets per cold start) and directly prevents
+		// multiple verification emails from rapid/duplicate client calls
+		// (retries, re-renders, etc.) within that window.
+		const recentOtp = await EmailVerificationOTP.findOne({
+			userId: context.userId,
+			createdAt: { $gt: new Date(Date.now() - 30 * 1000) },
+		})
+			.lean()
+			.exec();
+
+		if (recentOtp) {
+			return NextResponse.json(
+				{ code: 'Success', message: 'Verification code already sent. Please check your email.' },
+				{ status: 200 }
+			);
+		}
+
 		// Generate 6-digit OTP
 		const otp = crypto.randomInt(100000, 999999).toString();
-
-		const EmailVerificationOTP = getEmailVerificationOTPModel();
 
 		// Remove previous OTPs for this user
 		await EmailVerificationOTP.deleteMany({ userId: context.userId });
