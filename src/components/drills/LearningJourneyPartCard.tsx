@@ -28,7 +28,10 @@ export function LearningJourneyPartCard({
   const locked = status === "locked";
   const completedLike =
     status === "completed" || status === "journeyComplete";
-  const fillPercent = barPercent ?? percent;
+  // Prefer animation override; otherwise use real progress (100% only when complete).
+  const fillPercent =
+    barPercent ?? (completedLike ? 100 : percent);
+  const barColor = completedLike ? "#2a602c" : accent;
 
   const progressLabel =
     total > 0
@@ -100,8 +103,8 @@ export function LearningJourneyPartCard({
             <div
               className="journey-progress-fill h-full rounded-full"
               style={{
-                width: `${fillPercent}%`,
-                backgroundColor: accent,
+                width: `${Math.min(100, Math.max(0, fillPercent))}%`,
+                backgroundColor: barColor,
               }}
             />
           </div>

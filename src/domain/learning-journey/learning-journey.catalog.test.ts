@@ -11,6 +11,7 @@ import {
   MISSION_LOCKED_RAIL,
   parseLearningJourneyPartId,
   railSegmentColor,
+  railSegmentFillRatio,
   type LearningJourneyPartId,
   type MissionProgress,
 } from "./learning-journey.catalog";
@@ -262,5 +263,16 @@ describe("railSegmentColor", () => {
   it("returns mission accent for active and gray for locked", () => {
     assert.equal(railSegmentColor("active", "#a855f7"), "#a855f7");
     assert.equal(railSegmentColor("locked", "#3b82f6"), MISSION_LOCKED_RAIL);
+  });
+});
+
+describe("railSegmentFillRatio", () => {
+  it("is full only when completed; active uses percent; locked is 0", () => {
+    assert.equal(railSegmentFillRatio("completed", 40), 1);
+    assert.equal(railSegmentFillRatio("journeyComplete", 0), 1);
+    assert.equal(railSegmentFillRatio("active", 22), 0.22);
+    assert.equal(railSegmentFillRatio("active", 50), 0.5);
+    assert.equal(railSegmentFillRatio("active", 0), 0);
+    assert.equal(railSegmentFillRatio("locked", 100), 0);
   });
 });
