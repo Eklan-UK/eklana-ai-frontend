@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import {
   getMissionNumberLabel,
   getPartById,
@@ -11,18 +12,23 @@ export interface LearningJourneyPartCardProps {
   state: DerivedMissionState;
   /** Play unlock transition when enrollment just unlocked this mission */
   unlocking?: boolean;
+  /** Override bar width during load animation (defaults to state.percent) */
+  barPercent?: number;
 }
 
 export function LearningJourneyPartCard({
   state,
   unlocking = false,
+  barPercent,
 }: LearningJourneyPartCardProps) {
-  const { part, status, percent, isCurrent, completed, total, accent } = state;
+  const { part, status, percent, isCurrent, ctaLabel, completed, total, accent } =
+    state;
   const partDef = getPartById(part);
   const title = partDef?.title ?? getMissionNumberLabel(part);
   const locked = status === "locked";
   const completedLike =
     status === "completed" || status === "journeyComplete";
+  const fillPercent = barPercent ?? percent;
 
   const progressLabel =
     total > 0
@@ -30,6 +36,9 @@ export function LearningJourneyPartCard({
       : locked
         ? "Not enrolled yet"
         : "No drills assigned yet";
+
+  const ctaText =
+    ctaLabel === "start" ? "Start" : ctaLabel === "continue" ? "Continue" : null;
 
   const cardClass = locked
     ? "border border-dashed border-[#e0e0e0] dark:border-border bg-card opacity-60"
@@ -91,25 +100,29 @@ export function LearningJourneyPartCard({
             <div
               className="journey-progress-fill h-full rounded-full"
               style={{
-                width: `${percent}%`,
+                width: `${fillPercent}%`,
                 backgroundColor: accent,
               }}
             />
           </div>
-          <p className="text-[10px] font-nunito text-foreground/80 pt-0.5">
-            {progressLabel}
-          </p>
-          {isCurrent ? (
-            <div className="flex justify-end pt-1">
-              <span className="inline-flex items-center justify-center rounded-full bg-[#ff7a00] px-4 py-1.5 text-[11px] font-bold text-white shadow-sm">
-                Continue
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <p className="text-[10px] font-nunito text-foreground/80 min-w-0">
+              {progressLabel}
+            </p>
+            {ctaText ? (
+              <span
+                className="inline-flex items-center gap-0.5 shrink-0 text-[11px] font-bold font-nunito"
+                style={{ color: accent }}
+              >
+                {ctaText}
+                <ChevronRight className="size-3.5" strokeWidth={2.5} aria-hidden />
               </span>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </>
       ) : (
         <p className="text-[10px] font-nunito text-[#9ca3af] pt-0.5">
-          {total > 0 ? progressLabel : "Not enrolled yet"}
+          {total > 0 ? `${completed} of ${total} drills completed` : "Not enrolled yet"}
         </p>
       )}
     </div>
@@ -123,13 +136,13 @@ export function LearningJourneyPartCard({
     );
   }
 
+  const ctaAria = ctaText ? ` — ${ctaText}` : isCurrent ? " — Current" : "";
+
   return (
     <Link
       href={`/account/drills/journey/${part}`}
       className="block w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2a602c]"
-      aria-label={`${getMissionNumberLabel(part)}: ${title}${
-        isCurrent ? " — Continue" : ""
-      }`}
+      aria-label={`${getMissionNumberLabel(part)}: ${title}${ctaAria}`}
     >
       {inner}
     </Link>
