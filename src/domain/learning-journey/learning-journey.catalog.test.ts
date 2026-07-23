@@ -109,14 +109,29 @@ describe("deriveMissionStates", () => {
     assert.equal(getViewDetailsPart(states), 2);
   });
 
-  it("does not treat total 0 as completed", () => {
+  it("treats enrolled mission with no drills (total 0) as complete at 100%", () => {
     const states = deriveMissionStates(
       [1],
       progressMap({ 1: { completed: 0, total: 0 } }),
     );
-    assert.equal(states[0].status, "active");
-    assert.equal(states[0].isCurrent, true);
-    assert.equal(states[0].percent, 0);
+    assert.equal(states[0].status, "journeyComplete");
+    assert.equal(states[0].percent, 100);
+    assert.equal(states[0].isCurrent, false);
+    assert.ok(states.slice(1).every((s) => s.status === "locked"));
+  });
+
+  it("sets journeyComplete on highest enrolled when only no-drill missions are assigned", () => {
+    const empty: MissionProgress = { completed: 0, total: 0 };
+    const states = deriveMissionStates(
+      [1, 2],
+      progressMap({ 1: empty, 2: empty }),
+    );
+    assert.equal(states[0].status, "completed");
+    assert.equal(states[0].percent, 100);
+    assert.equal(states[1].status, "journeyComplete");
+    assert.equal(states[1].percent, 100);
+    assert.ok(states.slice(2).every((s) => s.status === "locked"));
+    assert.ok(states.every((s) => !s.isCurrent));
   });
 
   it("sets M5 to journeyComplete when all five missions are done", () => {
@@ -133,8 +148,50 @@ describe("deriveMissionStates", () => {
     assert.equal(getViewDetailsPart(states), 1);
   });
 
+  it("sets journeyComplete on highest enrolled when only M1–M2 are assigned and done", () => {
+    const full: MissionProgress = { completed: 1, total: 1 };
+    const states = deriveMissionStates(
+      [1, 2],
+      progressMap({ 1: full, 2: full }),
+    );
+    assert.equal(states[0].status, "completed");
+    assert.equal(states[1].status, "journeyComplete");
+    assert.equal(states[2].status, "locked");
+    assert.equal(states[3].status, "locked");
+    assert.equal(states[4].status, "locked");
+    assert.ok(states.every((s) => !s.isCurrent));
+    assert.equal(getViewDetailsPart(states), 1);
+  });
+
+  it("sets journeyComplete on sole enrolled mission when it is complete", () => {
+    const states = deriveMissionStates(
+      [1],
+      progressMap({ 1: { completed: 5, total: 5 } }),
+    );
+    assert.equal(states[0].status, "journeyComplete");
+    assert.ok(states.slice(1).every((s) => s.status === "locked"));
+    assert.ok(states.every((s) => !s.isCurrent));
+  });
+
+  it("does not set journeyComplete when an enrolled mission is still incomplete", () => {
+    const states = deriveMissionStates(
+      [1, 2],
+      progressMap({
+        1: { completed: 10, total: 10 },
+        2: { completed: 1, total: 5 },
+      }),
+    );
+    assert.equal(states[0].status, "completed");
+    assert.equal(states[1].status, "active");
+    assert.equal(states[1].isCurrent, true);
+    assert.ok(states.every((s) => s.status !== "journeyComplete"));
+  });
+
   it("includes mission theme accents and icons", () => {
-    const states = deriveMissionStates([1], progressMap({}));
+    const states = deriveMissionStates(
+      [1],
+      progressMap({ 1: { completed: 1, total: 5 } }),
+    );
     assert.equal(states[0].accent, "#3b82f6");
     assert.equal(states[0].icon, "stethoscope");
     assert.equal(states[1].icon, "users");

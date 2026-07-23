@@ -336,7 +336,8 @@ export function deriveMissionStates(
     const progress = resolveProgress(progressByPart, partDef.part);
     const isEnrolled = enrolled.has(partDef.part);
     const isComplete =
-      isEnrolled && progress.total > 0 && progress.completed >= progress.total;
+      isEnrolled &&
+      (progress.total === 0 || progress.completed >= progress.total);
     const percent =
       progress.total > 0
         ? Math.min(100, Math.round((progress.completed / progress.total) * 100))
@@ -363,15 +364,18 @@ export function deriveMissionStates(
     };
   });
 
-  const allComplete = states.every(
-    (s) => s.status === "completed" || s.status === "journeyComplete",
-  );
-  if (allComplete && states.length === 5) {
-    const m5 = states.find((s) => s.part === 5);
-    if (m5) {
-      m5.status = "journeyComplete";
-      m5.accent = MISSION_COMPLETED_ACCENT;
-    }
+  // Journey complete when every enrolled mission is done (unenrolled stay locked).
+  // Trophy sits on the highest enrolled part, not always M5.
+  const enrolledStates = states.filter((s) => s.status !== "locked");
+  const allEnrolledComplete =
+    enrolledStates.length >= 1 &&
+    enrolledStates.every((s) => s.status === "completed");
+  if (allEnrolledComplete) {
+    const highest = enrolledStates.reduce((best, s) =>
+      s.part > best.part ? s : best,
+    );
+    highest.status = "journeyComplete";
+    highest.accent = MISSION_COMPLETED_ACCENT;
   }
 
   const current = states.find((s) => s.status === "active");
