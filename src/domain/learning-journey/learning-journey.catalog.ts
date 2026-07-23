@@ -24,6 +24,8 @@ export type MissionVisualStatus =
   | "completed"
   | "journeyComplete";
 
+export type MissionCtaLabel = "start" | "continue";
+
 export type MissionProgress = {
   completed: number;
   total: number;
@@ -34,8 +36,10 @@ export type DerivedMissionState = {
   status: MissionVisualStatus;
   /** 0–100, rounded */
   percent: number;
-  /** Lowest incomplete enrolled mission only */
+  /** Lowest incomplete enrolled mission — View Details / ring emphasis only */
   isCurrent: boolean;
+  /** Active missions: Start at 0%, Continue otherwise; null when not active */
+  ctaLabel: MissionCtaLabel | null;
   completed: number;
   total: number;
   accent: string;
@@ -44,6 +48,26 @@ export type DerivedMissionState = {
 
 /** Completed rail / node / bar accent from Figma */
 export const MISSION_COMPLETED_ACCENT = "#2a602c";
+
+/** Locked / track rail gray from Figma */
+export const MISSION_LOCKED_RAIL = "#e0e0e0";
+
+/**
+ * Color for the rail segment from mission `i` down to mission `i+1`.
+ * Green when completed, mission accent when active, gray when locked.
+ */
+export function railSegmentColor(
+  status: MissionVisualStatus,
+  accent: string,
+): string {
+  if (status === "completed" || status === "journeyComplete") {
+    return MISSION_COMPLETED_ACCENT;
+  }
+  if (status === "active") {
+    return accent;
+  }
+  return MISSION_LOCKED_RAIL;
+}
 
 export type LearningJourneyPart = {
   part: LearningJourneyPartId;
@@ -316,8 +340,9 @@ function resolveProgress(
 
 /**
  * Derive per-mission visual state from tutor enrollments + drill progress.
- * Unlock gate remains enrollment; only the lowest incomplete enrolled mission
- * gets `isCurrent` (Continue CTA emphasis).
+ * Unlock gate remains enrollment. Every active mission gets a Start/Continue
+ * `ctaLabel`; only the lowest incomplete enrolled mission gets `isCurrent`
+ * (View Details / ring emphasis).
  */
 export function deriveMissionStates(
   enrolledParts: readonly number[],
@@ -352,11 +377,16 @@ export function deriveMissionStates(
       status = "active";
     }
 
+    const displayPercent = isComplete ? 100 : percent;
+    const ctaLabel: MissionCtaLabel | null =
+      status === "active" ? (displayPercent === 0 ? "start" : "continue") : null;
+
     return {
       part: partDef.part,
       status,
-      percent: isComplete ? 100 : percent,
+      percent: displayPercent,
       isCurrent: false,
+      ctaLabel,
       completed: progress.completed,
       total: progress.total,
       accent: isComplete ? MISSION_COMPLETED_ACCENT : partDef.accent,

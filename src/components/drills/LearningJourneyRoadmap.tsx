@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CircleCheck,
@@ -18,6 +18,8 @@ import {
   getPartById,
   getViewDetailsPart,
   MISSION_COMPLETED_ACCENT,
+  MISSION_LOCKED_RAIL,
+  railSegmentColor,
   type DerivedMissionState,
   type LearningJourneyPartId,
   type MissionThemeIconKey,
@@ -32,10 +34,8 @@ const MISSION_ICONS: Record<MissionThemeIconKey, LucideIcon> = {
 };
 
 const NODE_SIZE = 52;
-/** Rail is 4px; center aligns with node center at NODE_SIZE/2 */
-const RAIL_LEFT = NODE_SIZE / 2 - 2;
 
-/** ms between each completed-node reveal during the mount load animation */
+/** ms between each mission reveal during the mount load animation */
 const LOAD_STEP_MS = 420;
 
 export interface LearningJourneyRoadmapProps {
@@ -46,14 +46,6 @@ export interface LearningJourneyRoadmapProps {
 
 function isCompletedLike(status: DerivedMissionState["status"]): boolean {
   return status === "completed" || status === "journeyComplete";
-}
-
-function indexToRailPercent(index: number, length: number): number {
-  if (length <= 0 || index < 0) return 0;
-  if (length === 1) return 100;
-  const raw = (index / (length - 1)) * 100;
-  // First-node endpoint is 0% of the track; keep a small stub so color is visible.
-  return index === 0 ? Math.max(8, raw) : raw;
 }
 
 function TimelineNode({
@@ -124,41 +116,6 @@ function TimelineNode({
   );
 }
 
-/** Dual-layer rail: green through last completed; accent through current. */
-function railFillGeometry(states: DerivedMissionState[]): {
-  greenPercent: number;
-  accentPercent: number;
-  accentColor: string;
-} {
-  if (states.length === 0) {
-    return { greenPercent: 0, accentPercent: 0, accentColor: "#e0e0e0" };
-  }
-
-  let lastCompletedIndex = -1;
-  for (let i = 0; i < states.length; i++) {
-    if (isCompletedLike(states[i].status)) lastCompletedIndex = i;
-  }
-
-  const currentIndex = states.findIndex((s) => s.isCurrent);
-  const current = currentIndex >= 0 ? states[currentIndex] : undefined;
-
-  const greenPercent =
-    lastCompletedIndex >= 0
-      ? indexToRailPercent(lastCompletedIndex, states.length)
-      : 0;
-
-  const accentPercent =
-    currentIndex >= 0
-      ? indexToRailPercent(currentIndex, states.length)
-      : 0;
-
-  return {
-    greenPercent,
-    accentPercent,
-    accentColor: current?.accent ?? "#e0e0e0",
-  };
-}
-
 /**
  * Pre-complete look for a completed node that has not yet been revealed
  * in the load animation (mission accent + theme icon).
@@ -169,6 +126,7 @@ function asPreComplete(state: DerivedMissionState): DerivedMissionState {
     ...state,
     status: "active",
     isCurrent: false,
+    ctaLabel: null,
     accent: partDef?.accent ?? state.accent,
   };
 }
@@ -184,29 +142,16 @@ export function LearningJourneyRoadmap({
     Set<LearningJourneyPartId>
   >(new Set());
 
-  /** How many completed nodes have been revealed (0 = none yet). */
-  const [revealedCompletedCount, setRevealedCompletedCount] = useState(0);
-  /** Whether the accent stub to current has been shown. */
-  const [accentRevealed, setAccentRevealed] = useState(false);
+  /**
+   * Highest mission index revealed in the top→down load sequence (−1 = none).
+   * Revealing index i shows node i, grows its progress bar, and fills segment i→i+1.
+   */
+  const [revealedThrough, setRevealedThrough] = useState(-1);
   /** Part that just flipped to check/trophy (for check-in animation). */
   const [checkingInPart, setCheckingInPart] = useState<LearningJourneyPartId | null>(
     null,
   );
   const [loadAnimReady, setLoadAnimReady] = useState(false);
-
-  const completedIndices = useMemo(
-    () =>
-      states
-        .map((s, i) => (isCompletedLike(s.status) ? i : -1))
-        .filter((i) => i >= 0),
-    [states],
-  );
-  const currentIndex = useMemo(
-    () => states.findIndex((s) => s.isCurrent),
-    [states],
-  );
-
-  const finalGeometry = useMemo(() => railFillGeometry(states), [states]);
 
   // Progression load animation: top → bottom on each mount / My Plan revisit.
   useEffect(() => {
@@ -217,40 +162,28 @@ export function LearningJourneyRoadmap({
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const completedCount = completedIndices.length;
-    const hasAccent = currentIndex >= 0;
+    const n = states.length;
 
-    if (reduceMotion) {
-      setRevealedCompletedCount(completedCount);
-      setAccentRevealed(hasAccent);
+    if (reduceMotion || n === 0) {
+      setRevealedThrough(n - 1);
       setLoadAnimReady(true);
       return;
     }
 
-    // Start from empty rail; nodes stay pre-complete until their step.
-    setRevealedCompletedCount(0);
-    setAccentRevealed(false);
+    setRevealedThrough(-1);
     setLoadAnimReady(true);
 
-    if (completedCount === 0 && !hasAccent) return;
-
     let step = 0;
-    const totalSteps = completedCount + (hasAccent ? 1 : 0);
-
     const timer = window.setInterval(() => {
-      step += 1;
-      if (step <= completedCount) {
-        const idx = completedIndices[step - 1];
-        const part = states[idx]?.part;
-        setRevealedCompletedCount(step);
-        if (part != null) {
-          setCheckingInPart(part);
-          window.setTimeout(() => setCheckingInPart(null), 550);
-        }
-      } else {
-        setAccentRevealed(true);
+      const part = states[step]?.part;
+      const status = states[step]?.status;
+      setRevealedThrough(step);
+      if (part != null && status != null && isCompletedLike(status)) {
+        setCheckingInPart(part);
+        window.setTimeout(() => setCheckingInPart(null), 550);
       }
-      if (step >= totalSteps) {
+      step += 1;
+      if (step >= n) {
         window.clearInterval(timer);
       }
     }, LOAD_STEP_MS);
@@ -290,41 +223,6 @@ export function LearningJourneyRoadmap({
     return () => window.clearTimeout(timer);
   }, [states, isLoading]);
 
-  // Animated rail heights derived from reveal progress.
-  const { greenPercent, accentPercent, accentColor } = useMemo(() => {
-    if (!loadAnimReady) {
-      return { greenPercent: 0, accentPercent: 0, accentColor: finalGeometry.accentColor };
-    }
-
-    const greenIdx =
-      revealedCompletedCount > 0
-        ? completedIndices[revealedCompletedCount - 1]
-        : -1;
-    const green =
-      greenIdx >= 0
-        ? indexToRailPercent(greenIdx, states.length)
-        : 0;
-
-    const accent =
-      accentRevealed && currentIndex >= 0
-        ? indexToRailPercent(currentIndex, states.length)
-        : 0;
-
-    return {
-      greenPercent: green,
-      accentPercent: accent,
-      accentColor: finalGeometry.accentColor,
-    };
-  }, [
-    loadAnimReady,
-    revealedCompletedCount,
-    accentRevealed,
-    completedIndices,
-    currentIndex,
-    states.length,
-    finalGeometry.accentColor,
-  ]);
-
   return (
     <section aria-labelledby="learning-journey-heading">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -351,61 +249,54 @@ export function LearningJourneyRoadmap({
         )}
       </div>
 
-      <ol className="relative flex flex-col gap-5">
-        {/* Gray track */}
-        <div
-          className="pointer-events-none absolute top-[26px] bottom-[26px] w-1 rounded-sm bg-[#e0e0e0] dark:bg-border"
-          style={{ left: RAIL_LEFT }}
-          aria-hidden
-        />
-        {/* Accent stub: through current mission (under green where they overlap) */}
-        <div
-          className="journey-rail-fill pointer-events-none absolute top-[26px] w-1 rounded-sm origin-top"
-          style={{
-            left: RAIL_LEFT,
-            height: `calc((100% - 52px) * ${accentPercent / 100})`,
-            backgroundColor: accentColor,
-            maxHeight: "calc(100% - 52px)",
-          }}
-          aria-hidden
-        />
-        {/* Green fill: only through last completed / journeyComplete */}
-        <div
-          className="journey-rail-fill pointer-events-none absolute top-[26px] w-1 rounded-sm origin-top"
-          style={{
-            left: RAIL_LEFT,
-            height: `calc((100% - 52px) * ${greenPercent / 100})`,
-            backgroundColor: MISSION_COMPLETED_ACCENT,
-            maxHeight: "calc(100% - 52px)",
-          }}
-          aria-hidden
-        />
-
+      <ol className="relative flex flex-col">
         {states.map((state, index) => {
-          const completedOrder = completedIndices.indexOf(index);
           const isDoneLike = isCompletedLike(state.status);
-          const revealed =
-            !isDoneLike ||
-            (completedOrder >= 0 && completedOrder < revealedCompletedCount);
+          const revealed = loadAnimReady && revealedThrough >= index;
           const displayState =
             isDoneLike && !revealed ? asPreComplete(state) : state;
           const unlocking = unlockingParts.has(state.part);
           const checkingIn = checkingInPart === state.part;
+          const hasNext = index < states.length - 1;
+          const segmentColor = railSegmentColor(state.status, state.accent);
+          const segmentGrown = revealed;
+          const barPercent =
+            state.status === "locked" || !revealed ? 0 : state.percent;
 
           return (
-            <li
-              key={state.part}
-              className="relative flex items-start gap-6"
-            >
-              <TimelineNode
-                state={displayState}
-                unlocking={unlocking}
-                checkingIn={checkingIn}
-              />
-              <div className="min-w-0 flex-1 pt-1">
+            <li key={state.part} className="relative flex items-stretch gap-6">
+              <div
+                className="relative z-10 flex shrink-0 flex-col items-center"
+                style={{ width: NODE_SIZE }}
+              >
+                <TimelineNode
+                  state={displayState}
+                  unlocking={unlocking}
+                  checkingIn={checkingIn}
+                />
+                {hasNext ? (
+                  <div className="relative w-1 min-h-5 flex-1" aria-hidden>
+                    <div
+                      className="absolute inset-0 rounded-sm"
+                      style={{ backgroundColor: MISSION_LOCKED_RAIL }}
+                    />
+                    <div
+                      className="journey-rail-fill absolute top-0 left-0 right-0 rounded-sm origin-top"
+                      style={{
+                        height: segmentGrown ? "100%" : "0%",
+                        backgroundColor: segmentColor,
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div
+                className={`min-w-0 flex-1 pt-1 ${hasNext ? "pb-5" : ""}`}
+              >
                 <LearningJourneyPartCard
                   state={state}
                   unlocking={unlocking}
+                  barPercent={barPercent}
                 />
               </div>
             </li>
