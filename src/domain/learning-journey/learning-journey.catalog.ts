@@ -10,9 +10,87 @@ export type LearningJourneyTopic = {
   freeTalkScenarioType?: string;
 };
 
+/** Lucide icon keys for mission timeline nodes (Figma accents). */
+export type MissionThemeIconKey =
+  | "stethoscope"
+  | "users"
+  | "message"
+  | "clipboard"
+  | "star";
+
+export type MissionVisualStatus =
+  | "locked"
+  | "active"
+  | "completed"
+  | "journeyComplete";
+
+export type MissionCtaLabel = "start" | "continue";
+
+export type MissionProgress = {
+  completed: number;
+  total: number;
+};
+
+export type DerivedMissionState = {
+  part: LearningJourneyPartId;
+  status: MissionVisualStatus;
+  /** 0–100, rounded */
+  percent: number;
+  /** Lowest incomplete enrolled mission — View Details / ring emphasis only */
+  isCurrent: boolean;
+  /** Active missions: Start at 0%, Continue otherwise; null when not active */
+  ctaLabel: MissionCtaLabel | null;
+  completed: number;
+  total: number;
+  accent: string;
+  icon: MissionThemeIconKey;
+};
+
+/** Completed rail / node / bar accent from Figma */
+export const MISSION_COMPLETED_ACCENT = "#2a602c";
+
+/** Locked / track rail gray from Figma */
+export const MISSION_LOCKED_RAIL = "#e0e0e0";
+
+/**
+ * Color for the rail segment from mission `i` down to mission `i+1`.
+ * Green when completed, mission accent when active, gray when locked.
+ */
+export function railSegmentColor(
+  status: MissionVisualStatus,
+  accent: string,
+): string {
+  if (status === "completed" || status === "journeyComplete") {
+    return MISSION_COMPLETED_ACCENT;
+  }
+  if (status === "active") {
+    return accent;
+  }
+  return MISSION_LOCKED_RAIL;
+}
+
+/**
+ * How far the colored rail should grow toward the next mission (0–1).
+ * Completed = full segment; active = actual progress percent; locked = none
+ * (gray track shows through). Incomplete missions must not paint a full bar.
+ */
+export function railSegmentFillRatio(
+  status: MissionVisualStatus,
+  percent: number,
+): number {
+  if (status === "completed" || status === "journeyComplete") return 1;
+  if (status === "active") {
+    return Math.min(1, Math.max(0, percent / 100));
+  }
+  return 0;
+}
+
 export type LearningJourneyPart = {
   part: LearningJourneyPartId;
   title: string;
+  /** Figma mission accent (active state) */
+  accent: string;
+  icon: MissionThemeIconKey;
   topics: LearningJourneyTopic[];
 };
 
@@ -20,6 +98,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   {
     part: 1,
     title: "Communication with Patients",
+    accent: "#3b82f6",
+    icon: "stethoscope",
     topics: [
       {
         id: "handling_emergency_critical",
@@ -56,6 +136,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   {
     part: 2,
     title: "Communication with Colleagues",
+    accent: "#ff7a00",
+    icon: "users",
     topics: [
       {
         id: "receiving_handover",
@@ -86,6 +168,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   {
     part: 3,
     title: "Communication with Doctors, Families and Friends",
+    accent: "#a855f7",
+    icon: "message",
     topics: [
       {
         id: "providing_updates_doctor",
@@ -110,6 +194,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   {
     part: 4,
     title: "Interview Preparation",
+    accent: "#3b82f6",
+    icon: "clipboard",
     topics: [
       {
         id: "motivation_prep",
@@ -156,6 +242,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
   {
     part: 5,
     title: "Bonus Scenarios",
+    accent: "#ff7a00",
+    icon: "star",
     topics: [
       {
         id: "phone_colleagues",
@@ -239,4 +327,122 @@ export function getMissionNumberLabel(part: LearningJourneyPartId): string {
 export function getPartLabel(part: LearningJourneyPartId): string {
   const def = getPartById(part);
   return def ? `${getMissionNumberLabel(part)}: ${def.title}` : getMissionNumberLabel(part);
+}
+
+function resolveProgress(
+  progressByPart:
+    | Partial<Record<LearningJourneyPartId, MissionProgress>>
+    | Map<LearningJourneyPartId, MissionProgress>
+    | ReadonlyMap<LearningJourneyPartId, MissionProgress>,
+  part: LearningJourneyPartId,
+): MissionProgress {
+  if (
+    typeof (progressByPart as Map<LearningJourneyPartId, MissionProgress>).get ===
+    "function"
+  ) {
+    return (
+      (progressByPart as Map<LearningJourneyPartId, MissionProgress>).get(part) ?? {
+        completed: 0,
+        total: 0,
+      }
+    );
+  }
+  return (
+    (progressByPart as Partial<Record<LearningJourneyPartId, MissionProgress>>)[
+      part
+    ] ?? { completed: 0, total: 0 }
+  );
+}
+
+/**
+ * Derive per-mission visual state from tutor enrollments + drill progress.
+ * Unlock gate remains enrollment. Every active mission gets a Start/Continue
+ * `ctaLabel`; only the lowest incomplete enrolled mission gets `isCurrent`
+ * (View Details / ring emphasis).
+ */
+export function deriveMissionStates(
+  enrolledParts: readonly number[],
+  progressByPart:
+    | Partial<Record<LearningJourneyPartId, MissionProgress>>
+    | Map<LearningJourneyPartId, MissionProgress>
+    | ReadonlyMap<LearningJourneyPartId, MissionProgress>,
+): DerivedMissionState[] {
+  const enrolled = new Set(
+    enrolledParts.filter((p): p is LearningJourneyPartId =>
+      isLearningJourneyPartId(p),
+    ),
+  );
+
+  const states: DerivedMissionState[] = LEARNING_JOURNEY_PARTS.map((partDef) => {
+    const progress = resolveProgress(progressByPart, partDef.part);
+    const isEnrolled = enrolled.has(partDef.part);
+    const isComplete =
+      isEnrolled &&
+      (progress.total === 0 || progress.completed >= progress.total);
+    const percent =
+      progress.total > 0
+        ? Math.min(100, Math.round((progress.completed / progress.total) * 100))
+        : 0;
+
+    let status: MissionVisualStatus;
+    if (!isEnrolled) {
+      status = "locked";
+    } else if (isComplete) {
+      status = "completed";
+    } else {
+      status = "active";
+    }
+
+    const displayPercent = isComplete ? 100 : percent;
+    const ctaLabel: MissionCtaLabel | null =
+      status === "active" ? (displayPercent === 0 ? "start" : "continue") : null;
+
+    return {
+      part: partDef.part,
+      status,
+      percent: displayPercent,
+      isCurrent: false,
+      ctaLabel,
+      completed: progress.completed,
+      total: progress.total,
+      accent: isComplete ? MISSION_COMPLETED_ACCENT : partDef.accent,
+      icon: partDef.icon,
+    };
+  });
+
+  // Journey complete when every enrolled mission is done (unenrolled stay locked).
+  // Trophy sits on the highest enrolled part, not always M5.
+  const enrolledStates = states.filter((s) => s.status !== "locked");
+  const allEnrolledComplete =
+    enrolledStates.length >= 1 &&
+    enrolledStates.every((s) => s.status === "completed");
+  if (allEnrolledComplete) {
+    const highest = enrolledStates.reduce((best, s) =>
+      s.part > best.part ? s : best,
+    );
+    highest.status = "journeyComplete";
+    highest.accent = MISSION_COMPLETED_ACCENT;
+  }
+
+  const current = states.find((s) => s.status === "active");
+  if (current) {
+    current.isCurrent = true;
+  }
+
+  return states;
+}
+
+/** View Details target: current active, else first enrolled, else null. */
+export function getViewDetailsPart(
+  states: readonly DerivedMissionState[],
+): LearningJourneyPartId | null {
+  const current = states.find((s) => s.isCurrent);
+  if (current) return current.part;
+  const enrolled = states.find(
+    (s) =>
+      s.status === "active" ||
+      s.status === "completed" ||
+      s.status === "journeyComplete",
+  );
+  return enrolled?.part ?? null;
 }
