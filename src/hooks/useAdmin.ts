@@ -509,8 +509,11 @@ export function useUpdateUserSubscription() {
       months?: number;
       billingPeriod?: "monthly" | "quarterly" | "annual";
       zeroPauseProducts?: ("challenge" | "maintainer")[];
+      zeroPauseChallengePhase?: "trial" | "post_trial";
       zeroPauseDate?: string | null;
       zeroPauseEndDate?: string | null;
+      zeroPausePostTrialDate?: string | null;
+      zeroPausePostTrialEndDate?: string | null;
       amount?: number;
       paymentMethod?: string;
       note?: string;
@@ -535,6 +538,8 @@ export function useUpdateUserSubscription() {
                       zeroPauseProducts: updated.zeroPauseProducts,
                       zeroPauseDate: updated.zeroPauseDate,
                       zeroPauseEndDate: updated.zeroPauseEndDate,
+                      zeroPausePostTrialDate: updated.zeroPausePostTrialDate,
+                      zeroPausePostTrialEndDate: updated.zeroPausePostTrialEndDate,
                       subscriptionActivatedAt: updated.subscriptionActivatedAt,
                       subscriptionExpiresAt: updated.subscriptionExpiresAt,
                     }

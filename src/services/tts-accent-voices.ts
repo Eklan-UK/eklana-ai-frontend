@@ -11,6 +11,8 @@ export const ACCENT_VOICE_KEYS = [
   'british_female',
   'australian_male',
   'australian_female',
+  'canadian_male',
+  'canadian_female',
 ] as const;
 
 export type AccentVoiceKey = (typeof ACCENT_VOICE_KEYS)[number];
@@ -32,6 +34,8 @@ export const ACCENT_VOICE_OPTIONS: AccentVoiceOption[] = [
   { key: 'british_female', label: 'British (female)', voiceId: 'LZAcK8Cx5QjdQhfBsJQZ' },
   { key: 'australian_male', label: 'Australian (male)', voiceId: 'hIreuBly94QFepU63yel' },
   { key: 'australian_female', label: 'Australian (female)', voiceId: 'VyyyOgRmsqOzaZXnKWnI' },
+  { key: 'canadian_male', label: 'Canadian (male)', voiceId: 'FyYFoP6qNryBV7G8rnI9' },
+  { key: 'canadian_female', label: 'Canadian (female)', voiceId: '3T3dPoABJjGZZAI1eif7' },
 ];
 
 const VOICE_ID_BY_KEY = Object.fromEntries(

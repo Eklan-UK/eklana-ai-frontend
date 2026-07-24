@@ -319,6 +319,8 @@ export function buildDrillPayloadFromDraft(
     assignedTo?: string[];
     isActive?: boolean;
     omitAssignment?: boolean;
+    /** Drill-builder week context — places assignedAt in that week when set. */
+    weekNumber?: number;
   },
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -341,6 +343,14 @@ export function buildDrillPayloadFromDraft(
     if (options?.isActive !== undefined) {
       payload.is_active = options.isActive;
     }
+  }
+
+  if (
+    options?.weekNumber != null &&
+    Number.isFinite(options.weekNumber) &&
+    options.weekNumber >= 1
+  ) {
+    payload.weekNumber = Math.floor(options.weekNumber);
   }
 
   const { drillType } = draft;
@@ -471,7 +481,17 @@ export function getMissingCompletionDateLabels(drafts: DrillDraft[]): string[] {
 // One drill+assignment is created per selected student, so a draft with multiple
 // selected students must expand into multiple payload entries here — otherwise
 // only the first selected student (`selectedUsers[0]`) would ever get assigned.
-export function buildBulkAssignPayload(drafts: DrillDraft[]) {
+export function buildBulkAssignPayload(
+  drafts: DrillDraft[],
+  options?: { weekNumber?: number },
+) {
+  const weekNumber =
+    options?.weekNumber != null &&
+    Number.isFinite(options.weekNumber) &&
+    options.weekNumber >= 1
+      ? Math.floor(options.weekNumber)
+      : undefined;
+
   return drafts.flatMap((draft) => {
     const content = buildBulkContentFromDraft(draft);
 
@@ -484,6 +504,7 @@ export function buildBulkAssignPayload(drafts: DrillDraft[]) {
       difficulty: draft.difficulty.toLowerCase(),
       topic: draft.journeyTopic || undefined,
       part: draft.journeyPart ? getPartLabel(draft.journeyPart) : undefined,
+      ...(weekNumber != null ? { weekNumber } : {}),
     }));
   });
 }

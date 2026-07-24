@@ -123,6 +123,10 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   const preselectedWeek = searchParams.get("week") || "";
   const returnToParam = searchParams.get("returnTo");
   const isEditMode = !!drillId;
+  const contextWeekNumber = useMemo(() => {
+    const weekNum = preselectedWeek ? parseInt(preselectedWeek, 10) : NaN;
+    return Number.isFinite(weekNum) && weekNum >= 1 ? weekNum : undefined;
+  }, [preselectedWeek]);
 
   const drillListReturnPath = useMemo(
     () => sanitizeReturnTo(returnToParam) ?? getDrillCreateDefaultReturn(variant),
@@ -288,12 +292,11 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
 
   const initialAiContext = useMemo(() => {
     if (!preselectedStudentId) return undefined;
-    const weekNum = preselectedWeek ? parseInt(preselectedWeek, 10) : undefined;
     return {
       studentId: preselectedStudentId,
-      weekNumber: Number.isFinite(weekNum) ? weekNum : undefined,
+      weekNumber: contextWeekNumber,
     };
-  }, [preselectedStudentId, preselectedWeek]);
+  }, [preselectedStudentId, contextWeekNumber]);
 
   const aiStudentOptions = useMemo(
     () =>
@@ -389,7 +392,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
 
       let drillPayload: Record<string, unknown> = buildDrillPayloadFromDraft(
         draft,
-        { assignedTo, isActive: true },
+        { assignedTo, isActive: true, weekNumber: contextWeekNumber },
       );
 
       if (draft.generateTTSAudio) {
@@ -481,7 +484,11 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         draft,
         isAssignedDrill
           ? { omitAssignment: true }
-          : { assignedTo: draft.selectedUsers, isActive: false },
+          : {
+              assignedTo: draft.selectedUsers,
+              isActive: false,
+              weekNumber: contextWeekNumber,
+            },
       );
 
       if (isEditMode && drillId) {
@@ -570,6 +577,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         returnTo={bulkReturnTo}
         users={users}
         loadingUsers={loadingUsers}
+        weekNumber={contextWeekNumber}
       />
     );
   }

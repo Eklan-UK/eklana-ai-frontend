@@ -16,13 +16,15 @@ import {
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
 const ACCENT_FLAGS: Record<string, string> = {
-  aanu_afolabi: "🇳🇬",
+  aanu_afolabi: "🇨🇦",
   american_male: "🇺🇸",
   american_female: "🇺🇸",
   british_male: "🇬🇧",
   british_female: "🇬🇧",
   australian_male: "🇦🇺",
   australian_female: "🇦🇺",
+  canadian_male: "🇨🇦",
+  canadian_female: "🇨🇦",
 };
 
 const ACCENT_OPTIONS = ACCENT_VOICE_OPTIONS.map((opt) => ({

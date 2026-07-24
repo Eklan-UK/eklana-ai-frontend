@@ -17,6 +17,7 @@ import { parseLearningJourneyPartId } from "@/domain/learning-journey/learning-j
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 import { parseDrillCompletionDateInput } from "@/lib/drill-completion-date";
+import { getAssignedAtForWeek } from "@/lib/ai-drill-builder/week-utils";
 
 interface BulkDrillInput {
   drillType: string;
@@ -30,6 +31,8 @@ interface BulkDrillInput {
   topic?: unknown;
   part?: unknown;
   mission?: unknown;
+  /** Drill-builder week context — places assignedAt in that week when set. */
+  weekNumber?: number;
 }
 
 // Builds a map from character name to its normalized speaker key
@@ -159,7 +162,18 @@ async function handler(
     const results = await Promise.all(
       drills.map(async (item) => {
         try {
-          const { drillType, title, content, studentId, completionDate, difficulty, topic, part, mission } = item;
+          const {
+            drillType,
+            title,
+            content,
+            studentId,
+            completionDate,
+            difficulty,
+            topic,
+            part,
+            mission,
+            weekNumber,
+          } = item;
           const rawPart = part ?? mission;
           const extractedPart = typeof rawPart === 'string' ? rawPart.match(/\d+/)?.[0] : rawPart;
 
@@ -203,9 +217,12 @@ async function handler(
             });
           }
 
+          const student = await User.findById(studentId)
+            .select("firstName subscriptionActivatedAt createdAt")
+            .lean();
+
           let studentCharacterNameOverride: string | undefined;
           if (drillType === "roleplay") {
-            const student = await User.findById(studentId).lean();
             if (student && (student as any).firstName) {
               studentCharacterNameOverride = `Nurse ${(student as any).firstName}`;
             }
@@ -234,10 +251,27 @@ async function handler(
 
           const drill = await Drill.create(drillData);
 
+          const parsedWeek =
+            typeof weekNumber === "number" &&
+            Number.isFinite(weekNumber) &&
+            weekNumber >= 1
+              ? Math.floor(weekNumber)
+              : undefined;
+          const assignedAt =
+            parsedWeek != null && student
+              ? getAssignedAtForWeek(
+                  parsedWeek,
+                  (student as { subscriptionActivatedAt?: Date | null })
+                    .subscriptionActivatedAt,
+                  (student as { createdAt?: Date }).createdAt,
+                )
+              : new Date();
+
           const assignment = await DrillAssignment.create({
             drillId: drill._id,
             learnerId: toUserIdQuery(studentId),
             assignedBy: toUserIdQuery(context.userId),
+            assignedAt,
             dueDate,
             status: "pending",
           });

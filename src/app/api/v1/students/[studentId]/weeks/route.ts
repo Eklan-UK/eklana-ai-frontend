@@ -5,10 +5,14 @@ import { logger } from "@/lib/api/logger";
 import { Types } from "mongoose";
 import User from "@/models/user";
 import DrillAssignment from "@/models/drill-assignment";
+import {
+  resolveDrillBuilderWeekCount,
+  incrementDrillBuilderWeekCount,
+  weekNumberFromAssignedAt,
+} from "@/lib/ai-drill-builder/resolve-drill-builder-weeks";
+import { WEEK_MS } from "@/lib/ai-drill-builder/week-utils";
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-async function handler(
+async function getHandler(
   _req: NextRequest,
   _context: { userId: any; userRole: string },
   params: { studentId: string },
@@ -35,13 +39,11 @@ async function handler(
       );
     }
 
-    const anchor: Date =
-      (user as any).subscriptionActivatedAt ?? (user as any).createdAt;
-
-    const currentWeek = Math.max(
-      1,
-      Math.ceil((Date.now() - anchor.getTime()) / WEEK_MS),
-    );
+    const { anchor, weekCount: currentWeek } =
+      await resolveDrillBuilderWeekCount({
+        learnerId: learnerObjectId,
+        user,
+      });
 
     const assignments = await DrillAssignment.find({ learnerId: learnerObjectId })
       .populate(
@@ -54,10 +56,7 @@ async function handler(
 
     for (const assignment of assignments) {
       const assignedAt: Date = (assignment as any).assignedAt;
-      const weekNumber = Math.max(
-        1,
-        Math.ceil((assignedAt.getTime() - anchor.getTime()) / WEEK_MS),
-      );
+      const weekNumber = weekNumberFromAssignedAt(assignedAt, anchor);
 
       const drill = (assignment as any).drillId as any;
 
@@ -136,12 +135,83 @@ async function handler(
   }
 }
 
+async function postHandler(
+  _req: NextRequest,
+  _context: { userId: any; userRole: string },
+  params: { studentId: string },
+): Promise<NextResponse> {
+  try {
+    const { studentId } = params;
+
+    if (!Types.ObjectId.isValid(studentId)) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "Invalid student ID" },
+        { status: 400 },
+      );
+    }
+
+    await connectToDatabase();
+
+    const learnerObjectId = new Types.ObjectId(studentId);
+
+    const user = await User.findById(learnerObjectId).select("_id").lean();
+    if (!user) {
+      return NextResponse.json(
+        { code: "NotFoundError", message: "Student not found" },
+        { status: 404 },
+      );
+    }
+
+    const created = await incrementDrillBuilderWeekCount(learnerObjectId);
+
+    logger.info("Created next drill-builder week for student", {
+      studentId,
+      weekNumber: created.weekNumber,
+      currentWeek: created.weekCount,
+    });
+
+    return NextResponse.json(
+      {
+        code: "Success",
+        data: {
+          weekNumber: created.weekNumber,
+          weekStartDate: created.weekStartDate.toISOString(),
+          weekEndDate: created.weekEndDate.toISOString(),
+          currentWeek: created.weekCount,
+          anchorDate: created.anchor.toISOString(),
+        },
+      },
+      { status: 201 },
+    );
+  } catch (error: any) {
+    logger.error("Error creating student week", { error: error.message });
+    return NextResponse.json(
+      {
+        code: "ServerError",
+        message: "Failed to create student week",
+        error: error.message,
+      },
+      { status: 500 },
+    );
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ studentId: string }> },
 ) {
   const resolvedParams = await params;
   return withRole(["admin", "tutor"], (req, context) =>
-    handler(req, context, resolvedParams),
+    getHandler(req, context, resolvedParams),
+  )(req);
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const resolvedParams = await params;
+  return withRole(["admin", "tutor"], (req, context) =>
+    postHandler(req, context, resolvedParams),
   )(req);
 }

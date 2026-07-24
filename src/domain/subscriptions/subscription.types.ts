@@ -27,7 +27,7 @@ export const ZERO_PAUSE_PRODUCTS: ZeroPauseProduct[] = [
 
 export const ZERO_PAUSE_PRODUCT_LABELS: Record<ZeroPauseProduct, string> = {
   challenge: "Zero Pause Challenge",
-  maintainer: "Zero Pause maintenance",
+  maintainer: "Zero Pause Maintenance",
 };
 
 export function isZeroPauseProduct(
@@ -165,6 +165,11 @@ export function formatZeroPauseProducts(
 
 export type ZeroPauseChallengePhase = "trial" | "post_trial";
 
+/** Post-trial duration after Challenge Trial ends. */
+export const ZERO_PAUSE_POST_TRIAL_MONTHS = 2;
+export const ZERO_PAUSE_POST_TRIAL_EXTRA_DAYS = 14; // 2 weeks
+export const ZERO_PAUSE_POST_TRIAL_DURATION_LABEL = "2 months and 2 weeks";
+
 /** UTC calendar day at 00:00:00.000Z — matches admin subscription route validation. */
 export function toUtcDayStart(value: Date | string): Date {
   const d = value instanceof Date ? value : new Date(value);
@@ -173,53 +178,132 @@ export function toUtcDayStart(value: Date | string): Date {
   );
 }
 
-export function getZeroPauseChallengePhase(user: {
+export function addUtcMonths(date: Date | string, months: number): Date {
+  const d = toUtcDayStart(date);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate())
+  );
+}
+
+export function addUtcDays(date: Date | string, days: number): Date {
+  const d = toUtcDayStart(date);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days)
+  );
+}
+
+/** Post-trial starts the day after trial ends and lasts 2 months and 2 weeks. */
+export function computeAutoPostTrialWindow(trialEnd: Date | string): {
+  start: Date;
+  end: Date;
+} {
+  const trialEndDay = toUtcDayStart(trialEnd);
+  const start = new Date(
+    Date.UTC(
+      trialEndDay.getUTCFullYear(),
+      trialEndDay.getUTCMonth(),
+      trialEndDay.getUTCDate() + 1
+    )
+  );
+  return {
+    start,
+    end: addUtcDays(
+      addUtcMonths(start, ZERO_PAUSE_POST_TRIAL_MONTHS),
+      ZERO_PAUSE_POST_TRIAL_EXTRA_DAYS
+    ),
+  };
+}
+
+export type ZeroPauseChallengeDateFields = {
   zeroPauseProducts?: ZeroPauseProduct[] | string[] | null;
+  zeroPauseDate?: string | Date | null;
   zeroPauseEndDate?: string | Date | null;
-}): ZeroPauseChallengePhase | null {
+  zeroPausePostTrialDate?: string | Date | null;
+  zeroPausePostTrialEndDate?: string | Date | null;
+};
+
+export function getZeroPauseChallengePhase(
+  user: ZeroPauseChallengeDateFields
+): ZeroPauseChallengePhase | null {
   const products = user.zeroPauseProducts;
   if (!Array.isArray(products) || !products.includes("challenge")) {
     return null;
   }
-  if (!user.zeroPauseEndDate) {
-    return "trial";
+  // Active trial window → Trial; otherwise Post Trial (auto after trial, or admin-assigned).
+  if (user.zeroPauseEndDate) {
+    const today = toUtcDayStart(new Date());
+    const trialEnd = toUtcDayStart(user.zeroPauseEndDate);
+    if (today.getTime() <= trialEnd.getTime()) {
+      return "trial";
+    }
   }
-  const today = toUtcDayStart(new Date());
-  const end = toUtcDayStart(user.zeroPauseEndDate);
-  return today.getTime() <= end.getTime() ? "trial" : "post_trial";
+  return "post_trial";
 }
 
-const TRIAL_DATE_OPTS: Intl.DateTimeFormatOptions = {
+const PHASE_DATE_OPTS: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
 };
 
-function formatChallengeTrialDateRange(
+function formatChallengePhaseDateRange(
+  phaseLabel: "Trial" | "Post Trial",
   startDate: string | Date,
   endDate: string | Date
 ): string {
   const startFormatted = new Date(startDate).toLocaleDateString(
     "en-US",
-    TRIAL_DATE_OPTS
+    PHASE_DATE_OPTS
   );
   const endFormatted = new Date(endDate).toLocaleDateString(
     "en-US",
-    TRIAL_DATE_OPTS
+    PHASE_DATE_OPTS
   );
-  return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Trial) · ${startFormatted} – ${endFormatted}`;
+  return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (${phaseLabel}) · ${startFormatted} – ${endFormatted}`;
+}
+
+function resolvePostTrialDisplayDates(user: ZeroPauseChallengeDateFields): {
+  start: string | Date;
+  end: string | Date;
+} | null {
+  if (user.zeroPausePostTrialDate && user.zeroPausePostTrialEndDate) {
+    return {
+      start: user.zeroPausePostTrialDate,
+      end: user.zeroPausePostTrialEndDate,
+    };
+  }
+  if (user.zeroPauseEndDate) {
+    return computeAutoPostTrialWindow(user.zeroPauseEndDate);
+  }
+  return null;
 }
 
 export function formatZeroPauseChallengePhaseLabel(
   phase: ZeroPauseChallengePhase,
-  startDate?: string | Date | null,
-  endDate?: string | Date | null
+  user: ZeroPauseChallengeDateFields
 ): string {
   if (phase === "post_trial") {
+    const postDates = resolvePostTrialDisplayDates(user);
+    if (postDates) {
+      try {
+        return formatChallengePhaseDateRange(
+          "Post Trial",
+          postDates.start,
+          postDates.end
+        );
+      } catch {
+        return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Post Trial)`;
+      }
+    }
     return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Post Trial)`;
   }
-  if (startDate && endDate) {
+
+  if (user.zeroPauseDate && user.zeroPauseEndDate) {
     try {
-      return formatChallengeTrialDateRange(startDate, endDate);
+      return formatChallengePhaseDateRange(
+        "Trial",
+        user.zeroPauseDate,
+        user.zeroPauseEndDate
+      );
     } catch {
       return `${ZERO_PAUSE_PRODUCT_LABELS.challenge} (Trial)`;
     }
@@ -230,16 +314,22 @@ export function formatZeroPauseChallengePhaseLabel(
 export function formatZeroPauseProductWithDate(
   product: ZeroPauseProduct | string,
   date?: string | Date | null,
-  endDate?: string | Date | null
+  endDate?: string | Date | null,
+  postTrialDate?: string | Date | null,
+  postTrialEndDate?: string | Date | null
 ): string | null {
   if (!isZeroPauseProduct(product)) return null;
 
   if (product === "challenge") {
-    const phase = getZeroPauseChallengePhase({
+    const fields: ZeroPauseChallengeDateFields = {
       zeroPauseProducts: ["challenge"],
+      zeroPauseDate: date,
       zeroPauseEndDate: endDate,
-    });
-    return formatZeroPauseChallengePhaseLabel(phase ?? "trial", date, endDate);
+      zeroPausePostTrialDate: postTrialDate,
+      zeroPausePostTrialEndDate: postTrialEndDate,
+    };
+    const phase = getZeroPauseChallengePhase(fields);
+    return formatZeroPauseChallengePhaseLabel(phase ?? "trial", fields);
   }
 
   const label = ZERO_PAUSE_PRODUCT_LABELS[product];
