@@ -34,6 +34,7 @@ interface StudentCard {
   image?: string | null;
   subscriptionActivatedAt?: string | null;
   createdAt?: string | null;
+  drillBuilderWeekCount?: number | null;
 }
 
 export function StudentListPage({ variant }: StudentListPageProps) {
@@ -75,6 +76,10 @@ export function StudentListPage({ variant }: StudentListPageProps) {
             image: s.image as string | null | undefined,
             subscriptionActivatedAt: s.subscriptionActivatedAt as string | null,
             createdAt: s.createdAt as string | null,
+            drillBuilderWeekCount:
+              typeof s.drillBuilderWeekCount === "number"
+                ? s.drillBuilderWeekCount
+                : null,
           };
         })
         .filter((s): s is NonNullable<typeof s> => s !== null);
@@ -91,6 +96,10 @@ export function StudentListPage({ variant }: StudentListPageProps) {
           image: s.image,
           subscriptionActivatedAt: s.subscriptionActivatedAt,
           createdAt: s.createdAt,
+          drillBuilderWeekCount:
+            typeof s.drillBuilderWeekCount === "number"
+              ? s.drillBuilderWeekCount
+              : null,
         };
       })
       .filter((s): s is NonNullable<typeof s> => s !== null);
@@ -153,10 +162,14 @@ export function StudentListPage({ variant }: StudentListPageProps) {
       ) : (
         <div className="space-y-4">
           {filteredStudents.map((student) => {
-            const currentWeek = computeCurrentWeek(
-              student.subscriptionActivatedAt,
-              student.createdAt,
-            );
+            const currentWeek =
+              typeof student.drillBuilderWeekCount === "number" &&
+              student.drillBuilderWeekCount >= 1
+                ? student.drillBuilderWeekCount
+                : computeCurrentWeek(
+                    student.subscriptionActivatedAt,
+                    student.createdAt,
+                  );
             return (
               <Link key={student.id} href={`${basePath}/${student.id}`}>
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">

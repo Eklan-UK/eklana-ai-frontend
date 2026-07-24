@@ -373,6 +373,8 @@ export const drillAPI = {
   assign: (drillId: string, data: {
     userIds: string[];
     dueDate?: string;
+    /** Drill-builder week context — places assignedAt in that week when set. */
+    weekNumber?: number;
   }) => {
     return apiRequest<{
       code: string;
@@ -2145,6 +2147,21 @@ export const studentAPI = {
         weeks: StudentWeekData[];
       };
     }>(`/students/${studentId}/weeks`, { cache: false });
+  },
+
+  createStudentWeek: (studentId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        weekNumber: number;
+        weekStartDate: string;
+        weekEndDate: string;
+        currentWeek: number;
+        anchorDate: string;
+      };
+    }>(`/students/${studentId}/weeks`, {
+      method: 'POST',
+    });
   },
 };
 

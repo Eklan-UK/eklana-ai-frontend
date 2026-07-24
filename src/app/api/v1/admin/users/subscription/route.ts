@@ -127,7 +127,7 @@ async function handler(
 
           user.zeroPauseDate = start;
           user.zeroPauseEndDate = end;
-          // Auto-set Post Trial to exactly 3 months starting the day after Trial ends.
+          // Auto-set Post Trial to 2 months + 2 weeks starting the day after Trial ends.
           const postWindow = computeAutoPostTrialWindow(end);
           user.zeroPausePostTrialDate = postWindow.start;
           user.zeroPausePostTrialEndDate = postWindow.end;

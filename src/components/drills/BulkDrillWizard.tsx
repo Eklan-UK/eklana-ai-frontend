@@ -39,6 +39,8 @@ export interface BulkDrillWizardProps {
   }>;
   loadingUsers?: boolean;
   onCancel?: () => void;
+  /** Drill-builder week context — places assignedAt in that week when set. */
+  weekNumber?: number;
 }
 
 export function BulkDrillWizard({
@@ -48,6 +50,7 @@ export function BulkDrillWizard({
   users,
   loadingUsers = false,
   onCancel,
+  weekNumber,
 }: BulkDrillWizardProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -115,7 +118,9 @@ export function BulkDrillWizard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ drills: buildBulkAssignPayload(drafts) }),
+        body: JSON.stringify({
+          drills: buildBulkAssignPayload(drafts, { weekNumber }),
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -160,6 +165,7 @@ export function BulkDrillWizard({
         buildDrillPayloadFromDraft(currentDraft, {
           assignedTo: currentDraft.selectedUsers,
           isActive: false,
+          weekNumber,
         }),
       );
       if (currentDraft.selectedUsers.length > 0) {

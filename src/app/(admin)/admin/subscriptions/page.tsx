@@ -6,7 +6,7 @@ import { Loader2, Edit2, Save, X, Search } from "lucide-react";
 import {
   BILLING_PERIODS,
   BILLING_PERIOD_LABELS,
-  ZERO_PAUSE_POST_TRIAL_MONTHS,
+  ZERO_PAUSE_POST_TRIAL_DURATION_LABEL,
   ZERO_PAUSE_PRODUCTS,
   ZERO_PAUSE_PRODUCT_LABELS,
   billingPeriodFromMonths,
@@ -678,8 +678,8 @@ const SubscriptionsPage: React.FC = () => {
                       <>
                         <p className="text-xs text-gray-500">
                           Set the Trial period. When it ends, Post Trial is set
-                          automatically for {ZERO_PAUSE_POST_TRIAL_MONTHS}{" "}
-                          months.
+                          automatically for {ZERO_PAUSE_POST_TRIAL_DURATION_LABEL}
+                          .
                         </p>
                         <div className="space-y-1">
                           <label className="text-xs font-medium text-gray-600">
@@ -723,7 +723,7 @@ const SubscriptionsPage: React.FC = () => {
                                 );
                                 return `${toDateInput(auto.start)} – ${toDateInput(auto.end)}`;
                               } catch {
-                                return `for ${ZERO_PAUSE_POST_TRIAL_MONTHS} months after Trial ends`;
+                                return `for ${ZERO_PAUSE_POST_TRIAL_DURATION_LABEL} after Trial ends`;
                               }
                             })()}
                             .
