@@ -159,6 +159,8 @@ const createDrillSchema = z.object({
 	is_active: z.boolean().optional(),
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
+	/** Drill-builder week context — places assignedAt in that week when set. */
+	weekNumber: z.number().int().min(1).optional(),
 }).superRefine((data, ctx) => {
 	refineLearningJourneyFields(data, ctx, { requireAlways: true });
 	if (data.type === 'vocabulary') {
@@ -322,6 +324,7 @@ async function postHandler(
 		drillData,
 		creatorId: context.userId.toString(),
 		assignedUserIds: validated.assigned_to,
+		weekNumber: validated.weekNumber,
 	});
 
 	return apiResponse.success(

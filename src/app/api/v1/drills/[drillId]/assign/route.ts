@@ -12,6 +12,7 @@ import User from "@/models/user";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
+import { getAssignedAtForWeek } from "@/lib/ai-drill-builder/week-utils";
 
 async function handler(
   req: NextRequest,
@@ -27,7 +28,23 @@ async function handler(
   }
 
   const body = await req.json();
-  const { userIds, dueDate } = body as { userIds?: unknown; dueDate?: unknown };
+  const { userIds, dueDate, weekNumber } = body as {
+    userIds?: unknown;
+    dueDate?: unknown;
+    weekNumber?: unknown;
+  };
+
+  const parsedWeekNumber =
+    typeof weekNumber === "number" &&
+    Number.isFinite(weekNumber) &&
+    weekNumber >= 1
+      ? Math.floor(weekNumber)
+      : typeof weekNumber === "string" &&
+          weekNumber.trim() !== "" &&
+          Number.isFinite(Number(weekNumber)) &&
+          Number(weekNumber) >= 1
+        ? Math.floor(Number(weekNumber))
+        : undefined;
 
   if (!Array.isArray(userIds) || userIds.length === 0) {
     throw new ValidationError("userIds (non-empty array) is required");
@@ -66,11 +83,14 @@ async function handler(
     _id: { $in: toUserIdQueryMulti(userIds as string[]) },
     role: "user",
   })
-    .select("_id")
+    .select("_id subscriptionActivatedAt createdAt")
     .lean()
     .exec();
 
-  const validLearnerIds = new Set(learners.map((u) => String(u._id)));
+  const learnerById = new Map(
+    learners.map((u) => [String(u._id), u] as const),
+  );
+  const validLearnerIds = new Set(learnerById.keys());
   const invalidIds = (userIds as string[]).filter((id) => !validLearnerIds.has(id));
   if (invalidIds.length > 0) {
     throw new ValidationError(
@@ -105,12 +125,22 @@ async function handler(
     // learnerId is stored as-is: Types.ObjectId for ObjectId-format users,
     // string for UUID users (DrillAssignment.learnerId is Schema.Types.Mixed).
     const learnerIdValue = toUserIdQuery(uid);
+    const learner = learnerById.get(uid);
+    const assignedAt =
+      parsedWeekNumber != null && learner
+        ? getAssignedAtForWeek(
+            parsedWeekNumber,
+            (learner as { subscriptionActivatedAt?: Date | null })
+              .subscriptionActivatedAt,
+            (learner as { createdAt?: Date }).createdAt,
+          )
+        : new Date();
     try {
       const assignment = await DrillAssignment.create({
         drillId: drillObjectId,
         learnerId: learnerIdValue,
         assignedBy: toUserIdQuery(context.userId),
-        assignedAt: new Date(),
+        assignedAt,
         dueDate: dueDateObj,
         status: "pending",
       });

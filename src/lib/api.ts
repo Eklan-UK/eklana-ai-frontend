@@ -373,6 +373,8 @@ export const drillAPI = {
   assign: (drillId: string, data: {
     userIds: string[];
     dueDate?: string;
+    /** Drill-builder week context — places assignedAt in that week when set. */
+    weekNumber?: number;
   }) => {
     return apiRequest<{
       code: string;
@@ -1098,8 +1100,11 @@ export const adminAPI = {
     months?: number;
     billingPeriod?: "monthly" | "quarterly" | "annual";
     zeroPauseProducts?: ("challenge" | "maintainer")[];
+    zeroPauseChallengePhase?: "trial" | "post_trial";
     zeroPauseDate?: string | null;
     zeroPauseEndDate?: string | null;
+    zeroPausePostTrialDate?: string | null;
+    zeroPausePostTrialEndDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -1114,6 +1119,8 @@ export const adminAPI = {
         zeroPauseProducts: ("challenge" | "maintainer")[];
         zeroPauseDate: string | null;
         zeroPauseEndDate: string | null;
+        zeroPausePostTrialDate: string | null;
+        zeroPausePostTrialEndDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
@@ -2140,6 +2147,21 @@ export const studentAPI = {
         weeks: StudentWeekData[];
       };
     }>(`/students/${studentId}/weeks`, { cache: false });
+  },
+
+  createStudentWeek: (studentId: string) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        weekNumber: number;
+        weekStartDate: string;
+        weekEndDate: string;
+        currentWeek: number;
+        anchorDate: string;
+      };
+    }>(`/students/${studentId}/weeks`, {
+      method: 'POST',
+    });
   },
 };
 

@@ -9,12 +9,14 @@ import {
   Calendar,
 } from "lucide-react";
 import {
-  computeCurrentWeek,
   formatWeekDateRange,
   mergeWeeksWithEmptySlots,
   type StudentWeek,
 } from "@/lib/ai-drill-builder/week-utils";
-import { useStudentWeeks } from "@/hooks/useStudentWeeks";
+import {
+  useCreateStudentWeek,
+  useStudentWeeks,
+} from "@/hooks/useStudentWeeks";
 
 interface StudentWeeksViewProps {
   studentId: string;
@@ -30,14 +32,14 @@ export function StudentWeeksView({
   anchorDate,
 }: StudentWeeksViewProps) {
   const { data, isLoading } = useStudentWeeks(studentId);
+  const createWeek = useCreateStudentWeek(studentId);
   const [expandedPast, setExpandedPast] = useState<Set<number>>(new Set());
 
-  const currentWeek = useMemo(() => {
-    if (data?.currentWeek) return data.currentWeek;
-    return computeCurrentWeek(data?.anchorDate ?? anchorDate);
-  }, [data, anchorDate]);
+  // Trust the API week count after seed — do not expand from client clock.
+  const currentWeek = data?.currentWeek ?? 0;
 
   const weeks = useMemo(() => {
+    if (!currentWeek) return [] as StudentWeek[];
     const rawWeeks = (data?.weeks ?? []) as StudentWeek[];
     return mergeWeeksWithEmptySlots(
       rawWeeks,
@@ -68,13 +70,27 @@ export function StudentWeeksView({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        Weekly work for <span className="font-medium text-gray-900">{studentName}</span>
-      </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-sm text-gray-500">
+          Weekly work for{" "}
+          <span className="font-medium text-gray-900">{studentName}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => createWeek.mutate()}
+          disabled={createWeek.isPending}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          {createWeek.isPending && (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          )}
+          + Week
+        </button>
+      </div>
 
       {weeks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500">
-          No weeks available yet.
+          No weeks available yet. Use + Week to create week 1.
         </div>
       ) : (
         weeks
@@ -85,16 +101,10 @@ export function StudentWeeksView({
             const isPast = week.weekNumber < currentWeek;
             const isCollapsed = isPast && !expandedPast.has(week.weekNumber);
             const drillCount = week.drills?.length ?? week.items?.length ?? 0;
-            const dateRange =
-              week.weekStartDate && week.weekEndDate
-                ? formatWeekDateRange(
-                    week.weekNumber,
-                    data?.anchorDate ?? anchorDate,
-                  )
-                : formatWeekDateRange(
-                    week.weekNumber,
-                    data?.anchorDate ?? anchorDate,
-                  );
+            const dateRange = formatWeekDateRange(
+              week.weekNumber,
+              data?.anchorDate ?? anchorDate,
+            );
 
             return (
               <div

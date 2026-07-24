@@ -30,6 +30,28 @@ import type {
   DrillListFilters,
 } from './drill.types';
 import type { CreateAssignmentData } from '../assignments/assignment.types';
+import { getAssignedAtForWeek } from '@/lib/ai-drill-builder/week-utils';
+
+function resolveAssignmentAssignedAt(
+  learner: {
+    subscriptionActivatedAt?: Date | string | null;
+    createdAt?: Date | string | null;
+  },
+  weekNumber?: number,
+): Date {
+  if (
+    weekNumber == null ||
+    !Number.isFinite(weekNumber) ||
+    weekNumber < 1
+  ) {
+    return new Date();
+  }
+  return getAssignedAtForWeek(
+    weekNumber,
+    learner.subscriptionActivatedAt,
+    learner.createdAt,
+  );
+}
 
 export type DrillAssignmentNotifyTarget = {
   learnerId: Types.ObjectId | string;
@@ -298,7 +320,7 @@ export class DrillService {
     const users = await userService.findMultipleWithRole(
       params.userIds,
       'user',
-      'email firstName lastName'
+      'email firstName lastName subscriptionActivatedAt createdAt'
     );
 
     // 4. Calculate due date
@@ -329,7 +351,7 @@ export class DrillService {
         learnerId: user._id,
         // assignedBy may be a UUID (Better Auth admin/tutor account)
         assignedBy: toUserIdQuery(params.assignedBy),
-        assignedAt: new Date(),
+        assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
         dueDate: dueDate!,
         status: 'pending' as const,
       }));
@@ -423,6 +445,8 @@ export class DrillService {
     drillData: CreateDrillData;
     creatorId: string;
     assignedUserIds: string[];
+    /** When set, assignedAt is placed in that drill-builder week for each learner. */
+    weekNumber?: number;
   }): Promise<{
     drill: DrillType;
     assignmentCount: number;
@@ -442,7 +466,7 @@ export class DrillService {
         ? await userService.findMultipleWithRole(
             params.assignedUserIds,
             'user',
-            'email firstName lastName'
+            'email firstName lastName subscriptionActivatedAt createdAt'
           )
         : [];
 
@@ -486,7 +510,7 @@ export class DrillService {
           // creatorId may be a UUID (Better Auth admin/tutor account) — a raw
           // `new Types.ObjectId(...)` throws for UUID ids, unlike toUserIdQuery.
           assignedBy: toUserIdQuery(params.creatorId),
-          assignedAt: new Date(),
+          assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
           dueDate: dueDate,
           status: 'pending' as const,
         }));

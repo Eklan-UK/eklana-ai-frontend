@@ -6,14 +6,18 @@ import { Loader2, Edit2, Save, X, Search } from "lucide-react";
 import {
   BILLING_PERIODS,
   BILLING_PERIOD_LABELS,
+  ZERO_PAUSE_POST_TRIAL_DURATION_LABEL,
   ZERO_PAUSE_PRODUCTS,
   ZERO_PAUSE_PRODUCT_LABELS,
   billingPeriodFromMonths,
+  computeAutoPostTrialWindow,
   formatBillingPeriodLabel,
   formatZeroPauseProductWithDate,
+  getZeroPauseChallengePhase,
   isZeroPauseProduct,
   resolveSubscriptionExpiry,
   type BillingPeriod,
+  type ZeroPauseChallengePhase,
   type ZeroPauseProduct,
 } from "@/domain/subscriptions/subscription.types";
 import { toast } from "sonner";
@@ -49,8 +53,11 @@ type SubscriptionForm = {
   plan: "free" | "premium";
   billingPeriod: BillingPeriod;
   zeroPauseProducts: ZeroPauseProduct[];
+  zeroPauseChallengePhase: ZeroPauseChallengePhase;
   zeroPauseDate: string;
   zeroPauseEndDate: string;
+  zeroPausePostTrialDate: string;
+  zeroPausePostTrialEndDate: string;
   amount?: number;
   paymentMethod?: string;
   note?: string;
@@ -93,14 +100,25 @@ const SubscriptionsPage: React.FC = () => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savedDates, setSavedDates] = useState<
-    Record<string, { start: string; end: string }>
+    Record<
+      string,
+      {
+        start: string;
+        end: string;
+        postStart: string;
+        postEnd: string;
+      }
+    >
   >({});
   const [form, setForm] = useState<SubscriptionForm>({
     plan: "free",
     billingPeriod: "monthly",
     zeroPauseProducts: [],
+    zeroPauseChallengePhase: "trial",
     zeroPauseDate: "",
     zeroPauseEndDate: "",
+    zeroPausePostTrialDate: "",
+    zeroPausePostTrialEndDate: "",
   });
 
   const filteredLearners = useMemo(() => {
@@ -124,17 +142,38 @@ const SubscriptionsPage: React.FC = () => {
   };
 
   const startEdit = (l: any) => {
+    const products: ZeroPauseProduct[] = Array.isArray(l.zeroPauseProducts)
+      ? l.zeroPauseProducts.filter(isZeroPauseProduct)
+      : [];
+    const phase =
+      getZeroPauseChallengePhase({
+        zeroPauseProducts: products,
+        zeroPauseDate: l.zeroPauseDate,
+        zeroPauseEndDate: l.zeroPauseEndDate,
+        zeroPausePostTrialDate: l.zeroPausePostTrialDate,
+        zeroPausePostTrialEndDate: l.zeroPausePostTrialEndDate,
+      }) ?? "trial";
+
+    let postStart = toDateInput(l.zeroPausePostTrialDate);
+    let postEnd = toDateInput(l.zeroPausePostTrialEndDate);
+    if ((!postStart || !postEnd) && l.zeroPauseEndDate) {
+      const auto = computeAutoPostTrialWindow(l.zeroPauseEndDate);
+      postStart = toDateInput(auto.start);
+      postEnd = toDateInput(auto.end);
+    }
+
     setEditingId(l._id);
     setForm({
       plan: l.subscriptionPlan === "premium" ? "premium" : "free",
       billingPeriod:
         l.subscriptionBillingPeriod ||
         billingPeriodFromMonths(l.subscriptionMonthsPaidFor),
-      zeroPauseProducts: Array.isArray(l.zeroPauseProducts)
-        ? l.zeroPauseProducts.filter(isZeroPauseProduct)
-        : [],
+      zeroPauseProducts: products,
+      zeroPauseChallengePhase: phase,
       zeroPauseDate: toDateInput(l.zeroPauseDate),
       zeroPauseEndDate: toDateInput(l.zeroPauseEndDate),
+      zeroPausePostTrialDate: postStart,
+      zeroPausePostTrialEndDate: postEnd,
       amount: l.subscriptionAmountPaid || undefined,
       paymentMethod: l.subscriptionPaymentMethod || "",
       note: l.subscriptionAdminNote || "",
@@ -162,12 +201,20 @@ const SubscriptionsPage: React.FC = () => {
 
       const hasChallenge = nextProducts.includes("challenge");
       const cleared = nextProducts.length === 0;
+      const enablingChallenge = !has && product === "challenge";
       return {
         ...f,
         zeroPauseProducts: nextProducts,
+        zeroPauseChallengePhase: enablingChallenge
+          ? "trial"
+          : f.zeroPauseChallengePhase,
         // Dates are Challenge-window only; clear when Challenge is off.
         zeroPauseDate: cleared || !hasChallenge ? "" : f.zeroPauseDate,
         zeroPauseEndDate: cleared || !hasChallenge ? "" : f.zeroPauseEndDate,
+        zeroPausePostTrialDate:
+          cleared || !hasChallenge ? "" : f.zeroPausePostTrialDate,
+        zeroPausePostTrialEndDate:
+          cleared || !hasChallenge ? "" : f.zeroPausePostTrialEndDate,
       };
     });
   };
@@ -175,35 +222,81 @@ const SubscriptionsPage: React.FC = () => {
   const save = async (userId: string) => {
     const hasChallenge = form.zeroPauseProducts.includes("challenge");
     if (hasChallenge) {
-      if (!form.zeroPauseDate || !form.zeroPauseEndDate) {
-        toast.error("Challenge requires both start and end dates");
-        return;
-      }
-      if (form.zeroPauseEndDate < form.zeroPauseDate) {
-        toast.error("Challenge end date must be on or after the start date");
-        return;
+      if (form.zeroPauseChallengePhase === "trial") {
+        if (!form.zeroPauseDate || !form.zeroPauseEndDate) {
+          toast.error("Trial requires both start and end dates");
+          return;
+        }
+        if (form.zeroPauseEndDate < form.zeroPauseDate) {
+          toast.error("Trial end date must be on or after the start date");
+          return;
+        }
+      } else {
+        if (!form.zeroPausePostTrialDate || !form.zeroPausePostTrialEndDate) {
+          toast.error("Post Trial requires both start and end dates");
+          return;
+        }
+        if (form.zeroPausePostTrialEndDate < form.zeroPausePostTrialDate) {
+          toast.error(
+            "Post Trial end date must be on or after the start date"
+          );
+          return;
+        }
       }
     }
+
+    const autoPost =
+      hasChallenge &&
+      form.zeroPauseChallengePhase === "trial" &&
+      form.zeroPauseEndDate
+        ? computeAutoPostTrialWindow(form.zeroPauseEndDate)
+        : null;
 
     await mutateAsync({
       userId,
       plan: form.plan,
       billingPeriod: form.plan === "premium" ? form.billingPeriod : undefined,
       zeroPauseProducts: form.zeroPauseProducts,
+      zeroPauseChallengePhase: hasChallenge
+        ? form.zeroPauseChallengePhase
+        : undefined,
       zeroPauseDate: hasChallenge ? form.zeroPauseDate || null : null,
       zeroPauseEndDate: hasChallenge ? form.zeroPauseEndDate || null : null,
+      zeroPausePostTrialDate: hasChallenge
+        ? form.zeroPauseChallengePhase === "trial"
+          ? autoPost
+            ? toDateInput(autoPost.start)
+            : null
+          : form.zeroPausePostTrialDate || null
+        : null,
+      zeroPausePostTrialEndDate: hasChallenge
+        ? form.zeroPauseChallengePhase === "trial"
+          ? autoPost
+            ? toDateInput(autoPost.end)
+            : null
+          : form.zeroPausePostTrialEndDate || null
+        : null,
       amount: form.amount,
       paymentMethod: form.paymentMethod,
       note: form.note,
     });
-    // Keep a local record of the saved dates so the badge renders immediately,
-    // regardless of React Query cache timing after invalidation.
-    if (hasChallenge && form.zeroPauseDate) {
+
+    if (hasChallenge) {
+      const postStart =
+        form.zeroPauseChallengePhase === "trial" && autoPost
+          ? toDateInput(autoPost.start)
+          : form.zeroPausePostTrialDate;
+      const postEnd =
+        form.zeroPauseChallengePhase === "trial" && autoPost
+          ? toDateInput(autoPost.end)
+          : form.zeroPausePostTrialEndDate;
       setSavedDates((prev) => ({
         ...prev,
         [userId]: {
           start: form.zeroPauseDate,
           end: form.zeroPauseEndDate,
+          postStart,
+          postEnd,
         },
       }));
     } else {
@@ -332,7 +425,11 @@ const SubscriptionsPage: React.FC = () => {
                               const label = formatZeroPauseProductWithDate(
                                 product,
                                 savedDates[l._id]?.start ?? l.zeroPauseDate,
-                                savedDates[l._id]?.end ?? l.zeroPauseEndDate
+                                savedDates[l._id]?.end ?? l.zeroPauseEndDate,
+                                savedDates[l._id]?.postStart ??
+                                  l.zeroPausePostTrialDate,
+                                savedDates[l._id]?.postEnd ??
+                                  l.zeroPausePostTrialEndDate
                               );
                               if (!label) return null;
                               return (
@@ -518,53 +615,187 @@ const SubscriptionsPage: React.FC = () => {
                   ))}
                 </div>
                 {form.zeroPauseProducts.includes("challenge") && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs text-gray-500">
-                      Trial period — students show as Trial until the end date,
-                      then Post-Trial automatically.
-                    </p>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-600">
-                        Trial start date (required)
-                      </label>
-                      <input
-                        type="date"
-                        value={form.zeroPauseDate}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            zeroPauseDate: e.target.value,
-                          }))
-                        }
-                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-600">
-                        Trial end date (required)
-                      </label>
-                      <input
-                        type="date"
-                        value={form.zeroPauseEndDate}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            zeroPauseEndDate: e.target.value,
-                          }))
-                        }
-                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                    {form.zeroPauseDate && form.zeroPauseEndDate && (
-                      <p className="text-xs font-medium text-violet-700">
-                        Currently:{" "}
-                        {formatZeroPauseProductWithDate(
-                          "challenge",
-                          form.zeroPauseDate,
-                          form.zeroPauseEndDate
-                        )}
+                  <div className="space-y-3 pt-1">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-gray-600">
+                        Challenge phase
                       </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(
+                          [
+                            ["trial", "Trial"],
+                            ["post_trial", "Post Trial"],
+                          ] as const
+                        ).map(([value, label]) => {
+                          const selected =
+                            form.zeroPauseChallengePhase === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() =>
+                                setForm((f) => {
+                                  if (value === "post_trial") {
+                                    let postStart = f.zeroPausePostTrialDate;
+                                    let postEnd = f.zeroPausePostTrialEndDate;
+                                    if (
+                                      (!postStart || !postEnd) &&
+                                      f.zeroPauseEndDate
+                                    ) {
+                                      const auto = computeAutoPostTrialWindow(
+                                        f.zeroPauseEndDate
+                                      );
+                                      postStart = toDateInput(auto.start);
+                                      postEnd = toDateInput(auto.end);
+                                    }
+                                    return {
+                                      ...f,
+                                      zeroPauseChallengePhase: value,
+                                      zeroPausePostTrialDate: postStart,
+                                      zeroPausePostTrialEndDate: postEnd,
+                                    };
+                                  }
+                                  return {
+                                    ...f,
+                                    zeroPauseChallengePhase: value,
+                                  };
+                                })
+                              }
+                              className={`rounded-lg px-3 py-2 text-sm font-medium border transition-colors ${
+                                selected
+                                  ? "bg-violet-600 text-white border-violet-600"
+                                  : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {form.zeroPauseChallengePhase === "trial" ? (
+                      <>
+                        <p className="text-xs text-gray-500">
+                          Set the Trial period. When it ends, Post Trial is set
+                          automatically for {ZERO_PAUSE_POST_TRIAL_DURATION_LABEL}
+                          .
+                        </p>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">
+                            Trial start date (required)
+                          </label>
+                          <input
+                            type="date"
+                            value={form.zeroPauseDate}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                zeroPauseDate: e.target.value,
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">
+                            Trial end date (required)
+                          </label>
+                          <input
+                            type="date"
+                            value={form.zeroPauseEndDate}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                zeroPauseEndDate: e.target.value,
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                          />
+                        </div>
+                        {form.zeroPauseEndDate && (
+                          <p className="text-xs text-gray-500">
+                            Post Trial will run{" "}
+                            {(() => {
+                              try {
+                                const auto = computeAutoPostTrialWindow(
+                                  form.zeroPauseEndDate
+                                );
+                                return `${toDateInput(auto.start)} – ${toDateInput(auto.end)}`;
+                              } catch {
+                                return `for ${ZERO_PAUSE_POST_TRIAL_DURATION_LABEL} after Trial ends`;
+                              }
+                            })()}
+                            .
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500">
+                          Set the Post Trial period dates for this learner.
+                        </p>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">
+                            Post Trial start date (required)
+                          </label>
+                          <input
+                            type="date"
+                            value={form.zeroPausePostTrialDate}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                zeroPausePostTrialDate: e.target.value,
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">
+                            Post Trial end date (required)
+                          </label>
+                          <input
+                            type="date"
+                            value={form.zeroPausePostTrialEndDate}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                zeroPausePostTrialEndDate: e.target.value,
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+                          />
+                        </div>
+                      </>
                     )}
+
+                    {form.zeroPauseChallengePhase === "trial" &&
+                      form.zeroPauseDate &&
+                      form.zeroPauseEndDate && (
+                        <p className="text-xs font-medium text-violet-700">
+                          Label:{" "}
+                          {formatZeroPauseProductWithDate(
+                            "challenge",
+                            form.zeroPauseDate,
+                            form.zeroPauseEndDate
+                          )}
+                        </p>
+                      )}
+                    {form.zeroPauseChallengePhase === "post_trial" &&
+                      form.zeroPausePostTrialDate &&
+                      form.zeroPausePostTrialEndDate && (
+                        <p className="text-xs font-medium text-violet-700">
+                          Label:{" "}
+                          {formatZeroPauseProductWithDate(
+                            "challenge",
+                            null,
+                            null,
+                            form.zeroPausePostTrialDate,
+                            form.zeroPausePostTrialEndDate
+                          )}
+                        </p>
+                      )}
                   </div>
                 )}
               </div>

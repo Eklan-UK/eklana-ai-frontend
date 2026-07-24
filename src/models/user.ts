@@ -116,12 +116,22 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionBillingPeriod?: "monthly" | "quarterly" | "annual" | null;
   subscriptionActivatedAt?: Date | null;
   subscriptionExpiresAt?: Date | null;
+  /**
+   * Admin/tutor Drill Builder week cap for this learner.
+   * Lazily seeded from the prior time-based week count; further weeks are
+   * created manually via POST /students/:id/weeks. Null/unset = not seeded yet.
+   */
+  drillBuilderWeekCount?: number | null;
   // Zero Pause add-on products (admin-assigned). `mastery` is legacy storage only.
   zeroPauseProducts?: ("challenge" | "maintainer" | "mastery")[];
-  /** Maintainer (community) / cohort window start (admin “Start date”). */
+  /** Zero Pause Challenge trial window start. */
   zeroPauseDate?: Date | null;
-  /** Maintainer window end (inclusive). Kept as history after expiry. */
+  /** Zero Pause Challenge trial window end (inclusive). */
   zeroPauseEndDate?: Date | null;
+  /** Zero Pause Challenge post-trial window start. */
+  zeroPausePostTrialDate?: Date | null;
+  /** Zero Pause Challenge post-trial window end (inclusive). */
+  zeroPausePostTrialEndDate?: Date | null;
   /**
    * Public Stripe Price ID to restore when leaving Maintainer (→ Challenge).
    * Snapshotted when entering Maintainer from a non-Maintainer cohort.
@@ -323,6 +333,14 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    zeroPausePostTrialDate: {
+      type: Date,
+      default: null,
+    },
+    zeroPausePostTrialEndDate: {
+      type: Date,
+      default: null,
+    },
     zeroPausePriorStripePriceId: {
       type: String,
       default: null,
@@ -340,6 +358,11 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: null,
       index: true,
+    },
+    drillBuilderWeekCount: {
+      type: Number,
+      default: null,
+      min: 1,
     },
     // Admin-only bookkeeping
     subscriptionMonthsPaidFor: {

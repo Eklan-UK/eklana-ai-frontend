@@ -11,8 +11,11 @@ import { z } from "zod";
 import {
   addMonthsToDate,
   billingPeriodToMonths,
+  computeAutoPostTrialWindow,
   hasProviderBillingLink,
+  toUtcDayStart,
   type BillingPeriod,
+  type ZeroPauseChallengePhase,
   type ZeroPauseProduct,
 } from "@/domain/subscriptions/subscription.types";
 import { syncUserSubscriptionFromProvider } from "@/domain/subscriptions/subscription-provider-sync.service";
@@ -27,20 +30,16 @@ const updateSubscriptionSchema = z.object({
   zeroPauseProducts: z
     .array(z.enum(["challenge", "maintainer"]))
     .optional(),
+  /** Which Challenge date pair the admin is editing. */
+  zeroPauseChallengePhase: z.enum(["trial", "post_trial"]).optional(),
   zeroPauseDate: z.string().nullable().optional(),
   zeroPauseEndDate: z.string().nullable().optional(),
+  zeroPausePostTrialDate: z.string().nullable().optional(),
+  zeroPausePostTrialEndDate: z.string().nullable().optional(),
   amount: z.number().nonnegative().optional(),
   paymentMethod: z.string().max(100).optional(),
   note: z.string().max(500).optional(),
 });
-
-/** UTC calendar day at 00:00:00.000Z for Challenge date validation. */
-function toUtcDayStart(value: Date | string): Date {
-  const d = value instanceof Date ? value : new Date(value);
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-  );
-}
 
 /** Challenge and Maintainer are mutually exclusive labels. */
 function normalizeZeroPauseProducts(
@@ -90,43 +89,114 @@ async function handler(
         user.zeroPauseProducts = [];
         user.zeroPauseDate = null;
         user.zeroPauseEndDate = null;
+        user.zeroPausePostTrialDate = null;
+        user.zeroPausePostTrialEndDate = null;
       } else if (products.includes("challenge")) {
-        const start =
-          parseOptionalDate(input.zeroPauseDate) ??
-          (user.zeroPauseDate ? toUtcDayStart(user.zeroPauseDate) : null);
-        const end =
-          parseOptionalDate(input.zeroPauseEndDate) ??
-          (user.zeroPauseEndDate ? toUtcDayStart(user.zeroPauseEndDate) : null);
-
-        if (!start || !end) {
-          return NextResponse.json(
-            {
-              code: "ValidationError",
-              message:
-                "Challenge requires both start date and end date (zeroPauseDate and zeroPauseEndDate).",
-            },
-            { status: 400 }
-          );
-        }
-        if (end.getTime() < start.getTime()) {
-          return NextResponse.json(
-            {
-              code: "ValidationError",
-              message: "Challenge end date must be on or after the start date.",
-            },
-            { status: 400 }
-          );
-        }
-
+        const phase: ZeroPauseChallengePhase =
+          input.zeroPauseChallengePhase ?? "trial";
         user.zeroPauseProducts = products;
-        user.zeroPauseDate = start;
-        user.zeroPauseEndDate = end;
+
+        if (phase === "trial") {
+          const start =
+            parseOptionalDate(input.zeroPauseDate) ??
+            (user.zeroPauseDate ? toUtcDayStart(user.zeroPauseDate) : null);
+          const end =
+            parseOptionalDate(input.zeroPauseEndDate) ??
+            (user.zeroPauseEndDate ? toUtcDayStart(user.zeroPauseEndDate) : null);
+
+          if (!start || !end) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Trial requires both start date and end date.",
+              },
+              { status: 400 }
+            );
+          }
+          if (end.getTime() < start.getTime()) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Trial end date must be on or after the start date.",
+              },
+              { status: 400 }
+            );
+          }
+
+          user.zeroPauseDate = start;
+          user.zeroPauseEndDate = end;
+          // Auto-set Post Trial to 2 months + 2 weeks starting the day after Trial ends.
+          const postWindow = computeAutoPostTrialWindow(end);
+          user.zeroPausePostTrialDate = postWindow.start;
+          user.zeroPausePostTrialEndDate = postWindow.end;
+        } else {
+          const postStart =
+            parseOptionalDate(input.zeroPausePostTrialDate) ??
+            (user.zeroPausePostTrialDate
+              ? toUtcDayStart(user.zeroPausePostTrialDate)
+              : null);
+          const postEnd =
+            parseOptionalDate(input.zeroPausePostTrialEndDate) ??
+            (user.zeroPausePostTrialEndDate
+              ? toUtcDayStart(user.zeroPausePostTrialEndDate)
+              : null);
+
+          if (!postStart || !postEnd) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Post Trial requires both start date and end date.",
+              },
+              { status: 400 }
+            );
+          }
+          if (postEnd.getTime() < postStart.getTime()) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Post Trial end date must be on or after the start date.",
+              },
+              { status: 400 }
+            );
+          }
+
+          user.zeroPausePostTrialDate = postStart;
+          user.zeroPausePostTrialEndDate = postEnd;
+
+          // Optional: allow clearing/keeping trial dates when editing Post Trial.
+          if (input.zeroPauseDate !== undefined) {
+            user.zeroPauseDate = parseOptionalDate(input.zeroPauseDate) ?? null;
+          }
+          if (input.zeroPauseEndDate !== undefined) {
+            user.zeroPauseEndDate =
+              parseOptionalDate(input.zeroPauseEndDate) ?? null;
+          }
+
+          // If Post Trial is assigned without an active trial window, clear trial
+          // so dashboard/badges treat the learner as Post Trial immediately.
+          if (
+            user.zeroPauseEndDate &&
+            toUtcDayStart(new Date()).getTime() <=
+              toUtcDayStart(user.zeroPauseEndDate).getTime()
+          ) {
+            // Admin chose Post Trial while trial dates are still active — clear
+            // trial end so phase resolves to post_trial right away.
+            user.zeroPauseDate = null;
+            user.zeroPauseEndDate = null;
+          }
+        }
       } else {
         // Maintainer (no Challenge) — clear Challenge window dates.
         user.zeroPauseProducts = products;
         if (products.includes("maintainer")) {
           user.zeroPauseDate = null;
           user.zeroPauseEndDate = null;
+          user.zeroPausePostTrialDate = null;
+          user.zeroPausePostTrialEndDate = null;
         } else {
           if (input.zeroPauseDate !== undefined) {
             user.zeroPauseDate = parseOptionalDate(input.zeroPauseDate) ?? null;
@@ -135,11 +205,21 @@ async function handler(
             user.zeroPauseEndDate =
               parseOptionalDate(input.zeroPauseEndDate) ?? null;
           }
+          if (input.zeroPausePostTrialDate !== undefined) {
+            user.zeroPausePostTrialDate =
+              parseOptionalDate(input.zeroPausePostTrialDate) ?? null;
+          }
+          if (input.zeroPausePostTrialEndDate !== undefined) {
+            user.zeroPausePostTrialEndDate =
+              parseOptionalDate(input.zeroPausePostTrialEndDate) ?? null;
+          }
         }
       }
     } else if (
       input.zeroPauseDate !== undefined ||
-      input.zeroPauseEndDate !== undefined
+      input.zeroPauseEndDate !== undefined ||
+      input.zeroPausePostTrialDate !== undefined ||
+      input.zeroPausePostTrialEndDate !== undefined
     ) {
       if (input.zeroPauseDate !== undefined) {
         user.zeroPauseDate = parseOptionalDate(input.zeroPauseDate) ?? null;
@@ -148,28 +228,75 @@ async function handler(
         user.zeroPauseEndDate =
           parseOptionalDate(input.zeroPauseEndDate) ?? null;
       }
+      if (input.zeroPausePostTrialDate !== undefined) {
+        user.zeroPausePostTrialDate =
+          parseOptionalDate(input.zeroPausePostTrialDate) ?? null;
+      }
+      if (input.zeroPausePostTrialEndDate !== undefined) {
+        user.zeroPausePostTrialEndDate =
+          parseOptionalDate(input.zeroPausePostTrialEndDate) ?? null;
+      }
+
       if ((user.zeroPauseProducts ?? []).includes("challenge")) {
-        if (!user.zeroPauseDate || !user.zeroPauseEndDate) {
-          return NextResponse.json(
-            {
-              code: "ValidationError",
-              message:
-                "Challenge requires both start date and end date (zeroPauseDate and zeroPauseEndDate).",
-            },
-            { status: 400 }
-          );
-        }
-        if (
-          toUtcDayStart(user.zeroPauseEndDate).getTime() <
-          toUtcDayStart(user.zeroPauseDate).getTime()
-        ) {
-          return NextResponse.json(
-            {
-              code: "ValidationError",
-              message: "Challenge end date must be on or after the start date.",
-            },
-            { status: 400 }
-          );
+        const phase: ZeroPauseChallengePhase =
+          input.zeroPauseChallengePhase ??
+          (user.zeroPauseEndDate &&
+          toUtcDayStart(new Date()).getTime() <=
+            toUtcDayStart(user.zeroPauseEndDate).getTime()
+            ? "trial"
+            : "post_trial");
+
+        if (phase === "trial") {
+          if (!user.zeroPauseDate || !user.zeroPauseEndDate) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Trial requires both start date and end date.",
+              },
+              { status: 400 }
+            );
+          }
+          if (
+            toUtcDayStart(user.zeroPauseEndDate).getTime() <
+            toUtcDayStart(user.zeroPauseDate).getTime()
+          ) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Trial end date must be on or after the start date.",
+              },
+              { status: 400 }
+            );
+          }
+          const postWindow = computeAutoPostTrialWindow(user.zeroPauseEndDate);
+          user.zeroPausePostTrialDate = postWindow.start;
+          user.zeroPausePostTrialEndDate = postWindow.end;
+        } else {
+          if (!user.zeroPausePostTrialDate || !user.zeroPausePostTrialEndDate) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Post Trial requires both start date and end date.",
+              },
+              { status: 400 }
+            );
+          }
+          if (
+            toUtcDayStart(user.zeroPausePostTrialEndDate).getTime() <
+            toUtcDayStart(user.zeroPausePostTrialDate).getTime()
+          ) {
+            return NextResponse.json(
+              {
+                code: "ValidationError",
+                message:
+                  "Challenge Post Trial end date must be on or after the start date.",
+              },
+              { status: 400 }
+            );
+          }
         }
       }
     }
@@ -245,6 +372,8 @@ async function handler(
           zeroPauseProducts: user.zeroPauseProducts ?? [],
           zeroPauseDate: user.zeroPauseDate ?? null,
           zeroPauseEndDate: user.zeroPauseEndDate ?? null,
+          zeroPausePostTrialDate: user.zeroPausePostTrialDate ?? null,
+          zeroPausePostTrialEndDate: user.zeroPausePostTrialEndDate ?? null,
           subscriptionActivatedAt: user.subscriptionActivatedAt,
           subscriptionExpiresAt: user.subscriptionExpiresAt,
         },
