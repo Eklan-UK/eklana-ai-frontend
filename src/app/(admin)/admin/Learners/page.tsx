@@ -324,7 +324,9 @@ const Learners: React.FC = () => {
                               const label = formatZeroPauseProductWithDate(
                                 product,
                                 l.zeroPauseDate,
-                                l.zeroPauseEndDate
+                                l.zeroPauseEndDate,
+                                l.zeroPausePostTrialDate,
+                                l.zeroPausePostTrialEndDate
                               );
                               if (!label) return null;
                               return (

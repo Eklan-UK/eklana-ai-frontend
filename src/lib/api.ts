@@ -1098,8 +1098,11 @@ export const adminAPI = {
     months?: number;
     billingPeriod?: "monthly" | "quarterly" | "annual";
     zeroPauseProducts?: ("challenge" | "maintainer")[];
+    zeroPauseChallengePhase?: "trial" | "post_trial";
     zeroPauseDate?: string | null;
     zeroPauseEndDate?: string | null;
+    zeroPausePostTrialDate?: string | null;
+    zeroPausePostTrialEndDate?: string | null;
     amount?: number;
     paymentMethod?: string;
     note?: string;
@@ -1114,6 +1117,8 @@ export const adminAPI = {
         zeroPauseProducts: ("challenge" | "maintainer")[];
         zeroPauseDate: string | null;
         zeroPauseEndDate: string | null;
+        zeroPausePostTrialDate: string | null;
+        zeroPausePostTrialEndDate: string | null;
         subscriptionActivatedAt: string | null;
         subscriptionExpiresAt: string | null;
       };
