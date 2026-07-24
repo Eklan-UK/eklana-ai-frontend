@@ -525,19 +525,15 @@ async function fetchStudentIdentity(
 
 export async function aggregateWeaknesses(
 	learnerId: Types.ObjectId,
-	weekStartDate: Date
+	weekStartDate: Date,
+	lookbackMinutes: number = 14400
 ): Promise<WeaknessProfile> {
 	const now = new Date();
 
-	// 6-day window for existing drill / free-talk signals
-	const weekStartLookback = new Date(now);
-	weekStartLookback.setUTCDate(weekStartLookback.getUTCDate() - 10);
-	weekStartLookback.setUTCHours(0, 0, 0, 0);
-	const dateFilter = { $gte: weekStartLookback, $lt: now };
-
-	// 10-day window for new pronunciation-frequency and bookmark signals
-	const tenDaysAgo = new Date(now);
-	tenDaysAgo.setUTCDate(tenDaysAgo.getUTCDate() - 10);
+	// Lookback window for all weakness signals. Defaults to 10 days (14400 min);
+	// dev scripts can pass a shorter window to test generation on demand.
+	const lookbackStart = new Date(now.getTime() - lookbackMinutes * 60_000);
+	const dateFilter = { $gte: lookbackStart, $lt: now };
 
 	const [
 		drillAttempts,
@@ -553,14 +549,14 @@ export async function aggregateWeaknesses(
 		DrillAttempt.find({ learnerId, completedAt: dateFilter }).lean() as Promise<IDrillAttempt[]>,
 		PronunciationAttemptModel.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IPronunciationAttempt[]>,
 		FreeTalkAttempt.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IFreeTalkAttempt[]>,
-		PronunciationAttemptModel.find({ learnerId, createdAt: { $gte: tenDaysAgo } }).lean() as Promise<IPronunciationAttempt[]>,
+		PronunciationAttemptModel.find({ learnerId, createdAt: { $gte: lookbackStart } }).lean() as Promise<IPronunciationAttempt[]>,
 		Bookmark.find({
 			userId: learnerId,
-			createdAt: { $gte: tenDaysAgo },
+			createdAt: { $gte: lookbackStart },
 			type: { $in: ['word', 'sentence'] },
 		}).lean(),
-		computeAllTimePhonemeAnalysis(learnerId, tenDaysAgo),
-		computePrimaryMissionAndTopic(learnerId, tenDaysAgo),
+		computeAllTimePhonemeAnalysis(learnerId, lookbackStart),
+		computePrimaryMissionAndTopic(learnerId, lookbackStart),
 		fetchCountry(learnerId),
 		fetchStudentIdentity(learnerId),
 	]);

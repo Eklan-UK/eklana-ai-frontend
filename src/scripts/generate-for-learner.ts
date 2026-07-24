@@ -40,7 +40,7 @@ async function main() {
 
 	console.log(
 		'drillSequence types:',
-		saved?.content?.drillSequence?.map((item) => item.drillType)
+		saved?.content?.drillSequence?.map((item: { drillType: string }) => item.drillType)
 	);
 	console.log('totalEstimatedMinutes:', saved?.content?.totalEstimatedMinutes);
 

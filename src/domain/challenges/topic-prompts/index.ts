@@ -13,5 +13,6 @@ export const topicPrompts: Record<number, Record<string, {
 	1: mission1Prompts,
 	2: mission2Prompts,
 	3: mission3Prompts,
-	4: { ...mission4Prompts, ...bonusScenarioPrompts },
+	4: mission4Prompts,
+	5: bonusScenarioPrompts,
 };
