@@ -60,6 +60,8 @@ export interface AssignDrillParams {
   userIds: string[];
   assignedBy: string;
   dueDate?: Date;
+  /** When set, assignedAt is placed in that drill-builder week for each learner. */
+  weekNumber?: number;
 }
 
 export interface CompleteDrillParams {

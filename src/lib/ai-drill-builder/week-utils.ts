@@ -16,6 +16,21 @@ export function computeCurrentWeek(
   return Math.max(1, Math.ceil((Date.now() - anchor) / WEEK_MS));
 }
 
+/**
+ * assignedAt that buckets into `weekNumber` with the existing
+ * `ceil((assignedAt - anchor) / WEEK_MS)` formula (min 1).
+ * Week 1 uses anchor+1ms so the value is strictly after the anchor.
+ */
+export function getAssignedAtForWeek(
+  weekNumber: number,
+  anchorDate?: string | Date | null,
+  fallbackCreatedAt?: string | Date | null,
+): Date {
+  const anchor = getAnchorTimestamp(anchorDate, fallbackCreatedAt);
+  const safeWeek = Math.max(1, Math.floor(weekNumber));
+  return new Date(anchor + (safeWeek - 1) * WEEK_MS + 1);
+}
+
 export function getWeekDateRange(
   weekNumber: number,
   anchorDate?: string | Date | null,

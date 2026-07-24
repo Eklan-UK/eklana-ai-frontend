@@ -116,6 +116,12 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionBillingPeriod?: "monthly" | "quarterly" | "annual" | null;
   subscriptionActivatedAt?: Date | null;
   subscriptionExpiresAt?: Date | null;
+  /**
+   * Admin/tutor Drill Builder week cap for this learner.
+   * Lazily seeded from the prior time-based week count; further weeks are
+   * created manually via POST /students/:id/weeks. Null/unset = not seeded yet.
+   */
+  drillBuilderWeekCount?: number | null;
   // Zero Pause add-on products (admin-assigned). `mastery` is legacy storage only.
   zeroPauseProducts?: ("challenge" | "maintainer" | "mastery")[];
   /** Zero Pause Challenge trial window start. */
@@ -352,6 +358,11 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: null,
       index: true,
+    },
+    drillBuilderWeekCount: {
+      type: Number,
+      default: null,
+      min: 1,
     },
     // Admin-only bookkeeping
     subscriptionMonthsPaidFor: {

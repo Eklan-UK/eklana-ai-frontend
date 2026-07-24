@@ -9,6 +9,7 @@ export interface LearnerRecord {
   image?: string | null;
   subscriptionActivatedAt?: string | null;
   createdAt?: string | null;
+  drillBuilderWeekCount?: number | null;
 }
 
 /** Normalize Mongo/API learner id to a stable string for links and comparisons. */

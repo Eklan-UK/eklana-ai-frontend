@@ -27,7 +27,7 @@ export const ZERO_PAUSE_PRODUCTS: ZeroPauseProduct[] = [
 
 export const ZERO_PAUSE_PRODUCT_LABELS: Record<ZeroPauseProduct, string> = {
   challenge: "Zero Pause Challenge",
-  maintainer: "Zero Pause maintenance",
+  maintainer: "Zero Pause Maintenance",
 };
 
 export function isZeroPauseProduct(
@@ -165,7 +165,10 @@ export function formatZeroPauseProducts(
 
 export type ZeroPauseChallengePhase = "trial" | "post_trial";
 
-export const ZERO_PAUSE_POST_TRIAL_MONTHS = 3;
+/** Post-trial duration after Challenge Trial ends. */
+export const ZERO_PAUSE_POST_TRIAL_MONTHS = 2;
+export const ZERO_PAUSE_POST_TRIAL_EXTRA_DAYS = 14; // 2 weeks
+export const ZERO_PAUSE_POST_TRIAL_DURATION_LABEL = "2 months and 2 weeks";
 
 /** UTC calendar day at 00:00:00.000Z — matches admin subscription route validation. */
 export function toUtcDayStart(value: Date | string): Date {
@@ -182,7 +185,14 @@ export function addUtcMonths(date: Date | string, months: number): Date {
   );
 }
 
-/** Post-trial starts the day after trial ends and lasts exactly 3 months. */
+export function addUtcDays(date: Date | string, days: number): Date {
+  const d = toUtcDayStart(date);
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days)
+  );
+}
+
+/** Post-trial starts the day after trial ends and lasts 2 months and 2 weeks. */
 export function computeAutoPostTrialWindow(trialEnd: Date | string): {
   start: Date;
   end: Date;
@@ -197,7 +207,10 @@ export function computeAutoPostTrialWindow(trialEnd: Date | string): {
   );
   return {
     start,
-    end: addUtcMonths(start, ZERO_PAUSE_POST_TRIAL_MONTHS),
+    end: addUtcDays(
+      addUtcMonths(start, ZERO_PAUSE_POST_TRIAL_MONTHS),
+      ZERO_PAUSE_POST_TRIAL_EXTRA_DAYS
+    ),
   };
 }
 

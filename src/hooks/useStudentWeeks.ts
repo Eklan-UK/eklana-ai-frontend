@@ -1,4 +1,10 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { toast } from "sonner";
 import { studentAPI } from "@/lib/api";
 
 export const studentWeeksQueryKey = (studentId: string) =>
@@ -40,5 +46,29 @@ export function useStudentWeeks(studentId: string, enabled = true) {
     // Global QueryClient sets refetchOnMount: false; week detail must refresh
     // after returning from drill create flows that invalidate this query.
     refetchOnMount: true,
+  });
+}
+
+export function useCreateStudentWeek(studentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => studentAPI.createStudentWeek(studentId),
+    onSuccess: async () => {
+      await invalidateStudentWeeks(queryClient, studentId);
+      // Learner list "Week N" badge reads drillBuilderWeekCount from these queries.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "ai-drill-builder", "all-learners"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+      ]);
+      toast.success("Week added");
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to add week";
+      toast.error(message);
+    },
   });
 }
