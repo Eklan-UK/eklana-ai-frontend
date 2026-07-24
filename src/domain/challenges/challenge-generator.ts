@@ -261,6 +261,8 @@ function substitutePlaceholders(
 		country: context?.country ?? profile.country ?? 'the learner\'s home country',
 		mission: profile.primaryMission != null ? `Mission ${profile.primaryMission}` : 'General practice',
 		topic: profile.primaryTopic ?? 'General clinical communication',
+		student_name: profile.studentName || 'the learner',
+		student_role: profile.studentRole || 'nurse',
 		weak_phonemes: extractEvidenceContaining(profile, (w) => w.category === 'pronunciation', 'phoneme'),
 		weak_words: extractEvidenceContaining(profile, (w) => w.category === 'pronunciation', 'word'),
 		missed_phrases: extractEvidence(profile, (w) => w.drillType === 'key_phrases'),

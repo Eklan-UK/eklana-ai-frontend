@@ -4,86 +4,9 @@ import { connectToDatabase, disconnectFromDatabase } from '@/lib/api/db';
 import WeeklyChallengeModel from '@/models/weekly-challenge';
 import UserModel from '@/models/user';
 import mongoose from 'mongoose';
+import { DRILL_LABELS, summariseContent } from './lib/weekly-challenge-format';
 
-const LEARNER_FILTER = '6a145e8ea1983cbd047bfd49';
-
-const DRILL_LABELS: Record<string, string> = {
-  pronunciation: 'Pronunciation',
-  vocabulary: 'Vocabulary',
-  key_phrases: 'Key Phrases',
-  roleplay: 'Roleplay',
-  fill_blank: 'Fill in the Blank',
-};
-
-function summariseContent(drillType: string, content: any): string[] {
-  if (!content) return ['  (no content)'];
-
-  switch (drillType) {
-    case 'pronunciation': {
-      const items: any[] = content.pronunciation_items ?? [];
-      if (items.length === 0) return ['  (no items)'];
-      return items.map((item, i) => `  ${i + 1}. "${item.word}" [${item.sound ?? '?'}] — ${item.sentence}`);
-    }
-
-    case 'vocabulary': {
-      const items: any[] = content.vocabulary_items ?? content.target_sentences ?? [];
-      if (items.length === 0) return ['  (no items)'];
-      return items.map((item, i) => {
-        const sentence = item.sentence ?? item.text ?? '?';
-        const blank = item.blanks?.[0]?.correctAnswer ?? item.word ?? '?';
-        return `  ${i + 1}. ${sentence}  → answer: "${blank}"`;
-      });
-    }
-
-    case 'key_phrases': {
-      const items: any[] = content.key_phrase_items ?? [];
-      if (items.length === 0) return ['  (no items)'];
-      return items.map((item, i) =>
-        `  ${i + 1}. [${item.respondentName ?? 'Speaker'}] ${item.prompt}  → correct: "${item.correctAnswer}"`
-      );
-    }
-
-    case 'roleplay': {
-      const scenes: any[] = content.roleplay_scenes ?? [];
-      if (scenes.length === 0) return ['  (no scenes)'];
-
-      const studentName: string = content.student_character_name ?? 'Student';
-      const aiNames: string[] = content.ai_character_names ?? [];
-
-      const resolveSpeaker = (speaker: string): string => {
-        if (speaker === 'student') return studentName;
-        const match = speaker.match(/^ai_(\d+)$/);
-        if (match) return aiNames[Number(match[1])] ?? speaker;
-        return speaker;
-      };
-
-      const lines: string[] = [];
-      scenes.forEach((scene, i) => {
-        const title = scene.scene_name || scene.scene_title || `Scene ${i + 1}`;
-        lines.push(`  SCENE ${i + 1}: ${title}`);
-        const dialogue: any[] = scene.dialogue ?? [];
-        if (dialogue.length === 0) {
-          lines.push('    (no dialogue)');
-        } else {
-          for (const turn of dialogue) {
-            const speakerName = resolveSpeaker(turn.speaker);
-            lines.push(`    ${speakerName}: "${turn.text}"`);
-          }
-        }
-      });
-      return lines;
-    }
-
-    case 'fill_blank': {
-      const items: any[] = content.fill_blank_items ?? [];
-      if (items.length === 0) return ['  (no items)'];
-      return items.map((item, i) => `  ${i + 1}. ${item.sentence}`);
-    }
-
-    default:
-      return [`  (unknown drill type: ${drillType})`];
-  }
-}
+const LEARNER_FILTER = '6995750e9882aa80e597d516';
 
 async function main() {
   await connectToDatabase();
