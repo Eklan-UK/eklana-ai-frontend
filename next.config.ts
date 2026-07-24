@@ -151,6 +151,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
+  // Reduce peak RAM during webpack compiles on Vercel's 8GB build containers.
+  experimental: {
+    webpackMemoryOptimizations: true,
+  },
+
   /**
    * Short URL aliases (URL bar shows the short path; internally serves /account/*).
    * SubscriptionGuard normalizes these for allowlist checks (see subscriptionGuardPathname).
@@ -242,8 +247,8 @@ export default withSentryConfig(withPWA(nextConfig), {
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+  // Keep false on Vercel — widenClientFileUpload spikes RAM and was contributing to OOM kills.
+  widenClientFileUpload: false,
 
   // Uncomment to route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.
