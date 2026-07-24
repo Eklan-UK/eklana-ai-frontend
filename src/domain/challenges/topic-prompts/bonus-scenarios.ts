@@ -1,15 +1,2165 @@
-// Mission 4: Bonus Scenarios
-// TODO: replace placeholder prompt strings with real per-topic prompt copy.
+// Mission 5: Bonus Scenarios
+// Real per-topic prompt copy for phone_colleagues, phone_other_departments,
+// phone_patient_families. `grammar` remains a TODO placeholder (no authored copy yet).
 export const bonusScenarioPrompts: Record<string, {
 	pronunciation: string;
 	vocabulary: string;
 	key_phrases: string;
 	roleplay: string;
 }> = {
+	phone_colleagues: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a pronunciation drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week:
+{{weak_phonemes}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Pronunciation Selection
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}).
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used during telephone communication between healthcare professionals.
+- Every word must clearly contain the target phoneme.
+- Do not repeat words.
+- Use authentic nursing vocabulary commonly spoken during professional phone conversations.
+
+Examples include:
+
+- assessment
+- recommendation
+- clarification
+- consultation
+- intervention
+- deterioration
+- physician
+- transfer
+- responsibility
+- follow-up
+- oxygen saturation
+- laboratory results
+- intravenous fluids
+- medication order
+- escalation
+- observation
+- documentation
+- confirmation
+- communication
+- discharge planning
+
+3. Clinical Context
+
+- Every sentence should sound like authentic telephone communication between healthcare professionals in hospitals in {{country}}.
+- Avoid textbook examples or isolated vocabulary.
+- Every sentence should naturally reflect a nurse communicating with another healthcare professional by phone.
+- Include realistic situations such as:
+  - introducing yourself and your unit
+  - identifying the patient
+  - explaining the purpose of the call
+  - reporting assessment findings
+  - discussing medications
+  - reporting abnormal laboratory or imaging results
+  - requesting recommendations
+  - arranging consultations
+  - coordinating patient transfers
+  - confirming physician instructions
+  - discussing escalation plans
+  - confirming follow-up actions
+
+Examples:
+
+- "Hello, this is Amanda from the Intensive Care Unit calling about John Miller."
+- "The patient's oxygen saturation has fallen despite oxygen therapy."
+- "Could you clarify whether you want the medication given immediately?"
+- "I'll repeat the order to make sure I've understood it correctly."
+
+4. Competency Alignment
+
+The selected words and sentences should reinforce the learner's ability to:
+
+- identify themselves, their role, and the patient
+- state the purpose of the phone call clearly
+- communicate relevant clinical information accurately
+- report assessment findings and nursing interventions
+- request clarification when needed
+- confirm recommendations and responsibilities
+- repeat important instructions before ending the call
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult medical terminology.
+- Include words from different clinical categories, including:
+  - patient assessment
+  - medications
+  - laboratory results
+  - imaging
+  - communication
+  - patient transfer
+  - escalation
+  - consultations
+  - documentation
+  - follow-up actions
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural telephone communication sentence}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 vocabulary questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}
+
+2. Clinical Context
+
+- Every sentence should describe a realistic telephone conversation between healthcare colleagues in a hospital in {{country}}.
+- The sentence should sound like something a nurse would naturally say while speaking with another nurse, charge nurse, physician, pharmacist, or other healthcare professional.
+- Replace only the target vocabulary with the blank.
+- Every sentence should contain enough clinical information that only one answer is correct.
+- Include realistic details such as:
+  - introducing yourself and your unit
+  - identifying the patient
+  - stating the purpose of the call
+  - diagnosis
+  - assessment findings
+  - vital signs
+  - medications
+  - nursing interventions
+  - laboratory results
+  - imaging findings
+  - pending investigations
+  - consultations
+  - patient transfer
+  - escalation
+  - follow-up actions
+
+3. Vocabulary Selection
+
+- Begin with the student's weak words ({{weak_words}}).
+- If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication between healthcare professionals.
+- Use authentic clinical vocabulary rather than textbook terminology.
+
+Examples include:
+
+- assessment
+- recommendation
+- clarification
+- intervention
+- consultation
+- transfer
+- deterioration
+- observation
+- physician
+- charge nurse
+- laboratory results
+- oxygen saturation
+- intravenous fluids
+- medication order
+- follow-up
+
+Do not repeat vocabulary.
+
+4. Realistic Answer Choices
+
+- Provide four clinically legitimate answer choices.
+- Exactly one option must be correct.
+- The remaining options should also be realistic medical vocabulary.
+- Avoid obviously incorrect or unrelated words.
+- At least half of the questions should contain multiple plausible options so the learner must use clinical reasoning.
+
+The correct answer should reinforce one or more of the following competencies:
+
+- identifying yourself and the patient
+- stating the purpose of the call
+- reporting assessment findings
+- communicating changes in the patient's condition
+- requesting recommendations
+- confirming responsibilities
+- clarifying instructions
+- confirming follow-up actions
+
+5. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C and D.
+- Do not follow a predictable pattern.
+
+6. Learning Objective
+
+The learner should strengthen recognition and understanding of vocabulary commonly used during professional telephone communication with healthcare colleagues.
+
+Every sentence should reinforce clear, concise, and safe communication.
+
+7. Sentence Design
+
+- Every question must contain exactly one blank represented by "______".
+- Replace only the target vocabulary.
+- Every sentence should sound like authentic communication used during hospital telephone conversations.
+- Avoid dictionary definitions or generic examples.
+
+8. Medical Terminology
+
+- Use full clinical terminology rather than abbreviations whenever possible.
+
+Example:
+
+Correct:
+"intravenous fluids"
+
+Incorrect:
+"IV fluids"
+
+9. Difficulty
+
+- Include a balanced mix of common and moderately difficult clinical vocabulary.
+- Require understanding of the clinical context rather than simple word recognition.
+
+Return a JSON array:
+
+[
+  {
+    "vocabulary": "{{correct vocabulary}}",
+    "sentence": "{{Sentence containing ______}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a key phrases drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week:
+{{missed_phrases}}
+
+Generate 10–15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Colleague says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Clinical Context
+
+- Every conversation should reflect realistic telephone communication between healthcare professionals in hospitals in {{country}}.
+- The learner always plays the nurse making or receiving the phone call.
+- The AI plays another healthcare professional, such as a staff nurse, charge nurse, physician, pharmacist, physiotherapist, respiratory therapist, or laboratory staff member.
+- Every situation should involve introducing yourself, identifying the patient, explaining the purpose of the call, reporting clinical information, requesting assistance, clarifying information, or confirming next steps.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during professional telephone conversations in hospitals.
+
+3. Important Requirements
+
+- Every correct answer must naturally include one or more phrases from {{missed_phrases}} whenever appropriate.
+- Every scenario should reinforce one or more of the following competencies:
+  - identifying yourself, your role, your unit, and the patient
+  - stating the purpose of the call clearly
+  - communicating relevant assessment findings and clinical information
+  - requesting recommendations or assistance appropriately
+  - seeking clarification when necessary
+  - confirming responsibilities and follow-up actions before ending the call
+
+4. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two or more responses that an experienced nurse could realistically say.
+- The learner must identify the MOST professional, concise, collaborative, and clinically appropriate response.
+
+The correct response should demonstrate one or more of the following:
+
+- introduces the nurse, unit, and patient clearly
+- explains the reason for the call promptly
+- reports relevant assessment findings
+- communicates changes in the patient's condition accurately
+- requests assistance or recommendations appropriately
+- asks appropriate clarification questions
+- confirms responsibilities
+- repeats important instructions or follow-up actions before ending the call
+
+Incorrect responses should be plausible but less appropriate because they:
+
+- delay the purpose of the call
+- omit important patient information
+- provide incomplete assessment findings
+- fail to clarify instructions
+- fail to confirm responsibilities
+- communicate less effectively
+
+5. Scenario Variety
+
+Include a balanced mix of situations involving:
+
+- deteriorating patients
+- medication clarification
+- abnormal laboratory results
+- abnormal imaging findings
+- urgent consultations
+- patient transfers
+- oxygen therapy
+- uncontrolled pain
+- postoperative concerns
+- equipment requests
+- physician instructions
+- discharge coordination
+- documentation clarification
+- escalation of care
+- arranging follow-up
+
+6. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C, and D.
+- Do not follow a predictable answer pattern.
+
+7. Learning Objective
+
+The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
+
+Every option should sound like something a healthcare professional could realistically say.
+
+The correct answer must be unambiguously the best response for the specific clinical situation.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{Healthcare Professional Name}}",
+    "prompt": "{{What the colleague says}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week:
+{{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic phone conversations between healthcare professionals in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same communication skills in a new clinical situation.
+- The student always plays the nurse making or receiving a work-related phone call.
+- The AI should play one or more healthcare colleagues, such as another nurse, a charge nurse, a physician, a pharmacist, a physiotherapist, or another hospital staff member.
+- The scenario should progress naturally from answering or placing the call, discussing the patient, exchanging relevant clinical information, agreeing on actions, and confirming the next steps before ending the call.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for healthcare professionals in hospitals in {{country}}.
+
+Examples:
+- Emily Rodriguez (Charge Nurse)
+- James Wilson (Staff Nurse)
+- Dr. Michael Patel
+- Rachel Green (Physiotherapist)
+- Olivia Brown (Pharmacist)
+
+Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during professional phone calls in hospitals.
+- Each scene must contain at least 8 dialogue turns.
+- The student must speak at least 4 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Clearly identifies themselves, their role or unit, and the patient at the beginning of the call.
+- States the purpose of the call promptly and concisely.
+- Provides relevant and accurate clinical information, including assessment findings, interventions, medications, vital signs, and significant changes in the patient's condition.
+- Confirms recommendations, responsibilities, physician or colleague instructions, and follow-up actions by repeating or summarising important information before ending the call.
+
+5. Realism
+
+Include realistic phone conversations involving situations such as:
+
+- requesting assistance
+- reporting a deteriorating patient
+- clarifying medication orders
+- requesting patient transfer
+- discussing laboratory or imaging results
+- arranging consultations
+- requesting equipment
+- coordinating patient transport
+- confirming physician instructions
+- discussing discharge arrangements
+- handing over urgent information
+- resolving documentation questions
+
+Include realistic clinical information such as:
+
+- patient identification
+- diagnosis
+- reason for admission
+- current condition
+- vital signs
+- medications
+- allergies
+- laboratory results
+- imaging findings
+- oxygen therapy
+- intravenous access
+- nursing interventions
+- pending investigations
+- physician recommendations
+- escalation plans
+
+Some information should require the learner to ask clarification questions or repeat instructions to confirm understanding.
+
+6. Learning Objective
+
+The learner should develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
+
+The learner should naturally practise:
+
+- introducing themselves and identifying the patient
+- stating the reason for the call clearly
+- communicating concise and accurate clinical information
+- requesting assistance or recommendations appropriately
+- asking clarification questions when necessary
+- confirming responsibilities and agreed follow-up actions before ending the call
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{Healthcare Professional Name}}"
+  ],
+  "context": "{{Brief description of the phone communication scenario}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+	},
+	phone_other_departments: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a pronunciation drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week:
+{{weak_phonemes}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Pronunciation Selection
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}).
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used during telephone communication with other hospital departments.
+- Every word must clearly contain the target phoneme.
+- Do not repeat words.
+- Use authentic clinical and operational vocabulary commonly spoken during interdepartmental telephone communication.
+
+Examples include:
+
+- radiology
+- laboratory
+- specimen
+- pharmacist
+- consultation
+- transport
+- scheduling
+- availability
+- confirmation
+- physician order
+- blood bank
+- oxygen therapy
+- isolation precautions
+- intravenous fluids
+- respiratory therapy
+- diagnostic imaging
+- patient transfer
+- laboratory results
+- interpreter
+- discharge planning
+
+3. Clinical Context
+
+- Every sentence should sound like authentic telephone communication between a nurse and another hospital department in hospitals in {{country}}.
+- Avoid textbook examples or isolated vocabulary.
+- Every sentence should naturally reflect operational communication required to coordinate patient care.
+- Include realistic situations such as:
+  - introducing yourself and your unit
+  - identifying the patient
+  - requesting a service
+  - scheduling diagnostic tests
+  - requesting medications or blood products
+  - arranging patient transport
+  - discussing specimen collection
+  - clarifying physician orders
+  - communicating urgency
+  - confirming appointment times
+  - verifying departmental procedures
+  - confirming follow-up actions
+
+Examples:
+
+- "I'm calling from the Intensive Care Unit to schedule a CT scan for Mr. Miller."
+- "Has the laboratory received the blood specimen yet?"
+- "Could you confirm the transport time for the patient?"
+- "The physician has requested an urgent radiology consultation this afternoon."
+
+4. Competency Alignment
+
+The selected words and sentences should reinforce the learner's ability to:
+
+- identify themselves, their unit, and the patient
+- state the purpose of the call clearly
+- provide complete clinical and operational information
+- communicate urgency appropriately
+- request hospital services professionally
+- clarify departmental procedures
+- confirm timelines and responsibilities
+- repeat important follow-up actions before ending the call
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult clinical and operational terminology.
+- Include words from different categories, including:
+  - hospital departments
+  - diagnostic services
+  - laboratory services
+  - pharmacy
+  - patient transport
+  - scheduling
+  - physician orders
+  - communication
+  - follow-up actions
+  - patient care coordination
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural interdepartmental telephone sentence}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 vocabulary questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}
+
+2. Clinical Context
+
+- Every sentence should describe a realistic telephone conversation between a nurse and another hospital department in {{country}}.
+- The sentence should sound like something a nurse would naturally say while speaking with Radiology, Laboratory, Pharmacy, Blood Bank, Respiratory Therapy, Patient Transport, Central Supply, Nutrition Services, Medical Records, or another hospital department.
+- Replace only the target vocabulary with the blank.
+- Every sentence should contain enough clinical and operational context that only one answer is correct.
+- Include realistic details such as:
+  - introducing yourself and your unit
+  - identifying the patient
+  - requesting a service
+  - scheduling investigations
+  - medication requests
+  - specimen collection
+  - patient transport
+  - oxygen requirements
+  - mobility status
+  - isolation precautions
+  - urgency
+  - physician orders
+  - timing
+  - follow-up requirements
+
+3. Vocabulary Selection
+
+- Begin with the student's weak words ({{weak_words}}).
+- If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication with hospital departments.
+- Use authentic clinical and operational vocabulary.
+
+Examples include:
+
+- consultation
+- specimen
+- transport
+- laboratory results
+- radiology
+- pharmacy
+- blood bank
+- physician order
+- priority
+- isolation precautions
+- oxygen therapy
+- intravenous fluids
+- scheduling
+- availability
+- confirmation
+
+Do not repeat vocabulary.
+
+4. Realistic Answer Choices
+
+- Provide four clinically legitimate answer choices.
+- Exactly one option must be correct.
+- The remaining options should also be realistic healthcare vocabulary.
+- Avoid obviously incorrect or unrelated words.
+- At least half of the questions should contain multiple plausible options so the learner must use clinical reasoning.
+
+The correct answer should reinforce one or more of the following competencies:
+
+- identifying yourself and your unit
+- identifying the patient
+- stating the purpose of the call
+- providing complete information
+- communicating urgency
+- requesting hospital services
+- confirming timelines
+- confirming follow-up actions
+
+5. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C and D.
+- Do not follow a predictable pattern.
+
+6. Learning Objective
+
+The learner should strengthen recognition and understanding of vocabulary commonly used when communicating with hospital departments by telephone.
+
+Every sentence should reinforce clear, accurate, and efficient professional communication.
+
+7. Sentence Design
+
+- Every question must contain exactly one blank represented by "______".
+- Replace only the target vocabulary.
+- Every sentence should sound like authentic communication used during hospital telephone calls.
+- Avoid dictionary definitions or generic examples.
+
+8. Medical Terminology
+
+- Use full clinical terminology rather than abbreviations whenever possible.
+
+Example:
+
+Correct:
+"intravenous fluids"
+
+Incorrect:
+"IV fluids"
+
+9. Difficulty
+
+- Include a balanced mix of common and moderately difficult clinical and operational vocabulary.
+- Require understanding of both the clinical situation and the operational workflow to select the correct answer.
+
+Return a JSON array:
+
+[
+  {
+    "vocabulary": "{{correct vocabulary}}",
+    "sentence": "{{Sentence containing ______}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a key phrases drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week:
+{{missed_phrases}}
+
+Generate 10–15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Department staff says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Clinical Context
+
+- Every conversation should reflect realistic telephone communication between a bedside nurse and another hospital department in hospitals in {{country}}.
+- The learner always plays the bedside nurse making or receiving the phone call.
+- The AI plays staff from departments such as Radiology, Laboratory, Pharmacy, Blood Bank, Respiratory Therapy, Patient Transport, Nutrition Services, Central Supply, Medical Records, or Admissions.
+- Every situation should involve requesting a service, providing patient information, clarifying operational details, confirming scheduling, discussing urgency, or confirming follow-up actions.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during interdepartmental phone calls.
+
+3. Important Requirements
+
+- Every correct answer must naturally include one or more phrases from {{missed_phrases}} whenever appropriate.
+- Every scenario should reinforce one or more of the following competencies:
+  - identifying yourself, your department, and the patient
+  - stating the purpose of the call clearly
+  - providing relevant clinical and operational information
+  - communicating urgency appropriately
+  - clarifying requests or departmental procedures
+  - confirming responsibilities, timelines, and follow-up actions
+
+4. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two or more responses that an experienced nurse could realistically say.
+- The learner must identify the MOST professional, concise, collaborative, and clinically appropriate response.
+
+The correct response should demonstrate one or more of the following:
+
+- introduces the nurse, unit, and patient clearly
+- explains the reason for the call promptly
+- provides complete patient or request information
+- communicates urgency appropriately
+- clarifies important operational details
+- confirms appointment times or service availability
+- repeats important instructions or timelines
+- confirms follow-up responsibilities before ending the call
+
+Incorrect responses should be plausible but less appropriate because they:
+
+- omit important patient information
+- provide incomplete request details
+- fail to explain urgency
+- fail to clarify timelines
+- fail to confirm departmental instructions
+- communicate less efficiently
+
+5. Scenario Variety
+
+Include a balanced mix of situations involving:
+
+- requesting CT or MRI appointments
+- following up on laboratory results
+- requesting blood products
+- arranging patient transport
+- medication requests with Pharmacy
+- respiratory therapy referrals
+- scheduling diagnostic procedures
+- specimen collection
+- equipment requests
+- interpreter services
+- discharge coordination
+- dietary requests
+- isolation precautions
+- confirming physician orders
+- urgent service requests
+
+6. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C, and D.
+- Do not follow a predictable answer pattern.
+
+7. Learning Objective
+
+The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with other hospital departments.
+
+Every option should sound like something a healthcare professional could realistically say.
+
+The correct answer must be unambiguously the best response for the specific situation.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{Department Staff Name}}",
+    "department": "{{Department}}",
+    "prompt": "{{What the department staff says}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week:
+{{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic telephone communication between a nurse and other hospital departments in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same communication skills in a new clinical situation.
+- The student always plays the bedside nurse making or receiving the phone call.
+- The AI should play staff from other hospital departments such as Radiology, Laboratory, Pharmacy, Blood Bank, Respiratory Therapy, Central Supply, Transport Services, Admissions, Environmental Services, Nutrition Services, or Medical Records.
+- The scenario should progress naturally from introducing yourself, identifying the patient or request, explaining the purpose of the call, providing the required information, discussing logistics or urgency, and confirming the agreed actions before ending the call.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for hospital staff in {{country}}.
+
+Examples:
+- Rachel Green (Radiology Coordinator)
+- James Wilson (Laboratory Technologist)
+- Emily Carter (Pharmacist)
+- Michael Davis (Patient Transport Coordinator)
+- Sarah Chen (Respiratory Therapist)
+
+Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during professional telephone conversations between hospital departments.
+- Each scene must contain at least 8 dialogue turns.
+- The student must speak at least 4 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Clearly identifies themselves, their department or unit, and the patient or service request.
+- States the purpose of the call promptly and concisely.
+- Provides all relevant information needed to process the request, including patient details, urgency, timing, and important clinical information.
+- Confirms that the request has been understood, clarifies responsibilities, expected timelines, and required follow-up before ending the call.
+
+5. Realism
+
+Include realistic phone conversations involving situations such as:
+
+- scheduling a CT scan or MRI
+- requesting laboratory tests
+- following up on pending laboratory results
+- arranging patient transport
+- requesting blood products
+- contacting pharmacy about medications
+- requesting respiratory therapy
+- ordering medical equipment
+- arranging interpreter services
+- coordinating patient discharge
+- requesting dietary changes
+- clarifying imaging appointments
+- requesting environmental cleaning after isolation
+- confirming specimen collection
+
+Include realistic information such as:
+
+- patient identification
+- diagnosis
+- reason for request
+- urgency level
+- allergies
+- mobility status
+- infection precautions
+- oxygen requirements
+- scheduled procedures
+- physician orders
+- timing requirements
+- location
+- operational constraints
+
+Some information should require the learner to clarify timelines, repeat important information, or confirm departmental procedures.
+
+6. Learning Objective
+
+The learner should develop automatic, confident, and professional communication when speaking with other hospital departments by telephone.
+
+The learner should naturally practise:
+
+- introducing themselves and their unit
+- identifying the patient or service request
+- stating the reason for the call clearly
+- providing complete and relevant information
+- communicating urgency appropriately
+- asking clarification questions
+- confirming timelines, responsibilities, and follow-up actions before ending the call
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{Department Staff Name}}"
+  ],
+  "context": "{{Brief description of the telephone communication scenario}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+	},
+	phone_patient_families: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a pronunciation drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week:
+{{weak_phonemes}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Pronunciation Selection
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}).
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used during telephone conversations with patients' families.
+- Every word must clearly contain the target phoneme.
+- Do not repeat words.
+- Use authentic clinical and communication vocabulary commonly spoken during telephone conversations with patients' families.
+
+Examples include:
+
+- confidentiality
+- authorisation
+- identity
+- representative
+- physician
+- diagnosis
+- prognosis
+- rehabilitation
+- discharge planning
+- follow-up
+- medication
+- treatment plan
+- consent
+- privacy
+- recovery
+- condition
+- laboratory results
+- imaging results
+- appointment
+- reassurance
+
+3. Clinical Context
+
+- Every sentence should sound like authentic telephone communication between a bedside nurse and a patient's family member in hospitals in {{country}}.
+- Avoid textbook examples or isolated vocabulary.
+- Every sentence should naturally reflect conversations about patient care while maintaining professional boundaries.
+- Include realistic situations such as:
+  - verifying the caller's identity
+  - confirming authorisation
+  - providing appropriate patient updates
+  - explaining confidentiality
+  - discussing nursing care
+  - explaining medications
+  - discussing rehabilitation or discharge planning
+  - referring questions to the physician
+  - explaining follow-up appointments
+  - responding to emotional family members
+  - protecting patient privacy
+
+Examples:
+
+- "Before I discuss your father's condition, could you confirm your full name and your relationship to him?"
+- "I'm authorised to provide an update on today's nursing care, but the physician will discuss the treatment plan."
+- "For privacy reasons, I need to verify that you're the authorised contact."
+- "I'll let the physician know that you would like a call as soon as possible."
+
+4. Competency Alignment
+
+The selected words and sentences should reinforce the learner's ability to:
+
+- verify the caller's identity
+- confirm authorisation
+- communicate clearly using language families can understand
+- demonstrate empathy and professionalism
+- protect patient confidentiality
+- explain professional boundaries appropriately
+- refer callers to the appropriate healthcare professional
+- confirm follow-up actions before ending the call
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult clinical terminology.
+- Include words from different communication categories, including:
+  - patient privacy
+  - confidentiality
+  - family communication
+  - diagnosis
+  - medications
+  - rehabilitation
+  - discharge planning
+  - follow-up
+  - professional communication
+  - patient support
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural telephone conversation sentence}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following words this week:
+{{weak_words}}
+
+Generate 10–15 vocabulary questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}
+
+2. Clinical Context
+
+- Every sentence should describe a realistic telephone conversation between a bedside nurse and a patient's family member or authorised representative in a hospital in {{country}}.
+- The sentence should sound like something a nurse would naturally say during a phone call with a patient's family.
+- Replace only the target vocabulary with the blank.
+- Every sentence should contain enough clinical context that only one answer is correct.
+- Include realistic details such as:
+  - verifying the caller's identity
+  - confirming authorisation
+  - discussing the patient's current condition
+  - medications
+  - nursing care
+  - pending laboratory or imaging results
+  - discharge planning
+  - rehabilitation
+  - physician updates
+  - follow-up appointments
+  - visiting arrangements
+  - patient confidentiality
+  - referrals to the physician
+
+3. Vocabulary Selection
+
+- Begin with the student's weak words ({{weak_words}}).
+- If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication with patients' families.
+- Use authentic clinical and communication vocabulary.
+
+Examples include:
+
+- confidentiality
+- authorisation
+- identity
+- diagnosis
+- prognosis
+- physician
+- treatment plan
+- rehabilitation
+- discharge planning
+- follow-up
+- medication
+- consent
+- privacy
+- authorised representative
+- patient information
+
+Do not repeat vocabulary.
+
+4. Realistic Answer Choices
+
+- Provide four clinically legitimate answer choices.
+- Exactly one option must be correct.
+- The remaining options should also be realistic healthcare vocabulary.
+- Avoid obviously incorrect or unrelated words.
+- At least half of the questions should contain multiple plausible options so the learner must use clinical reasoning.
+
+The correct answer should reinforce one or more of the following competencies:
+
+- verifying identity
+- confirming authorisation
+- providing appropriate patient information
+- communicating clearly
+- protecting confidentiality
+- explaining professional boundaries
+- referring callers appropriately
+- confirming follow-up actions
+
+5. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C and D.
+- Do not follow a predictable pattern.
+
+6. Learning Objective
+
+The learner should strengthen recognition and understanding of vocabulary commonly used during telephone conversations with patients' families while maintaining professional communication and patient confidentiality.
+
+Every sentence should reinforce safe, compassionate, and professional communication.
+
+7. Sentence Design
+
+- Every question must contain exactly one blank represented by "______".
+- Replace only the target vocabulary.
+- Every sentence should sound like authentic telephone communication used in hospitals.
+- Avoid dictionary definitions or generic examples.
+
+8. Medical Terminology
+
+- Use full clinical terminology rather than abbreviations whenever possible.
+
+Example:
+
+Correct:
+"authorised representative"
+
+Incorrect:
+"authorised rep"
+
+9. Difficulty
+
+- Include a balanced mix of common and moderately difficult clinical and communication vocabulary.
+- Require understanding of both the clinical situation and confidentiality requirements to identify the correct answer.
+
+Return a JSON array:
+
+[
+  {
+    "vocabulary": "{{correct vocabulary}}",
+    "sentence": "{{Sentence containing ______}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a key phrases drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week:
+{{missed_phrases}}
+
+Generate 10–15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Caller says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Clinical Context
+
+- Every conversation should reflect realistic telephone communication between a bedside nurse and a patient's family member or authorised representative in hospitals in {{country}}.
+- The learner always plays the bedside nurse answering or making the phone call.
+- The AI plays a family member, friend, spouse, parent, child, or authorised representative calling about a patient.
+- Every situation should involve verifying identity, confirming authorisation, providing appropriate patient updates, responding to concerns, maintaining confidentiality, or explaining the next steps.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during telephone conversations with patients' families.
+
+3. Important Requirements
+
+- Every correct answer must naturally include one or more phrases from {{missed_phrases}} whenever appropriate.
+- Every scenario should reinforce one or more of the following competencies:
+  - verifying the caller's identity
+  - confirming authorisation before discussing patient information
+  - providing accurate information within the nurse's scope of practice
+  - communicating clearly without unnecessary medical jargon
+  - demonstrating empathy and professionalism
+  - maintaining confidentiality
+  - referring callers to the physician or appropriate healthcare provider when necessary
+  - explaining follow-up actions
+
+4. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two or more responses that a professional nurse could realistically say.
+- The learner must identify the MOST professional, compassionate, and clinically appropriate response.
+
+The correct response should demonstrate one or more of the following:
+
+- verifies the caller's identity before discussing the patient
+- confirms authorisation appropriately
+- provides accurate information within the nurse's scope
+- explains confidentiality professionally
+- responds with empathy
+- avoids speculation
+- refers medical decisions or prognosis to the physician
+- clearly explains the next steps
+
+Incorrect responses should be plausible but less appropriate because they:
+
+- disclose information before verifying authorisation
+- speculate about the patient's condition or prognosis
+- use unnecessary medical jargon
+- fail to acknowledge the caller's concerns
+- fail to protect confidentiality
+- omit appropriate referrals or follow-up information
+
+5. Scenario Variety
+
+Include a balanced mix of situations involving:
+
+- requests for updates on the patient's condition
+- surgery or procedure questions
+- medication questions
+- prognosis questions
+- discharge planning
+- rehabilitation updates
+- visiting arrangements
+- pending laboratory or imaging results
+- emotional family members
+- requests from unauthorised callers
+- physician availability
+- follow-up appointments
+- home care questions
+- patient privacy concerns
+- care coordination after discharge
+
+6. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C, and D.
+- Do not follow a predictable answer pattern.
+
+7. Learning Objective
+
+The learner's objective is to develop automatic, confident, compassionate, and professional telephone communication with patients' families.
+
+Every option should sound like something a professional nurse could realistically say.
+
+The correct answer must be unambiguously the best response for the specific situation.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{Caller Name}}",
+    "relationship": "{{Relationship to Patient}}",
+    "prompt": "{{What the caller says}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week:
+{{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic telephone conversations between a bedside nurse and a patient's family member or authorised representative in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same communication skills in a new clinical situation.
+- The student always plays the bedside nurse answering or making the phone call.
+- The AI should play one or more family members, friends, or authorised representatives calling to ask about a patient's condition or care.
+- The scenario should progress naturally from answering the call, verifying the caller's identity and authorisation, discussing appropriate information, responding to concerns, and explaining the next steps before ending the conversation.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for hospitals in {{country}}.
+
+Examples:
+- Emily Carter (Daughter)
+- David Miller (Son)
+- Sarah Wilson (Spouse)
+- James Brown (Brother)
+- Rachel Kim (Authorised Representative)
+
+Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during telephone conversations between nurses and patients' families.
+- Each scene must contain at least 8 dialogue turns.
+- The student must speak at least 4 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Verifies the identity of the caller and confirms they are authorised to receive patient information before discussing the patient's care.
+- Provides accurate, appropriate, and understandable information within the nurse's scope of practice.
+- Demonstrates empathy by listening actively, acknowledging concerns, and communicating calmly, respectfully, and professionally.
+- Protects patient confidentiality, sets appropriate boundaries when information cannot be shared, and clearly explains follow-up actions or referrals when additional information is needed.
+
+5. Realism
+
+Include realistic telephone conversations involving situations such as:
+
+- requests for updates on a patient's condition
+- questions after surgery
+- medication concerns
+- discharge planning
+- rehabilitation updates
+- visiting arrangements
+- pending laboratory or imaging results
+- concerns after a sudden deterioration
+- emotional family members
+- requests from unauthorised callers
+- requests for physician updates
+- follow-up appointments
+- care coordination after discharge
+
+Include realistic clinical information such as:
+
+- patient identification
+- diagnosis
+- current condition
+- nursing care
+- medications
+- physician updates
+- pending investigations
+- rehabilitation plans
+- discharge planning
+- safety precautions
+- follow-up appointments
+
+Some situations should require the learner to politely decline sharing confidential information, verify authorisation, or refer the caller to the physician or another appropriate healthcare professional.
+
+6. Learning Objective
+
+The learner should develop automatic, confident, compassionate, and professional telephone communication with patients' families.
+
+The learner should naturally practise:
+
+- verifying the caller's identity and authorisation
+- providing appropriate patient updates
+- communicating clearly without unnecessary medical jargon
+- responding empathetically to concerns
+- protecting patient confidentiality
+- explaining professional boundaries
+- referring questions appropriately
+- confirming the next steps before ending the call
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{Family Member Name}}"
+  ],
+  "context": "{{Brief description of the telephone conversation}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON.
+No markdown.
+No explanation.
+
+`,
+	},
 	grammar: {
-		pronunciation: `TODO`,
-		vocabulary: `TODO`,
-		key_phrases: `TODO`,
-		roleplay: `TODO`,
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a grammar pronunciation drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following grammar topics this week:
+{{grammar_topics}}
+
+The student struggled with the following phonemes this week:
+{{weak_phonemes}}
+
+Generate 10–15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Grammar Focus:
+{{grammar_topic}}
+
+Sentence:
+{{example sentence}}
+
+2. Pronunciation Selection
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}).
+- Generate sentences that naturally reinforce the student's grammar topics ({{grammar_topics}}).
+- Every sentence must clearly contain one or more target phonemes while also demonstrating correct grammar.
+- Do not repeat the same grammar structure excessively.
+- Do not repeat sentences.
+
+3. Grammar Focus
+
+Adapt the sentences naturally according to the grammar topic, such as:
+
+- present simple
+- present continuous
+- past simple
+- present perfect
+- future forms
+- modal verbs
+- articles
+- prepositions
+- conditionals
+- passive voice
+- reported speech
+- question formation
+- subject-verb agreement
+- countable and uncountable nouns
+- relative clauses
+- comparative and superlative forms
+
+Do not explain grammar rules.
+
+The learner should reinforce grammar naturally through speaking.
+
+4. Clinical Context
+
+- Every sentence should sound like authentic communication used by nurses in hospitals in {{country}}.
+- Avoid isolated vocabulary or textbook examples.
+- Every sentence should reflect realistic nursing communication such as:
+  - shift handovers
+  - patient assessments
+  - speaking with doctors
+  - answering patients
+  - communicating with families
+  - medication administration
+  - discharge education
+  - documenting care
+  - emergency situations
+  - multidisciplinary discussions
+
+Examples:
+
+- "The patient has been waiting for the physician since this morning."
+- "If the patient's temperature increases again, I will notify the doctor immediately."
+- "She was transferred to the Intensive Care Unit after the procedure."
+- "Have you checked the patient's blood glucose level today?"
+
+5. Competency Alignment
+
+The selected sentences should reinforce the learner's ability to:
+
+- communicate naturally using grammatically correct English
+- produce complete and accurate sentences
+- speak fluently while maintaining correct grammar
+- communicate professionally in common clinical situations
+
+6. Difficulty
+
+- Include a balanced mix of simple and moderately complex sentence structures.
+- Use vocabulary commonly spoken by nurses.
+- Ensure the learner practises both pronunciation and grammatical accuracy simultaneously.
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "grammarFocus": "{{grammar topic}}",
+    "sentence": "{{natural clinical sentence}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.`,
+		vocabulary: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a grammar fill-in-the-blank drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following grammar topics this week:
+{{grammar_topics}}
+
+Generate 10–15 grammar questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}
+
+2. Clinical Context
+
+- Every sentence should describe a realistic nursing situation in a hospital in {{country}}.
+- The learner should determine the correct answer based primarily on grammar rather than vocabulary.
+- The blank may represent a verb, auxiliary verb, article, preposition, modal verb, pronoun, conjunction, or other grammatical element depending on the target grammar.
+- Every sentence should contain enough clinical context that only one answer is grammatically and contextually correct.
+
+Include realistic situations such as:
+
+- shift handovers
+- patient assessments
+- speaking with doctors
+- answering patients
+- answering families
+- medication administration
+- discharge education
+- documentation
+- telephone communication
+- emergency situations
+- multidisciplinary rounds
+
+3. Grammar Focus
+
+Generate questions based on the student's grammar topics ({{grammar_topics}}).
+
+Examples include:
+
+- present simple
+- present continuous
+- past simple
+- present perfect
+- future forms
+- modal verbs
+- articles
+- prepositions
+- passive voice
+- reported speech
+- subject-verb agreement
+- conditionals
+- question formation
+- countable and uncountable nouns
+- comparative and superlative forms
+- relative clauses
+
+Do not explain grammar rules.
+
+4. Realistic Answer Choices
+
+- Provide four answer choices.
+- Exactly one option must be grammatically correct.
+- The remaining options should be plausible grammatical alternatives rather than obviously incorrect words.
+- At least half of the questions should require careful grammatical reasoning to distinguish between multiple plausible answers.
+
+Examples of distractors include:
+
+- different verb tenses
+- different auxiliary verbs
+- similar prepositions
+- articles
+- modal verbs
+- pronouns
+- conjunctions
+
+Do not include spelling mistakes or nonsense words.
+
+5. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C and D.
+- Do not follow a predictable pattern.
+
+6. Learning Objective
+
+The learner should strengthen grammatical accuracy while reading and producing professional nursing English.
+
+The learner should improve their ability to recognise correct grammar within realistic healthcare communication.
+
+7. Sentence Design
+
+- Every question must contain exactly one blank represented by "______".
+- The blank should test grammar, not vocabulary knowledge.
+- Every sentence should sound like authentic communication used in hospitals.
+- Avoid textbook examples and isolated grammar exercises.
+
+Examples:
+
+- "The physician ______ already reviewed the laboratory results before morning rounds."
+- "If the patient's blood pressure falls again, we ______ notify the doctor immediately."
+- "She ______ caring for postoperative patients since the beginning of her shift."
+- "The medication was administered ______ the physician's order."
+
+8. Difficulty
+
+- Include a balanced mix of straightforward and moderately challenging grammar questions.
+- Require learners to understand both the grammar and the clinical context to identify the correct answer.
+
+Return a JSON array:
+
+[
+  {
+    "grammarFocus": "{{grammar topic}}",
+    "sentence": "{{Sentence containing ______}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a grammar key phrases drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following grammar topics this week:
+{{grammar_topics}}
+
+Generate 10–15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Respondent says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Clinical Context
+
+- Every conversation should reflect realistic communication in hospitals in {{country}}.
+- The learner always plays the nurse.
+- The AI may play a doctor, nurse, patient, family member, pharmacist, therapist, or another healthcare professional.
+- Adapt the conversations naturally according to the target grammar topic ({{grammar_topics}}).
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic healthcare communication commonly heard in hospitals.
+
+3. Grammar Focus
+
+- Every question should require the learner to recognise the response with the most grammatically accurate and natural English.
+- The grammar should be reinforced through realistic communication rather than explicit grammar instruction.
+- Depending on {{grammar_topics}}, focus on grammar such as:
+  - verb tenses
+  - articles
+  - prepositions
+  - modal verbs
+  - passive voice
+  - reported speech
+  - question formation
+  - subject-verb agreement
+  - conditionals
+  - relative clauses
+  - comparative structures
+  - countable and uncountable nouns
+
+4. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically appropriate.
+- At least half of the questions should contain two or more responses that a nurse could realistically say.
+- Only one response should be grammatically correct, the most natural, and the most appropriate for the situation.
+
+Incorrect answers should remain realistic but contain subtle grammar mistakes such as:
+
+- incorrect tense
+- incorrect article usage
+- incorrect preposition
+- incorrect word order
+- incorrect modal verb
+- subject-verb disagreement
+- incorrect conditional structure
+- incorrect reported speech
+- incorrect question formation
+
+Do not create spelling mistakes or unnatural sentences.
+
+5. Scenario Variety
+
+Include a balanced mix of conversations involving:
+
+- shift handovers
+- speaking with doctors
+- multidisciplinary rounds
+- answering patients
+- answering family members
+- medication administration
+- telephone communication
+- discharge education
+- emergency situations
+- documenting patient care
+
+6. Balanced Answer Distribution
+
+- Randomly distribute the correct answers across A, B, C, and D.
+- Do not follow a predictable answer pattern.
+
+7. Learning Objective
+
+The learner's objective is to improve grammatical accuracy while communicating naturally in professional nursing situations.
+
+Every option should sound like something a nurse could realistically say.
+
+The correct answer must be the only response that is both grammatically correct and professionally appropriate.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{Speaker Name}}",
+    "role": "{{Speaker Role}}",
+    "grammarFocus": "{{grammar topic}}",
+    "prompt": "{{What the speaker says}}",
+    "options": [
+      "{{option1}}",
+      "{{option2}}",
+      "{{option3}}",
+      "{{option4}}"
+    ],
+    "correctOption": "{{A|B|C|D}}"
+  }
+]
+
+Return only valid JSON.
+No markdown.
+No explanation.`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a grammar roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced the following grammar topics this week:
+{{practiced_grammar}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic communication in a hospital in {{country}}.
+- The roleplay should naturally require the learner to use the target grammar rather than explicitly teaching grammar rules.
+- Base the scenario on the student's practiced grammar topics ({{practiced_grammar}}), but do not copy previous scenarios exactly.
+- The learner should demonstrate correct grammar while communicating professionally in authentic nursing situations.
+- The student always plays the nurse.
+- The AI may play patients, nurses, doctors, family members, or other healthcare professionals depending on the scenario.
+- The conversation should progress naturally toward a clear clinical outcome.
+
+2. Characters
+
+- Name the student using student_character_name.
+- AI characters must have realistic names appropriate for hospitals in {{country}}.
+
+Examples:
+- Sarah Johnson (Charge Nurse)
+- Michael Patel (Physician)
+- Emily Carter (Patient)
+- James Wilson (Patient's Son)
+
+Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic healthcare communication commonly heard in hospitals in {{country}}.
+- Each scene must contain at least 8 dialogue turns.
+- The student must speak at least 4 times per scene.
+- The target grammar should appear naturally throughout the dialogue without drawing attention to it.
+
+4. Grammar Focus
+
+- The dialogue should create multiple opportunities for the learner to use the target grammar correctly.
+- Depending on {{topic}}, this may include:
+  - verb tenses
+  - articles
+  - prepositions
+  - modal verbs
+  - conditionals
+  - question formation
+  - reported speech
+  - passive voice
+  - subject-verb agreement
+  - countable and uncountable nouns
+  - comparative structures
+  - relative clauses
+
+- Do not explain grammar rules during the roleplay.
+- The emphasis should be on natural communication rather than explicit grammar instruction.
+
+5. Clinical Context
+
+Include realistic nursing situations such as:
+
+- shift handovers
+- speaking with doctors
+- speaking with patients
+- answering families' questions
+- giving discharge instructions
+- medication administration
+- documenting patient care
+- responding to emergencies
+- telephone communication
+- multidisciplinary rounds
+
+6. Learning Objective
+
+The learner should develop automatic, grammatically accurate spoken English while communicating naturally in professional nursing situations.
+
+The learner should practise:
+
+- speaking fluently without focusing consciously on grammar
+- using correct grammar naturally in context
+- communicating clearly and professionally
+- responding confidently in realistic clinical conversations
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{AI Character Name}}"
+  ],
+  "context": "{{Brief scenario description}}",
+  "grammar_focus": "{{target grammar}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON.
+No markdown.
+No explanation.`,
 	},
 };

@@ -1,0 +1,178 @@
+2026-07-22 01:25:56 AM [[32minfo[39m]: 	[32mMongoDB connected successfully[39m
+{"host":"ac-vdzlwvb-shard-00-00.syzkp32.mongodb.net","readyState":1,"attempt":1}
+
+Weekly Challenge Report — 2 challenges
+
+══════════════════════════════════════════════════════════════════════
+  Amanda Pada  <sa@eklan.ai>
+  Generated: 2026-07-22 00:25:46 UTC   Est. 40 min
+  Summary:   Personalized to address your weakest areas
+
+  PRONUNCIATION
+  Practice these words and phrases focusing on clear pronunciation.
+  1. "cardiac" [/ɑː/] — Cardiac monitoring is required after chest pain.
+  2. "artery" [/ɑːr/] — Assess circulation before removing an arterial line.
+  3. "tachycardia" [/ɑː/] — Tachycardia can indicate pain, fever, or blood loss.
+  4. "analgesia" [/æ/] — Give analgesia before wound dressing if prescribed.
+  5. "lactate" [/l/] — Check lactate when sepsis is suspected.
+  6. "allergy" [/æ/] — Confirm any allergy before administering antibiotics.
+  7. "fluid" [/l/] — Record fluid intake accurately during your shift.
+  8. "alert" [/l/] — Report if a patient becomes less alert.
+  9. "airway" [/eɪ/] — Maintain airway safety during sedation.
+  10. "sedation" [/eɪ/] — Sedation level must be assessed regularly in ICU.
+  11. "pain" [/eɪ/] — Ask about pain before mobilising a patient.
+  12. "level" [/ɛ/] — Monitor consciousness level after a fall.
+  13. "dressing" [/ɛ/] — Change dressing using aseptic technique.
+  14. "pressure" [/ɜːr/] — Recheck pressure manually if a reading seems unusual.
+  15. "temperature" [/ɛ/] — Measure temperature when infection is possible.
+  16. "transfer" [/ɜːr/] — Prepare transfer notes before moving a patient.
+  17. "catheter" [/ər/] — Inspect catheter site for redness or leakage.
+  18. "nebulizer" [/ər/] — Set up nebulizer therapy for wheeze if prescribed.
+
+  VOCABULARY
+  Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage.
+  1. Can ___ tell me your full name and date of birth?  → answer: "you"
+  2. ___ patient in bed four is nil by mouth before surgery.  → answer: "The"
+  3. The patient reports nausea ___ dizziness after standing.  → answer: "and"
+  4. I ___ checking the IV site now because it looks red.  → answer: "am"
+  5. Please record ___ blood pressure after the repeat check.  → answer: "the"
+  6. My initial ___ shows new confusion and shortness of breath.  → answer: "assessment"
+  7. This ___ is due at 18:00 and must be given with food.  → answer: "medication"
+  8. The patient needs clear ___ about wound care at home.  → answer: "education"
+  9. We need the patient’s ___ before inserting the line.  → answer: "consent"
+  10. There is a high risk of ___ because the wound is hot and swollen.  → answer: "infection"
+  11. Please send the ___ to the laboratory with the correct label.  → answer: "specimen"
+  12. There is moderate ___ from the surgical wound today.  → answer: "drainage"
+  13. Check the patient’s ___ before walking to the bathroom.  → answer: "mobility"
+  14. This situation needs urgent ___ because the oxygen requirement is increasing.  → answer: "escalation"
+  15. Please confirm the correct ___ before I administer this opioid.  → answer: "dosage"
+
+  ROLEPLAY
+  Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift.
+  SCENE 1: Ward handover with a change in condition
+    Nurse Sarah Chen: "Amanda, can you give me a quick update on Mr David Thompson before I take over?"
+    Amanda: "Mr David Thompson is a sixty eight year old man admitted with pneumonia. His breathing has become more difficult in the last hour."
+    Nurse Sarah Chen: "What are his current observations?"
+    Amanda: "His respiratory rate is twenty eight, oxygen saturation is ninety one percent on four litres, heart rate is one hundred and ten, and blood pressure is one hundred over sixty."
+    Nurse Sarah Chen: "What have you already done for him?"
+    Amanda: "I sat him upright, checked his oxygen tubing, repeated his observations, and prepared to contact the medical team."
+  SCENE 2: Escalating to the doctor
+    Dr Maya Patel: "Hello Amanda, this is Dr Maya Patel. What is happening with Mr Thompson?"
+    Amanda: "I am calling about Mr David Thompson on the general ward. I am concerned because his work of breathing is increasing and his oxygen saturation remains low."
+    Dr Maya Patel: "Does he have chest pain or new confusion?"
+    Amanda: "He denies chest pain, but he is more tired and answers slowly. I think he needs urgent medical review."
+    Dr Maya Patel: "What would you like me to do now?"
+    Amanda: "Please review him now. I will continue monitoring, keep him upright, and repeat his observations every fifteen minutes."
+  SCENE 3: Reassuring the patient
+    Mr David Thompson: "Amanda, I feel more breathless than before. Is something wrong?"
+    Amanda: "I can see that your breathing is harder. I have increased monitoring and asked the doctor to review you urgently."
+    Mr David Thompson: "Should I try to lie down and rest?"
+    Amanda: "Please stay sitting upright for now because that position can help your breathing. I will stay nearby and check you again shortly."
+    Mr David Thompson: "I feel anxious."
+    Amanda: "That is understandable. Try slow breaths with me. I will explain each step and keep you informed."
+
+  KEY PHRASES
+  Practice responding in these clinical situations using the correct key phrases.
+  1. [Incoming Nurse] Incoming Nurse: Can you summarise the main concern before I take handover?  → correct: "The main concern is increased shortness of breath with a rising respiratory rate."
+  2. [Doctor] Doctor: Why are you calling about this patient now?  → correct: "I am calling because the patient has deteriorated and needs urgent review."
+  3. [Patient] Patient: Why do you need to check my name and date of birth again?  → correct: "I need to confirm your identity so I can give the correct medication safely."
+  4. [Doctor] Doctor: What is your recommendation?  → correct: "I recommend urgent medical review and repeat observations while we wait."
+  5. [Patient] Patient: I do not understand why I cannot eat before my procedure.  → correct: "You need to remain nil by mouth to reduce the risk of aspiration during the procedure."
+  6. [Incoming Nurse] Incoming Nurse: Has the antibiotic been given?  → correct: "Yes, it was given at 14:00, and I documented it on the medication chart."
+  7. [Patient] Patient: The cannula site feels sore.  → correct: "I will assess the site for redness, swelling, pain, and leakage now."
+  8. [Doctor] Doctor: What have the observations shown over the last hour?  → correct: "The respiratory rate has increased, and the oxygen saturation has decreased."
+  9. [Patient] Relative: Can you tell me everything about his condition?  → correct: "I can share general updates, but I need to follow confidentiality and confirm what he has consented to share."
+  10. [Patient] Patient: I feel dizzy when I stand up.  → correct: "Please sit down while I check your blood pressure and assess your safety."
+  11. [Incoming Nurse] Incoming Nurse: What should I watch most closely overnight?  → correct: "Monitor breathing effort, oxygen requirement, temperature, and mental state."
+  12. [Doctor] Doctor: Has the patient received any pain relief?  → correct: "Yes, oral paracetamol was given at 10:00, with partial effect after thirty minutes."
+  13. [Patient] Patient: I want to get out of bed by myself.  → correct: "Please call us before standing so we can support you and reduce your falls risk."
+  14. [Incoming Nurse] Incoming Nurse: Is there anything pending from the shift?  → correct: "The urine specimen is still pending, and the doctor is due to review the blood results."
+  15. [Doctor] Doctor: Can you read back the medication order?  → correct: "I will read it back to confirm: furosemide forty milligrams IV once now."
+
+══════════════════════════════════════════════════════════════════════
+  Amanda Pada  <sa@eklan.ai>
+  Generated: 2026-07-19 21:48:56 UTC   Est. 40 min
+  Summary:   Personalized to address your weakest areas
+
+  PRONUNCIATION
+  Practice these words and phrases focusing on clear pronunciation.
+  1. "heart" [/ɑːr/] — Check the heart rhythm on the monitor before giving the medication.
+  2. "chart" [/ɑːr/] — Please update the chart after the wound assessment.
+  3. "guarding" [/ɑːr/] — The patient has abdominal guarding during palpation.
+  4. "urine" [/ɜːr/] — Measure the urine output every hour in ICU.
+  5. "urgent" [/ɜːr/] — This is an urgent review because the oxygen saturation is falling.
+  6. "nurse" [/ɜːr/] — The nurse confirmed the allergy status before administering antibiotics.
+  7. "pain" [/eɪ/] — Assess the pain score before and after analgesia.
+  8. "drain" [/eɪ/] — Empty the surgical drain using aseptic technique.
+  9. "vein" [/eɪ/] — Choose a suitable vein before inserting the cannula.
+  10. "rate" [/r/] — Set the infusion rate according to the prescription.
+  11. "respiration" [/r/] — Record the respiration rate with the other vital signs.
+  12. "rash" [/r/] — Report a new rash after the first antibiotic dose.
+  13. "lung" [/l/] — Listen to the lung sounds before documenting the assessment.
+  14. "level" [/l/] — Check the blood glucose level before breakfast.
+  15. "liver" [/l/] — Review the liver function results before giving this medication.
+  16. "allergy" [/l/] — Confirm the allergy history with the patient and the medication chart.
+  17. "alert" [/l/] — The patient is alert and responding appropriately.
+
+  VOCABULARY
+  Focus on using these vocabularies correctly. Pay attention to the meaning and appropriate usage.
+  1. This is ___ patient in bed six who was admitted with pneumonia.  → answer: "the"
+  2. Can ___ tell me your full name and date of birth?  → answer: "you"
+  3. His blood pressure has dropped ___ his urine output is reduced.  → answer: "and"
+  4. I ___ going to check your temperature now.  → answer: "am"
+  5. I need ___ check your blood pressure again in fifteen minutes.  → answer: "to"
+  6. I will do a full ___ before I call the doctor.  → answer: "assessment"
+  7. I must check the patient’s ___ before giving penicillin.  → answer: "allergies"
+  8. The patient needs ___ because the pain score is eight out of ten.  → answer: "analgesia"
+  9. I will give you a brief ___ before I leave the ward.  → answer: "handover"
+  10. The next antibiotic ___ is due at fourteen hundred hours.  → answer: "dose"
+  11. Please document the patient’s fluid ___ at the end of the shift.  → answer: "intake"
+  12. His urine ___ has been thirty millilitres per hour.  → answer: "output"
+  13. I need to flush the IV ___ before administering the drug.  → answer: "cannula"
+  14. The patient is clinically ___ and needs urgent medical review.  → answer: "deteriorating"
+  15. We must use strict ___ technique during this dressing change.  → answer: "aseptic"
+  16. The patient is short of breath and needs oxygen ___ monitoring.  → answer: "saturation"
+
+  ROLEPLAY
+  Improve your speaking and conversational skills in these difficult scenarios. Make your mistakes here, not during your shift.
+  SCENE 1: Rapid ICU Handover
+    Nurse Sarah Chen: "I have just arrived for the late shift. Please give me a focused update on Mr. Robert Lewis."
+    Nurse: "Mr. Robert Lewis is a sixty-eight-year-old post-operative patient after bowel surgery. He has become more drowsy during this shift."
+    Nurse Sarah Chen: "What are your main concerns at this moment?"
+    Nurse: "My main concern is possible sepsis because his temperature is rising, his pulse is fast, and his blood pressure is lower than earlier."
+    Nurse Sarah Chen: "What actions have already been completed?"
+    Nurse: "I repeated his observations, checked his surgical site, reviewed his fluid balance, and prepared recent blood results for medical review."
+    Nurse Sarah Chen: "What do you need me to continue monitoring?"
+    Nurse: "Please continue close monitoring of his vital signs, mental state, wound appearance, and fluid balance. I will contact the doctor now."
+  SCENE 2: Escalating to the Doctor
+    Dr. Michael Patel: "This is Dr. Michael Patel. What is the situation?"
+    Nurse: "I am calling about Mr. Robert Lewis in ICU bed four. He is post-operative and his condition is worsening."
+    Dr. Michael Patel: "Give me the key clinical changes."
+    Nurse: "His temperature is thirty-eight point nine, pulse is one hundred and twenty-six, blood pressure is ninety-two over fifty-eight, and he is more confused."
+    Dr. Michael Patel: "What is your assessment?"
+    Nurse: "I am concerned about early septic shock. He needs urgent medical review and possible sepsis treatment."
+    Dr. Michael Patel: "What do you recommend while I am on my way?"
+    Nurse: "I recommend urgent review at the bedside, repeat blood tests, blood cultures, IV fluids as prescribed, and antibiotics if sepsis is confirmed."
+
+  KEY PHRASES
+  Practice responding in these clinical situations using the correct key phrases.
+  1. [Incoming Nurse] Incoming nurse: Can you give me a quick update on bed three before you leave?  → correct: "Certainly. I will use SBAR and start with the current situation."
+  2. [Patient] Patient: Why do you need to check my identity again when you already know me?  → correct: "I need to confirm your identity every time for safety before care or medication."
+  3. [Doctor] Doctor: What is your clinical concern about this patient?  → correct: "I am concerned that the patient is deteriorating and needs urgent review."
+  4. [Patient] Patient: I feel dizzy when I stand up.  → correct: "Please stay seated while I check your blood pressure and ask for assistance."
+  5. [Incoming Nurse] Incoming nurse: What should I monitor most closely after this opioid dose?  → correct: "Monitor sedation level, respiratory rate, oxygen saturation, and pain score."
+  6. [Patient] Patient: I do not understand why I cannot eat before surgery.  → correct: "You need to remain fasted to reduce the risk of aspiration during anaesthesia."
+  7. [Doctor] Doctor: Has the antibiotic been given yet?  → correct: "Not yet. I have checked allergies and I am preparing it now according to the prescription."
+  8. [Patient] Patient: My wound dressing feels wet.  → correct: "I will assess the dressing now and check for bleeding or leakage."
+  9. [Incoming Nurse] Incoming nurse: What is the plan if the patient’s oxygen saturation falls again?  → correct: "Escalate immediately, reassess airway and breathing, and follow the oxygen protocol."
+  10. [Patient] Patient: I am worried because nobody has explained the new tablet.  → correct: "I can explain what it is for, check your questions, and confirm anything unclear with the prescriber."
+  11. [Doctor] Doctor: Can you summarise the background briefly?  → correct: "The patient was admitted yesterday with community-acquired pneumonia and has COPD."
+  12. [Patient] Patient: I want to get out of bed by myself.  → correct: "Please call before standing so I can assess your mobility and keep you safe."
+  13. [Incoming Nurse] Incoming nurse: Are there any infection control precautions?  → correct: "Yes. The patient is on contact precautions, so use gloves and apron for direct care."
+  14. [Doctor] Doctor: What would you like me to do now?  → correct: "I would like you to review the patient urgently because the observations are worsening."
+  15. [Patient] Patient: I feel very short of breath.  → correct: "I will sit you upright, check your observations, and get urgent help."
+  16. [Incoming Nurse] Incoming nurse: Has the family been updated today?  → correct: "Yes. The daughter was updated at sixteen hundred, and she understands the current plan."
+
+══════════════════════════════════════════════════════════════════════
+
+2026-07-22 01:25:59 AM [[32minfo[39m]: 	[32mDisconnected from MongoDB successfully[39m

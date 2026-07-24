@@ -327,7 +327,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 2. Characters
 
-- Name the student using student_character_name.
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
 - AI characters must have realistic names appropriate for their roles.
 Examples:
   - Dr. James Wilson
@@ -754,7 +754,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 2. Characters
 
-- Name the student using student_character_name.
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
 - AI characters must have realistic names appropriate for their roles.
 Examples:
   - Dr. James Wilson
@@ -1161,7 +1161,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 2. Characters
 
-- Name the student using student_character_name.
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
 - AI characters must have realistic names appropriate for their roles.
 Examples:
   - Dr. James Wilson
@@ -1579,7 +1579,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 2. Characters
 
-- Name the student using student_character_name.
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
 - AI characters must have realistic names appropriate for their roles.
 Examples:
   - Mr. David Thompson
@@ -1985,7 +1985,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 2. Characters
 
-- Name the student using student_character_name.
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
 - AI characters must have realistic names appropriate for their roles.
 Examples:
   - Mr. David Thompson

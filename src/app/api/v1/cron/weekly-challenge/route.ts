@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     contexts.map((c) => [String(c.studentId), c.country]),
   );
 
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 3;
 
   for (let i = 0; i < learners.length; i += BATCH_SIZE) {
     const batch = learners.slice(i, i + BATCH_SIZE);
@@ -134,10 +134,10 @@ export async function GET(req: NextRequest) {
             });
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('[weekly-challenge cron] error processing learner', {
           learnerId: String(learner._id),
-          error: err.message,
+          error: err instanceof Error ? err.message : String(err),
         });
         errors++;
       }
