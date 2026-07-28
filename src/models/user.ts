@@ -144,7 +144,8 @@ export interface IUser extends Document<Types.ObjectId | string> {
   subscriptionAmountPaid?: number | null;
   subscriptionPaymentMethod?: string | null;
   subscriptionAdminNote?: string | null;
-  subscriptionUpdatedBy?: Types.ObjectId | null;
+  /** Admin/tutor who last updated subscription bookkeeping (ObjectId or UUID). */
+  subscriptionUpdatedBy?: Types.ObjectId | string | null;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   /** Active Stripe Subscription Schedule id (Phase 7 price migration). */
@@ -381,7 +382,8 @@ const userSchema = new Schema<IUser>(
       maxlength: 500,
     },
     subscriptionUpdatedBy: {
-      type: Schema.Types.ObjectId,
+      // UserId: Better Auth admin/tutor accounts may have UUID _id values.
+      type: UserIdSchemaType as unknown as typeof Schema.Types.Mixed,
       ref: "User",
     },
     stripeCustomerId: {

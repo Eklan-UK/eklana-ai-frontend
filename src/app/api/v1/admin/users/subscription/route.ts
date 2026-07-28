@@ -6,8 +6,9 @@ import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import User from "@/models/user";
 import { logger } from "@/lib/api/logger";
-import { Types } from "mongoose";
+import mongoose from "mongoose";
 import { z } from "zod";
+import { isValidUserId, toUserIdQuery } from "@/lib/api/user-id";
 import {
   addMonthsToDate,
   billingPeriodToMonths,
@@ -21,7 +22,7 @@ import {
 import { syncUserSubscriptionFromProvider } from "@/domain/subscriptions/subscription-provider-sync.service";
 
 const updateSubscriptionSchema = z.object({
-  userId: z.string().refine((id) => Types.ObjectId.isValid(id), {
+  userId: z.string().refine((id) => isValidUserId(id), {
     message: "Invalid user ID format",
   }),
   plan: z.enum(["free", "premium"]),
@@ -64,7 +65,7 @@ function parseOptionalDate(
 
 async function handler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string }
+  context: { userId: string; userRole: string }
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();
@@ -310,13 +311,13 @@ async function handler(
       user.subscriptionAmountPaid = 0;
       user.subscriptionPaymentMethod = undefined;
       user.subscriptionAdminNote = input.note || undefined;
-      user.subscriptionUpdatedBy = context.userId;
+      user.subscriptionUpdatedBy = toUserIdQuery(context.userId);
     } else {
       const providerResult = await syncUserSubscriptionFromProvider(user);
 
       if (providerResult.synced) {
         user.subscriptionAdminNote = input.note || undefined;
-        user.subscriptionUpdatedBy = context.userId;
+        user.subscriptionUpdatedBy = toUserIdQuery(context.userId);
       } else if (!hasProviderBillingLink(user)) {
         const billingPeriod: BillingPeriod =
           input.billingPeriod ??
@@ -346,14 +347,17 @@ async function handler(
         user.subscriptionProvider = "manual";
         user.subscriptionPlan = "premium";
         user.subscriptionAdminNote = input.note || undefined;
-        user.subscriptionUpdatedBy = context.userId;
+        user.subscriptionUpdatedBy = toUserIdQuery(context.userId);
       } else {
         user.subscriptionAdminNote = input.note || undefined;
-        user.subscriptionUpdatedBy = context.userId;
+        user.subscriptionUpdatedBy = toUserIdQuery(context.userId);
       }
     }
 
-    await user.save();
+    // Only validate fields this admin path mutates. Full-document validation
+    // rejects legacy/OAuth users with empty lastName ("Last name is required")
+    // even though the profile was never edited here.
+    await user.save({ validateModifiedOnly: true });
 
     logger.info("Subscription updated by admin", {
       userId: user._id,
@@ -387,6 +391,24 @@ async function handler(
           code: "ValidationError",
           message: "Validation failed",
           errors: error.issues,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      error instanceof mongoose.Error.CastError ||
+      error instanceof mongoose.Error.ValidationError
+    ) {
+      const err = error as Error;
+      logger.error("Error updating subscription", {
+        error: err.message,
+        stack: err.stack,
+      });
+      return NextResponse.json(
+        {
+          code: "ValidationError",
+          message: err.message,
         },
         { status: 400 }
       );
