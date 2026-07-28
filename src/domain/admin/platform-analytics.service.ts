@@ -10,6 +10,7 @@ import {
 	getAggregatedPronunciationWordStats,
 	type OverallPronunciationStats,
 	type PhonemeProblemArea,
+	type LetterProblemArea,
 } from '@/domain/pronunciations/pronunciation-analytics.service';
 import {
 	computeDrillAssignmentStatistics,
@@ -171,6 +172,7 @@ export interface AnalyticsDashboardPronunciation {
 	challengingWords?: number;
 	problemAreas: {
 		topIncorrectPhonemes: PhonemeProblemArea[];
+		topIncorrectLetters: LetterProblemArea[];
 	};
 }
 
@@ -1343,6 +1345,7 @@ export async function getAnalyticsDashboard(
 			challengingWords: pronunciationWordStats.challengingWords,
 			problemAreas: {
 				topIncorrectPhonemes: problemAreas.topIncorrectPhonemes,
+				topIncorrectLetters: problemAreas.topIncorrectLetters,
 			},
 		},
 		grammar,

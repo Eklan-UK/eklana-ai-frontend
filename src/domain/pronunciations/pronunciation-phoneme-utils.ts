@@ -1,7 +1,12 @@
-import type { PhonemeProblemArea, StrugglingWord } from './pronunciation-analytics.service';
+import type {
+	LetterProblemArea,
+	PhonemeProblemArea,
+	StrugglingWord,
+} from './pronunciation-analytics.service';
 
 const DEFAULT_PASS_THRESHOLD = 70;
 const MAX_PHONEMES = 10;
+const MAX_LETTERS = 10;
 const MAX_WORDS_PER_SOUND = 5;
 
 interface PhoneScore {
@@ -192,6 +197,80 @@ export function accumulatePhonemeHits(
 			if (wordScore.word) {
 				entry.words.set(wordScore.word, (entry.words.get(wordScore.word) ?? 0) + 1);
 			}
+		}
+	}
+}
+
+/** Merge letter problem areas by letter key, summing counts and merging word lists. */
+export function mergeLetterProblemAreas(
+	...sources: LetterProblemArea[][]
+): LetterProblemArea[] {
+	const merged = new Map<string, LetterProblemArea>();
+
+	for (const source of sources) {
+		for (const item of source) {
+			if (!item.letter) continue;
+			const existing = merged.get(item.letter);
+			if (existing) {
+				existing.count += item.count;
+				existing.words = mergeWordLists(existing.words ?? [], item.words ?? []);
+			} else {
+				merged.set(item.letter, {
+					letter: item.letter,
+					count: item.count,
+					words: [...(item.words ?? [])],
+				});
+			}
+		}
+	}
+
+	return Array.from(merged.values())
+		.sort((a, b) => b.count - a.count)
+		.slice(0, MAX_LETTERS);
+}
+
+/** Build LetterProblemArea[] from raw letter hit counts (snapshot / progress aggregation). */
+export function buildLetterProblemAreas(
+	letterCounts: Map<string, { count: number; words: Map<string, number> }>
+): LetterProblemArea[] {
+	return Array.from(letterCounts.entries())
+		.map(([letter, { count, words }]) => ({
+			letter,
+			count,
+			words: Array.from(words.entries())
+				.map(([word, wordCount]) => ({ word, count: wordCount }))
+				.sort((a, b) => b.count - a.count)
+				.slice(0, MAX_WORDS_PER_SOUND),
+		}))
+		.sort((a, b) => b.count - a.count)
+		.slice(0, MAX_LETTERS);
+}
+
+/**
+ * Accumulate letter hits from extracted snapshot data.
+ * Same heuristic as extract / word-attempt write path: failing words contribute unique a–z letters.
+ */
+export function accumulateLetterHits(
+	counts: Map<string, { count: number; words: Map<string, number> }>,
+	extracted: ExtractedPhonemeData,
+	passThreshold = DEFAULT_PASS_THRESHOLD
+): void {
+	for (const wordScore of extracted.wordScores) {
+		if (wordScore.score >= passThreshold) continue;
+		const word = wordScore.word;
+		if (!word) continue;
+
+		const seen = new Set<string>();
+		for (const char of word.toLowerCase()) {
+			if (!/[a-z]/.test(char) || seen.has(char)) continue;
+			seen.add(char);
+
+			if (!counts.has(char)) {
+				counts.set(char, { count: 0, words: new Map() });
+			}
+			const entry = counts.get(char)!;
+			entry.count++;
+			entry.words.set(word, (entry.words.get(word) ?? 0) + 1);
 		}
 	}
 }
