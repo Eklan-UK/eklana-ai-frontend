@@ -12,7 +12,7 @@
 - Day 6 — Eklan Free Talk
 - Day 7 — Eklan Weekly Challenge
 
-### 2. Conducting CPR
+### 2. Follow-up with Patients
 
 - Day 1 — Live Session
 - Day 2 — Vocabulary & Expressions Drills
@@ -22,7 +22,7 @@
 - Day 6 — Eklan Free Talk
 - Day 7 — Eklan Weekly Challenge
 
-### 3. Follow-up with Patients
+### 3. Admitting a Patient
 
 - Day 1 — Live Session
 - Day 2 — Vocabulary & Expressions Drills
@@ -32,17 +32,7 @@
 - Day 6 — Eklan Free Talk
 - Day 7 — Eklan Weekly Challenge
 
-### 4. Admitting a Patient
-
-- Day 1 — Live Session
-- Day 2 — Vocabulary & Expressions Drills
-- Day 3 — Roleplay Drills
-- Day 4 — Pronunciation Practice Drills
-- Day 5 — Key Phrase Drills
-- Day 6 — Eklan Free Talk
-- Day 7 — Eklan Weekly Challenge
-
-### 5. Small Talk with a Patient
+### 4. Small Talk with a Patient
 
 - Day 1 — Live Session
 - Day 2 — Vocabulary & Expressions Drills
@@ -229,7 +219,17 @@
 - Day 5 — Eklan Free Talk
 - Day 6 — Eklan Weekly Challenge
 
-### 16. Grammar
+### 16. Conducting CPR
+
+- Day 1 — Live Session
+- Day 2 — Vocabulary & Expressions Drills
+- Day 3 — Roleplay Drills
+- Day 4 — Pronunciation Practice Drills
+- Day 5 — Key Phrase Drills
+- Day 6 — Eklan Free Talk
+- Day 7 — Eklan Weekly Challenge
+
+### 17. Grammar
 
 - Day 1 — Vocabulary & Expressions Drills
 - Day 2 — Roleplay Drills

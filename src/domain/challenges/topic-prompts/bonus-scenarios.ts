@@ -1,6 +1,6 @@
 // Mission 5: Bonus Scenarios
 // Real per-topic prompt copy for phone_colleagues, phone_other_departments,
-// phone_patient_families. `grammar` remains a TODO placeholder (no authored copy yet).
+// phone_patient_families, conducting_cpr. `grammar` remains a TODO placeholder (no authored copy yet).
 export const bonusScenarioPrompts: Record<string, {
 	pronunciation: string;
 	vocabulary: string;
@@ -1654,6 +1654,434 @@ Return only valid JSON.
 No markdown.
 No explanation.
 
+`,
+	},
+	conducting_cpr: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a pronunciation drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week: {{weak_phonemes}}
+
+The student struggled with the following words this week: {{weak_words}}
+
+Generate 10 - 15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Important Requirements
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}) first.
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used within the selected mission and topic.
+- Every word must clearly contain the target phoneme.
+- Do not repeat the same word.
+- Use vocabulary that nurses commonly pronounce during real patient care.
+
+3. Clinical Context
+
+- Every sentence must sound like authentic communication in hospitals in {{country}}.
+- Avoid textbook examples or dictionary definitions.
+- The sentence should naturally reflect the selected mission and topic.
+- Use realistic patient names, symptoms, medications, procedures, equipment, or healthcare professionals where appropriate.
+- The pronunciation practice should reinforce professional nursing communication rather than isolated vocabulary.
+
+4. Competency Alignment
+
+The selected words and sentences should naturally reinforce the learner's ability to:
+- Recognizes cardiac arrest and patient deterioration quickly, identifying critical signs such as unresponsiveness, absent pulse, respiratory failure, or sudden collapse.
+- Initiates immediate emergency response, including activating Code Blue, starting high-quality CPR, providing oxygen, and preparing defibrillation.
+- Communicates CPR instructions clearly and calmly, giving concise, professional directions while maintaining leadership during emergencies.
+- Uses accurate ICU and CPR terminology, applying appropriate clinical language throughout emergency assessment and treatment.
+
+The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult medical terminology.
+- Include words from different clinical categories such as:
+  - symptoms
+  - assessments
+  - medications
+  - procedures
+  - medical equipment
+  - professional communication
+- Avoid extremely rare medical terminology unless it is directly relevant to the selected topic.
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural clinical sentence}}"
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses preparing to work in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+- Competencies: {{competencies}}
+- The student struggled with these words this week: {{weak_words}}
+
+The goal is to strengthen the learner's clinical vocabulary while reinforcing the communication competencies required for this topic.
+
+Generate 10-15 fill-in-the-blank questions according to the following rules.
+
+1. Vocabulary Selection
+
+- Use the student's weak words: {{weak_words}}.
+- If fewer than 10 words are provided, create more sentences for the weak words to be used in.
+- Every vocabulary item must be directly relevant to the topic.
+- Prioritize vocabulary that nurses actively use during patient care, communication, assessment, documentation, and collaboration.
+- Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
+- Every sentence must contain enough clinical context that only one answer is correct.
+
+2. Competency Alignment
+
+The vocabulary should naturally reinforce the following competencies:
+
+{{competencies}}
+
+Every question should require vocabulary that supports one or more of these competencies.
+
+For example, vocabulary may relate to:
+
+- patient assessment
+- recognizing deterioration
+- emergency interventions
+- medications
+- monitoring
+- procedures
+- patient education
+- communication with physicians or nurses
+- professional clinical terminology
+
+The competency should be demonstrated through the clinical situation rather than explicitly stated.
+
+3. Sentence Design
+
+- Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}.
+- Replace only the target vocabulary with the blank.
+- Every sentence must describe a realistic clinical situation in a hospital in {{country}}.
+- Include sufficient clinical context such as:
+  - patient symptoms
+  - vital signs
+  - medications
+  - laboratory results
+  - physician orders
+  - nursing interventions
+  - medical equipment
+  - procedures
+- The sentence should contain enough information that only one answer is clinically appropriate.
+- Avoid dictionary-style definitions or generic example sentences.
+- The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
+
+4. Answer Options
+
+- Provide four answer choices.
+- Exactly one option must be correct.
+- All incorrect options must be legitimate clinical vocabulary.
+- Incorrect options should be plausible but clearly incorrect for the specific clinical situation because of:
+  - incorrect assessment
+  - incorrect intervention
+  - incorrect procedure
+  - incorrect equipment
+  - incorrect medication
+  - incorrect clinical meaning
+- Do not use nonsense words.
+- Do not use synonyms of the correct answer.
+- Do not use different grammatical forms of the correct answer.
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+5. Medical Terminology
+
+- Do not use acronyms as the correct answer.
+- Always use the full clinical term.
+
+Example:
+
+Correct:
+"intravenous line"
+
+Incorrect:
+"IV line"
+
+- Use terminology commonly used by nurses in {{country}}.
+
+6. Difficulty
+
+- Include a balanced mix of straightforward and moderately challenging questions.
+- Prioritize clinical reasoning over simple vocabulary recall.
+- Ensure the learner must understand the clinical context to identify the correct answer.
+
+7. Learning Objective
+
+The learner's objective is to strengthen recognition and understanding of emergency and critical-care vocabulary while improving clinical communication during high-pressure situations.
+
+- Every option must be authentic medical vocabulary.
+- The correct answer must be unambiguously correct for the specific clinical situation.
+- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, procedure, equipment, medication, or clinical meaning.
+- Every sentence should reflect realistic emergency or ICU scenarios.
+
+8. Difficulty
+
+- Include a balanced mix of straightforward and moderately challenging questions.
+- Prioritize clinical reasoning over simple vocabulary recall.
+- Ensure the learner must understand the clinical context to identify the correct answer.
+
+9. Output Format
+
+Return only valid JSON.
+
+[
+  {
+    "vocabulary": "{{term}}",
+    "sentence": "{{sentence with ______}}",
+    "correctAnswer": "{{term}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON.
+
+Do not include markdown.
+
+Do not include explanations.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a key phrases drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week: {{missed_phrases}}
+
+Generate 10 - 15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Respondent says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Important Requirements
+
+- The conversation should reflect a realistic CPR or cardiac arrest situation in a hospital in {{country}}.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication between nurses, physicians, respiratory therapists, rapid response teams, and patients' family members where appropriate.
+- Every correct answer must contain at least one authentic phrase from {{missed_phrases}} whenever possible.
+
+3. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two answers that a competent nurse could realistically say.
+- The learner must identify the MOST appropriate response based on the clinical situation.
+
+- The correct answer should demonstrate one or more of the following competencies:
+
+- Recognizes cardiac arrest or patient deterioration immediately by identifying signs such as unresponsiveness, absence of pulse, abnormal heart rhythm, respiratory failure, oxygen desaturation, or sudden collapse.
+- Initiates immediate high-quality CPR by activating Code Blue, beginning chest compressions, requesting the defibrillator, applying oxygen support, or coordinating the emergency response.
+- Gives clear, calm, and direct CPR instructions using concise phrases such as:
+  - "Start chest compressions."
+  - "Call Code Blue."
+  - "Check for a pulse."
+  - "Resume CPR."
+  - "Everybody clear."
+- Uses professional ICU and CPR terminology accurately, including terms such as cardiac arrest, chest compressions, ventricular fibrillation, oxygen saturation, pulse check, airway management, defibrillation, epinephrine, return of spontaneous circulation, and heart rhythm.
+
+4. Balanced Answer Distribution
+
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+5. Learning Objective
+
+The learner's objective is to develop automatic, confident, and clinically appropriate communication during CPR and cardiac arrest situations through repeated practice in realistic emergency scenarios.
+
+- Every option should sound like something a professional healthcare provider could realistically say.
+- The correct answer must be unambiguously the best response for the specific situation.
+- Incorrect answers should be plausible but incorrect because of incorrect timing, inappropriate intervention, incomplete assessment, inaccurate clinical information, or poor prioritization—not because they sound unprofessional.
+- Every prompt must contain enough clinical detail that only one response is the best choice.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{who is speaking to the nurse — e.g. Doctor, Incoming Nurse, Respiratory Therapist, Patient's Family Member}}",
+    "prompt": "{{what they say to the nurse}}",
+    "correctAnswer": "{{the correct response}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic CPR or cardiac arrest situations in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same competencies in a new clinical situation.
+- The student always plays the nurse.
+- The scenario should progress naturally from patient deterioration through emergency intervention to patient stabilization, transfer, or handoff.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for their roles.
+Examples:
+  - Dr. James Wilson
+  - Sarah Chen
+  - Michael Patel
+  - Mr. David Thompson
+  - Emily Rodriguez
+- Never use role titles as names.
+- Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete, natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during emergencies in hospitals in {{country}}.
+- Each scene must contain at least 6 dialogue turns.
+- The student must speak at least 3 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Recognizes cardiac arrest and patient deterioration immediately by identifying signs such as unresponsiveness, absence of pulse, abnormal heart rhythm, respiratory failure, oxygen desaturation, or sudden collapse.
+- Initiates immediate high-quality CPR by activating Code Blue, beginning chest compressions, requesting the defibrillator, applying oxygen support, or coordinating the emergency response.
+- Gives clear, calm, and direct CPR instructions using professional emergency communication such as:
+  - "Start chest compressions."
+  - "Call Code Blue."
+  - "Check for a pulse."
+  - "Resume CPR."
+  - "Everybody clear."
+- Uses professional ICU and CPR terminology accurately, including cardiac arrest, chest compressions, ventricular fibrillation, oxygen saturation, pulse check, airway management, defibrillation, epinephrine, return of spontaneous circulation (ROSC), and heart rhythm.
+
+5. Realism
+
+- Include realistic vital signs, monitor alarms, patient deterioration, medication administration, CPR procedures, physician instructions, and multidisciplinary teamwork where appropriate.
+- AI characters should ask realistic questions, provide clinical updates, or issue instructions that require the learner to respond professionally.
+- Include natural interruptions and rapidly changing patient conditions that reflect real CPR situations.
+
+6. Learning Objective
+
+The learner's objective is to develop automatic, confident, and clinically appropriate communication while participating in CPR and cardiac arrest management.
+
+The roleplay should encourage the learner to:
+
+- recognize deterioration quickly
+- communicate effectively during emergencies
+- coordinate with the healthcare team
+- provide concise patient updates
+- use accurate CPR terminology
+- remain calm and professional under pressure
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{AI Character 1}}",
+    "{{AI Character 2}}"
+  ],
+  "context": "{{Brief scenario description}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON. No markdown. No explanation.
 `,
 	},
 	grammar: {
