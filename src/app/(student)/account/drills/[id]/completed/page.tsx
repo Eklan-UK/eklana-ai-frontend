@@ -15,6 +15,7 @@ import {
   XCircle,
   Clock3,
   FileText,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api";
@@ -26,6 +27,11 @@ import {
 } from "@/utils/drill";
 import { useQuery } from "@tanstack/react-query";
 import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
+
+function formatPercent(n: number | undefined | null): number {
+  const value = Number(n);
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
 
 interface DrillAttempt {
   _id: string;
@@ -158,6 +164,20 @@ interface DrillAttempt {
     completed: boolean;
     timeSpent: number;
   };
+  fillBlankResults?: {
+    items: Array<{
+      sentence: string;
+      blanks: Array<{
+        position: number;
+        selectedAnswer: string;
+        correctAnswer: string;
+        isCorrect: boolean;
+      }>;
+    }>;
+    totalBlanks?: number;
+    correctBlanks?: number;
+    score?: number;
+  };
   keyPhrasesResults?: {
     items: Array<{
       prompt: string;
@@ -171,6 +191,115 @@ interface DrillAttempt {
     correctItems: number;
     score: number;
   };
+}
+
+function FillBlankResultsView({
+  items,
+  totalBlanks,
+  correctBlanks,
+  score,
+}: {
+  items: NonNullable<DrillAttempt["fillBlankResults"]>["items"];
+  totalBlanks: number;
+  correctBlanks: number;
+  score: number;
+}) {
+  const [expandedIdx, setExpandedIdx] = React.useState<number | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-4">
+          Fill Blank Summary
+        </h3>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-[#22c55e]">{correctBlanks}</p>
+            <p className="text-sm text-muted-foreground">Correct</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-foreground">{totalBlanks}</p>
+            <p className="text-sm text-muted-foreground">Total</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-[#22c55e]">
+              {formatPercent(score)}%
+            </p>
+            <p className="text-sm text-muted-foreground">Score</p>
+          </div>
+        </div>
+      </Card>
+      {items?.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="font-semibold text-foreground">Your answers</h4>
+          {items.map((item, idx) => {
+            const isExpanded = expandedIdx === idx;
+            const itemCorrect = item.blanks.filter((b) => b.isCorrect).length;
+            const itemTotal = item.blanks.length;
+            const allCorrect = itemTotal > 0 && itemCorrect === itemTotal;
+
+            return (
+              <Card key={idx} className="overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                  className="w-full p-4 flex items-start gap-3 text-left hover:bg-muted/50 transition-colors"
+                >
+                  {allCorrect ? (
+                    <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground break-words">
+                      {item.sentence || `Sentence ${idx + 1}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {itemCorrect}/{itemTotal} correct
+                    </p>
+                  </div>
+                  <ChevronDown
+                    className={`w-5 h-5 text-muted-foreground shrink-0 mt-0.5 transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {isExpanded && (
+                  <div className="px-4 pb-4 pt-0 space-y-3 border-t border-border">
+                    {item.blanks.map((blank, blankIdx) => (
+                      <div
+                        key={blankIdx}
+                        className="flex items-start gap-2 pt-3"
+                      >
+                        {blank.isCorrect ? (
+                          <CheckCircle className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-muted-foreground mb-0.5">
+                            Blank {blankIdx + 1}
+                          </p>
+                          <p className="text-sm font-medium text-foreground break-words">
+                            {blank.selectedAnswer || "—"}
+                          </p>
+                          {!blank.isCorrect && (
+                            <p className="text-sm text-green-700 mt-1 break-words">
+                              Correct: {blank.correctAnswer}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface DrillAssignment {
@@ -1016,7 +1145,7 @@ export default function DrillCompletedPage() {
                     <p className="text-sm text-muted-foreground">Questions</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-[#22c55e]">{Math.round(score)}%</p>
+                    <p className="text-2xl font-bold text-[#22c55e]">{formatPercent(score)}%</p>
                     <p className="text-sm text-muted-foreground">Score</p>
                   </div>
                 </div>
@@ -1044,7 +1173,7 @@ export default function DrillCompletedPage() {
                           )}
                           {item.pronunciationScore != null && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Pronunciation: {Math.round(item.pronunciationScore)}%
+                              Pronunciation: {formatPercent(item.pronunciationScore)}%
                             </p>
                           )}
                         </div>
@@ -1054,6 +1183,21 @@ export default function DrillCompletedPage() {
                 </div>
               )}
             </div>
+          );
+        }
+        break;
+
+      case "fill_blank":
+        if (attempt.fillBlankResults) {
+          const { items, totalBlanks, correctBlanks, score } =
+            attempt.fillBlankResults;
+          return (
+            <FillBlankResultsView
+              items={items || []}
+              totalBlanks={totalBlanks ?? 0}
+              correctBlanks={correctBlanks ?? 0}
+              score={score ?? 0}
+            />
           );
         }
         break;
@@ -1167,7 +1311,7 @@ export default function DrillCompletedPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <p className="text-3xl font-bold text-[#22c55e] mb-1">
-                {attempt.score || 0}%
+                {formatPercent(attempt.score)}%
               </p>
               <p className="text-sm text-muted-foreground">Overall Score</p>
             </div>

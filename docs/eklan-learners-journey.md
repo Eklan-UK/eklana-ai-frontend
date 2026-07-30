@@ -229,10 +229,20 @@
 - Day 6 — Eklan Free Talk
 - Day 7 — Eklan Weekly Challenge
 
-### 17. Grammar
+### 17. Discharging Patients
 
 - Day 1 — Vocabulary & Expressions Drills
 - Day 2 — Roleplay Drills
 - Day 3 — Pronunciation Practice Drills
 - Day 4 — Key Phrase Drills
-- Day 5 — Eklan Weekly Challenge
+- Day 5 — Eklan Free Talk
+- Day 6 — Eklan Weekly Challenge
+
+### 18. Grammar
+
+- Day 1 — Vocabulary & Expressions Drills
+- Day 2 — Roleplay Drills
+- Day 3 — Pronunciation Practice Drills
+- Day 4 — Key Phrase Drills
+- Day 5 — Eklan Free Talk
+- Day 6 — Eklan Weekly Challenge

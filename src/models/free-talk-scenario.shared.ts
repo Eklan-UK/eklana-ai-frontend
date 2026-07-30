@@ -14,6 +14,8 @@ export const FREE_TALK_SCENARIO_TYPES = [
 	'phone_department',
 	'family_questions',
 	'phone_family',
+	'discharge',
+	'grammar',
 ] as const;
 
 export type FreeTalkScenarioType = (typeof FREE_TALK_SCENARIO_TYPES)[number];
@@ -34,6 +36,8 @@ export const FREE_TALK_SCENARIO_TYPE_LABELS: Record<FreeTalkScenarioType, string
 	phone_department: 'Phone Communication with Other Departments',
 	family_questions: "Answering Families' and Friends' Questions",
 	phone_family: "Phone Communication with the Patient's Families",
+	discharge: 'Discharging Patients',
+	grammar: 'Grammar',
 };
 
 /** Normalize `include` / `usefulPhrases` from pasted text, JSON strings, or legacy array shapes. */

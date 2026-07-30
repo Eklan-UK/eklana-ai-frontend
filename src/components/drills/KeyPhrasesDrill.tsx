@@ -631,17 +631,7 @@ export default function KeyPhrasesDrill({
   ).length;
 
   return (
-    <DrillLayout
-      title={drill.title}
-      headerRight={
-        <BookmarkButton
-          itemId={`${drill._id}-kp-${currentIndex}`}
-          itemType="sentence"
-          content={currentItem.prompt}
-          sourceDrillId={drill._id}
-        />
-      }
-    >
+    <DrillLayout title={drill.title}>
       <div className="w-full space-y-6 pb-10">
         <DrillProgress
           current={answeredCount}
@@ -660,11 +650,19 @@ export default function KeyPhrasesDrill({
             <p className="min-w-0 flex-1 text-lg font-semibold text-foreground leading-snug break-words pr-1">
               {currentItem.prompt}
             </p>
-            <TTSButton
-              text={currentItem.prompt}
-              audioUrl={currentItem.promptAudioUrl}
-              className="shrink-0"
-            />
+            <div className="flex items-center gap-1 shrink-0">
+              <TTSButton
+                text={currentItem.prompt}
+                audioUrl={currentItem.promptAudioUrl}
+                className="shrink-0"
+              />
+              <BookmarkButton
+                itemId={`${drill._id}-kp-${currentIndex}`}
+                itemType="sentence"
+                content={currentItem.prompt}
+                sourceDrillId={drill._id}
+              />
+            </div>
           </div>
         </Card>
 

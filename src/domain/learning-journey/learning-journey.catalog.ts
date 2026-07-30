@@ -264,9 +264,16 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         freeTalkScenarioType: "cpr",
       },
       {
+        id: "discharging_patients",
+        title: "Discharging Patients",
+        order: 5,
+        freeTalkScenarioType: "discharge",
+      },
+      {
         id: "grammar",
         title: "Grammar",
-        order: 5,
+        order: 6,
+        freeTalkScenarioType: "grammar",
       },
     ],
   },
@@ -378,7 +385,8 @@ export function deriveMissionStates(
     const isEnrolled = enrolled.has(partDef.part);
     const isComplete =
       isEnrolled &&
-      (progress.total === 0 || progress.completed >= progress.total);
+      progress.total > 0 &&
+      progress.completed >= progress.total;
     const percent =
       progress.total > 0
         ? Math.min(100, Math.round((progress.completed / progress.total) * 100))

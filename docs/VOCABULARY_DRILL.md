@@ -90,7 +90,7 @@ Same pattern as the word screen, but:
 
 - **“Next Item”** (or **“Complete Drill”** on the last item) requires **both** `wordPassed` and `sentencePassed` for the current index.
 - **“Back to Word”** on the sentence screen resets the sentence UI state for rework.
-- **“Previous Item”** (on first screen only, when `currentIndex > 0`) goes to the previous vocabulary item and resets to the word screen.
+- **“Previous Item”** (on word or sentence screen when `currentIndex > 0`) goes to the previous vocabulary item and resets to the word screen.
 
 ### 3.6 End-of-drill review and submit
 

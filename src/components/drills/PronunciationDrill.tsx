@@ -4,7 +4,15 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronLeft,
+  Mic,
+  Loader2,
+  Lock,
+  Send,
+  Square,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
@@ -603,6 +611,16 @@ export default function PronunciationDrill({
     }
   };
 
+  const handlePreviousItem = () => {
+    if (currentIndex === 0 || isRecording || isAnalyzing) return;
+    setCurrentIndex(currentIndex - 1);
+    setCurrentScreen("word");
+    setPronunciationScore(null);
+    discardPendingRecording();
+    setShowMic(true);
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+  };
+
   const handleSubmit = async () => {
     if (!assignmentId && !weeklyChallengeMeta) {
       toast.error("Assignment ID is missing. Cannot submit drill.");
@@ -1141,20 +1159,15 @@ export default function PronunciationDrill({
               </Button>
             )}
 
-            {currentIndex > 0 && currentScreen === "word" && (
+            {currentIndex > 0 && (
               <Button
                 variant="outline"
                 size="md"
                 fullWidth
-                onClick={() => {
-                  setCurrentIndex(currentIndex - 1);
-                  setCurrentScreen("word");
-                  setPronunciationScore(null);
-                  discardPendingRecording();
-                  scrollContainerRef.current?.scrollTo({ top: 0 });
-                }}
+                onClick={handlePreviousItem}
                 disabled={isRecording || isAnalyzing}
               >
+                <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous Item
               </Button>
             )}

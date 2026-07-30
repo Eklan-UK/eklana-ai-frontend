@@ -25,6 +25,7 @@ import {
 } from "@/lib/drill/drill-checkpoint";
 import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -468,11 +469,14 @@ export default function FillBlankDrill({
                     };
                   }
                 );
-                const itemScore = Math.round(
-                  (itemAnswers.filter((a: any) => a.isCorrect).length /
-                    itemAnswers.length) *
-                    100
-                );
+                const itemScore =
+                  itemAnswers.length === 0
+                    ? 0
+                    : Math.round(
+                        (itemAnswers.filter((a: any) => a.isCorrect).length /
+                          itemAnswers.length) *
+                          100
+                      );
 
                 return (
                   <div key={itemIdx} className="p-4 bg-muted rounded-lg">
@@ -525,12 +529,22 @@ export default function FillBlankDrill({
                   <h2 className="text-xl font-bold">
                     Sentence {currentIndex + 1} of {items.length}
                   </h2>
-                  {currentItem.audioUrl && (
-                    <TTSButton
-                      text={currentItem.sentence}
-                      audioUrl={currentItem.audioUrl}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {currentItem.audioUrl && (
+                      <TTSButton
+                        text={currentItem.sentence}
+                        audioUrl={currentItem.audioUrl}
+                      />
+                    )}
+                    <BookmarkButton
+                      itemId={`${drill._id}-fb-${currentIndex}`}
+                      itemType="sentence"
+                      content={currentItem.sentence}
+                      translation={currentItem.translation}
+                      context={currentItem.context}
+                      sourceDrillId={drill._id}
                     />
-                  )}
+                  </div>
                 </div>
 
                 {currentItem.context?.trim() && (

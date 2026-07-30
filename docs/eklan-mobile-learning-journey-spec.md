@@ -663,7 +663,8 @@ Summary card for one Mission on My Plans.
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
 | 4 | `conducting_cpr` | Conducting CPR | `cpr` |
-| 5 | `grammar` | Grammar | — |
+| 5 | `discharging_patients` | Discharging Patients | `discharge` |
+| 6 | `grammar` | Grammar | `grammar` |
 
 #### Drill-to-topic mapping (server-side fields)
 
@@ -1411,7 +1412,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
       { id: "phone_other_departments",title: "Phone Communication with Other Departments",           order: 2, freeTalkScenarioType: "phone_department" },
       { id: "phone_patient_families", title: "Phone Communication with the Patient's Families",      order: 3, freeTalkScenarioType: "phone_family" },
       { id: "conducting_cpr",         title: "Conducting CPR",                                        order: 4, freeTalkScenarioType: "cpr" },
-      { id: "grammar",                title: "Grammar",                                              order: 5 },
+      { id: "discharging_patients",   title: "Discharging Patients",                                  order: 5, freeTalkScenarioType: "discharge" },
+      { id: "grammar",                title: "Grammar",                                              order: 6, freeTalkScenarioType: "grammar" },
     ],
   },
 ];
