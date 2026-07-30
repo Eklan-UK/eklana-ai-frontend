@@ -84,6 +84,9 @@ drillAssignmentSchema.index({ drillId: 1, learnerId: 1 }, { unique: true });
 // Get learner's active drills
 drillAssignmentSchema.index({ learnerId: 1, status: 1, dueDate: 1 });
 
+// Learner list sorted by assignedAt (my-drills findByLearnerId)
+drillAssignmentSchema.index({ learnerId: 1, assignedAt: -1 });
+
 // Admin's assignment history
 drillAssignmentSchema.index({ assignedBy: 1, assignedAt: -1 });
 

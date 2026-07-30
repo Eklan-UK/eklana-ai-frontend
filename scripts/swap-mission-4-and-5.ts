@@ -38,6 +38,7 @@ const BONUS_SCENARIO_TOPICS = [
   "phone_colleagues",
   "phone_other_departments",
   "phone_patient_families",
+  "conducting_cpr",
   "grammar",
 ] as const;
 

@@ -4,6 +4,12 @@ export interface AnalyticsDashboardPhonemeProblem {
   words?: Array<{ word: string; count: number }>;
 }
 
+export interface AnalyticsDashboardLetterProblem {
+  letter: string;
+  count: number;
+  words?: Array<{ word: string; count: number }>;
+}
+
 export interface AnalyticsDashboardData {
   progress: {
     overallProgressPct: number;
@@ -46,6 +52,7 @@ export interface AnalyticsDashboardData {
     }>;
     problemAreas: {
       topIncorrectPhonemes: AnalyticsDashboardPhonemeProblem[];
+      topIncorrectLetters: AnalyticsDashboardLetterProblem[];
     };
   };
   grammar: {

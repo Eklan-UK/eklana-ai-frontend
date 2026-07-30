@@ -9,7 +9,6 @@ import User from '@/models/user';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
-import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 import { sortAssignedPlanItems } from '@/lib/learner-assigned-plan';
 import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 import type {
@@ -18,8 +17,9 @@ import type {
 } from '@/lib/server/learner-my-drills.server';
 import { enrichLearnerDrillRowsWithTopicTitle } from '@/lib/server/enrich-learner-drill-topic';
 
+// List select only — omit roleplay_scenes/context (heavy); detail routes fetch those.
 const LEARNER_DRILL_SELECT =
-  'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
+  'title type difficulty date duration_days audio_example_url student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
 
 function isPopulatedDrillDoc(
   value: unknown,
@@ -164,8 +164,7 @@ export async function getLearnerSavedDrillsPayload(
     };
   });
 
-  await purgeExpiredFreeTalkScenarios();
-
+  // Expired free-talk docs are left to the TTL index on completionDate — no write-on-read purge.
   const scenarioRows = await FreeTalkScenario.find({
     ...freeTalkScenarioLearnerFilter(learnerId),
     _id: { $in: drillObjectIds },

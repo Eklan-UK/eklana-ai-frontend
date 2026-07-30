@@ -398,7 +398,7 @@ export async function generateDrill(
   const toolsArray: OpenAI.Chat.Completions.ChatCompletionTool[] = [tool];
 
   const context = params.context.length > 500 ? params.context.slice(0, 500) : params.context;
-  const prompt = params.prompt.length > 1000 ? params.prompt.slice(0, 1000) : params.prompt;
+  const prompt = params.prompt.length > 10000 ? params.prompt.slice(0, 10000) : params.prompt;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-5.5',
