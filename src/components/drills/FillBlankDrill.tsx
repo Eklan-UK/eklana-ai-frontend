@@ -211,13 +211,17 @@ export default function FillBlankDrill({
                     disabled={sentenceIdx < submittedCount}
                     onChange={(e) => {
                       if (sentenceIdx < submittedCount) return;
+                      const value = e.target.value;
                       setAnswers({
                         ...answers,
                         [sentenceIdx]: {
                           ...answers[sentenceIdx],
-                          [currentBlankIdx]: e.target.value,
+                          [currentBlankIdx]: value,
                         },
                       });
+                      if (value) {
+                        playPracticeFeedback("success");
+                      }
                     }}
                     className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-80 disabled:bg-muted/40"
                   >
@@ -252,8 +256,6 @@ export default function FillBlankDrill({
       toast.error("Please fill all blanks before proceeding");
       return;
     }
-
-    playPracticeFeedback("neutral");
 
     const newSubmittedCount = Math.max(submittedCount, currentIndex + 1);
     setSubmittedCount(newSubmittedCount);
