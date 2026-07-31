@@ -27,6 +27,8 @@ import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
+
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -250,6 +252,8 @@ export default function FillBlankDrill({
       toast.error("Please fill all blanks before proceeding");
       return;
     }
+
+    playPracticeFeedback("neutral");
 
     const newSubmittedCount = Math.max(submittedCount, currentIndex + 1);
     setSubmittedCount(newSubmittedCount);

@@ -2,11 +2,12 @@ import { unlockAudioContext } from "@/lib/ios-audio-utils";
 import { triggerDrillEndConfetti } from "@/lib/drill-celebration";
 import { getClientCelebrationSoundUrl } from "@/lib/drill/celebration-sound-url";
 
-export type PracticeFeedbackKind = "success" | "failure";
+export type PracticeFeedbackKind = "success" | "failure" | "neutral";
 
 const HAPTIC_PATTERNS: Record<PracticeFeedbackKind, number[]> = {
   success: [40, 30, 40],
   failure: [120, 60, 120],
+  neutral: [25],
 };
 
 const TONE_SEQUENCES: Record<
@@ -21,6 +22,7 @@ const TONE_SEQUENCES: Record<
     { frequency: 220, durationMs: 120, gapMs: 40 },
     { frequency: 165, durationMs: 130, gapMs: 0 },
   ],
+  neutral: [{ frequency: 440, durationMs: 80, gapMs: 0 }],
 };
 
 let audioContext: AudioContext | null = null;
@@ -63,7 +65,7 @@ export async function playTone(kind: PracticeFeedbackKind): Promise<void> {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    oscillator.type = kind === "success" ? "sine" : "triangle";
+    oscillator.type = kind === "failure" ? "triangle" : "sine";
     oscillator.frequency.setValueAtTime(step.frequency, now + offset);
 
     gain.gain.setValueAtTime(0.0001, now + offset);

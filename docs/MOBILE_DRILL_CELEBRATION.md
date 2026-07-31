@@ -327,6 +327,7 @@ export function DrillCompletionScreen({
 | Moment | Sound |
 |--------|-------|
 | Each word / match / MCQ graded | Short feedback (haptics primary; optional local tone) — [`mobile-practice-feedback.md`](mobile-practice-feedback.md) |
+| Fill-blank **Next** (per sentence) | **Neutral** practice feedback — not the celebration MP3 — [`mobile-practice-feedback.md`](mobile-practice-feedback.md) |
 | **End of drill (pass)** | **Celebration MP3** from `effects.soundUrl` (this doc) |
 | End of drill (fail) | Failure haptics / short fail cue — not the celebration MP3 |
 
