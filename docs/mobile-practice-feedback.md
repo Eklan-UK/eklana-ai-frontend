@@ -7,7 +7,7 @@
 
 ## 1. Feature overview
 
-When a learner **passes** a practice section (correct answer, pronunciation pass, etc.), the app should play a short **success** cue and trigger **success haptics**. When they **fail**, play a **failure** cue and trigger **error haptics**. When they advance without a pass/fail grade yet (e.g. Fill-in-the-Blank **Next**), play a short **neutral** progress cue.
+When a learner **passes** a practice section (correct answer, pronunciation pass, etc.), the app should play a short **success** cue and trigger **success haptics**. When they **fail**, play a **failure** cue and trigger **error haptics**. A **neutral** kind exists on the shared helper for light progress cues if needed; Fill-in-the-Blank does **not** use it (see table below).
 
 The web app uses synthesized Web Audio tones plus `navigator.vibrate()` for **in-drill** feedback. On native mobile, **haptics are the primary feedback**; optional short sounds can be added with `expo-av` if product wants parity with web audio.
 
@@ -61,7 +61,7 @@ Call `void playPracticeFeedback('success' | 'failure' | 'neutral')` at the same 
 | Vocabulary / Pronunciation / Roleplay drills | pronunciation `score >= 65` | below 65% | — |
 | Key Phrases drill | correct choice **and** pronunciation `>= 65%` | wrong choice **or** pronunciation below 65% | Per-item only — web already fires `playPracticeFeedback('success' \| 'failure')` once per graded attempt; mobile must match. End-of-drill celebration is separate. |
 | Matching drill | correct pair | incorrect pair | — |
-| Fill-in-the-blank drill | end-of-drill final submit `score >= 70%` (celebration doc) | below 70% on final submit | **`neutral` on each Next** after all blanks on the current sentence are filled (not on Previous, not when Next is blocked) |
+| Fill-in-the-blank drill | **`success` on each blank option select** (dropdown/select change to a non-empty option); end-of-drill final submit `score >= 70%` (celebration doc) | below 70% on final submit | **Not on Next, Previous, or Submit** for per-item progress |
 | Unscored drills (definition, grammar, sentence, summary, listening) | successful final submit only | no failure sound | — |
 | Eklan Free Talk | `gradeResult.overallScore >= 60` when result screen shows | `< 60` |
 | Daily Focus | `isCorrect === true` on answer submit | incorrect answer |
@@ -83,7 +83,7 @@ Mirror these trigger points when implementing the equivalent mobile drill runner
 | `src/components/drills/RoleplayDrill.tsx` | After each student turn pronunciation analysis |
 | `src/components/drills/KeyPhrasesDrill.tsx` | After each item is graded (choice + pronunciation) — web already fires success/fail; mirror exactly |
 | `src/components/drills/MatchingDrill.tsx` | On each match attempt |
-| `src/components/drills/FillBlankDrill.tsx` | `playPracticeFeedback('neutral')` on **Next** after blanks filled; end-of-drill pass/fail via celebration hook on results |
+| `src/components/drills/FillBlankDrill.tsx` | `playPracticeFeedback('success')` on each blank option select (non-empty); **not** on Next / Previous / Submit; end-of-drill pass/fail via celebration hook on results |
 | `src/components/drills/DefinitionDrill.tsx` | On successful completion submit |
 | `src/components/drills/GrammarDrill.tsx` | On successful completion submit |
 | `src/components/drills/SentenceDrill.tsx` | On successful completion submit |
@@ -115,7 +115,7 @@ Mirror these trigger points when implementing the equivalent mobile drill runner
 - [ ] Roleplay: pass and fail a student line
 - [ ] Key Phrases: wrong MCQ → fail; correct + low pronunciation → fail; correct + pass → success (once each)
 - [ ] Matching: correct and incorrect pair
-- [ ] Fill-blank: Next after blanks filled → neutral; Next with empty blank → no sound; Previous → no sound
+- [ ] Fill-blank: selecting a blank option → success; clearing to "Select..." → no sound; Next / Previous / Submit → no per-item sound
 - [ ] Fill-blank: final submit above and below 70% (end celebration / failure)
 - [ ] Free Talk: grade at 60+ and below 60
 - [ ] Daily Focus: correct and incorrect answer
