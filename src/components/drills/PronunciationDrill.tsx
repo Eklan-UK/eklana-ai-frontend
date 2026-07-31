@@ -4,7 +4,15 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
-import { CheckCircle, Mic, Loader2, Lock, Send, Square } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronLeft,
+  Mic,
+  Loader2,
+  Lock,
+  Send,
+  Square,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
@@ -26,13 +34,14 @@ import {
   type PerformanceReviewGroup,
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface PronunciationDrillProps {
   drill: any;
@@ -140,6 +149,12 @@ export default function PronunciationDrill({
   weeklyChallengeMeta,
 }: PronunciationDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "pronunciation",
+    assignmentId,
+    weeklyChallengeMeta,
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -154,7 +169,7 @@ export default function PronunciationDrill({
   >([]);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -228,15 +243,43 @@ export default function PronunciationDrill({
       return initialProgress;
     };
 
+    if (!localProgress.isReady) return;
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    const applyPartial = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.wordProgress) {
+        setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+      } else {
+        setWordProgress(createEmptyProgress());
+      }
+      if (partial.sessionReviewAnalytics) {
+        setSessionReviewAnalytics(
+          partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+        );
+      }
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyPartial(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
     if (!assignmentId && !weeklyChallengeMeta) {
       setWordProgress(createEmptyProgress());
       setIsLoadingCheckpoint(false);
       return;
     }
-
-    let cancelled = false;
-    setIsLoadingCheckpoint(true);
-    setShowCheckpoint(false);
 
     if (weeklyChallengeMeta) {
       weeklyChallengeAPI
@@ -245,19 +288,11 @@ export default function PronunciationDrill({
           if (cancelled) return;
           const cp = res.data?.checkpoint as Record<string, unknown> | null;
           if (cp) {
-            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
-            const partial = cp.partialResults as Record<string, unknown> | undefined;
-            if (partial?.wordProgress) {
-              setWordProgress(partial.wordProgress as Record<number, WordProgress>);
-            } else {
-              setWordProgress(createEmptyProgress());
-            }
-            if (partial?.sessionReviewAnalytics) {
-              setSessionReviewAnalytics(
-                partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-              );
-            }
-            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+            applyPartial(
+              typeof cp.resumeFromIndex === "number" ? cp.resumeFromIndex : 0,
+              typeof cp.completedCount === "number" ? cp.completedCount : 0,
+              (cp.partialResults as Record<string, unknown>) ?? {},
+            );
           } else {
             setWordProgress(createEmptyProgress());
           }
@@ -273,19 +308,7 @@ export default function PronunciationDrill({
       loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
         if (cancelled) return;
         if (cp) {
-          setCurrentIndex(cp.resumeFromIndex);
-          const partial = cp.partialResults;
-          if (partial.wordProgress) {
-            setWordProgress(partial.wordProgress as Record<number, WordProgress>);
-          } else {
-            setWordProgress(createEmptyProgress());
-          }
-          if (partial.sessionReviewAnalytics) {
-            setSessionReviewAnalytics(
-              partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-            );
-          }
-          setCheckpointCount(cp.completedItemCount);
+          applyPartial(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
         } else {
           setWordProgress(createEmptyProgress());
         }
@@ -296,7 +319,7 @@ export default function PronunciationDrill({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, items.length, weeklyChallengeMeta]);
+  }, [localProgress.isReady, assignmentId, drill._id, items.length, weeklyChallengeMeta]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -569,6 +592,13 @@ export default function PronunciationDrill({
       setShowMic(true);
       scrollContainerRef.current?.scrollTo({ top: 0 });
 
+      localProgress.persist({
+        resumeFromIndex: currentIndex + 1,
+        completedItemCount: completedCount,
+        partialResults: { wordProgress, sessionReviewAnalytics },
+        startedAt: new Date(startTime).toISOString(),
+      });
+
       if (completedCount > 0 && completedCount % 5 === 0) {
         if (assignmentId) {
           void saveCheckpoint(String(drill._id), {
@@ -601,6 +631,16 @@ export default function PronunciationDrill({
       setPronunciationScore(null);
       setShowReview(true);
     }
+  };
+
+  const handlePreviousItem = () => {
+    if (currentIndex === 0 || isRecording || isAnalyzing) return;
+    setCurrentIndex(currentIndex - 1);
+    setCurrentScreen("word");
+    setPronunciationScore(null);
+    discardPendingRecording();
+    setShowMic(true);
+    scrollContainerRef.current?.scrollTo({ top: 0 });
   };
 
   const handleSubmit = async () => {
@@ -667,6 +707,7 @@ export default function PronunciationDrill({
 
       if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
       else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
+      localProgress.clear();
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -696,6 +737,16 @@ export default function PronunciationDrill({
     discardPendingRecording();
     setIsRecording(false);
     clearRecordingTimers();
+    setShowCheckpoint(false);
+    setCheckpointCount(0);
+    localProgress.clear();
+    if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
+    else if (weeklyChallengeMeta) {
+      void weeklyChallengeAPI.clearCheckpoint(
+        weeklyChallengeMeta.weekStartDate,
+        weeklyChallengeMeta.itemIndex,
+      );
+    }
     const initialProgress: Record<number, WordProgress> = {};
     items.forEach((_: any, index: number) => {
       initialProgress[index] = {
@@ -788,7 +839,7 @@ export default function PronunciationDrill({
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -814,7 +865,7 @@ export default function PronunciationDrill({
 
   if (showReview) {
     return (
-      <DrillLayout title="Review Performance" hideNavigation>
+      <DrillLayout title="Review Performance" hideNavigation headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <DrillPerformanceReview
           avgScore={reviewAvgScore}
           statsLine={reviewStatsLine}
@@ -873,7 +924,7 @@ export default function PronunciationDrill({
   // No content state
   if (!currentItem) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="text-center py-8">
           <p className="text-muted-foreground">
             No pronunciation items found in this drill.
@@ -916,7 +967,10 @@ export default function PronunciationDrill({
   ).length;
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout
+      title={drill.title}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div className="relative flex min-h-0 flex-1 flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)]">
         <div className="shrink-0 space-y-4">
           <DrillProgress
@@ -955,24 +1009,7 @@ export default function PronunciationDrill({
               <h1 className="text-3xl md:text-4xl font-bold text-foreground">
                 {currentText}
               </h1>
-              {currentScreen === "word" && (
-                <BookmarkButton
-                  itemId={currentWord}
-                  itemType="word"
-                  content={currentWord}
-                  sourceDrillId={drill._id}
-                  className="ml-2"
-                />
-              )}
-              {currentScreen === "sentence" && (
-                <BookmarkButton
-                  itemId={currentText}
-                  itemType="sentence"
-                  content={currentText}
-                  sourceDrillId={drill._id}
-                  className="ml-2"
-                />
-              )}
+              <DrillBookmarkToggle drillId={String(drill._id)} />
             </div>
             </div>
 
@@ -1141,20 +1178,15 @@ export default function PronunciationDrill({
               </Button>
             )}
 
-            {currentIndex > 0 && currentScreen === "word" && (
+            {currentIndex > 0 && (
               <Button
                 variant="outline"
                 size="md"
                 fullWidth
-                onClick={() => {
-                  setCurrentIndex(currentIndex - 1);
-                  setCurrentScreen("word");
-                  setPronunciationScore(null);
-                  discardPendingRecording();
-                  scrollContainerRef.current?.scrollTo({ top: 0 });
-                }}
+                onClick={handlePreviousItem}
                 disabled={isRecording || isAnalyzing}
               >
+                <ChevronLeft className="w-4 h-4 mr-1" />
                 Previous Item
               </Button>
             )}

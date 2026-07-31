@@ -424,12 +424,16 @@ const SubscriptionsPage: React.FC = () => {
                             {zeroPause.map((product) => {
                               const label = formatZeroPauseProductWithDate(
                                 product,
-                                savedDates[l._id]?.start ?? l.zeroPauseDate,
-                                savedDates[l._id]?.end ?? l.zeroPauseEndDate,
-                                savedDates[l._id]?.postStart ??
-                                  l.zeroPausePostTrialDate,
-                                savedDates[l._id]?.postEnd ??
-                                  l.zeroPausePostTrialEndDate
+                                ...(product === "challenge"
+                                  ? [
+                                      savedDates[l._id]?.start ?? l.zeroPauseDate,
+                                      savedDates[l._id]?.end ?? l.zeroPauseEndDate,
+                                      savedDates[l._id]?.postStart ??
+                                        l.zeroPausePostTrialDate,
+                                      savedDates[l._id]?.postEnd ??
+                                        l.zeroPausePostTrialEndDate,
+                                    ]
+                                  : [])
                               );
                               if (!label) return null;
                               return (

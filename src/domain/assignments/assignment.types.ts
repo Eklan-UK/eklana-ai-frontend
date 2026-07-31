@@ -9,6 +9,7 @@ export interface DrillAssignment {
   learnerId: Types.ObjectId | string;
   assignedBy: Types.ObjectId | string;
   assignedAt: Date;
+  builderWeekNumber?: number | null;
   dueDate?: Date;
   status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
   completedAt?: Date;
@@ -21,6 +22,7 @@ export interface CreateAssignmentData {
   learnerId: Types.ObjectId | string;
   assignedBy: Types.ObjectId | string;
   assignedAt: Date;
+  builderWeekNumber?: number | null;
   dueDate?: Date;
   status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
 }

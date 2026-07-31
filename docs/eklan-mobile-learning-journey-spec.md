@@ -268,13 +268,13 @@ When navigating to My Plans with deep link / hash `#saved-drills`, the section *
 │  ┌─ PlanDrillRow ────────────────────┐  │
 │  └───────────────────────────────────┘  │
 │                                         │
-│  Conducting CPR                         │  ← topic heading
+│  Follow-up with Patients                │  ← topic heading
 │  ┌───────────────────────────────────┐  │
 │  │ No drills assigned for this topic   │  │
 │  │ yet.                              │  │
 │  └───────────────────────────────────┘  │
 │                                         │
-│  Follow-up with Patients                │
+│  Admitting a Patient                    │
 │  ...                                    │
 │                                         │
 ├─────────────────────────────────────────┤
@@ -621,10 +621,9 @@ Summary card for one Mission on My Plans.
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
 | 1 | `handling_emergency_critical` | Handling Emergency/Critical Situation | `icu_emergency` |
-| 2 | `conducting_cpr` | Conducting CPR | `cpr` |
-| 3 | `patient_follow_up` | Follow-up with Patients | `patient_follow_up` |
-| 4 | `admitting_patient` | Admitting a Patient | `admission` |
-| 5 | `small_talk_patient` | Small Talk with a Patient | `small_talk_patient` |
+| 2 | `patient_follow_up` | Follow-up with Patients | `patient_follow_up` |
+| 3 | `admitting_patient` | Admitting a Patient | `admission` |
+| 4 | `small_talk_patient` | Small Talk with a Patient | `small_talk_patient` |
 
 #### Mission 2: Communication with Colleagues
 
@@ -663,7 +662,9 @@ Summary card for one Mission on My Plans.
 | 1 | `phone_colleagues` | Phone Communication with Colleagues | `phone_colleague` |
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
-| 4 | `grammar` | Grammar | — |
+| 4 | `conducting_cpr` | Conducting CPR | `cpr` |
+| 5 | `discharging_patients` | Discharging Patients | `discharge` |
+| 6 | `grammar` | Grammar | `grammar` |
 
 #### Drill-to-topic mapping (server-side fields)
 
@@ -1365,10 +1366,9 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
     title: "Communication with Patients",
     topics: [
       { id: "handling_emergency_critical", title: "Handling Emergency/Critical Situation", order: 1, freeTalkScenarioType: "icu_emergency" },
-      { id: "conducting_cpr",              title: "Conducting CPR",                        order: 2, freeTalkScenarioType: "cpr" },
-      { id: "patient_follow_up",           title: "Follow-up with Patients",               order: 3, freeTalkScenarioType: "patient_follow_up" },
-      { id: "admitting_patient",           title: "Admitting a Patient",                   order: 4, freeTalkScenarioType: "admission" },
-      { id: "small_talk_patient",          title: "Small Talk with a Patient",             order: 5, freeTalkScenarioType: "small_talk_patient" },
+      { id: "patient_follow_up",           title: "Follow-up with Patients",               order: 2, freeTalkScenarioType: "patient_follow_up" },
+      { id: "admitting_patient",           title: "Admitting a Patient",                   order: 3, freeTalkScenarioType: "admission" },
+      { id: "small_talk_patient",          title: "Small Talk with a Patient",             order: 4, freeTalkScenarioType: "small_talk_patient" },
     ],
   },
   {
@@ -1411,7 +1411,9 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
       { id: "phone_colleagues",      title: "Phone Communication with Colleagues",                   order: 1, freeTalkScenarioType: "phone_colleague" },
       { id: "phone_other_departments",title: "Phone Communication with Other Departments",           order: 2, freeTalkScenarioType: "phone_department" },
       { id: "phone_patient_families", title: "Phone Communication with the Patient's Families",      order: 3, freeTalkScenarioType: "phone_family" },
-      { id: "grammar",                title: "Grammar",                                              order: 4 },
+      { id: "conducting_cpr",         title: "Conducting CPR",                                        order: 4, freeTalkScenarioType: "cpr" },
+      { id: "discharging_patients",   title: "Discharging Patients",                                  order: 5, freeTalkScenarioType: "discharge" },
+      { id: "grammar",                title: "Grammar",                                              order: 6, freeTalkScenarioType: "grammar" },
     ],
   },
 ];

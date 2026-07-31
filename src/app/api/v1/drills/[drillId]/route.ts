@@ -64,6 +64,7 @@ const updateDrillSchema = z.object({
 	})).optional(),
 	student_character_name: z.string().optional(),
 	ai_character_names: z.array(z.string()).optional(),
+	ai_character_voice_keys: z.array(z.string()).optional(),
 	drill_intro: z.string().max(5000).optional(),
 	roleplay_scenes: z.array(z.object({
 		scene_name: z.string(),
@@ -224,6 +225,9 @@ async function putHandler(
 	if (validated.pronunciation_items !== undefined) updateData.pronunciation_items = validated.pronunciation_items;
 	if (validated.student_character_name !== undefined) updateData.student_character_name = validated.student_character_name;
 	if (validated.ai_character_names !== undefined) updateData.ai_character_names = validated.ai_character_names;
+	if (validated.ai_character_voice_keys !== undefined) {
+		updateData.ai_character_voice_keys = validated.ai_character_voice_keys;
+	}
 	if (validated.drill_intro !== undefined) updateData.drill_intro = validated.drill_intro;
 	if (validated.roleplay_scenes !== undefined) updateData.roleplay_scenes = validated.roleplay_scenes;
 	if (validated.matching_pairs !== undefined) updateData.matching_pairs = validated.matching_pairs;

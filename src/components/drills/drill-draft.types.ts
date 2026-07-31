@@ -65,6 +65,8 @@ export interface DrillDraft {
   pronunciationItems: PronunciationItem[];
   studentCharacterName: string;
   aiCharacterNames: string[];
+  /** Parallel to aiCharacterNames; empty = drill-level ttsVoiceKey / default */
+  aiCharacterVoiceKeys: string[];
   drillIntro: string;
   roleplayScenes: RoleplayScene[];
   matchingPairs: MatchingPair[];
@@ -108,6 +110,7 @@ export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraf
     pronunciationItems: [{ sound: "", word: "", sentence: "" }],
     studentCharacterName: "",
     aiCharacterNames: [""],
+    aiCharacterVoiceKeys: [""],
     drillIntro: "",
     roleplayScenes: [
       {

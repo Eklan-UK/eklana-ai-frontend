@@ -50,8 +50,15 @@ describe("learning-journey.catalog", () => {
       getTopicById("phone_colleagues")?.title,
       "Phone Communication with Colleagues",
     );
+    assert.equal(
+      getTopicById("discharging_patients")?.title,
+      "Discharging Patients",
+    );
     assert.equal(getTopicById("grammar")?.part, 5);
     assert.equal(getTopicById("phone_colleagues")?.part, 5);
+    assert.equal(getTopicById("discharging_patients")?.part, 5);
+    assert.equal(getTopicById("discharging_patients")?.freeTalkScenarioType, "discharge");
+    assert.equal(getTopicById("grammar")?.freeTalkScenarioType, "grammar");
   });
 
   it("validates Mission 4 interview prep and Mission 5 bonus part/topic pairs", () => {
@@ -60,8 +67,10 @@ describe("learning-journey.catalog", () => {
     assert.equal(isValidPartTopicPair(5, "mock_3"), false);
     assert.equal(isValidPartTopicPair(5, "grammar"), true);
     assert.equal(isValidPartTopicPair(5, "phone_colleagues"), true);
+    assert.equal(isValidPartTopicPair(5, "discharging_patients"), true);
     assert.equal(isValidPartTopicPair(4, "grammar"), false);
     assert.equal(isValidPartTopicPair(4, "phone_colleagues"), false);
+    assert.equal(isValidPartTopicPair(4, "discharging_patients"), false);
   });
 
   it("no longer recognizes interview_preparation as a known topic", () => {
@@ -160,29 +169,35 @@ describe("deriveMissionStates", () => {
     assert.equal(getViewDetailsPart(states), 2);
   });
 
-  it("treats enrolled mission with no drills (total 0) as complete at 100%", () => {
+  it("treats enrolled mission with no drills (total 0) as active at 0%", () => {
     const states = deriveMissionStates(
       [1],
       progressMap({ 1: { completed: 0, total: 0 } }),
     );
-    assert.equal(states[0].status, "journeyComplete");
-    assert.equal(states[0].percent, 100);
-    assert.equal(states[0].isCurrent, false);
+    assert.equal(states[0].status, "active");
+    assert.equal(states[0].percent, 0);
+    assert.equal(states[0].ctaLabel, "start");
+    assert.equal(states[0].isCurrent, true);
     assert.ok(states.slice(1).every((s) => s.status === "locked"));
+    assert.ok(states.every((s) => s.status !== "journeyComplete"));
   });
 
-  it("sets journeyComplete on highest enrolled when only no-drill missions are assigned", () => {
+  it("keeps no-drill enrolled missions active without journeyComplete", () => {
     const empty: MissionProgress = { completed: 0, total: 0 };
     const states = deriveMissionStates(
       [1, 2],
       progressMap({ 1: empty, 2: empty }),
     );
-    assert.equal(states[0].status, "completed");
-    assert.equal(states[0].percent, 100);
-    assert.equal(states[1].status, "journeyComplete");
-    assert.equal(states[1].percent, 100);
+    assert.equal(states[0].status, "active");
+    assert.equal(states[0].percent, 0);
+    assert.equal(states[0].ctaLabel, "start");
+    assert.equal(states[0].isCurrent, true);
+    assert.equal(states[1].status, "active");
+    assert.equal(states[1].percent, 0);
+    assert.equal(states[1].ctaLabel, "start");
+    assert.equal(states[1].isCurrent, false);
     assert.ok(states.slice(2).every((s) => s.status === "locked"));
-    assert.ok(states.every((s) => !s.isCurrent));
+    assert.ok(states.every((s) => s.status !== "journeyComplete"));
   });
 
   it("sets M5 to journeyComplete when all five missions are done", () => {

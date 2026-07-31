@@ -108,27 +108,21 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         freeTalkScenarioType: "icu_emergency",
       },
       {
-        id: "conducting_cpr",
-        title: "Conducting CPR",
-        order: 2,
-        freeTalkScenarioType: "cpr",
-      },
-      {
         id: "patient_follow_up",
         title: "Follow-up with Patients",
-        order: 3,
+        order: 2,
         freeTalkScenarioType: "patient_follow_up",
       },
       {
         id: "admitting_patient",
         title: "Admitting a Patient",
-        order: 4,
+        order: 3,
         freeTalkScenarioType: "admission",
       },
       {
         id: "small_talk_patient",
         title: "Small Talk with a Patient",
-        order: 5,
+        order: 4,
         freeTalkScenarioType: "small_talk_patient",
       },
     ],
@@ -264,9 +258,22 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         freeTalkScenarioType: "phone_family",
       },
       {
+        id: "conducting_cpr",
+        title: "Conducting CPR",
+        order: 4,
+        freeTalkScenarioType: "cpr",
+      },
+      {
+        id: "discharging_patients",
+        title: "Discharging Patients",
+        order: 5,
+        freeTalkScenarioType: "discharge",
+      },
+      {
         id: "grammar",
         title: "Grammar",
-        order: 4,
+        order: 6,
+        freeTalkScenarioType: "grammar",
       },
     ],
   },
@@ -378,7 +385,8 @@ export function deriveMissionStates(
     const isEnrolled = enrolled.has(partDef.part);
     const isComplete =
       isEnrolled &&
-      (progress.total === 0 || progress.completed >= progress.total);
+      progress.total > 0 &&
+      progress.completed >= progress.total;
     const percent =
       progress.total > 0
         ? Math.min(100, Math.round((progress.completed / progress.total) * 100))

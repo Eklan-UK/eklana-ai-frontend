@@ -7,12 +7,12 @@ import Drill from '@/models/drill';
 import FreeTalkScenario from '@/models/free-talk-scenario';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import { freeTalkScenarioLearnerFilter } from '@/lib/free-talk-scenario-assignment';
-import { purgeExpiredFreeTalkScenarios } from '@/lib/free-talk-scenario-purge';
 import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 import { getBookmarkedDrillIdSet } from '@/lib/server/learner-saved-drills.server';
 import { enrichLearnerDrillRowsWithTopicTitle } from '@/lib/server/enrich-learner-drill-topic';
 import DrillAssignment from '@/models/drill-assignment';
 import type { CreateAssignmentData } from '@/domain/assignments/assignment.types';
+import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
 
 /** Lean populated assignment from `findByLearnerId` (drillId is a drill document). */
 type PopulatedLearnerAssignment = Omit<AssignmentRow, 'drillId' | 'assignedBy'> & {
@@ -49,10 +49,9 @@ export type LearnerMyDrillsPayload = {
 
 export type LearnerMyDrillRow = LearnerMyDrillsPayload['drills'][number];
 
-import { FREE_TALK_PLAN_ITEM_TYPE } from '@/lib/learner-assigned-plan.shared';
-
+// List select only — omit roleplay_scenes/context (heavy); detail routes fetch those.
 const LEARNER_DRILL_SELECT =
-  'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
+  'title type difficulty date duration_days audio_example_url student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic';
 
 function isPopulatedDrillDoc(
   value: unknown,
@@ -79,6 +78,95 @@ function drillRefId(value: unknown): string | null {
 export type LearnerFreeTalkPlanRow = LearnerMyDrillRow & {
 	itemType: typeof FREE_TALK_PLAN_ITEM_TYPE;
 };
+
+type FreeTalkScenarioLean = {
+  _id: Types.ObjectId;
+  title: string;
+  scenarioType?: string;
+  createdAt: Date | string;
+  completionDate?: Date | string | null;
+};
+
+type FreeTalkScenarioData = {
+  scenarioRows: FreeTalkScenarioLean[];
+  latestAttemptByScenario: Map<string, Date>;
+};
+
+/**
+ * Load free-talk scenarios + latest attempt timestamps for a learner (list read).
+ * Expired docs are left to the TTL index on completionDate — no write-on-read purge.
+ */
+async function loadFreeTalkScenarioData(learnerId: string): Promise<FreeTalkScenarioData> {
+  const scenarioRows = (await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(learnerId))
+    .sort({ createdAt: -1 })
+    .select({ title: 1, scenarioType: 1, createdAt: 1, completionDate: 1 })
+    .lean()
+    .exec()) as FreeTalkScenarioLean[];
+
+  const scenarioIds = scenarioRows.map((doc) => String(doc._id));
+  const attemptRows =
+    scenarioIds.length > 0
+      ? await FreeTalkAttempt.find({
+          learnerId: toUserIdQuery(learnerId),
+          scenarioId: { $in: scenarioIds },
+        })
+          .select({ scenarioId: 1, createdAt: 1 })
+          .sort({ createdAt: -1 })
+          .lean()
+          .exec()
+      : [];
+
+  const latestAttemptByScenario = new Map<string, Date>();
+  for (const row of attemptRows) {
+    const sid = String(row.scenarioId);
+    if (!latestAttemptByScenario.has(sid)) {
+      latestAttemptByScenario.set(
+        sid,
+        row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+      );
+    }
+  }
+
+  return { scenarioRows, latestAttemptByScenario };
+}
+
+function mapFreeTalkPlanRows(
+  data: FreeTalkScenarioData,
+  bookmarkedDrillIds: Set<string>,
+): LearnerFreeTalkPlanRow[] {
+  return data.scenarioRows.map((doc) => {
+    const createdAt = doc.createdAt instanceof Date ? doc.createdAt : new Date(doc.createdAt);
+    const id = doc._id as Types.ObjectId;
+    const idStr = String(id);
+    const completionDate =
+      doc.completionDate instanceof Date
+        ? doc.completionDate
+        : doc.completionDate
+          ? new Date(doc.completionDate as string)
+          : null;
+    const completedAt = data.latestAttemptByScenario.get(idStr) ?? null;
+    const dueDate = completionDate ?? createdAt;
+    return {
+      itemType: FREE_TALK_PLAN_ITEM_TYPE,
+      assignmentId: id,
+      drill: {
+        _id: id,
+        title: doc.title,
+        type: 'eklan_free_talk',
+        scenarioType: doc.scenarioType,
+        date: dueDate,
+        completionDate: completionDate?.toISOString() ?? null,
+      },
+      assignedBy: null,
+      assignedAt: createdAt,
+      dueDate,
+      status: completedAt ? 'completed' : 'pending',
+      completedAt,
+      latestAttempt: null,
+      hasBookmarks: bookmarkedDrillIds.has(idStr),
+    };
+  });
+}
 
 /**
  * Drills can list a learner in `assigned_to` without a matching `drill_assignments`
@@ -152,14 +240,10 @@ export async function getLearnerMyDrillsPayload(
   const assignmentRepo = new AssignmentRepository();
   const attemptRepo = new AttemptRepository();
 
-  if (!params.drillId) {
-    await syncMissingAssignmentsForLearner(learnerId, assignmentRepo);
-  }
-
   const limit = params.limit ?? 100;
   const offset = params.offset ?? 0;
 
-  const result = params.drillId
+  let result = params.drillId
     ? {
         assignments: await assignmentRepo.findMany({
           learnerId,
@@ -178,12 +262,29 @@ export async function getLearnerMyDrillsPayload(
         offset,
       });
 
+  // Only backfill when the learner has zero assignments (avoid Drill.find on every list load).
+  if (!params.drillId && result.assignments.length === 0) {
+    await syncMissingAssignmentsForLearner(learnerId, assignmentRepo);
+    result = await assignmentRepo.findByLearnerId(learnerId, {
+      status: params.status,
+      limit,
+      offset,
+    });
+  }
+
   const assignmentIds = result.assignments.map((a: { _id: Types.ObjectId }) =>
     a._id.toString()
   );
-  const attemptMap = await attemptRepo.getLatestAttemptsForAssignments(assignmentIds);
 
-  const bookmarkedDrillIds = await getBookmarkedDrillIdSet(learnerId);
+  const [attemptMap, bookmarkedDrillIds, freeTalkData] = await Promise.all([
+    attemptRepo.getLatestAttemptsForAssignments(assignmentIds),
+    getBookmarkedDrillIdSet(learnerId),
+    params.drillId ? Promise.resolve(null) : loadFreeTalkScenarioData(learnerId),
+  ]);
+
+  const freeTalkDrills = freeTalkData
+    ? mapFreeTalkPlanRows(freeTalkData, bookmarkedDrillIds)
+    : [];
 
   // Repository types drillId as ObjectId; lean+populate returns a drill subdocument at runtime.
   const populated = result.assignments as unknown as PopulatedLearnerAssignment[];
@@ -259,74 +360,6 @@ export async function getLearnerMyDrillsPayload(
         { learnerId, orphanDrillCount: orphanCount }
       );
     }
-  }
-
-  await purgeExpiredFreeTalkScenarios();
-
-  let freeTalkDrills: LearnerFreeTalkPlanRow[] = [];
-  if (!params.drillId) {
-    const scenarioRows = await FreeTalkScenario.find(freeTalkScenarioLearnerFilter(learnerId))
-      .sort({ createdAt: -1 })
-      .select({ title: 1, scenarioType: 1, createdAt: 1, completionDate: 1 })
-      .lean()
-      .exec();
-
-    const scenarioIds = scenarioRows.map((doc) => String(doc._id));
-    const attemptRows =
-      scenarioIds.length > 0
-        ? await FreeTalkAttempt.find({
-            learnerId: toUserIdQuery(learnerId),
-            scenarioId: { $in: scenarioIds },
-          })
-            .select({ scenarioId: 1, createdAt: 1 })
-            .sort({ createdAt: -1 })
-            .lean()
-            .exec()
-        : [];
-
-    const latestAttemptByScenario = new Map<string, Date>();
-    for (const row of attemptRows) {
-      const sid = String(row.scenarioId);
-      if (!latestAttemptByScenario.has(sid)) {
-        latestAttemptByScenario.set(
-          sid,
-          row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
-        );
-      }
-    }
-
-    freeTalkDrills = scenarioRows.map((doc) => {
-      const createdAt = doc.createdAt instanceof Date ? doc.createdAt : new Date(doc.createdAt);
-      const id = doc._id as Types.ObjectId;
-      const idStr = String(id);
-      const completionDate =
-        doc.completionDate instanceof Date
-          ? doc.completionDate
-          : doc.completionDate
-            ? new Date(doc.completionDate as string)
-            : null;
-      const completedAt = latestAttemptByScenario.get(idStr) ?? null;
-      const dueDate = completionDate ?? createdAt;
-      return {
-        itemType: FREE_TALK_PLAN_ITEM_TYPE,
-        assignmentId: id,
-        drill: {
-          _id: id,
-          title: doc.title,
-          type: 'eklan_free_talk',
-          scenarioType: doc.scenarioType,
-          date: dueDate,
-          completionDate: completionDate?.toISOString() ?? null,
-        },
-        assignedBy: null,
-        assignedAt: createdAt,
-        dueDate,
-        status: completedAt ? 'completed' : 'pending',
-        completedAt,
-        latestAttempt: null,
-        hasBookmarks: bookmarkedDrillIds.has(idStr),
-      };
-    });
   }
 
   return {

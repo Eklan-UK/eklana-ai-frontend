@@ -252,9 +252,9 @@ export class AssignmentRepository {
         .populate({
           path: 'drillId',
           model: Drill,
-          // Include roleplay fields for assignment drill previews + learning journey metadata.
+          // List select only — omit roleplay_scenes/context (heavy); detail routes fetch those.
           select:
-            'title type difficulty date duration_days context audio_example_url roleplay_scenes student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic',
+            'title type difficulty date duration_days audio_example_url student_character_name ai_character_name ai_character_names learning_journey_part learning_journey_topic',
         })
         .populate({ path: 'assignedBy', model: User, select: 'firstName lastName email' })
         // Descending so a hit `limit` keeps the most recent (most actionable)

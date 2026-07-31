@@ -102,7 +102,7 @@ On each successful analysis, the client appends/updates **`sessionTranscripts`**
 - **Continue to Sentence:** requires `wordPassed`.
 - **Next item / Complete drill:** requires **both** `wordPassed` and `sentencePassed`.
 - **Back to Word** from sentence step (clears current score/recording).
-- **Previous item** when `currentIndex > 0` and on word screen.
+- **Previous item** when `currentIndex > 0` on either word or sentence screen (resets to the previous item’s word screen).
 
 ### 3.6 Review performance → submit
 

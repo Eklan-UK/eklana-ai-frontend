@@ -100,7 +100,7 @@ The existing `/tutor/drills/create` and `/admin/drills/create` pages are extende
 | Drill Type | Select dropdown | Yes | All 10 types: vocabulary, pronunciation, roleplay, matching, definition, grammar, sentence_writing, fill_blank, key_phrases, summary |
 | Difficulty | Select dropdown | Yes | beginner, intermediate, advanced |
 | Part | Select dropdown | Yes | "Part 1: Communication with Patients", "Part 2: Communication with Colleagues", "Part 3: Communication with Doctors, Families and Friends", "Part 4: Bonus Scenarios" |
-| Topic | Select dropdown | Yes | "Handling Emergency/Critical Situation", "Conducting CPR", "Follow-up with Patients", "Admitting a Patient", "Small Talk with a Patient" |
+| Topic | Select dropdown | Yes | "Handling Emergency/Critical Situation", "Follow-up with Patients", "Admitting a Patient", "Small Talk with a Patient" |
 | Context / Scenario | Textarea | Yes | Max 500 chars. Placeholder: "e.g. ICU nurse at Mount Sinai giving handover to incoming nurse" |
 | Prompt | Textarea | Yes | Max 1000 chars. Placeholder: "Paste your curriculum prompt here" |
 

@@ -8,13 +8,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout, CheckpointScreen } from "./shared";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface MatchingDrillProps {
   drill: any;
@@ -109,6 +110,11 @@ function computeMatchingScore(
 
 export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "matching",
+    assignmentId,
+  });
   const [pairs, setPairs] = useState<MatchPair[]>([]);
   const [leftItems, setLeftItems] = useState<ShuffledItem[]>([]);
   const [rightItems, setRightItems] = useState<ShuffledItem[]>([]);
@@ -122,7 +128,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
   const matchTimingAnchorRef = useRef<number>(Date.now());
   const isSubmittingRef = useRef(false);
   const incorrectPairsRef = useRef<
@@ -188,15 +194,29 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       pairMatchEventsRef.current = [];
     };
 
+    if (!localProgress.isReady) return;
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    const local = localProgress.hydrate();
+    if (local) {
+      const restoredKeys =
+        local.partialResults.matchedPairKeys != null
+          ? new Set(local.partialResults.matchedPairKeys as string[])
+          : new Set<string>();
+      setCheckpointCount(local.completedItemCount);
+      applyPairSetup(restoredKeys);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
     if (!assignmentId) {
       applyPairSetup(new Set());
       setIsLoadingCheckpoint(false);
       return;
     }
-
-    let cancelled = false;
-    setIsLoadingCheckpoint(true);
-    setShowCheckpoint(false);
 
     loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
       if (cancelled) return;
@@ -214,7 +234,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, drill.matching_pairs]);
+  }, [localProgress.isReady, assignmentId, drill._id, drill.matching_pairs]);
 
   const isLeftMatched = (leftIndex: number): boolean => {
     const leftItem = leftItems[leftIndex];
@@ -309,6 +329,13 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       });
 
       playPracticeFeedback("success");
+
+      localProgress.persist({
+        resumeFromIndex: newMatchedCount,
+        completedItemCount: newMatchedCount,
+        partialResults: { matchedPairKeys: [...newMatchedPairs] },
+        startedAt: new Date(startTime).toISOString(),
+      });
 
       const allMatched = newMatchedCount === pairs.length && pairs.length > 0;
       if (allMatched) {
@@ -411,6 +438,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
 
       void clearCheckpoint(String(drill._id), assignmentId);
+      localProgress.clear();
       succeeded = true;
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -432,7 +460,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -492,15 +520,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       progress={{ current: matchedCount, total: pairs.length }}
       headerRight={
         drillIdStr ? (
-          <BookmarkButton
-            itemId={`matching-drill-${drillIdStr}`}
-            itemType="sentence"
-            content={drill.title || "Matching drill"}
-            translation={undefined}
-            context={drill.context}
-            sourceDrillId={drillIdStr}
-            className="-mr-1"
-          />
+          <DrillBookmarkToggle drillId={drillIdStr} className="-mr-1" />
         ) : null
       }
     >

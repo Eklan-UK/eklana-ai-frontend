@@ -3,6 +3,8 @@
  * Audio is generated server-side and uploaded to Cloudinary
  */
 
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
+
 interface AudioGenerationItem {
   id: string;
   text: string;
@@ -132,27 +134,45 @@ export function extractPronunciationTexts(
 }
 
 /**
- * Helper to extract texts from roleplay dialogue
+ * Helper to extract texts from roleplay dialogue.
+ * Sets per-item voiceId for AI characters when aiCharacterVoiceKeys are provided;
+ * student lines and empty character voices use defaultVoiceId (drill-level accent).
  */
 export function extractRoleplayTexts(
   scenes: Array<{
     scene_name: string;
     dialogue: Array<{ speaker: string; text: string }>;
-  }>
+  }>,
+  options?: {
+    aiCharacterVoiceKeys?: string[];
+    defaultVoiceId?: string;
+  }
 ): AudioGenerationItem[] {
   const texts: AudioGenerationItem[] = [];
-  
+  const voiceKeys = options?.aiCharacterVoiceKeys ?? [];
+  const defaultVoiceId = options?.defaultVoiceId;
+
   scenes.forEach((scene, sceneIndex) => {
     scene.dialogue.forEach((turn, turnIndex) => {
       if (turn.text && turn.text.trim()) {
+        let voiceId = defaultVoiceId;
+        const aiMatch = /^ai_(\d+)$/.exec(turn.speaker);
+        if (aiMatch) {
+          const aiIndex = Number(aiMatch[1]);
+          const characterKey = voiceKeys[aiIndex];
+          if (characterKey?.trim()) {
+            voiceId = resolveAccentVoiceId(characterKey) ?? defaultVoiceId;
+          }
+        }
         texts.push({
           id: `roleplay_s${sceneIndex}_t${turnIndex}`,
           text: turn.text.trim(),
+          ...(voiceId ? { voiceId } : {}),
         });
       }
     });
   });
-  
+
   return texts;
 }
 
@@ -278,16 +298,34 @@ export function extractTextsForDrillType(drillData: any, drillType: string): Aud
     return extractPronunciationTexts(drillData.pronunciation_items);
   }
   if (drillType === "roleplay") {
+    const defaultVoiceId = resolveAccentVoiceId(drillData.tts_voice_key);
+    const aiCharacterVoiceKeys = Array.isArray(drillData.ai_character_voice_keys)
+      ? drillData.ai_character_voice_keys
+      : [];
     if (drillData.roleplay_scenes) {
-      return extractRoleplayTexts(drillData.roleplay_scenes);
+      return extractRoleplayTexts(drillData.roleplay_scenes, {
+        aiCharacterVoiceKeys,
+        defaultVoiceId,
+      });
     }
     if (drillData.roleplay_dialogue) {
       return drillData.roleplay_dialogue
         .filter((turn: any) => turn.text && turn.text.trim())
-        .map((turn: any, index: number) => ({
-          id: `roleplay_legacy_t${index}`,
-          text: turn.text.trim(),
-        }));
+        .map((turn: any, index: number) => {
+          let voiceId = defaultVoiceId;
+          const aiMatch = /^ai_(\d+)$/.exec(turn.speaker);
+          if (aiMatch) {
+            const characterKey = aiCharacterVoiceKeys[Number(aiMatch[1])];
+            if (characterKey?.trim()) {
+              voiceId = resolveAccentVoiceId(characterKey) ?? defaultVoiceId;
+            }
+          }
+          return {
+            id: `roleplay_legacy_t${index}`,
+            text: turn.text.trim(),
+            ...(voiceId ? { voiceId } : {}),
+          };
+        });
     }
   }
   if (drillType === "matching" && drillData.matching_pairs) {
