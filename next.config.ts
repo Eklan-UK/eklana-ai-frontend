@@ -151,10 +151,19 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // Reduce peak RAM during webpack compiles on Vercel's 8GB build containers.
+  // Reduce peak RAM during webpack + SSG on Vercel's ~8GB build containers.
+  // Low SSG concurrency avoids loading many page/API graphs in parallel (OOM/SIGKILL).
   experimental: {
     webpackMemoryOptimizations: true,
+    webpackBuildWorker: true,
+    serverSourceMaps: false,
+    // 1 page at a time per worker — safer on Vercel default ~8GB than the default of 8.
+    staticGenerationMaxConcurrency: 1,
+    staticGenerationMinPagesPerWorker: 50,
   },
+
+  // Source maps inflate peak RAM during builds; keep off for Vercel.
+  productionBrowserSourceMaps: false,
 
   /**
    * Short URL aliases (URL bar shows the short path; internally serves /account/*).
@@ -185,7 +194,16 @@ const nextConfig: NextConfig = {
   // from node_modules at runtime (not inlined as a bundle chunk).
   // ffmpeg-static: binary path mangled when bundled → ENOENT on Vercel.
   // ws / bufferutil / utf-8-validate: "b.mask is not a function" in production.
-  serverExternalPackages: ['ws', 'bufferutil', 'utf-8-validate', 'ffmpeg-static'],
+  // Keep heavy native/server packages out of webpack bundles (less RAM during build,
+  // and avoids inlining mongoose into every server chunk that touches models).
+  serverExternalPackages: [
+    'ws',
+    'bufferutil',
+    'utf-8-validate',
+    'ffmpeg-static',
+    'mongoose',
+    'mongodb',
+  ],
 
   // Force Vercel's output-file-tracing to include the ffmpeg binary that
   // ffmpeg-static resolves to at runtime — it is a plain executable file
