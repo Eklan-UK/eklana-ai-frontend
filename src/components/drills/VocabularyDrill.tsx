@@ -31,13 +31,14 @@ import {
   type PerformanceReviewAnalyticsRow,
   type PerformanceReviewGroup,
 } from "./shared";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface VocabularyDrillProps {
   drill: any;
@@ -135,6 +136,11 @@ export default function VocabularyDrill({
   assignmentId,
 }: VocabularyDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "vocabulary",
+    assignmentId,
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -149,7 +155,7 @@ export default function VocabularyDrill({
   >([]);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -200,32 +206,48 @@ export default function VocabularyDrill({
       return initialProgress;
     };
 
+    if (!localProgress.isReady) return;
+
+    let cancelled = false;
+    setIsLoadingCheckpoint(true);
+    setShowCheckpoint(false);
+
+    const applyPartial = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.wordProgress) {
+        setWordProgress(partial.wordProgress as Record<number, WordProgress>);
+      } else {
+        setWordProgress(createEmptyProgress());
+      }
+      if (partial.sessionReviewAnalytics) {
+        setSessionReviewAnalytics(
+          partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+        );
+      }
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyPartial(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
     if (!assignmentId) {
       setWordProgress(createEmptyProgress());
       setIsLoadingCheckpoint(false);
       return;
     }
 
-    let cancelled = false;
-    setIsLoadingCheckpoint(true);
-    setShowCheckpoint(false);
-
     loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
       if (cancelled) return;
       if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        const partial = cp.partialResults;
-        if (partial.wordProgress) {
-          setWordProgress(partial.wordProgress as Record<number, WordProgress>);
-        } else {
-          setWordProgress(createEmptyProgress());
-        }
-        if (partial.sessionReviewAnalytics) {
-          setSessionReviewAnalytics(
-            partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-          );
-        }
-        setCheckpointCount(cp.completedItemCount);
+        applyPartial(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
       } else {
         setWordProgress(createEmptyProgress());
       }
@@ -235,7 +257,7 @@ export default function VocabularyDrill({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, targetSentences.length]);
+  }, [localProgress.isReady, assignmentId, drill._id, targetSentences.length]);
 
   const revokeRecordingPreview = useCallback(() => {
     setRecordingPreviewUrl((prev) => {
@@ -502,6 +524,13 @@ export default function VocabularyDrill({
       setPronunciationScore(null);
       discardPendingRecording();
 
+      localProgress.persist({
+        resumeFromIndex: currentIndex + 1,
+        completedItemCount: completedCount,
+        partialResults: { wordProgress, sessionReviewAnalytics },
+        startedAt: new Date(startTime).toISOString(),
+      });
+
       if (completedCount > 0 && completedCount % 5 === 0 && assignmentId) {
         void saveCheckpoint(String(drill._id), {
           assignmentId,
@@ -585,6 +614,7 @@ export default function VocabularyDrill({
       });
 
       void clearCheckpoint(String(drill._id), assignmentId);
+      localProgress.clear();
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -612,6 +642,10 @@ export default function VocabularyDrill({
     discardPendingRecording();
     setIsRecording(false);
     clearRecordingTimers();
+    setShowCheckpoint(false);
+    setCheckpointCount(0);
+    localProgress.clear();
+    if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
     const initialProgress: Record<number, WordProgress> = {};
     targetSentences.forEach((_: any, index: number) => {
       initialProgress[index] = {
@@ -703,7 +737,7 @@ export default function VocabularyDrill({
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -738,7 +772,7 @@ export default function VocabularyDrill({
 
   if (showReview) {
     return (
-      <DrillLayout title="Review Performance" hideNavigation>
+      <DrillLayout title="Review Performance" hideNavigation headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <DrillPerformanceReview
           avgScore={reviewAvgScore}
           statsLine={reviewStatsLine}
@@ -755,7 +789,7 @@ export default function VocabularyDrill({
 
   if (!currentSentence) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="text-center py-8">
           <p className="text-muted-foreground">
             No vocabulary items found in this drill.
@@ -797,7 +831,10 @@ export default function VocabularyDrill({
   };
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout
+      title={drill.title}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div className="relative flex min-h-0 flex-1 flex-col gap-3 h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)]">
         <div className="shrink-0 space-y-4">
           <DrillProgress
@@ -829,27 +866,7 @@ export default function VocabularyDrill({
                   <h1 className="text-3xl md:text-4xl font-bold text-foreground">
                     {currentText}
                   </h1>
-                  {currentScreen === "word" && (
-                    <BookmarkButton
-                      itemId={currentWord}
-                      itemType="word"
-                      content={currentWord}
-                      translation={currentSentence.wordTranslation}
-                      context={currentSentence.text}
-                      sourceDrillId={drill._id}
-                      className="ml-2"
-                    />
-                  )}
-                  {currentScreen === "sentence" && (
-                    <BookmarkButton
-                      itemId={currentText}
-                      itemType="sentence"
-                      content={currentText}
-                      translation={currentSentence.translation}
-                      sourceDrillId={drill._id}
-                      className="ml-2"
-                    />
-                  )}
+                  <DrillBookmarkToggle drillId={String(drill._id)} />
                 </div>
                 {currentScreen === "word" && currentSentence.wordTranslation && (
                   <p className="text-sm text-muted-foreground mt-2">

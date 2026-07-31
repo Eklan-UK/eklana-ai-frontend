@@ -23,9 +23,10 @@ import {
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 interface FillBlankDrillProps {
   drill: any;
   assignmentId?: string;
@@ -40,6 +41,12 @@ export default function FillBlankDrill({
   weeklyChallengeMeta,
 }: FillBlankDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "fill_blank",
+    assignmentId,
+    weeklyChallengeMeta,
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submittedCount, setSubmittedCount] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
@@ -52,17 +59,43 @@ export default function FillBlankDrill({
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
 
   useEffect(() => {
-    if (!assignmentId && !weeklyChallengeMeta) {
-      setIsLoadingCheckpoint(false);
-      return;
-    }
+    if (!localProgress.isReady) return;
 
     let cancelled = false;
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
+
+    const applyPartial = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.answers) {
+        setAnswers(partial.answers as Record<number, Record<number, string>>);
+      }
+      if (typeof partial.submittedCount === "number") {
+        setSubmittedCount(partial.submittedCount as number);
+      } else {
+        setSubmittedCount(completedCount);
+      }
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyPartial(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    if (!assignmentId && !weeklyChallengeMeta) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
 
     if (weeklyChallengeMeta) {
       weeklyChallengeAPI
@@ -71,15 +104,11 @@ export default function FillBlankDrill({
           if (cancelled) return;
           const cp = res.data?.checkpoint as Record<string, unknown> | null;
           if (cp) {
-            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
-            const partial = cp.partialResults as Record<string, unknown> | undefined;
-            if (partial?.answers) {
-              setAnswers(partial.answers as Record<number, Record<number, string>>);
-            }
-            if (typeof partial?.submittedCount === "number") {
-              setSubmittedCount(partial.submittedCount as number);
-            }
-            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+            applyPartial(
+              typeof cp.resumeFromIndex === "number" ? cp.resumeFromIndex : 0,
+              typeof cp.completedCount === "number" ? cp.completedCount : 0,
+              (cp.partialResults as Record<string, unknown>) ?? {},
+            );
           }
           setIsLoadingCheckpoint(false);
         })
@@ -88,15 +117,7 @@ export default function FillBlankDrill({
       loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
         if (cancelled) return;
         if (cp) {
-          setCurrentIndex(cp.resumeFromIndex);
-          const partial = cp.partialResults;
-          if (partial.answers) {
-            setAnswers(partial.answers as Record<number, Record<number, string>>);
-          }
-          if (typeof partial.submittedCount === "number") {
-            setSubmittedCount(partial.submittedCount as number);
-          }
-          setCheckpointCount(cp.completedItemCount);
+          applyPartial(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
         }
         setIsLoadingCheckpoint(false);
       });
@@ -105,7 +126,7 @@ export default function FillBlankDrill({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, weeklyChallengeMeta]);
+  }, [localProgress.isReady, assignmentId, drill._id, weeklyChallengeMeta]);
 
   const items = drill.fill_blank_items || [];
   const currentItem = items[currentIndex];
@@ -185,7 +206,9 @@ export default function FillBlankDrill({
                 ) : (
                   <select
                     value={currentAnswer}
+                    disabled={sentenceIdx < submittedCount}
                     onChange={(e) => {
+                      if (sentenceIdx < submittedCount) return;
                       setAnswers({
                         ...answers,
                         [sentenceIdx]: {
@@ -194,7 +217,7 @@ export default function FillBlankDrill({
                         },
                       });
                     }}
-                    className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-80 disabled:bg-muted/40"
                   >
                     <option value="">Select...</option>
                     {(blank.options || [])
@@ -230,6 +253,13 @@ export default function FillBlankDrill({
 
     const newSubmittedCount = Math.max(submittedCount, currentIndex + 1);
     setSubmittedCount(newSubmittedCount);
+
+    localProgress.persist({
+      resumeFromIndex: currentIndex < items.length - 1 ? currentIndex + 1 : currentIndex,
+      completedItemCount: newSubmittedCount,
+      partialResults: { answers, submittedCount: newSubmittedCount },
+      startedAt: new Date(startTime).toISOString(),
+    });
 
     if (currentIndex < items.length - 1) {
       setCurrentIndex(currentIndex + 1);
@@ -311,6 +341,7 @@ export default function FillBlankDrill({
   const handleRetry = () => {
     if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
     else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
+    localProgress.clear();
     setSubmittedResults(null);
     setAnswers({});
     setCurrentIndex(0);
@@ -345,6 +376,7 @@ export default function FillBlankDrill({
           },
         );
         void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
+        localProgress.clear();
         trackActivity("drill", drill._id, "completed", {
           title: drill.title,
           type: drill.type,
@@ -364,6 +396,7 @@ export default function FillBlankDrill({
           platform: "web",
         });
         void clearCheckpoint(String(drill._id), assignmentId!);
+        localProgress.clear();
         trackActivity("drill", drill._id, "completed", {
           title: drill.title,
           type: drill.type,
@@ -389,7 +422,7 @@ export default function FillBlankDrill({
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title} showBack={true}>
+      <DrillLayout title={drill.title} showBack={true} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -434,7 +467,11 @@ export default function FillBlankDrill({
   );
 
   return (
-    <DrillLayout title={drill.title} showBack={true}>
+    <DrillLayout
+      title={drill.title}
+      showBack={true}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         <DrillProgress
           current={submittedCount}
@@ -530,20 +567,11 @@ export default function FillBlankDrill({
                     Sentence {currentIndex + 1} of {items.length}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
-                    {currentItem.audioUrl && (
-                      <TTSButton
-                        text={currentItem.sentence}
-                        audioUrl={currentItem.audioUrl}
-                      />
-                    )}
-                    <BookmarkButton
-                      itemId={`${drill._id}-fb-${currentIndex}`}
-                      itemType="sentence"
-                      content={currentItem.sentence}
-                      translation={currentItem.translation}
-                      context={currentItem.context}
-                      sourceDrillId={drill._id}
+                    <TTSButton
+                      text={currentItem.sentence}
+                      audioUrl={currentItem.audioUrl}
                     />
+                    <DrillBookmarkToggle drillId={String(drill._id)} />
                   </div>
                 </div>
 

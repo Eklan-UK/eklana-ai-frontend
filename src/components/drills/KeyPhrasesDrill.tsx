@@ -30,8 +30,9 @@ import {
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { preloadTTSAudio } from "@/hooks/useTTS";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface KeyPhrasesDrillProps {
@@ -62,6 +63,12 @@ export default function KeyPhrasesDrill({
   weeklyChallengeMeta,
 }: KeyPhrasesDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "key_phrases",
+    assignmentId,
+    weeklyChallengeMeta,
+  });
   const items = useMemo(() => drill.key_phrase_items || [], [drill.key_phrase_items]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -77,7 +84,7 @@ export default function KeyPhrasesDrill({
   >([]);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId || !!weeklyChallengeMeta);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -113,14 +120,40 @@ export default function KeyPhrasesDrill({
   }, [revokeRecordingPreview]);
 
   useEffect(() => {
-    if (!assignmentId && !weeklyChallengeMeta) {
-      setIsLoadingCheckpoint(false);
-      return;
-    }
+    if (!localProgress.isReady) return;
 
     let cancelled = false;
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
+
+    const applyPartial = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.itemResults) {
+        setItemResults(partial.itemResults as Record<number, ItemResult>);
+      }
+      if (partial.sessionReviewAnalytics) {
+        setSessionReviewAnalytics(
+          partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
+        );
+      }
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyPartial(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    if (!assignmentId && !weeklyChallengeMeta) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
 
     if (weeklyChallengeMeta) {
       weeklyChallengeAPI
@@ -129,17 +162,11 @@ export default function KeyPhrasesDrill({
           if (cancelled) return;
           const cp = res.data?.checkpoint as Record<string, unknown> | null;
           if (cp) {
-            if (typeof cp.resumeFromIndex === "number") setCurrentIndex(cp.resumeFromIndex);
-            const partial = cp.partialResults as Record<string, unknown> | undefined;
-            if (partial?.itemResults) {
-              setItemResults(partial.itemResults as Record<number, ItemResult>);
-            }
-            if (partial?.sessionReviewAnalytics) {
-              setSessionReviewAnalytics(
-                partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-              );
-            }
-            if (typeof cp.completedCount === "number") setCheckpointCount(cp.completedCount);
+            applyPartial(
+              typeof cp.resumeFromIndex === "number" ? cp.resumeFromIndex : 0,
+              typeof cp.completedCount === "number" ? cp.completedCount : 0,
+              (cp.partialResults as Record<string, unknown>) ?? {},
+            );
           }
           setIsLoadingCheckpoint(false);
         })
@@ -148,17 +175,7 @@ export default function KeyPhrasesDrill({
       loadCheckpoint(String(drill._id), assignmentId!).then((cp) => {
         if (cancelled) return;
         if (cp) {
-          setCurrentIndex(cp.resumeFromIndex);
-          const partial = cp.partialResults;
-          if (partial.itemResults) {
-            setItemResults(partial.itemResults as Record<number, ItemResult>);
-          }
-          if (partial.sessionReviewAnalytics) {
-            setSessionReviewAnalytics(
-              partial.sessionReviewAnalytics as PerformanceReviewAnalyticsRow[],
-            );
-          }
-          setCheckpointCount(cp.completedItemCount);
+          applyPartial(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
         }
         setIsLoadingCheckpoint(false);
       });
@@ -167,7 +184,7 @@ export default function KeyPhrasesDrill({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id, weeklyChallengeMeta]);
+  }, [localProgress.isReady, assignmentId, drill._id, weeklyChallengeMeta]);
 
   // Pre-warm prompt TTS for every question while the drill loads / between questions
   useEffect(() => {
@@ -371,6 +388,13 @@ export default function KeyPhrasesDrill({
       const completedCount = currentIndex + 1;
       setCurrentIndex(currentIndex + 1);
 
+      localProgress.persist({
+        resumeFromIndex: currentIndex + 1,
+        completedItemCount: completedCount,
+        partialResults: { itemResults, sessionReviewAnalytics },
+        startedAt: new Date(startTime).toISOString(),
+      });
+
       if (completedCount % 5 === 0) {
         if (assignmentId) {
           void saveCheckpoint(String(drill._id), {
@@ -511,6 +535,7 @@ export default function KeyPhrasesDrill({
 
       if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
       else if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
+      localProgress.clear();
       setShowReview(false);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -536,6 +561,16 @@ export default function KeyPhrasesDrill({
     setPronunciationScore(null);
     discardPendingRecording();
     setAttempts(0);
+    setShowCheckpoint(false);
+    setCheckpointCount(0);
+    localProgress.clear();
+    if (assignmentId) void clearCheckpoint(String(drill._id), assignmentId);
+    else if (weeklyChallengeMeta) {
+      void weeklyChallengeAPI.clearCheckpoint(
+        weeklyChallengeMeta.weekStartDate,
+        weeklyChallengeMeta.itemIndex,
+      );
+    }
   };
 
   const inDrillReviewRow: PerformanceReviewAnalyticsRow | null = useMemo(() => {
@@ -555,7 +590,7 @@ export default function KeyPhrasesDrill({
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -595,7 +630,7 @@ export default function KeyPhrasesDrill({
 
   if (showReview) {
     return (
-      <DrillLayout title="Review Performance" hideNavigation>
+      <DrillLayout title="Review Performance" hideNavigation headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <DrillPerformanceReview
           avgScore={reviewAvgScore}
           statsLine={reviewStatsLine}
@@ -612,7 +647,7 @@ export default function KeyPhrasesDrill({
 
   if (!currentItem) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="p-6 text-center text-muted-foreground">
           No key phrase items found for this drill.
         </Card>
@@ -631,7 +666,10 @@ export default function KeyPhrasesDrill({
   ).length;
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout
+      title={drill.title}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div className="w-full space-y-6 pb-10">
         <DrillProgress
           current={answeredCount}
@@ -656,12 +694,7 @@ export default function KeyPhrasesDrill({
                 audioUrl={currentItem.promptAudioUrl}
                 className="shrink-0"
               />
-              <BookmarkButton
-                itemId={`${drill._id}-kp-${currentIndex}`}
-                itemType="sentence"
-                content={currentItem.prompt}
-                sourceDrillId={drill._id}
-              />
+              <DrillBookmarkToggle drillId={String(drill._id)} />
             </div>
           </div>
         </Card>

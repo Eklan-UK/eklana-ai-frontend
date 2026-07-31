@@ -7,7 +7,9 @@ import {
   ChevronRight,
   Loader2,
   Calendar,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   formatWeekDateRange,
   mergeWeeksWithEmptySlots,
@@ -15,8 +17,10 @@ import {
 } from "@/lib/ai-drill-builder/week-utils";
 import {
   useCreateStudentWeek,
+  useDeleteStudentWeeks,
   useStudentWeeks,
 } from "@/hooks/useStudentWeeks";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 interface StudentWeeksViewProps {
   studentId: string;
@@ -33,7 +37,11 @@ export function StudentWeeksView({
 }: StudentWeeksViewProps) {
   const { data, isLoading } = useStudentWeeks(studentId);
   const createWeek = useCreateStudentWeek(studentId);
+  const deleteWeeks = useDeleteStudentWeeks(studentId);
   const [expandedPast, setExpandedPast] = useState<Set<number>>(new Set());
+  const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<Set<number>>(
+    new Set(),
+  );
 
   // Trust the API week count after seed — do not expand from client clock.
   const currentWeek = data?.currentWeek ?? 0;
@@ -48,6 +56,12 @@ export function StudentWeeksView({
     );
   }, [data, currentWeek, anchorDate]);
 
+  const emptyWeekNumbers = useMemo(() => {
+    return weeks
+      .filter((week) => (week.drills?.length ?? week.items?.length ?? 0) === 0)
+      .map((week) => week.weekNumber);
+  }, [weeks]);
+
   const togglePastWeek = (weekNumber: number) => {
     setExpandedPast((prev) => {
       const next = new Set(prev);
@@ -60,6 +74,57 @@ export function StudentWeeksView({
     });
   };
 
+  const toggleWeekSelected = (weekNumber: number, checked: boolean) => {
+    setSelectedWeekNumbers((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(weekNumber);
+      else next.delete(weekNumber);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedWeekNumbers(new Set());
+
+  const handleDeleteSelected = async () => {
+    const selected = Array.from(selectedWeekNumbers).sort((a, b) => a - b);
+    if (selected.length === 0) return;
+
+    const nonEmpty = selected.filter((weekNumber) => {
+      const week = weeks.find((w) => w.weekNumber === weekNumber);
+      return (week?.drills?.length ?? week?.items?.length ?? 0) > 0;
+    });
+    if (nonEmpty.length > 0) {
+      toast.error(
+        `Cannot delete week${nonEmpty.length === 1 ? "" : "s"} ${nonEmpty.join(", ")}: move or remove drills first`,
+      );
+      return;
+    }
+
+    if (selected.length >= weeks.length) {
+      toast.error("Cannot delete all weeks; at least one week must remain");
+      return;
+    }
+
+    const label =
+      selected.length === 1
+        ? `Week ${selected[0]}`
+        : `${selected.length} empty weeks (${selected.join(", ")})`;
+    if (
+      !confirm(
+        `Delete ${label}? Remaining weeks will be renumbered to stay consecutive.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteWeeks.mutateAsync({ weekNumbers: selected });
+      clearSelection();
+    } catch {
+      // Toast handled by mutation onError
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -68,6 +133,8 @@ export function StudentWeeksView({
     );
   }
 
+  const selectedCount = selectedWeekNumbers.size;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -75,18 +142,52 @@ export function StudentWeeksView({
           Weekly work for{" "}
           <span className="font-medium text-gray-900">{studentName}</span>
         </p>
-        <button
-          type="button"
-          onClick={() => createWeek.mutate()}
-          disabled={createWeek.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-        >
-          {createWeek.isPending && (
-            <Loader2 className="w-4 h-4 animate-spin" />
+        <div className="flex items-center gap-2">
+          {selectedCount > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={clearSelection}
+                disabled={deleteWeeks.isPending}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteSelected()}
+                disabled={deleteWeeks.isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {deleteWeeks.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete {selectedCount} week{selectedCount === 1 ? "" : "s"}
+              </button>
+            </>
           )}
-          + Week
-        </button>
+          <button
+            type="button"
+            onClick={() => createWeek.mutate()}
+            disabled={createWeek.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {createWeek.isPending && (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            )}
+            + Week
+          </button>
+        </div>
       </div>
+
+      {emptyWeekNumbers.length > 0 && (
+        <p className="text-xs text-gray-400">
+          Select empty weeks to delete them. Weeks with drills must be cleared
+          first.
+        </p>
+      )}
 
       {weeks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500">
@@ -101,6 +202,8 @@ export function StudentWeeksView({
             const isPast = week.weekNumber < currentWeek;
             const isCollapsed = isPast && !expandedPast.has(week.weekNumber);
             const drillCount = week.drills?.length ?? week.items?.length ?? 0;
+            const isEmpty = drillCount === 0;
+            const isSelected = selectedWeekNumbers.has(week.weekNumber);
             const dateRange = formatWeekDateRange(
               week.weekNumber,
               data?.anchorDate ?? anchorDate,
@@ -110,17 +213,39 @@ export function StudentWeeksView({
               <div
                 key={week.weekNumber}
                 className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-                  isCurrent
-                    ? "border-emerald-200 ring-1 ring-emerald-100"
-                    : "border-gray-100"
+                  isSelected
+                    ? "border-red-200 ring-1 ring-red-100"
+                    : isCurrent
+                      ? "border-emerald-200 ring-1 ring-emerald-100"
+                      : "border-gray-100"
                 }`}
               >
                 <div className="flex items-center">
+                  <div className="pl-4 py-4 shrink-0">
+                    <Checkbox
+                      checked={isSelected}
+                      disabled={!isEmpty || deleteWeeks.isPending}
+                      onChange={(e) =>
+                        toggleWeekSelected(week.weekNumber, e.target.checked)
+                      }
+                      aria-label={
+                        isEmpty
+                          ? `Select week ${week.weekNumber} for deletion`
+                          : `Week ${week.weekNumber} has drills and cannot be deleted`
+                      }
+                      title={
+                        isEmpty
+                          ? "Select empty week to delete"
+                          : "Move or remove drills before deleting this week"
+                      }
+                      className="rounded border-gray-300 disabled:opacity-40"
+                    />
+                  </div>
                   {isPast && (
                     <button
                       type="button"
                       onClick={() => togglePastWeek(week.weekNumber)}
-                      className="px-4 py-4 text-gray-400 hover:text-gray-600"
+                      className="px-2 py-4 text-gray-400 hover:text-gray-600"
                       aria-label={
                         isCollapsed ? "Expand week" : "Collapse week"
                       }
@@ -156,6 +281,11 @@ export function StudentWeeksView({
                           {isCurrent && (
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                               Current
+                            </span>
+                          )}
+                          {isEmpty && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200">
+                              Empty
                             </span>
                           )}
                         </div>

@@ -24,8 +24,9 @@ import {
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { trackActivity } from "@/utils/activity-cache";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 
 interface GrammarDrillProps {
   drill: any;
@@ -50,6 +51,11 @@ export default function GrammarDrill({
   assignmentId,
 }: GrammarDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "grammar",
+    assignmentId,
+  });
   const patternItems: PatternItem[] = useMemo(() => {
     return (drill.grammar_items || []).map((item: any) => ({
       pattern: item.pattern || "",
@@ -69,28 +75,47 @@ export default function GrammarDrill({
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [completedItemCount, setCompletedItemCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollToTopAfterNextRef = useRef(false);
 
   useEffect(() => {
-    if (!assignmentId) {
-      setIsLoadingCheckpoint(false);
-      return;
-    }
+    if (!localProgress.isReady) return;
 
     let cancelled = false;
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
 
+    const applyProgress = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.answers) {
+        setAnswers(partial.answers as Record<number, PatternAnswer>);
+      }
+      setCompletedItemCount(completedCount);
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyProgress(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
     loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
       if (cancelled) return;
       if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        if (cp.partialResults.answers) {
-          setAnswers(cp.partialResults.answers as Record<number, PatternAnswer>);
-        }
-        setCheckpointCount(cp.completedItemCount);
+        applyProgress(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
       }
       setIsLoadingCheckpoint(false);
     });
@@ -98,7 +123,7 @@ export default function GrammarDrill({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id]);
+  }, [localProgress.isReady, assignmentId, drill._id]);
 
   const currentPattern = patternItems[currentIndex];
   const currentAnswer = answers[currentIndex] || {
@@ -133,7 +158,10 @@ export default function GrammarDrill({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentIndex]);
 
+  const isCurrentLocked = currentIndex < completedItemCount;
+
   const updateCurrentAnswer = (field: keyof PatternAnswer, value: string) => {
+    if (isCurrentLocked) return;
     setAnswers((prev) => {
       const existing = prev[currentIndex] ?? {
         sentence1: "",
@@ -165,8 +193,18 @@ export default function GrammarDrill({
       await handleSubmit();
     } else {
       const completedCount = currentIndex + 1;
+      const nextAnswers = { ...answers, [currentIndex]: currentAnswer };
       scrollToTopAfterNextRef.current = true;
+      setAnswers(nextAnswers);
       setCurrentIndex(currentIndex + 1);
+      setCompletedItemCount(completedCount);
+
+      localProgress.persist({
+        resumeFromIndex: currentIndex + 1,
+        completedItemCount: completedCount,
+        partialResults: { answers: nextAnswers },
+        startedAt: new Date(startTime).toISOString(),
+      });
 
       if (completedCount % 5 === 0 && assignmentId) {
         void saveCheckpoint(String(drill._id), {
@@ -174,7 +212,7 @@ export default function GrammarDrill({
           drillType: "grammar",
           resumeFromIndex: currentIndex + 1,
           completedItemCount: completedCount,
-          partialResults: { answers },
+          partialResults: { answers: nextAnswers },
           startedAt: new Date(startTime),
         });
         setCheckpointCount(completedCount);
@@ -233,6 +271,7 @@ export default function GrammarDrill({
       });
 
       void clearCheckpoint(String(drill._id), assignmentId);
+      localProgress.clear();
       setIsCompleted(true);
       toast.success("Drill submitted! Your submission is pending review.");
 
@@ -252,7 +291,7 @@ export default function GrammarDrill({
 
   if (isLoadingCheckpoint) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -289,7 +328,7 @@ export default function GrammarDrill({
 
   if (totalPatterns === 0) {
     return (
-      <DrillLayout title={drill.title}>
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="mb-4">
           <div className="flex flex-col items-center gap-3 text-amber-600 py-8">
             <AlertCircle className="w-12 h-12" />
@@ -305,7 +344,10 @@ export default function GrammarDrill({
   }
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout
+      title={drill.title}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div className="flex flex-col h-[calc(100svh-8.75rem)] max-h-[calc(100svh-8.75rem)] md:h-[calc(100svh-9.25rem)] md:max-h-[calc(100svh-9.25rem)] min-h-0 gap-3">
         <div
           ref={scrollAreaRef}
@@ -335,13 +377,7 @@ export default function GrammarDrill({
               size="md"
               audioUrl={currentPattern?.patternAudioUrl}
             />
-            <BookmarkButton
-              itemId={currentPattern?.pattern || ""}
-              itemType="sentence"
-              content={currentPattern?.pattern || ""}
-              context={currentPattern?.hint}
-              sourceDrillId={drill._id}
-            />
+            <DrillBookmarkToggle drillId={String(drill._id)} />
           </div>
 
           {currentPattern?.hint && (
@@ -404,6 +440,7 @@ export default function GrammarDrill({
             className="w-full p-4 border border-border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all min-h-[100px] resize-none"
             placeholder="Write your first sentence using the pattern..."
             value={currentAnswer.sentence1}
+            readOnly={isCurrentLocked}
             onChange={(e) => updateCurrentAnswer("sentence1", e.target.value)}
           />
           <p className="text-xs text-muted-foreground mt-2">
@@ -425,6 +462,7 @@ export default function GrammarDrill({
             className="w-full p-4 border border-border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all min-h-[100px] resize-none"
             placeholder="Write your second sentence using the pattern..."
             value={currentAnswer.sentence2}
+            readOnly={isCurrentLocked}
             onChange={(e) => updateCurrentAnswer("sentence2", e.target.value)}
           />
           <p className="text-xs text-muted-foreground mt-2">

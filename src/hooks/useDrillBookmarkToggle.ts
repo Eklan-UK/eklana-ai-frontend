@@ -48,6 +48,9 @@ export function useDrillBookmarkToggle() {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.drills.learner.saved(),
         });
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.bookmarks.drillStatus(),
+        });
       } catch {
         toast.error(
           currentlyBookmarked

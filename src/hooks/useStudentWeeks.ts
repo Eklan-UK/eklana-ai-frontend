@@ -72,3 +72,56 @@ export function useCreateStudentWeek(studentId: string) {
     },
   });
 }
+
+export function useMoveStudentWeekDrills(studentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      assignmentIds: string[];
+      targetWeekNumber: number;
+    }) => studentAPI.moveStudentWeekDrills(studentId, data),
+    onSuccess: async (response) => {
+      await invalidateStudentWeeks(queryClient, studentId);
+      const movedCount = response.data?.movedCount ?? 0;
+      const targetWeekNumber = response.data?.targetWeekNumber;
+      toast.success(
+        `Moved ${movedCount} drill${movedCount === 1 ? "" : "s"} to Week ${targetWeekNumber}`,
+      );
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to move drills";
+      toast.error(message);
+    },
+  });
+}
+
+export function useDeleteStudentWeeks(studentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { weekNumbers: number[] }) =>
+      studentAPI.deleteStudentWeeks(studentId, data),
+    onSuccess: async (response) => {
+      await invalidateStudentWeeks(queryClient, studentId);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "ai-drill-builder", "all-learners"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+      ]);
+      const deleted = response.data?.deletedWeekNumbers ?? [];
+      const label =
+        deleted.length === 1
+          ? `Week ${deleted[0]}`
+          : `${deleted.length} weeks`;
+      toast.success(`Deleted ${label}`);
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete weeks";
+      toast.error(message);
+    },
+  });
+}

@@ -101,6 +101,9 @@ function mapContentFields(
       const displayStudentCharacterName =
         studentCharacterNameOverride ?? originalStudentCharacterName;
       const aiCharacterNames = content.ai_character_names ?? [];
+      const storedVoices = Array.isArray(content.ai_character_voice_keys)
+        ? content.ai_character_voice_keys
+        : [];
       return {
         roleplay_scenes: normalizeRoleplayScenes(
           content.roleplay_scenes ?? [],
@@ -109,6 +112,9 @@ function mapContentFields(
         ),
         student_character_name: displayStudentCharacterName,
         ai_character_names: aiCharacterNames,
+        ai_character_voice_keys: aiCharacterNames.map(
+          (_: string, i: number) => storedVoices[i] ?? ""
+        ),
         drill_intro: content.drill_intro ?? "",
       };
     }
@@ -272,6 +278,7 @@ async function handler(
             learnerId: toUserIdQuery(studentId),
             assignedBy: toUserIdQuery(context.userId),
             assignedAt,
+            ...(parsedWeek != null ? { builderWeekNumber: parsedWeek } : {}),
             dueDate,
             status: "pending",
           });

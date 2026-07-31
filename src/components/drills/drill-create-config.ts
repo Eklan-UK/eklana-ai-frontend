@@ -101,6 +101,14 @@ export function drillRecordToDraft(
         : (drill as { ai_character_name?: string }).ai_character_name
           ? [String((drill as { ai_character_name?: string }).ai_character_name)]
           : base.aiCharacterNames;
+    {
+      const storedVoices = Array.isArray(drill.ai_character_voice_keys)
+        ? (drill.ai_character_voice_keys as string[])
+        : [];
+      base.aiCharacterVoiceKeys = base.aiCharacterNames.map(
+        (_, i) => storedVoices[i] ?? "",
+      );
+    }
     base.drillIntro =
       typeof drill.drill_intro === "string" ? drill.drill_intro : "";
     base.roleplayScenes =

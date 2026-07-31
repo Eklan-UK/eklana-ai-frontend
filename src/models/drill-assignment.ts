@@ -18,6 +18,12 @@ export interface IDrillAssignment extends Document {
 	// can also have a UUID _id.
 	assignedBy: Types.ObjectId | string;
 	assignedAt: Date;
+	/**
+	 * AI Drill Builder week slot (1-based). Arrangement-only — used to bucket
+	 * assignments in the builder weeks UI. Independent of `assignedAt` so moves
+	 * do not affect learner challenge timing or other assignedAt-based features.
+	 */
+	builderWeekNumber?: number | null;
 	dueDate?: Date;
 	status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
 	completedAt?: Date;
@@ -56,6 +62,11 @@ const drillAssignmentSchema = new Schema<IDrillAssignment>(
 			default: Date.now,
 			required: true,
 		},
+		builderWeekNumber: {
+			type: Number,
+			default: null,
+			min: 1,
+		},
 		dueDate: {
 			type: Date,
 			default: null,
@@ -87,6 +98,9 @@ drillAssignmentSchema.index({ learnerId: 1, status: 1, dueDate: 1 });
 // Learner list sorted by assignedAt (my-drills findByLearnerId)
 drillAssignmentSchema.index({ learnerId: 1, assignedAt: -1 });
 
+// Drill Builder week bucketing
+drillAssignmentSchema.index({ learnerId: 1, builderWeekNumber: 1 });
+
 // Admin's assignment history
 drillAssignmentSchema.index({ assignedBy: 1, assignedAt: -1 });
 
@@ -112,7 +126,15 @@ drillAssignmentSchema.pre('save', function () {
 	}
 });
 
-// Prevent model recompilation in Next.js development
-const DrillAssignmentModel = models.DrillAssignment || model<IDrillAssignment>('DrillAssignment', drillAssignmentSchema);
+// Re-register in dev so schema changes (e.g. builderWeekNumber) apply without
+// a full server restart. Without this, Mongoose keeps the first-compiled schema
+// and silently strips unknown paths from updates (strict mode).
+if (process.env.NODE_ENV === 'development' && models.DrillAssignment) {
+	delete models.DrillAssignment;
+}
+
+const DrillAssignmentModel =
+	models.DrillAssignment ||
+	model<IDrillAssignment>('DrillAssignment', drillAssignmentSchema);
 export default DrillAssignmentModel;
 

@@ -2163,6 +2163,36 @@ export const studentAPI = {
       method: 'POST',
     });
   },
+
+  moveStudentWeekDrills: (
+    studentId: string,
+    data: { assignmentIds: string[]; targetWeekNumber: number },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        movedCount: number;
+        targetWeekNumber: number;
+      };
+    }>(`/students/${studentId}/weeks/move-drills`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  deleteStudentWeeks: (studentId: string, data: { weekNumbers: number[] }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        deletedWeekNumbers: number[];
+        weekCount: number;
+        remappedAssignmentCount: number;
+      };
+    }>(`/students/${studentId}/weeks`, {
+      method: 'DELETE',
+      data,
+    });
+  },
 };
 
 // Learning Journey API
