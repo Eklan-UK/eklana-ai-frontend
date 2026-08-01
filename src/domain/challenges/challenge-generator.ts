@@ -61,10 +61,14 @@ function buildPrompt(profile: WeaknessProfile, context?: ChallengeGenerationCont
 		label: w.label,
 	}));
 
-	const masteredNote =
-		profile.masteredPhonemes && profile.masteredPhonemes.length > 0
-			? `\nDo NOT generate pronunciation content targeting these phonemes as the student has recently mastered them: ${profile.masteredPhonemes.join(', ')}\n`
-			: '';
+	let masteredNote = '';
+	if (profile.masteredPhonemes && profile.masteredPhonemes.length > 0) {
+		const masteredList = profile.masteredPhonemes.join(', ');
+		masteredNote =
+			weaknesses.length < 4
+				? `\nThe learner's weaknesses list is thin, so also include some pronunciation content reinforcing these recently mastered phonemes to keep them sharp: ${masteredList}\n`
+				: `\nDo NOT generate pronunciation content targeting these phonemes as the student has recently mastered them: ${masteredList}\n`;
+	}
 
 	const countryNote = context?.country
 		? `\nThe learner practices nursing in ${context.country} — use clinical terminology, medication names, and healthcare-system conventions appropriate to that country.\n`
@@ -78,31 +82,28 @@ The learner has the following top weaknesses (up to 4), ranked by severity (1 = 
 
 ${JSON.stringify(weaknesses, null, 2)}
 
-If the weaknesses array is empty or has fewer than 4 items, generate content based on common nursing English challenges: clinical handover vocabulary, medical terminology pronunciation, professional communication key phrases, and SBAR roleplay scenarios. Use realistic nursing contexts from ICU, general ward, and patient communication settings.
 
-IMPORTANT: The evidence[] field for each weakness contains the specific words, phrases, and phonemes the student actually struggled with during their drills this week. You MUST use these exact items as the basis for generated content:
+IMPORTANT: The evidence[] field is the primary source for all weakness-specific content. Use the listed words, phrases, and phonemes directly when creating drills. Do not invent additional weaknesses or replace them with generic examples.
 - For pronunciation: use the weak phonemes listed in evidence to select words that target those specific sounds
 - For vocabulary: use the exact words listed in 'Struggled with:' from the evidence field
 - For key_phrases: base the clinical scenarios on the student's actual drill context
 - For roleplay: create scenarios that naturally incorporate the student's weak areas from evidence
-Do NOT invent generic content — every drill item must directly address what the student failed at this week.
 
-IMPORTANT: Each drill type must target DIFFERENT aspects of the student's weaknesses — do not repeat the same words across multiple drills.
-- pronunciation drill: focus on phoneme sounds and pronunciation of words
-- vocabulary drill: focus on meaning and correct usage in context
-- roleplay drill: focus on fluency and conversational scenarios — do NOT use the same specific words from pronunciation/vocabulary drills; instead create realistic clinical scenarios that test communication
-- key_phrases drill: focus on choosing the right professional response in clinical situations
-Distribute the student's weak areas across the 4 drills so each one feels distinct and complementary, not repetitive.
+IMPORTANT: The four drills must complement each other rather than repeat each other.
+- pronunciation: target weak phonemes using words from the evidence field.
+- vocabulary: teach the meaning and correct clinical usage of weak words from the evidence field.
+- roleplay: build realistic clinical conversations that exercise the same underlying communication weaknesses without reusing the exact vocabulary items from the pronunciation or vocabulary drills.
+- key_phrases: practise selecting the most appropriate professional response in realistic clinical situations.
 
-Generate exactly 4 ChallengeDrillItems — one for each drill type:
-1. One 'pronunciation' drill
-2. One 'vocabulary' drill
-3. One 'roleplay' drill
-4. One 'key_phrases' drill
+Distribute the student's weak areas across the four drills so each focuses on a different aspect of the learner's performance.
 
-Each drill must target the student's actual weaknesses from the profile above. If a weakness directly maps to that drill type, use it. If not, create content relevant to the student's overall weak areas based on the evidence provided.
+Generate exactly four ChallengeDrillItems:
+1. pronunciation
+2. vocabulary
+3. roleplay
+4. key_phrases
 
-drillType must be one of: pronunciation, vocabulary, key_phrases, roleplay. Every drill must be a different type — no duplicates.
+Each drillType must be unique and exactly match one of the four values above.
 
 Use these exact instructions per drill type:
 - pronunciation: "Practice these words and phrases focusing on clear pronunciation."
