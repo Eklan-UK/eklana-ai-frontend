@@ -61,13 +61,13 @@ function extractPronunciationSignals(
 			phoneme,
 			avg: scores.reduce((s, v) => s + v, 0) / scores.length,
 		}))
-		.filter(({ avg }) => avg < 70)
+		.filter(({ avg }) => avg < 90)
 		.sort((a, b) => a.avg - b.avg)
 		.slice(0, 5);
 
 	const signals: WeaknessSignal[] = [];
 
-	if (avgTextScore < 85) {
+	if (avgTextScore < 90) {
 		signals.push({
 			drillType: 'pronunciation',
 			category: 'pronunciation',
@@ -85,7 +85,7 @@ function extractPronunciationSignals(
 		});
 	}
 
-	if (avgFluency < 80) {
+	if (avgFluency < 90) {
 		signals.push({
 			drillType: 'pronunciation',
 			category: 'fluency',
@@ -97,7 +97,7 @@ function extractPronunciationSignals(
 
 	// Surface consistently weak phonemes from scored data even when overall scores
 	// pass the threshold above — ensures generation always has phoneme-level evidence.
-	if (weakScoredPhonemes.length > 0 && avgTextScore >= 85) {
+	if (weakScoredPhonemes.length > 0 && avgTextScore >= 90) {
 		const labels = weakScoredPhonemes.map(({ phoneme, avg }) => `${phoneme} (${avg.toFixed(0)})`);
 		signals.push({
 			drillType: 'pronunciation',
@@ -136,17 +136,31 @@ function extractVocabularySignals(
 			const score = ws.pronunciationScore ?? ws.score;
 			totalScore += score;
 			count++;
-			if (score < 70 || (ws.attempts > 2)) {
+			if (drillType !== 'key_phrases' && (score < 90 || ws.attempts > 2)) {
 				weakWords.push(ws.word ?? (ws as { prompt?: string }).prompt ?? '');
+			}
+		}
+
+		if (drillType === 'key_phrases') {
+			for (const item of attempt.keyPhrasesResults?.items ?? []) {
+				if (!item.isCorrect) {
+					weakWords.push(
+						item.selectedAnswer
+							? `Missed phrase: ${item.correctAnswer} (chose: ${item.selectedAnswer})`
+							: `Missed phrase: ${item.correctAnswer}`
+					);
+				} else if ((item.pronunciationScore ?? 100) < 90) {
+					weakWords.push(`Practise saying: ${item.correctAnswer}`);
+				}
 			}
 		}
 	}
 
 	if (count === 0) return [];
 	const avg = totalScore / count;
-	if (avg >= 85 && weakWords.length === 0) return [];
+	if (avg >= 90 && weakWords.length === 0) return [];
 
-	const uniqueWeak = [...new Set(weakWords)].slice(0, 5);
+	const uniqueWeak = [...new Set(weakWords)].slice(0, drillType === 'key_phrases' ? 10 : 5);
 	return [
 		{
 			drillType,
@@ -183,7 +197,7 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 	const avgPron = pronTotal / count;
 	const signals: WeaknessSignal[] = [];
 
-	if (avgFluency < 75) {
+	if (avgFluency < 90) {
 		signals.push({
 			drillType: 'roleplay',
 			category: 'fluency',
@@ -193,7 +207,7 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 		});
 	}
 
-	if (avgPron < 75) {
+	if (avgPron < 90) {
 		signals.push({
 			drillType: 'roleplay',
 			category: 'pronunciation',
@@ -234,7 +248,7 @@ function extractAccuracySignals(
 	if (accuracies.length === 0) return [];
 
 	const avg = accuracies.reduce((s, v) => s + v, 0) / accuracies.length;
-	if (avg >= 80) return [];
+	if (avg >= 90) return [];
 
 	const categoryMap: Record<string, WeaknessSignal['category']> = {
 		fill_blank: 'grammar',
@@ -268,7 +282,7 @@ function extractGrammarSignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 		}
 
 		for (const ps of r.patternScores ?? []) {
-			if (ps.score < 70 || ps.attempts > 2) {
+			if (ps.score < 90 || ps.attempts > 2) {
 				weakPatterns.push(ps.pattern);
 			}
 		}
@@ -277,7 +291,7 @@ function extractGrammarSignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 	if (count === 0 && weakPatterns.length === 0) return [];
 
 	const avg = count > 0 ? scoreTotal / count : 50;
-	if (avg >= 80 && weakPatterns.length === 0) return [];
+	if (avg >= 90 && weakPatterns.length === 0) return [];
 
 	const uniqueWeak = [...new Set(weakPatterns)].slice(0, 5);
 	return [
@@ -309,7 +323,7 @@ function buildPronunciationFrequencySignal(
 			if (p) phonemeFreq.set(p, (phonemeFreq.get(p) ?? 0) + 1);
 		}
 		for (const ws of attempt.wordScores ?? []) {
-			if (ws.score < 70 && ws.word) {
+			if (ws.score < 90 && ws.word) {
 				wordFreq.set(ws.word, (wordFreq.get(ws.word) ?? 0) + 1);
 			}
 		}
@@ -397,7 +411,7 @@ async function computeAllTimePhonemeAnalysis(
 
 	for (const { _id: phoneme, count } of allTimePhonemes as Array<{ _id: string; count: number }>) {
 		const recentAvg = recentScoreMap.get(phoneme);
-		if (recentAvg != null && recentAvg >= 80) {
+		if (recentAvg != null && recentAvg >= 90) {
 			masteredPhonemes.push(phoneme);
 		} else {
 			difficultPhonemes.push({ phoneme, count });
