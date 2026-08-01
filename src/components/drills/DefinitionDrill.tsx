@@ -16,7 +16,8 @@ import {
   saveCheckpoint,
   clearCheckpoint,
 } from "@/lib/drill/drill-checkpoint";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 
 interface DefinitionDrillProps {
   drill: any;
@@ -25,6 +26,11 @@ interface DefinitionDrillProps {
 
 export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "definition",
+    assignmentId,
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
@@ -35,26 +41,45 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointCount, setCheckpointCount] = useState(0);
-  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(!!assignmentId);
+  const [completedItemCount, setCompletedItemCount] = useState(0);
+  const [isLoadingCheckpoint, setIsLoadingCheckpoint] = useState(true);
 
   useEffect(() => {
-    if (!assignmentId) {
-      setIsLoadingCheckpoint(false);
-      return;
-    }
+    if (!localProgress.isReady) return;
 
     let cancelled = false;
     setIsLoadingCheckpoint(true);
     setShowCheckpoint(false);
 
+    const applyProgress = (
+      resumeFromIndex: number,
+      completedCount: number,
+      partial: Record<string, unknown>,
+    ) => {
+      setCurrentIndex(resumeFromIndex);
+      if (partial.answers) {
+        setAnswers(partial.answers as Record<number, string>);
+      }
+      setCompletedItemCount(completedCount);
+      setCheckpointCount(completedCount);
+    };
+
+    const local = localProgress.hydrate();
+    if (local) {
+      applyProgress(local.resumeFromIndex, local.completedItemCount, local.partialResults);
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
+    if (!assignmentId) {
+      setIsLoadingCheckpoint(false);
+      return;
+    }
+
     loadCheckpoint(String(drill._id), assignmentId).then((cp) => {
       if (cancelled) return;
       if (cp) {
-        setCurrentIndex(cp.resumeFromIndex);
-        if (cp.partialResults.answers) {
-          setAnswers(cp.partialResults.answers as Record<number, string>);
-        }
-        setCheckpointCount(cp.completedItemCount);
+        applyProgress(cp.resumeFromIndex, cp.completedItemCount, cp.partialResults);
       }
       setIsLoadingCheckpoint(false);
     });
@@ -62,14 +87,17 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, drill._id]);
+  }, [localProgress.isReady, assignmentId, drill._id]);
 
   const items = drill.definition_items || [];
   const currentItem = items[currentIndex];
   const currentAnswer = answers[currentIndex] || "";
   const hasAnswer = currentAnswer.trim().length > 0;
 
+  const isCurrentLocked = currentIndex < completedItemCount;
+
   const handleAnswerChange = (value: string) => {
+    if (isCurrentLocked) return;
     setAnswers({
       ...answers,
       [currentIndex]: value,
@@ -84,7 +112,17 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
 
     if (currentIndex < items.length - 1) {
       const completedCount = currentIndex + 1;
+      const nextAnswers = { ...answers, [currentIndex]: currentAnswer };
+      setAnswers(nextAnswers);
       setCurrentIndex(currentIndex + 1);
+      setCompletedItemCount(completedCount);
+
+      localProgress.persist({
+        resumeFromIndex: currentIndex + 1,
+        completedItemCount: completedCount,
+        partialResults: { answers: nextAnswers },
+        startedAt: new Date(startTime).toISOString(),
+      });
 
       if (completedCount % 5 === 0 && assignmentId) {
         void saveCheckpoint(String(drill._id), {
@@ -92,15 +130,25 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
           drillType: "definition",
           resumeFromIndex: currentIndex + 1,
           completedItemCount: completedCount,
-          partialResults: { answers: { ...answers, [currentIndex]: currentAnswer } },
+          partialResults: { answers: nextAnswers },
           startedAt: new Date(startTime),
         });
         setCheckpointCount(completedCount);
         setShowCheckpoint(true);
       }
     } else {
+      const nextAnswers = { ...answers, [currentIndex]: currentAnswer };
+      setAnswers(nextAnswers);
+      setCompletedItemCount(items.length);
+      localProgress.persist({
+        resumeFromIndex: items.length,
+        completedItemCount: items.length,
+        partialResults: { answers: nextAnswers },
+        startedAt: new Date(startTime).toISOString(),
+      });
+
       const allAnswered = items.every((_: any, idx: number) => {
-        const answer = answers[idx];
+        const answer = nextAnswers[idx];
         return answer && answer.trim().length > 0;
       });
 
@@ -160,6 +208,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
 
       void clearCheckpoint(String(drill._id), assignmentId);
+      localProgress.clear();
       setIsCompleted(true);
       setCompletionScore(score);
       toast.success("Drill completed! Great job!");
@@ -181,7 +230,11 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     return (
       <div className="min-h-screen bg-background pb-6">
         <div className="h-6" />
-        <Header title={drill.title} showBack={true} />
+        <Header
+          title={drill.title}
+          showBack={true}
+          rightAction={<DrillBookmarkToggle drillId={String(drill._id)} />}
+        />
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -217,7 +270,11 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     return (
       <div className="min-h-screen bg-background pb-6">
         <div className="h-6"></div>
-        <Header title="Review Your Definitions" showBack={true} />
+        <Header
+          title="Review Your Definitions"
+          showBack={true}
+          rightAction={<DrillBookmarkToggle drillId={String(drill._id)} />}
+        />
         
         <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
           <Card className="mb-4 bg-card/95 backdrop-blur-sm border border-border">
@@ -238,13 +295,6 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                       </h3>
                       <div className="flex items-center gap-2">
                         <TTSButton text={item.word} audioUrl={item.audioUrl} />
-                        <BookmarkButton
-                          itemId={item.word}
-                          itemType="word"
-                          content={item.word}
-                          context={item.hint}
-                          sourceDrillId={drill._id}
-                        />
                       </div>
                     </div>
                     {item.hint && (
@@ -299,7 +349,11 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   return (
     <div className="min-h-screen bg-background pb-6">
       <div className="h-6"></div>
-      <Header title={drill.title} showBack={true} />
+      <Header
+        title={drill.title}
+        showBack={true}
+        rightAction={<DrillBookmarkToggle drillId={String(drill._id)} />}
+      />
       
       <div className="max-w-md md:max-w-2xl mx-auto px-4 md:px-8 py-6">
         {/* Progress */}
@@ -342,13 +396,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                   </div>
                   <div className="flex items-center gap-2">
                     <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} />
-                    <BookmarkButton
-                      itemId={currentItem.word}
-                      itemType="word"
-                      content={currentItem.word}
-                      context={currentItem.hint}
-                      sourceDrillId={drill._id}
-                    />
+                    <DrillBookmarkToggle drillId={String(drill._id)} />
                   </div>
                 </div>
 
@@ -368,9 +416,10 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                   Write your definition:
                 </label>
                 <textarea
-                  className="w-full p-4 border-2 border-border rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all min-h-[120px] resize-none"
+                  className="w-full p-4 border-2 border-border rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all min-h-[120px] resize-none disabled:opacity-80 disabled:bg-muted/40"
                   placeholder="Type your definition here... Be as detailed as possible!"
                   value={currentAnswer}
+                  readOnly={isCurrentLocked}
                   onChange={(e) => handleAnswerChange(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-2">

@@ -12,14 +12,18 @@
 
 Web implemented **save-and-resume** for drills in June 2026. Mobile should mirror the same behavior so learners can exit mid-drill and continue on either platform.
 
-| Drill category | Checkpoint mechanism | API |
-|----------------|------------------------|-----|
-| Vocabulary, Pronunciation, Matching, Definition, Grammar, Sentence Writing, Fill in the Blank, Key Phrases | Every **5 completed items** | `GET/POST/DELETE /drills/:drillId/checkpoint` |
-| Roleplay | After each **scene** (scene break UI) | `GET/POST/DELETE /drills/:drillId/roleplay-progress` |
-| Summary | None — single sitting | N/A |
-| Listening | Not in this rollout | N/A |
+| Drill category | Server checkpoint | Local item resume | API |
+|----------------|-------------------|-------------------|-----|
+| Vocabulary, Pronunciation, Matching, Definition, Grammar, Sentence Writing, Fill in the Blank, Key Phrases | Every **5 completed items** + CheckpointScreen | Every completed item (device-local) | `GET/POST/DELETE /drills/:drillId/checkpoint` |
+| Roleplay | After each **scene** (Continue Later) | Scene/turn + maps on leave | `GET/POST/DELETE /drills/:drillId/roleplay-progress` |
+| Summary | None | Draft + phase flags | N/A |
+| Listening | None | `hasListened` | N/A |
 
-A drill is only marked **complete** when the learner finishes all items/scenes and calls the existing **complete** endpoint. Checkpoints are cleared on successful completion.
+A drill is only marked **complete** when the learner finishes all items/scenes and calls the existing **complete** endpoint. Server checkpoints are cleared on successful completion. **Local progress** is also cleared on complete and on redo/restart.
+
+**Hydrate order (required):** local progress → else server checkpoint / roleplay-progress → else fresh. Do **not** skip local restore for assigned drills. Local is the source of truth between every-5 milestones; do **not** POST every item to the server.
+
+See `docs/DRILL_CHECKPOINTS.md` for the isomorphic `LocalDrillProgressV1` envelope and storage keys (`eklan-drill-progress:v1:{userId}:{scopeKey}`).
 
 ---
 
@@ -194,20 +198,23 @@ Same query params as GET. Call after successful roleplay completion.
 
 ## 5. `partialResults` by drill type
 
-Store whatever state is needed to restore the UI. Web implementations:
+Store whatever state is needed to restore the UI. Same shapes for **server checkpoints** and **local progress** `partialResults`:
 
 | Drill | `partialResults` keys | Restore behavior |
 |-------|----------------------|------------------|
 | Vocabulary | `wordProgress`, `sessionReviewAnalytics` | Set `currentIndex` from `resumeFromIndex`; merge `wordProgress` |
 | Pronunciation | `wordProgress`, `sessionReviewAnalytics` | Same as vocabulary |
 | Matching | `matchedPairKeys` | Restore matched pairs set/array |
-| Definition | `answers` | Map of index → answer string |
+| Definition | `answers` | Map of index → answer string (locked when revisiting completed items) |
 | Grammar | `answers` | Map of index → answer |
 | Sentence Writing | `answers` | Map of index → answer |
 | Fill in the Blank | `answers`, `submittedCount` | Answers map + count of submitted blanks |
 | Key Phrases | `itemResults`, `sessionReviewAnalytics` | Per-item results + analytics |
+| Listening | `hasListened` | Restore listened gate |
+| Summary | `summary`, `hasRead`, `hasListened`, `currentMode`, `showPassage` | Restore draft + phase |
+| Roleplay (local) | `currentSceneIndex`, `currentTurnIndex`, `pausedAtSceneBreak`, `completedSceneIndex`, `turnProgress`, `sessionAnalytics`, `roleMode`, `originalRoleProgress`, `swappedRoleProgress`, `sessionStarted` | Silent resume at scene/turn |
 
-`resumeFromIndex` should always point to the **next uncompleted item** (web sets this to `currentIndex + 1` when saving at the 5-item boundary).
+`resumeFromIndex` should always point to the **next uncompleted item** (web sets this on every item advance for local; server still saves at the 5-item boundary).
 
 ---
 
@@ -215,28 +222,33 @@ Store whatever state is needed to restore the UI. Web implementations:
 
 ### 6.1 When to save
 
-- **Item drills**: After every **5th completed item** (when `completedCount % 5 === 0` and `completedCount > 0`), POST checkpoint, then show checkpoint UI.
-- **Roleplay**: On scene break — auto-save when advancing scenes; explicit save on “Continue Later”.
-- **Summary**: No checkpoints.
+- **Local (all drills)**: After every completed item; Listening/Summary on meaningful phase / draft changes (debounce text ~300–500ms). Flush on AppState background, `beforeRemove`, unmount. Same `LocalDrillProgressV1` keys as web.
+- **Server item drills**: After every **5th completed item** (when `completedCount % 5 === 0` and `completedCount > 0`), POST checkpoint, then show checkpoint UI. Unchanged.
+- **Roleplay server**: On scene break — auto-save when advancing scenes; explicit save on “Continue Later”. Also write local twin on the same triggers + AppState.
+- **Listening / Summary**: Local only (no server checkpoint).
 
 ### 6.2 When to load
 
 ```
-ON mount OR WHEN assignmentId / drillId changes:
-  IF assignmentId is missing:
-    initialize empty drill state
-    RETURN
+ON mount OR WHEN assignmentId / drillId / WC scope changes:
   SET loading = true
-  FETCH checkpoint (or roleplay progress)
-  IF checkpoint exists:
-    apply resumeFromIndex + partialResults
+  LOAD local progress (AsyncStorage; same key as web)
+  IF local exists:
+    apply resumeFromIndex + partialResults silently
     SET checkpointCount = completedItemCount
+    SET loading = false
+    RETURN
+  IF assignment / WC scope available:
+    FETCH server checkpoint (or roleplay progress)
+    IF checkpoint exists:
+      apply resumeFromIndex + partialResults
+      SET checkpointCount = completedItemCount
   ELSE:
     initialize empty drill state
   SET loading = false
 ```
 
-**Critical**: Do not run a separate “init empty state” effect that races with async restore. Web merged these into one effect with a cancellation flag.
+**Critical**: Do not run a separate “init empty state” effect that races with async restore. Web merged these into one effect with a cancellation flag. Do **not** use `skipLocalRestore` for assigned drills for this store.
 
 ### 6.3 Checkpoint screen UI
 
@@ -251,7 +263,7 @@ Checkpoint screen is shown **after** save succeeds at a 5-item boundary, not on 
 
 ### 6.4 When to clear
 
-After successful `POST /drills/:drillId/complete` (fire-and-forget). Do not clear on exit without completion.
+After successful `POST /drills/:drillId/complete` (fire-and-forget): clear **server checkpoint** and **local progress**. Also clear local on redo/restart open. Do not clear on exit without completion.
 
 ### 6.5 Assignment ID timing (resume bug fix)
 
@@ -326,16 +338,20 @@ If mobile still sees 500 on save after deploying against an updated backend, ret
 ```
 lib/drill/
   drill-checkpoint.ts      # saveCheckpoint, loadCheckpoint, clearCheckpoint
+  local-drill-progress.ts  # LocalDrillProgressV1 get/set/clear + key helpers (match web)
   roleplay-progress.ts     # get/save/clear wrappers (or extend existing api client)
 
 components/drills/
   CheckpointScreen.tsx     # shared progress-saved UI
 
 hooks/
-  useDrillCheckpoint.ts    # load on assignmentId change, save helper, loading flag
+  useLocalDrillProgress.ts # AppState + beforeRemove flush; persist / hydrate / clear
+  useDrillCheckpoint.ts    # hydrate local first, else server; every-item local persist helper
 ```
 
 API client methods should match web (`src/lib/api.ts` → `getCheckpoint`, `saveCheckpoint`, `clearCheckpoint`, `getRoleplayProgress`, `saveRoleplayProgress`, `clearRoleplayProgress`). Use `cache: false` on GETs.
+
+Web reference for local layer: `src/lib/drill/local-drill-progress.ts`, `src/hooks/useLocalDrillProgress.ts`.
 
 ---
 
@@ -407,12 +423,15 @@ sequenceDiagram
 ### Generic checkpoints
 
 - [ ] Open drill with no prior progress — starts at item 0, no checkpoint screen on load.
+- [ ] Complete 3 items → leave via back → reopen → lands on item 4 with 1–3 locked (local; no server POST required).
+- [ ] Kill app after item 2 → reopen → same silent local resume.
 - [ ] Complete 5 items — checkpoint screen appears; assignment shows `in-progress` on My Plan.
 - [ ] Tap **Exit & Resume Later** — return to drills list; reopen same drill — resumes at item 6 with prior answers/scores intact.
 - [ ] Tap **Continue** on checkpoint screen — proceeds without losing state.
-- [ ] Complete entire drill — checkpoint cleared; assignment marked complete.
+- [ ] Complete entire drill — server checkpoint + local progress cleared; assignment marked complete.
+- [ ] Redo/restart — local cleared; starts clean.
 - [ ] Open drill before `assignmentId` resolves — no erroneous empty overwrite after ID arrives.
-- [ ] Kill app mid-drill (after checkpoint save) — cold start resume works.
+- [ ] Listening: listen then leave → `hasListened` restored; Summary: draft text restored.
 
 ### Roleplay
 
@@ -437,6 +456,7 @@ sequenceDiagram
 | Checkpoint model | `src/models/drill-checkpoint.ts` |
 | Checkpoint API | `src/app/api/v1/drills/[drillId]/checkpoint/route.ts` |
 | Client helpers | `src/lib/drill/drill-checkpoint.ts` |
+| Local progress (isomorphic) | `src/lib/drill/local-drill-progress.ts`, `src/hooks/useLocalDrillProgress.ts` |
 | Checkpoint UI | `src/components/drills/shared/CheckpointScreen.tsx` |
 | Drill router + remount key | `src/components/drills/DrillPracticeInterface.tsx` |
 | Roleplay progress API | `src/app/api/v1/drills/[drillId]/roleplay-progress/route.ts` |
@@ -444,4 +464,4 @@ sequenceDiagram
 | Roleplay model | `src/models/roleplay-drill-progress.ts` |
 | Roleplay drill UI | `src/components/drills/RoleplayDrill.tsx` |
 | API client | `src/lib/api.ts` (`getCheckpoint`, `saveCheckpoint`, `clearCheckpoint`, roleplay progress methods) |
-| Per-drill checkpoint logic | `src/components/drills/{Vocabulary,Pronunciation,Matching,Definition,Grammar,Sentence,FillBlank,KeyPhrases}Drill.tsx` |
+| Per-drill checkpoint + local resume | `src/components/drills/{Vocabulary,Pronunciation,Matching,Definition,Grammar,Sentence,FillBlank,KeyPhrases,Listening,Summary,Roleplay}Drill.tsx` |

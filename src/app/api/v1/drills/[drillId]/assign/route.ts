@@ -141,6 +141,9 @@ async function handler(
         learnerId: learnerIdValue,
         assignedBy: toUserIdQuery(context.userId),
         assignedAt,
+        ...(parsedWeekNumber != null
+          ? { builderWeekNumber: parsedWeekNumber }
+          : {}),
         dueDate: dueDateObj,
         status: "pending",
       });

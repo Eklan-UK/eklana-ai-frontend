@@ -83,6 +83,10 @@ export const queryKeys = {
   badges: {
     all: ["user-badges"] as const,
   },
+  bookmarks: {
+    all: ["bookmarks"] as const,
+    drillStatus: () => [...queryKeys.bookmarks.all, "drill-status"] as const,
+  },
   weeklyChallenge: {
     all: ['weeklyChallenge'] as const,
     history: () => [...queryKeys.weeklyChallenge.all, 'history'] as const,

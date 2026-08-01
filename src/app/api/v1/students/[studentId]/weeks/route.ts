@@ -2,25 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { connectToDatabase } from "@/lib/api/db";
 import { logger } from "@/lib/api/logger";
-import { Types } from "mongoose";
+import { isValidUserId, toUserIdQuery } from "@/lib/api/user-id";
+import { isValidationError } from "@/lib/api/response";
 import User from "@/models/user";
 import DrillAssignment from "@/models/drill-assignment";
 import {
   resolveDrillBuilderWeekCount,
   incrementDrillBuilderWeekCount,
-  weekNumberFromAssignedAt,
+  deleteStudentWeeks,
+  weekNumberFromAssignment,
 } from "@/lib/ai-drill-builder/resolve-drill-builder-weeks";
 import { WEEK_MS } from "@/lib/ai-drill-builder/week-utils";
 
 async function getHandler(
   _req: NextRequest,
-  _context: { userId: any; userRole: string },
+  _context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
     const { studentId } = params;
 
-    if (!Types.ObjectId.isValid(studentId)) {
+    if (!isValidUserId(studentId)) {
       return NextResponse.json(
         { code: "ValidationError", message: "Invalid student ID" },
         { status: 400 },
@@ -29,9 +31,9 @@ async function getHandler(
 
     await connectToDatabase();
 
-    const learnerObjectId = new Types.ObjectId(studentId);
+    const learnerIdQuery = toUserIdQuery(studentId);
 
-    const user = await User.findById(learnerObjectId).lean();
+    const user = await User.findById(studentId).lean();
     if (!user) {
       return NextResponse.json(
         { code: "NotFoundError", message: "Student not found" },
@@ -41,11 +43,11 @@ async function getHandler(
 
     const { anchor, weekCount: currentWeek } =
       await resolveDrillBuilderWeekCount({
-        learnerId: learnerObjectId,
+        learnerId: studentId,
         user,
       });
 
-    const assignments = await DrillAssignment.find({ learnerId: learnerObjectId })
+    const assignments = await DrillAssignment.find({ learnerId: learnerIdQuery })
       .populate(
         "drillId",
         "title type difficulty learning_journey_topic learning_journey_part is_active is_bookmarked",
@@ -55,28 +57,44 @@ async function getHandler(
     const weekMap = new Map<number, object[]>();
 
     for (const assignment of assignments) {
-      const assignedAt: Date = (assignment as any).assignedAt;
-      const weekNumber = weekNumberFromAssignedAt(assignedAt, anchor);
+      const weekNumber = weekNumberFromAssignment(assignment, anchor);
 
-      const drill = (assignment as any).drillId as any;
+      const drill = (assignment as { drillId?: Record<string, unknown> })
+        .drillId as
+        | {
+            _id?: unknown;
+            title?: string | null;
+            type?: string | null;
+            difficulty?: string | null;
+            learning_journey_topic?: string | null;
+            learning_journey_part?: string | null;
+            is_active?: boolean;
+            is_bookmarked?: boolean;
+          }
+        | null
+        | undefined;
 
       const entry = {
         type: "drill_assignment" as const,
-        assignmentId: (assignment as any)._id,
+        assignmentId: (assignment as { _id: unknown })._id,
         drillId: drill?._id ?? null,
         title: drill?.title ?? null,
         drillType: drill?.type ?? null,
         difficulty: drill?.difficulty ?? null,
         topic: drill?.learning_journey_topic ?? null,
         part: drill?.learning_journey_part ?? null,
-        status: (assignment as any).status,
+        status: (assignment as { status?: string }).status,
         // A drill saved with `is_active: false` still needs a tutor/admin to
         // select users and update/assign it before learners can act on it.
         isActive: drill?.is_active ?? true,
         isBookmarked: Boolean(drill?.is_bookmarked),
-        assignedAt: (assignment as any).assignedAt,
-        dueDate: (assignment as any).dueDate ?? null,
-        completedAt: (assignment as any).completedAt ?? null,
+        assignedAt: (assignment as { assignedAt?: Date }).assignedAt,
+        builderWeekNumber:
+          (assignment as { builderWeekNumber?: number | null })
+            .builderWeekNumber ?? weekNumber,
+        dueDate: (assignment as { dueDate?: Date | null }).dueDate ?? null,
+        completedAt:
+          (assignment as { completedAt?: Date | null }).completedAt ?? null,
       };
 
       const existing = weekMap.get(weekNumber);
@@ -122,13 +140,14 @@ async function getHandler(
       },
       { status: 200 },
     );
-  } catch (error: any) {
-    logger.error("Error fetching student weeks", { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Error fetching student weeks", { error: message });
     return NextResponse.json(
       {
         code: "ServerError",
         message: "Failed to fetch student weeks",
-        error: error.message,
+        error: message,
       },
       { status: 500 },
     );
@@ -137,13 +156,13 @@ async function getHandler(
 
 async function postHandler(
   _req: NextRequest,
-  _context: { userId: any; userRole: string },
+  _context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
     const { studentId } = params;
 
-    if (!Types.ObjectId.isValid(studentId)) {
+    if (!isValidUserId(studentId)) {
       return NextResponse.json(
         { code: "ValidationError", message: "Invalid student ID" },
         { status: 400 },
@@ -152,9 +171,7 @@ async function postHandler(
 
     await connectToDatabase();
 
-    const learnerObjectId = new Types.ObjectId(studentId);
-
-    const user = await User.findById(learnerObjectId).select("_id").lean();
+    const user = await User.findById(studentId).select("_id").lean();
     if (!user) {
       return NextResponse.json(
         { code: "NotFoundError", message: "Student not found" },
@@ -162,7 +179,7 @@ async function postHandler(
       );
     }
 
-    const created = await incrementDrillBuilderWeekCount(learnerObjectId);
+    const created = await incrementDrillBuilderWeekCount(studentId);
 
     logger.info("Created next drill-builder week for student", {
       studentId,
@@ -183,13 +200,84 @@ async function postHandler(
       },
       { status: 201 },
     );
-  } catch (error: any) {
-    logger.error("Error creating student week", { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Error creating student week", { error: message });
     return NextResponse.json(
       {
         code: "ServerError",
         message: "Failed to create student week",
-        error: error.message,
+        error: message,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function deleteHandler(
+  req: NextRequest,
+  _context: { userId: string; userRole: string },
+  params: { studentId: string },
+): Promise<NextResponse> {
+  try {
+    const { studentId } = params;
+
+    if (!isValidUserId(studentId)) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "Invalid student ID" },
+        { status: 400 },
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const weekNumbers = body?.weekNumbers;
+
+    if (!Array.isArray(weekNumbers) || weekNumbers.length === 0) {
+      return NextResponse.json(
+        {
+          code: "ValidationError",
+          message: "weekNumbers must be a non-empty array",
+        },
+        { status: 400 },
+      );
+    }
+
+    await connectToDatabase();
+
+    const data = await deleteStudentWeeks({
+      learnerId: studentId,
+      weekNumbers,
+    });
+
+    logger.info("Deleted student drill-builder weeks", {
+      studentId,
+      deletedWeekNumbers: data.deletedWeekNumbers,
+      weekCount: data.weekCount,
+      remappedAssignmentCount: data.remappedAssignmentCount,
+    });
+
+    return NextResponse.json({ code: "Success", data }, { status: 200 });
+  } catch (error: unknown) {
+    if (isValidationError(error)) {
+      return NextResponse.json(
+        { code: "ValidationError", message: error.message },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.name === "NotFoundError") {
+      return NextResponse.json(
+        { code: "NotFoundError", message: error.message },
+        { status: 404 },
+      );
+    }
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Error deleting student weeks", { error: message });
+    return NextResponse.json(
+      {
+        code: "ServerError",
+        message: "Failed to delete weeks",
+        error: message,
       },
       { status: 500 },
     );
@@ -213,5 +301,15 @@ export async function POST(
   const resolvedParams = await params;
   return withRole(["admin", "tutor"], (req, context) =>
     postHandler(req, context, resolvedParams),
+  )(req);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const resolvedParams = await params;
+  return withRole(["admin", "tutor"], (req, context) =>
+    deleteHandler(req, context, resolvedParams),
   )(req);
 }

@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Edit, Trash2, Loader2, ChevronRight, Eye } from "lucide-react";
+import { Edit, Trash2, Loader2, ChevronRight, Eye, X } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
 import { getDrillIcon } from "@/utils/drill";
 import { appendReturnTo } from "@/lib/drill-list-filters";
-import { invalidateStudentWeeks } from "@/hooks/useStudentWeeks";
+import {
+  invalidateStudentWeeks,
+  useMoveStudentWeekDrills,
+} from "@/hooks/useStudentWeeks";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
 import { AdminDrillBookmarkButton } from "@/components/admin/AdminDrillBookmarkButton";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { WeekDrillItem } from "@/lib/ai-drill-builder/week-utils";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -24,12 +28,19 @@ const STATUS_STYLES: Record<string, string> = {
 // still need a tutor/admin to select users and update/assign them.
 const SAVED_BADGE_CLASS = "bg-amber-50 text-amber-700 border-amber-200";
 
+/** ~5 option rows for the move-target week list. */
+const WEEK_PICKER_MAX_HEIGHT_CLASS = "max-h-[13.75rem]";
+
 interface WeekDrillListProps {
   drills: WeekDrillItem[];
   drillDetailBasePath: string;
   returnTo: string;
   /** Student whose weekly drill breakdown should be refreshed after a delete. */
   studentId: string;
+  /** Week currently being viewed. */
+  currentWeekNumber: number;
+  /** Highest existing week slot for this student (1..currentWeek). */
+  currentWeek: number;
 }
 
 export function WeekDrillList({
@@ -37,13 +48,77 @@ export function WeekDrillList({
   drillDetailBasePath,
   returnTo,
   studentId,
+  currentWeekNumber,
+  currentWeek,
 }: WeekDrillListProps) {
   const queryClient = useQueryClient();
+  const moveDrills = useMoveStudentWeekDrills(studentId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [targetWeekNumber, setTargetWeekNumber] = useState<number | "">("");
   const [viewingAssignedDrill, setViewingAssignedDrill] = useState<{
     id: string;
     title: string;
   } | null>(null);
+
+  const selectableAssignmentIds = useMemo(
+    () =>
+      drills
+        .map((d) => (d.assignmentId ? String(d.assignmentId) : null))
+        .filter((id): id is string => Boolean(id)),
+    [drills],
+  );
+
+  // Every open week slot (1..currentWeek) except the source week being viewed.
+  const availableWeeks = useMemo(() => {
+    const openWeekCount = Math.max(1, Math.floor(currentWeek || 1));
+    const weeks: number[] = [];
+    for (let w = 1; w <= openWeekCount; w++) {
+      if (w !== currentWeekNumber) weeks.push(w);
+    }
+    return weeks;
+  }, [currentWeek, currentWeekNumber]);
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleSelected = (assignmentId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(assignmentId);
+      else next.delete(assignmentId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(selectableAssignmentIds) : new Set());
+  };
+
+  const openMoveDialog = () => {
+    setTargetWeekNumber(availableWeeks[0] ?? "");
+    setShowMoveDialog(true);
+  };
+
+  const handleMoveConfirm = async () => {
+    if (typeof targetWeekNumber !== "number") {
+      toast.error("Select a target week");
+      return;
+    }
+    const assignmentIds = Array.from(selectedIds);
+    if (assignmentIds.length === 0) return;
+
+    try {
+      await moveDrills.mutateAsync({
+        assignmentIds,
+        targetWeekNumber,
+      });
+      clearSelection();
+      setShowMoveDialog(false);
+    } catch {
+      // Toast handled by mutation onError
+    }
+  };
 
   if (drills.length === 0) {
     return (
@@ -77,8 +152,57 @@ export function WeekDrillList({
     }
   };
 
+  const selectedCount = selectedIds.size;
+  const allSelectableSelected =
+    selectableAssignmentIds.length > 0 &&
+    selectableAssignmentIds.every((id) => selectedIds.has(id));
+
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${selectedCount > 0 ? "pb-20" : ""}`}>
+      {selectableAssignmentIds.length > 0 && (
+        <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={allSelectableSelected}
+                onChange={(e) => toggleSelectAll(e.target.checked)}
+                aria-label="Select all drills"
+                className="rounded border-gray-300 shrink-0"
+              />
+              <span className="text-xs text-gray-500">
+                {selectedCount > 0
+                  ? `${selectedCount} selected`
+                  : "Select all"}
+              </span>
+            </div>
+            {selectedCount > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={openMoveDialog}
+                  disabled={availableWeeks.length === 0}
+                  className="px-3 py-1.5 text-sm font-semibold text-amber-950 bg-amber-400 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={
+                    availableWeeks.length === 0
+                      ? "Add another week before moving drills"
+                      : "Move selected drills to another week"
+                  }
+                >
+                  Move to week
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {drills.map((drill) => {
         const drillType = drill.drillType ?? drill.type ?? "drill";
         const status = drill.status ?? "pending";
@@ -87,7 +211,11 @@ export function WeekDrillList({
         // users and update/assign them, so surface that alongside the status.
         const isSaved = drill.isActive === false;
         const drillId = drill.drillId ? String(drill.drillId) : null;
-        const key = drill.assignmentId ?? drillId ?? drill.title ?? drillType;
+        const assignmentId = drill.assignmentId
+          ? String(drill.assignmentId)
+          : null;
+        const key = assignmentId ?? drillId ?? drill.title ?? drillType;
+        const isSelected = assignmentId ? selectedIds.has(assignmentId) : false;
 
         const infoBlock = (
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -133,18 +261,37 @@ export function WeekDrillList({
         return (
           <div
             key={key}
-            className="flex items-center justify-between gap-4 p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-colors"
+            className={`flex items-center justify-between gap-4 p-4 bg-white rounded-xl border transition-colors ${
+              isSelected
+                ? "border-amber-200 bg-amber-50/40"
+                : "border-gray-100 hover:border-gray-200 hover:shadow-sm"
+            }`}
           >
-            {drillId ? (
-              <Link
-                href={appendReturnTo(`${drillDetailBasePath}/${drillId}`, returnTo)}
-                className="min-w-0 flex-1"
-              >
-                {infoBlock}
-              </Link>
-            ) : (
-              infoBlock
-            )}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              {assignmentId && (
+                <Checkbox
+                  checked={isSelected}
+                  onChange={(e) =>
+                    toggleSelected(assignmentId, e.target.checked)
+                  }
+                  aria-label={`Select ${drill.title ?? "drill"}`}
+                  className="rounded border-gray-300 shrink-0"
+                />
+              )}
+              {drillId ? (
+                <Link
+                  href={appendReturnTo(
+                    `${drillDetailBasePath}/${drillId}`,
+                    returnTo,
+                  )}
+                  className="min-w-0 flex-1"
+                >
+                  {infoBlock}
+                </Link>
+              ) : (
+                infoBlock
+              )}
+            </div>
 
             {drillId && (
               <div className="flex items-center gap-1 shrink-0">
@@ -192,7 +339,10 @@ export function WeekDrillList({
                   )}
                 </button>
                 <Link
-                  href={appendReturnTo(`${drillDetailBasePath}/${drillId}`, returnTo)}
+                  href={appendReturnTo(
+                    `${drillDetailBasePath}/${drillId}`,
+                    returnTo,
+                  )}
                   className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
                   title="View drill"
                 >
@@ -203,6 +353,135 @@ export function WeekDrillList({
           </div>
         );
       })}
+
+      {selectedCount > 0 && (
+        <div className="fixed bottom-4 inset-x-4 z-40 mx-auto max-w-3xl flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
+          <p className="text-sm font-medium text-amber-900">
+            {selectedCount} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-white/70 rounded-lg transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={openMoveDialog}
+              disabled={availableWeeks.length === 0}
+              className="px-3 py-1.5 text-sm font-semibold text-amber-950 bg-amber-400 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                availableWeeks.length === 0
+                  ? "Add another week before moving drills"
+                  : "Move selected drills to another week"
+              }
+            >
+              Move to week
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showMoveDialog && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !moveDrills.isPending) {
+              setShowMoveDialog(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md mx-4 shadow-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  Move to week
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Move {selectedCount} drill{selectedCount === 1 ? "" : "s"}{" "}
+                  from Week {currentWeekNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMoveDialog(false)}
+                disabled={moveDrills.isPending}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {availableWeeks.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No other weeks available. Add a week first, then try again.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Target week ({availableWeeks.length} available)
+                  </span>
+                  <div
+                    role="listbox"
+                    aria-label="Target week"
+                    className={`${WEEK_PICKER_MAX_HEIGHT_CLASS} overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100`}
+                  >
+                    {availableWeeks.map((week) => {
+                      const isActive = targetWeekNumber === week;
+                      return (
+                        <button
+                          key={week}
+                          type="button"
+                          role="option"
+                          aria-selected={isActive}
+                          disabled={moveDrills.isPending}
+                          onClick={() => setTargetWeekNumber(week)}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors disabled:opacity-50 ${
+                            isActive
+                              ? "bg-amber-50 text-amber-950 font-semibold"
+                              : "bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          Week {week}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowMoveDialog(false)}
+                disabled={moveDrills.isPending}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleMoveConfirm()}
+                disabled={
+                  moveDrills.isPending ||
+                  typeof targetWeekNumber !== "number" ||
+                  availableWeeks.length === 0
+                }
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-amber-950 bg-amber-400 hover:bg-amber-500 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {moveDrills.isPending && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                Move drills
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewingAssignedDrill && (
         <AssignedStudentsModal

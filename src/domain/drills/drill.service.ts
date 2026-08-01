@@ -53,6 +53,17 @@ function resolveAssignmentAssignedAt(
   );
 }
 
+function resolveBuilderWeekNumber(weekNumber?: number): number | undefined {
+  if (
+    weekNumber == null ||
+    !Number.isFinite(weekNumber) ||
+    weekNumber < 1
+  ) {
+    return undefined;
+  }
+  return Math.floor(weekNumber);
+}
+
 export type DrillAssignmentNotifyTarget = {
   learnerId: Types.ObjectId | string;
   _id?: Types.ObjectId | string;
@@ -344,6 +355,7 @@ export class DrillService {
     );
 
     // 6. Prepare new assignments for users that don't have one yet
+    const builderWeekNumber = resolveBuilderWeekNumber(params.weekNumber);
     const newAssignmentsData: CreateAssignmentData[] = users
       .filter((user) => !existingAssignments.has(user._id.toString()))
       .map((user) => ({
@@ -352,6 +364,7 @@ export class DrillService {
         // assignedBy may be a UUID (Better Auth admin/tutor account)
         assignedBy: toUserIdQuery(params.assignedBy),
         assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
+        ...(builderWeekNumber != null ? { builderWeekNumber } : {}),
         dueDate: dueDate!,
         status: 'pending' as const,
       }));
@@ -502,6 +515,7 @@ export class DrillService {
       const dueDate = params.drillData.date || new Date();
 
       // Create new assignments
+      const builderWeekNumber = resolveBuilderWeekNumber(params.weekNumber);
       const newAssignmentsData: CreateAssignmentData[] = assignedUsers
         .filter((user) => !existingAssignments.has(user._id.toString()))
         .map((user) => ({
@@ -511,6 +525,7 @@ export class DrillService {
           // `new Types.ObjectId(...)` throws for UUID ids, unlike toUserIdQuery.
           assignedBy: toUserIdQuery(params.creatorId),
           assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
+          ...(builderWeekNumber != null ? { builderWeekNumber } : {}),
           dueDate: dueDate,
           status: 'pending' as const,
         }));

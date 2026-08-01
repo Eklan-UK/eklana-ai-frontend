@@ -112,6 +112,12 @@ export class AttemptRepository {
    */
   async getLatestAttemptsForAssignments(assignmentIds: string[]): Promise<Map<string, any>> {
     try {
+      if (assignmentIds.length === 0) {
+        return new Map();
+      }
+
+      // Project only fields my-drills / saved-drills need — avoid $first: '$$ROOT'
+      // which pulls full attempt payloads (vocabulary, roleplay, audio, etc.).
       const latestAttempts = await DrillAttempt.aggregate([
         {
           $match: {
@@ -122,17 +128,31 @@ export class AttemptRepository {
           $sort: { completedAt: -1, createdAt: -1 },
         },
         {
+          $project: {
+            drillAssignmentId: 1,
+            score: 1,
+            timeSpent: 1,
+            completedAt: 1,
+            sentenceResults: 1,
+            grammarResults: 1,
+            summaryResults: 1,
+          },
+        },
+        {
           $group: {
             _id: '$drillAssignmentId',
-            latestAttempt: { $first: '$$ROOT' },
+            score: { $first: '$score' },
+            timeSpent: { $first: '$timeSpent' },
+            completedAt: { $first: '$completedAt' },
+            sentenceResults: { $first: '$sentenceResults' },
+            grammarResults: { $first: '$grammarResults' },
+            summaryResults: { $first: '$summaryResults' },
           },
         },
       ]);
 
       const attemptMap = new Map(
-        latestAttempts.map((item) => {
-          const attempt = item.latestAttempt;
-          
+        latestAttempts.map((attempt) => {
           // Determine review status and correct/incorrect counts
           let reviewInfo: {
             reviewStatus?: string;
@@ -198,7 +218,7 @@ export class AttemptRepository {
           }
           
           return [
-            item._id.toString(),
+            attempt._id.toString(),
             {
               score: attempt.score,
               timeSpent: attempt.timeSpent,

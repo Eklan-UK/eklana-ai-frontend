@@ -145,6 +145,24 @@ export const COMPETENCY_FRAMEWORK: Record<string, TopicCompetencies> = {
       { id: 4, name: "Maintains confidentiality and clarifies next steps", description: "Protects patient privacy, appropriately limits information sharing when required, and clearly explains follow-up actions, referrals, or whom the caller should contact for additional information" },
     ],
   },
+  discharging_patients: {
+    topic: "Discharging Patients",
+    competencies: [
+      { id: 1, name: "Introduces self clearly", description: "States name and role confidently and professionally at the start of the discharge conversation" },
+      { id: 2, name: "Explains role and purpose of interaction", description: "Clearly explains why they are there and what will happen during the discharge process" },
+      { id: 3, name: "Confirms patient identity correctly", description: "Uses at least two identifiers appropriately (e.g., name and date of birth) to support patient safety before reviewing discharge instructions" },
+      { id: 4, name: "Encourages patient questions or concerns", description: "Invites the patient to ask questions about medications, follow-up care, warning signs, or home arrangements and demonstrates openness to communication" },
+    ],
+  },
+  grammar: {
+    topic: "Grammar",
+    competencies: [
+      { id: 1, name: "Uses grammatical accuracy", description: "Produces correct verb forms, articles, prepositions, word order, and agreement while speaking in clinical and professional contexts" },
+      { id: 2, name: "Communicates with clarity", description: "Expresses meaning clearly so that listeners can follow instructions, updates, and explanations without confusion caused by unclear structure" },
+      { id: 3, name: "Maintains professional register", description: "Chooses appropriately formal, polite, and workplace-appropriate language for nurses, patients, families, and colleagues" },
+      { id: 4, name: "Self-corrects effectively", description: "Notices and repairs grammar mistakes smoothly without interrupting conversational flow or losing professional composure" },
+    ],
+  },
 };
 
 export function getCompetenciesForTopic(topicId: string): Competency[] | null {

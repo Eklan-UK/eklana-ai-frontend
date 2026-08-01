@@ -162,13 +162,19 @@ export function DrillFormBody({
   };
 
   const addAiCharacter = () => {
-    patchDraft({ aiCharacterNames: [...draft.aiCharacterNames, ""] });
+    patchDraft({
+      aiCharacterNames: [...draft.aiCharacterNames, ""],
+      aiCharacterVoiceKeys: [...(draft.aiCharacterVoiceKeys ?? []), ""],
+    });
   };
 
   const removeAiCharacter = (index: number) => {
     if (draft.aiCharacterNames.length > 1) {
       patchDraft({
         aiCharacterNames: draft.aiCharacterNames.filter((_, i) => i !== index),
+        aiCharacterVoiceKeys: (draft.aiCharacterVoiceKeys ?? []).filter(
+          (_, i) => i !== index,
+        ),
       });
     }
   };
@@ -753,6 +759,28 @@ export function DrillFormBody({
                         }`}
                       className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
+                    <div className="relative w-44 shrink-0">
+                      <select
+                        value={draft.aiCharacterVoiceKeys?.[idx] ?? ""}
+                        onChange={(e) => {
+                          const keys = draft.aiCharacterNames.map(
+                            (_, i) => draft.aiCharacterVoiceKeys?.[i] ?? "",
+                          );
+                          keys[idx] = e.target.value;
+                          patchDraft({ aiCharacterVoiceKeys: keys });
+                        }}
+                        aria-label={`Voice for AI character ${idx + 1}`}
+                        className="w-full px-3 py-3 bg-white border border-gray-100 rounded-xl appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
+                      >
+                        <option value="">Default voice</option>
+                        {ACCENT_VOICE_OPTIONS.map((opt) => (
+                          <option key={opt.key} value={opt.key}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                     {draft.aiCharacterNames.length > 1 && (
                       <button
                         onClick={() => removeAiCharacter(idx)}
@@ -1725,7 +1753,7 @@ export function DrillFormBody({
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Used for pre-generated ElevenLabs audio. Leave as default to use the system voice.
+                    Fallback for student lines, intro TTS, and AI characters left on Default voice.
                   </p>
                 </div>
               </div>

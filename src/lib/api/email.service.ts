@@ -206,7 +206,7 @@ This is an automated notification from Eklan.
         : "";
 
     return {
-      subject: "Your new drills for this week are ready",
+      subject: "Your outstanding drills for this week",
       html: `
 			<!DOCTYPE html>
 			<html>
@@ -223,15 +223,15 @@ This is an automated notification from Eklan.
 					</div>
 					<div style="background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
 						<div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; text-align: center;">
-							<div style="font-size: 48px; margin-bottom: 10px;">📅</div>
-							<h1 style="margin: 0; font-size: 24px; font-weight: 600;">Your new drills are ready</h1>
+							<div style="font-size: 48px; margin-bottom: 10px;">🗓️</div>
+							<h1 style="margin: 0; font-size: 24px; font-weight: 600;">Your outstanding drills</h1>
 							<p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Week of ${data.weekLabel}</p>
 						</div>
 						<div style="padding: 30px;">
 							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
-							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You have <strong>${data.drillCount}</strong> new drill${data.drillCount === 1 ? "" : "s"} this week. Open your plan to get started.</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You have <strong>${data.drillCount}</strong> outstanding drill${data.drillCount === 1 ? "" : "s"} this week. Open your plan to get started.</p>
 							<div style="background-color: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 25px 0;">
-								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #166534;">New drills</h2>
+								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #166534;">Outstanding drills</h2>
 								<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>
 								${moreLine}
 							</div>
@@ -251,9 +251,9 @@ This is an automated notification from Eklan.
       text: `
 Hi ${data.studentName},
 
-Your new drills for this week are ready (week of ${data.weekLabel}).
+Your outstanding drills for this week (week of ${data.weekLabel}).
 
-You have ${data.drillCount} new drill${data.drillCount === 1 ? "" : "s"} this week.
+You have ${data.drillCount} outstanding drill${data.drillCount === 1 ? "" : "s"} this week.
 
 ${listed.map((t) => `- ${t}`).join("\n")}${remaining > 0 ? `\n...and ${remaining} more` : ""}
 

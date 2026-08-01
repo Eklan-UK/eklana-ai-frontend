@@ -19,9 +19,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { trackActivity } from "@/utils/activity-cache";
 import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 import { useTTS } from "@/hooks/useTTS";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface SummaryDrillProps {
   drill: any;
@@ -33,6 +35,11 @@ export default function SummaryDrill({
   assignmentId,
 }: SummaryDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "summary",
+    assignmentId,
+  });
   const [summary, setSummary] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +51,7 @@ export default function SummaryDrill({
   const [currentMode, setCurrentMode] = useState<"read" | "listen" | "write">(
     "read"
   );
+  const [isHydrating, setIsHydrating] = useState(true);
   
   // Pre-generated audio player
   const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
@@ -69,6 +77,63 @@ export default function SummaryDrill({
     };
   }, []);
 
+  const persistSummaryProgress = (
+    next: {
+      summary?: string;
+      hasRead?: boolean;
+      hasListened?: boolean;
+      currentMode?: "read" | "listen" | "write";
+      showPassage?: boolean;
+    },
+    opts?: { debounce?: boolean },
+  ) => {
+    const payload = {
+      resumeFromIndex: 0,
+      completedItemCount: 0,
+      partialResults: {
+        summary: next.summary ?? summary,
+        hasRead: next.hasRead ?? hasRead,
+        hasListened: next.hasListened ?? hasListened,
+        currentMode: next.currentMode ?? currentMode,
+        showPassage: next.showPassage ?? showPassage,
+      },
+      startedAt: new Date(startTime).toISOString(),
+    };
+    if (opts?.debounce) {
+      localProgress.persistDebounced(payload, 400);
+    } else {
+      localProgress.persist(payload);
+    }
+  };
+
+  useEffect(() => {
+    if (!localProgress.isReady) return;
+    const local = localProgress.hydrate();
+    if (local) {
+      const partial = local.partialResults;
+      if (typeof partial.summary === "string") {
+        setSummary(partial.summary);
+        setWordCount(
+          partial.summary
+            .trim()
+            .split(/\s+/)
+            .filter((word) => word.length > 0).length,
+        );
+      }
+      if (typeof partial.hasRead === "boolean") setHasRead(partial.hasRead);
+      if (typeof partial.hasListened === "boolean") setHasListened(partial.hasListened);
+      if (
+        partial.currentMode === "read" ||
+        partial.currentMode === "listen" ||
+        partial.currentMode === "write"
+      ) {
+        setCurrentMode(partial.currentMode);
+      }
+      if (typeof partial.showPassage === "boolean") setShowPassage(partial.showPassage);
+    }
+    setIsHydrating(false);
+  }, [localProgress.isReady]);
+
   // Calculate reading time (average 200 words per minute)
   const passageWordCount = articleContent
     .trim()
@@ -84,6 +149,7 @@ export default function SummaryDrill({
         .split(/\s+/)
         .filter((word) => word.length > 0).length
     );
+    persistSummaryProgress({ summary: value }, { debounce: true });
   };
 
   const handlePlayPassage = async () => {
@@ -134,6 +200,7 @@ export default function SummaryDrill({
           await playTTSAudio(articleContent);
         }
         setHasListened(true);
+        persistSummaryProgress({ hasListened: true });
       } catch (error) {
         toast.error("Failed to play audio");
         // Reset on error so user can try again
@@ -145,6 +212,7 @@ export default function SummaryDrill({
   const handleMarkAsRead = () => {
     setHasRead(true);
     setCurrentMode("write");
+    persistSummaryProgress({ hasRead: true, currentMode: "write" });
     toast.success("Great! Now write your summary.");
   };
 
@@ -183,6 +251,7 @@ export default function SummaryDrill({
         platform: "web",
       });
 
+      localProgress.clear();
       setIsCompleted(true);
       toast.success("Summary submitted for review!");
 
@@ -198,6 +267,21 @@ export default function SummaryDrill({
       setIsSubmitting(false);
     }
   };
+
+  if (isHydrating) {
+    return (
+      <DrillLayout
+        title={drill.title}
+        backgroundGradient="bg-background"
+        maxWidth="3xl"
+        headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+      >
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
 
   if (isCompleted) {
     return (
@@ -215,11 +299,15 @@ export default function SummaryDrill({
       title={drill.title}
       backgroundGradient="bg-background"
       maxWidth="3xl"
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
     >
       {/* Mode Tabs */}
       <div className="flex gap-2 mb-6">
         <button
-          onClick={() => setCurrentMode("read")}
+          onClick={() => {
+            setCurrentMode("read");
+            persistSummaryProgress({ currentMode: "read" });
+          }}
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "read"
               ? "bg-green-600 text-white shadow-lg"
@@ -233,7 +321,10 @@ export default function SummaryDrill({
           )}
         </button>
         <button
-          onClick={() => setCurrentMode("listen")}
+          onClick={() => {
+            setCurrentMode("listen");
+            persistSummaryProgress({ currentMode: "listen" });
+          }}
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "listen"
               ? "bg-green-600 text-white shadow-lg"
@@ -247,7 +338,10 @@ export default function SummaryDrill({
           )}
         </button>
         <button
-          onClick={() => setCurrentMode("write")}
+          onClick={() => {
+            setCurrentMode("write");
+            persistSummaryProgress({ currentMode: "write" });
+          }}
           className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-all ${
             currentMode === "write"
               ? "bg-green-600 text-white shadow-lg"
@@ -379,7 +473,11 @@ export default function SummaryDrill({
                 Passage Text
               </h3>
               <button
-                onClick={() => setShowPassage(!showPassage)}
+                onClick={() => {
+                  const next = !showPassage;
+                  setShowPassage(next);
+                  persistSummaryProgress({ showPassage: next });
+                }}
                 className="text-sm text-green-600 hover:text-green-700 font-medium"
               >
                 {showPassage ? "Hide" : "Show"}
@@ -403,6 +501,7 @@ export default function SummaryDrill({
             onClick={() => {
               setHasListened(true);
               setCurrentMode("write");
+              persistSummaryProgress({ hasListened: true, currentMode: "write" });
             }}
             className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
           >
@@ -435,7 +534,11 @@ export default function SummaryDrill({
           {/* Reference Toggle */}
           <Card className="mb-4 bg-card shadow-sm">
             <button
-              onClick={() => setShowPassage(!showPassage)}
+              onClick={() => {
+                const next = !showPassage;
+                setShowPassage(next);
+                persistSummaryProgress({ showPassage: next });
+              }}
               className="w-full flex items-center justify-between"
             >
               <span className="flex items-center gap-2 font-medium text-foreground">

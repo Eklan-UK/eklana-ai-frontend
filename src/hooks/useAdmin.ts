@@ -523,28 +523,48 @@ export function useUpdateUserSubscription() {
     onSuccess: (response, variables) => {
       const updated = response?.data;
       if (updated?.userId) {
+        const patchLearnerSubscription = (learner: Record<string, unknown>) =>
+          String(learner._id) === String(variables.userId)
+            ? {
+                ...learner,
+                subscriptionPlan: updated.subscriptionPlan,
+                subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
+                zeroPauseProducts: updated.zeroPauseProducts,
+                zeroPauseDate: updated.zeroPauseDate,
+                zeroPauseEndDate: updated.zeroPauseEndDate,
+                zeroPausePostTrialDate: updated.zeroPausePostTrialDate,
+                zeroPausePostTrialEndDate: updated.zeroPausePostTrialEndDate,
+                subscriptionActivatedAt: updated.subscriptionActivatedAt,
+                subscriptionExpiresAt: updated.subscriptionExpiresAt,
+              }
+            : learner;
+
         queryClient.setQueriesData(
           { queryKey: [...queryKeys.students.all, "admin", "list"] },
           (old: { learners: Array<Record<string, unknown>>; total: number } | undefined) => {
             if (!old?.learners) return old;
             return {
               ...old,
-              learners: old.learners.map((learner) =>
-                String(learner._id) === String(variables.userId)
-                  ? {
-                      ...learner,
-                      subscriptionPlan: updated.subscriptionPlan,
-                      subscriptionBillingPeriod: updated.subscriptionBillingPeriod,
-                      zeroPauseProducts: updated.zeroPauseProducts,
-                      zeroPauseDate: updated.zeroPauseDate,
-                      zeroPauseEndDate: updated.zeroPauseEndDate,
-                      zeroPausePostTrialDate: updated.zeroPausePostTrialDate,
-                      zeroPausePostTrialEndDate: updated.zeroPausePostTrialEndDate,
-                      subscriptionActivatedAt: updated.subscriptionActivatedAt,
-                      subscriptionExpiresAt: updated.subscriptionExpiresAt,
-                    }
-                  : learner
-              ),
+              learners: old.learners.map(patchLearnerSubscription),
+            };
+          }
+        );
+
+        queryClient.setQueriesData(
+          { queryKey: ['admin', 'subscriptions'] },
+          (
+            old:
+              | {
+                  learners: Array<Record<string, unknown>>;
+                  sync?: { syncedCount: number; failedCount: number };
+                  total?: number;
+                }
+              | undefined
+          ) => {
+            if (!old?.learners) return old;
+            return {
+              ...old,
+              learners: old.learners.map(patchLearnerSubscription),
             };
           }
         );

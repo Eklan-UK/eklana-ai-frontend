@@ -62,6 +62,12 @@ export function applyParsedContentToDraft(
         }
         if ((first.ai_character_names as string[])?.length) {
           next.aiCharacterNames = first.ai_character_names as string[];
+          const storedVoices = Array.isArray(first.ai_character_voice_keys)
+            ? (first.ai_character_voice_keys as string[])
+            : [];
+          next.aiCharacterVoiceKeys = next.aiCharacterNames.map(
+            (_, i) => storedVoices[i] ?? "",
+          );
         }
         if (first.context) next.context = String(first.context);
         if (first.drill_intro) next.drillIntro = String(first.drill_intro);
@@ -376,6 +382,9 @@ export function buildDrillPayloadFromDraft(
     payload.roleplay_scenes = draft.roleplayScenes;
     payload.student_character_name = draft.studentCharacterName.trim();
     payload.ai_character_names = draft.aiCharacterNames.map((n) => n.trim());
+    payload.ai_character_voice_keys = draft.aiCharacterNames.map(
+      (_, i) => (draft.aiCharacterVoiceKeys[i] ?? "").trim(),
+    );
     payload.drill_intro = draft.drillIntro.trim();
   } else if (drillType === "matching") {
     payload.matching_pairs = draft.matchingPairs
@@ -438,6 +447,7 @@ export function buildBulkContentFromDraft(draft: DrillDraft): Record<string, unk
         roleplay_scenes: payload.roleplay_scenes,
         student_character_name: payload.student_character_name,
         ai_character_names: payload.ai_character_names,
+        ai_character_voice_keys: payload.ai_character_voice_keys,
         drill_intro: payload.drill_intro,
         context: draft.context,
       };

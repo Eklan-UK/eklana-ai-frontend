@@ -195,6 +195,8 @@ export function WeekDetailPage({
               drillDetailBasePath={drillDetailBasePath}
               returnTo={returnTo}
               studentId={studentId}
+              currentWeekNumber={weekNumber}
+              currentWeek={weeksData?.currentWeek ?? weekNumber}
             />
           </div>
 

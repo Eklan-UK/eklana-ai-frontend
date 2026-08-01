@@ -32,6 +32,7 @@ import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { completeWeeklyChallengeItem } from "@/lib/challenges/weekly-challenge-client";
 import type { WeeklyChallengeMeta } from "./DrillPracticeInterface";
 import { useTTS } from "@/hooks/useTTS";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { trackActivity } from "@/utils/activity-cache";
 import { speechaceService, TextScore } from "@/services/speechace.service";
 import {
@@ -43,8 +44,9 @@ import {
   RoleplayPerformanceReview,
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface RoleplayDrillProps {
   drill: any;
@@ -170,6 +172,12 @@ export default function RoleplayDrill({
   weeklyChallengeMeta,
 }: RoleplayDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id ?? weeklyChallengeMeta?.challengeId ?? "roleplay"),
+    drillType: "roleplay",
+    assignmentId,
+    weeklyChallengeMeta,
+  });
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [completedMessages, setCompletedMessages] = useState<CompletedMessage[]>([]);
@@ -183,6 +191,7 @@ export default function RoleplayDrill({
   /** True when saved assignment progress was restored — skip pre-start intro TTS on resume. */
   const [hasRestoredProgress, setHasRestoredProgress] = useState(false);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
+  const hasLocalHydratedRef = useRef(false);
 
   // Track if we're on review screen vs completion screen
   const [showReview, setShowReview] = useState(false);
@@ -272,6 +281,25 @@ export default function RoleplayDrill({
   const dialogue: DialogueTurn[] = currentScene?.dialogue || [];
   const studentCharacter = drill.student_character_name || "You";
   const aiCharacters = drill.ai_character_names || ["AI"];
+
+  /** ElevenLabs voice for a dialogue turn (AI character key, else drill-level accent). */
+  const resolveTurnVoiceId = useCallback(
+    (speaker: string): string | undefined => {
+      const defaultVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
+      const voiceKeys = Array.isArray(drill.ai_character_voice_keys)
+        ? drill.ai_character_voice_keys
+        : [];
+      const aiMatch = /^ai_(\d+)$/.exec(speaker);
+      if (aiMatch) {
+        const characterKey = voiceKeys[Number(aiMatch[1])];
+        if (characterKey?.trim()) {
+          return resolveAccentVoiceId(characterKey) ?? defaultVoiceId;
+        }
+      }
+      return defaultVoiceId;
+    },
+    [drill.ai_character_voice_keys, drill.tts_voice_key],
+  );
 
   const currentTurn = dialogue[currentTurnIndex];
 
@@ -413,8 +441,75 @@ export default function RoleplayDrill({
     let cancelled = false;
 
     async function loadSavedProgress() {
+      if (!localProgress.isReady) return;
+
+      const applyLocal = (partial: Record<string, unknown>, resumeFromIndex: number) => {
+        const savedSceneIndex = Number(
+          partial.currentSceneIndex ?? resumeFromIndex ?? 0,
+        );
+        if (!Number.isFinite(savedSceneIndex) || savedSceneIndex >= scenes.length) {
+          localProgress.clear();
+          return false;
+        }
+
+        setTurnProgress((partial.turnProgress as TurnProgressMap) ?? {});
+        setOriginalRoleProgress((partial.originalRoleProgress as TurnProgressMap) ?? {});
+        setSwappedRoleProgress((partial.swappedRoleProgress as TurnProgressMap) ?? {});
+        setRoleMode((partial.roleMode as "original" | "swapped") ?? "original");
+        setSessionAnalytics(
+          ((partial.sessionAnalytics as TurnAnalytics[]) ?? []).map((a) => ({
+            ...a,
+            timestamp: new Date(a.timestamp),
+          })),
+        );
+
+        const pausedAtBreak = Boolean(partial.pausedAtSceneBreak);
+        const completedIdx =
+          partial.completedSceneIndex != null
+            ? Number(partial.completedSceneIndex)
+            : Math.max(0, savedSceneIndex - 1);
+
+        if (pausedAtBreak && scenes.length > 1) {
+          setSceneBreak({
+            completedSceneIndex: completedIdx,
+            nextSceneIndex: savedSceneIndex,
+          });
+        } else {
+          setCurrentSceneIndex(savedSceneIndex);
+          setCurrentTurnIndex(Number(partial.currentTurnIndex ?? 0));
+        }
+
+        if (partial.sessionStarted !== false) {
+          setSessionStarted(true);
+        }
+        setHasRestoredProgress(true);
+        return true;
+      };
+
+      // Local first (silent) — fresher than server milestones between scene saves
+      const local = localProgress.hydrate();
+      if (local) {
+        if (!cancelled) {
+          const applied = applyLocal(local.partialResults, local.resumeFromIndex);
+          if (applied) {
+            if (local.startedAt) {
+              setSessionStartTime(new Date(local.startedAt).getTime());
+            }
+            hasLocalHydratedRef.current = true;
+            setIsLoadingProgress(false);
+            return;
+          }
+          // Outdated local was cleared — fall through to server checkpoint
+        } else {
+          return;
+        }
+      }
+
       if (!progressContext || !progressDrillId) {
-        setIsLoadingProgress(false);
+        if (!cancelled) {
+          hasLocalHydratedRef.current = true;
+          setIsLoadingProgress(false);
+        }
         return;
       }
       if (weeklyChallengeMeta) {
@@ -434,7 +529,10 @@ export default function RoleplayDrill({
         } catch {
           // Non-blocking
         }
-        if (!cancelled) setIsLoadingProgress(false);
+        if (!cancelled) {
+          hasLocalHydratedRef.current = true;
+          setIsLoadingProgress(false);
+        }
         return;
       }
 
@@ -455,6 +553,7 @@ export default function RoleplayDrill({
 
         const progress = response.data?.progress as Record<string, unknown> | null | undefined;
         if (!progress) {
+          hasLocalHydratedRef.current = true;
           setIsLoadingProgress(false);
           return;
         }
@@ -463,6 +562,7 @@ export default function RoleplayDrill({
         if (!Number.isFinite(savedSceneIndex) || savedSceneIndex >= scenes.length) {
           await clearCheckpoint();
           toast.info("Saved progress was outdated — starting fresh.");
+          hasLocalHydratedRef.current = true;
           setIsLoadingProgress(false);
           return;
         }
@@ -511,7 +611,10 @@ export default function RoleplayDrill({
           toast.error("Could not load saved progress.");
         }
       } finally {
-        if (!cancelled) setIsLoadingProgress(false);
+        if (!cancelled) {
+          hasLocalHydratedRef.current = true;
+          setIsLoadingProgress(false);
+        }
       }
     }
 
@@ -519,7 +622,52 @@ export default function RoleplayDrill({
     return () => {
       cancelled = true;
     };
-  }, [progressContext, progressDrillId, scenes, clearCheckpoint]);
+  }, [localProgress.isReady, progressContext, progressDrillId, scenes, clearCheckpoint, weeklyChallengeMeta]);
+
+  // Silent local twin of scene/turn progress (crash / background resume)
+  useEffect(() => {
+    if (!localProgress.isReady || !hasLocalHydratedRef.current || isLoadingProgress) return;
+    if (isCompleted) return;
+    // Avoid writing empty progress before the learner starts (or resumes)
+    if (!sessionStarted && !hasRestoredProgress && !sceneBreak) return;
+
+    localProgress.persist({
+      resumeFromIndex: sceneBreak ? sceneBreak.nextSceneIndex : currentSceneIndex,
+      completedItemCount: sceneBreak
+        ? sceneBreak.nextSceneIndex
+        : currentSceneIndex,
+      partialResults: {
+        currentSceneIndex: sceneBreak ? sceneBreak.nextSceneIndex : currentSceneIndex,
+        currentTurnIndex: sceneBreak ? 0 : currentTurnIndex,
+        pausedAtSceneBreak: Boolean(sceneBreak),
+        completedSceneIndex: sceneBreak?.completedSceneIndex,
+        turnProgress,
+        sessionAnalytics: sessionAnalytics.map((a) => ({
+          ...a,
+          timestamp: a.timestamp instanceof Date ? a.timestamp.toISOString() : a.timestamp,
+        })),
+        roleMode,
+        originalRoleProgress,
+        swappedRoleProgress,
+        sessionStarted,
+      },
+      startedAt: new Date(sessionStartTime).toISOString(),
+    });
+  }, [
+    localProgress.isReady,
+    isLoadingProgress,
+    isCompleted,
+    currentSceneIndex,
+    currentTurnIndex,
+    sceneBreak,
+    turnProgress,
+    sessionAnalytics,
+    roleMode,
+    originalRoleProgress,
+    swappedRoleProgress,
+    sessionStarted,
+    sessionStartTime,
+  ]);
 
   /** Best score per line, grouped by scene for the review screen. */
   const reviewSceneGroups = useMemo(() => {
@@ -673,6 +821,7 @@ export default function RoleplayDrill({
 
     // Play audio
     const audioUrl = turn.audioUrl;
+    const voiceId = resolveTurnVoiceId(turn.speaker);
 
     if (audioUrl) {
       // Play from pre-generated URL
@@ -689,7 +838,7 @@ export default function RoleplayDrill({
       audio.onerror = async () => {
         console.warn("Pre-generated audio failed, falling back to TTS");
         try {
-          await playTTSAudio(turn.text);
+          await playTTSAudio(turn.text, voiceId);
           setTimeout(moveToNextTurn, 500);
         } catch {
           moveToNextTurn();
@@ -703,7 +852,7 @@ export default function RoleplayDrill({
           console.error("Error playing pre-generated audio:", err);
         }
         try {
-          await playTTSAudio(turn.text);
+          await playTTSAudio(turn.text, voiceId);
           setTimeout(moveToNextTurn, 500);
         } catch {
           moveToNextTurn();
@@ -712,7 +861,7 @@ export default function RoleplayDrill({
     } else {
       // Use TTS generation
       try {
-        await playTTSAudio(turn.text);
+        await playTTSAudio(turn.text, voiceId);
         // After TTS finishes, move to next turn
         setTimeout(moveToNextTurn, 500);
       } catch (error) {
@@ -721,7 +870,7 @@ export default function RoleplayDrill({
         moveToNextTurn();
       }
     }
-  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio]);
+  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio, resolveTurnVoiceId]);
 
   // Auto-play AI turns - only after session start and if not already played
   useEffect(() => {
@@ -1103,6 +1252,7 @@ export default function RoleplayDrill({
     setSessionStarted(false);
     setHasRestoredProgress(false);
     void clearCheckpoint();
+    localProgress.clear();
     toast.success(`Starting over from the beginning as ${currentStudentRole}.`);
   };
 
@@ -1230,6 +1380,7 @@ export default function RoleplayDrill({
 
       await clearCheckpoint();
       if (weeklyChallengeMeta) void weeklyChallengeAPI.clearCheckpoint(weeklyChallengeMeta.weekStartDate, weeklyChallengeMeta.itemIndex);
+      localProgress.clear();
 
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
@@ -1290,7 +1441,7 @@ export default function RoleplayDrill({
 
   if (isLoadingProgress) {
     return (
-      <DrillLayout title={drill.title} hideNavigation>
+      <DrillLayout title={drill.title} hideNavigation headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <div className="flex flex-1 items-center justify-center py-24">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -1378,7 +1529,7 @@ export default function RoleplayDrill({
     const statsLine = `${completedStudentTurns} lines completed · ${totalAttempts} total attempts`;
 
     return (
-      <DrillLayout title="Review Performance" hideNavigation>
+      <DrillLayout title="Review Performance" hideNavigation headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <RoleplayPerformanceReview
           avgScore={avgScore}
           statsLine={statsLine}
@@ -1393,7 +1544,11 @@ export default function RoleplayDrill({
   }
 
   return (
-    <DrillLayout title={drill.title} hideNavigation>
+    <DrillLayout
+      title={drill.title}
+      hideNavigation
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
       <div
         className={`rounded-2xl bg-muted/30 p-4 md:p-6 shadow-sm ${
           !isCompleted && !showReview && currentTurn && !sessionStarted
@@ -1577,15 +1732,7 @@ export default function RoleplayDrill({
                       size="sm"
                       audioUrl={currentTurn.audioUrl}
                     />
-                    <BookmarkButton
-                      itemId={currentTurn.text}
-                      itemType="sentence"
-                      content={currentTurn.text}
-                      translation={currentTurn.translation}
-                      context={currentScene?.context}
-                      sourceDrillId={drill._id}
-                      className="ml-1"
-                    />
+                    <DrillBookmarkToggle drillId={String(drill._id)} />
                   </div>
                 </div>
                 <p className="text-xl font-semibold text-foreground text-center">

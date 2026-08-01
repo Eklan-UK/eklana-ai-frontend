@@ -86,6 +86,13 @@ describe("practice-feedback", () => {
     assert.deepEqual(vibrateMock.mock.calls[0]?.arguments, [[120, 60, 120]]);
   });
 
+  it("vibrates with the neutral pattern", async () => {
+    const { triggerHaptic } = await import("./practice-feedback");
+    triggerHaptic("neutral");
+    assert.equal(vibrateMock.mock.callCount(), 1);
+    assert.deepEqual(vibrateMock.mock.calls[0]?.arguments, [[25]]);
+  });
+
   it("does not throw when vibrate is unavailable", async () => {
     Object.defineProperty(globalThis, "navigator", {
       configurable: true,
@@ -110,6 +117,13 @@ describe("practice-feedback", () => {
     const { playPracticeFeedback } = await import("./practice-feedback");
     assert.doesNotThrow(() => playPracticeFeedback("success"));
     assert.equal(vibrateMock.mock.callCount(), 1);
+  });
+
+  it("playPracticeFeedback supports neutral kind", async () => {
+    const { playPracticeFeedback } = await import("./practice-feedback");
+    assert.doesNotThrow(() => playPracticeFeedback("neutral"));
+    assert.equal(vibrateMock.mock.callCount(), 1);
+    assert.deepEqual(vibrateMock.mock.calls[0]?.arguments, [[25]]);
   });
 
   it("playDrillEndCelebration triggers success haptic", async () => {

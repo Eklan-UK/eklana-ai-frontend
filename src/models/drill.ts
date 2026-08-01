@@ -409,6 +409,11 @@ export interface IDrill extends Document {
   student_character_name?: string;
   ai_character_name?: string;
   ai_character_names?: string[];
+  /**
+   * Parallel to ai_character_names: accent/gender key per AI character.
+   * Empty string = fall back to drill tts_voice_key / system default.
+   */
+  ai_character_voice_keys?: string[];
   /** Shown to learners on the roleplay pre-start screen before "Let's Get Started" */
   drill_intro?: string;
 
@@ -639,6 +644,13 @@ const drillSchema = new Schema<IDrill>(
       type: [String],
       default: [],
       description: "Array of AI character names",
+    },
+
+    ai_character_voice_keys: {
+      type: [String],
+      default: [],
+      description:
+        "Accent/gender key per AI character (parallel to ai_character_names); empty = drill tts_voice_key",
     },
 
     drill_intro: {

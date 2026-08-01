@@ -9,8 +9,10 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { useTTS } from "@/hooks/useTTS";
+import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
+import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 
 interface ListeningDrillProps {
   drill: any;
@@ -19,25 +21,42 @@ interface ListeningDrillProps {
 
 export default function ListeningDrill({ drill, assignmentId }: ListeningDrillProps) {
   const queryClient = useQueryClient();
+  const localProgress = useLocalDrillProgress({
+    drillId: String(drill._id),
+    drillType: "listening",
+    assignmentId,
+  });
   const [isCompleted, setIsCompleted] = useState(false);
   const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasListened, setHasListened] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(true);
   
   // Pre-generated audio player
   const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const markListenedRef = useRef<(listened: boolean) => void>(() => {});
 
   const contentTitle = drill.listening_drill_title || drill.title;
   const content = drill.listening_drill_content || "";
   const audioUrl = drill.listening_drill_audio_url || "";
 
+  markListenedRef.current = (listened: boolean) => {
+    setHasListened(listened);
+    localProgress.persist({
+      resumeFromIndex: listened ? 1 : 0,
+      completedItemCount: listened ? 1 : 0,
+      partialResults: { hasListened: listened },
+      startedAt: new Date(startTime).toISOString(),
+    });
+  };
+
   // TTS hook for playing content (fallback)
   const { playAudio: playTTSAudio, isGenerating: isGeneratingAudio, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
     autoPlay: false,
     onPlayStart: () => {
-      setHasListened(true);
+      markListenedRef.current(true);
     },
     onPlayEnd: () => {
       // Audio finished
@@ -61,6 +80,15 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
     };
   }, []);
 
+  useEffect(() => {
+    if (!localProgress.isReady) return;
+    const local = localProgress.hydrate();
+    if (local?.partialResults?.hasListened === true) {
+      setHasListened(true);
+    }
+    setIsHydrating(false);
+  }, [localProgress.isReady]);
+
   const handlePlay = async () => {
     if (!content.trim() && !audioUrl) {
       toast.error("No content available to play");
@@ -78,7 +106,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       
       audio.onplay = () => {
         setIsPlayingPreGen(true);
-        setHasListened(true);
+        markListenedRef.current(true);
       };
       audio.onended = () => setIsPlayingPreGen(false);
       audio.onerror = () => {
@@ -167,6 +195,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
 
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
 
+      localProgress.clear();
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
@@ -182,6 +211,16 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
     }
   };
 
+  if (isHydrating) {
+    return (
+      <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DrillLayout>
+    );
+  }
+
   if (isCompleted) {
     return (
       <DrillCompletionScreen
@@ -193,7 +232,10 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   }
 
   return (
-    <DrillLayout title={drill.title}>
+    <DrillLayout
+      title={drill.title}
+      headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}
+    >
         {/* Context */}
         {drill.context && (
           <Card className="mb-4">
