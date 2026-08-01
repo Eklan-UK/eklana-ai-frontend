@@ -31,8 +31,8 @@ import '@/models/studentContext';
 // ── Config (edit between runs) ──────────────────────────────────────────────
 const LEARNER_ID = '6a145e8ea1983cbd047bfd49'; // Litima
 const LOOKBACK_MINUTES = 1440; // 30 for last half hour, 1440 for 24 hrs
-const OVERRIDE_MISSION: number | null = 3;
-const OVERRIDE_TOPIC: string | null = 'answering_family_questions';
+const OVERRIDE_MISSION: number | null = 4;
+const OVERRIDE_TOPIC: string | null = 'motivation_prep';
 // ────────────────────────────────────────────────────────────────────────────
 
 async function main() {
