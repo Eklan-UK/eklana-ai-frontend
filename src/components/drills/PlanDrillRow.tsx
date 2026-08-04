@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight, Clock3, Bookmark, BookmarkCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { getDrillIcon, getDrillTypeInfo, getDrillStatus, getDrillTypeLabel, DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
+import {
+  getDrillIcon,
+  getDrillTypeInfo,
+  getDrillStatus,
+  getDrillTypeLabel,
+  DRILL_ESTIMATED_DURATION_LABEL,
+  formatDate,
+} from "@/utils/drill";
 
 const CATEGORY_TEXT: Record<string, string> = {
   green: "text-violet-600",
@@ -34,6 +41,21 @@ const THUMB_GRADIENT: Record<string, string> = {
   gray: "from-muted to-muted dark:from-slate-600 dark:to-slate-700",
 };
 
+/** Soft solid pastels for journey accordion drill thumbs (Figma). */
+const THUMB_SOLID: Record<string, string> = {
+  green: "bg-[#dcfce7]",
+  blue: "bg-[#eff6ff]",
+  primary: "bg-[#ede9fe]",
+  orange: "bg-[#ffedd5]",
+  indigo: "bg-[#fef9c3]",
+  pink: "bg-[#ffe4e6]",
+  teal: "bg-[#ccfbf1]",
+  violet: "bg-[#ede9fe]",
+  amber: "bg-[#fef9c3]",
+  emerald: "bg-[#dcfce7]",
+  gray: "bg-muted",
+};
+
 export interface PlanDrillRowProps {
   drill: {
     _id: string;
@@ -50,6 +72,8 @@ export interface PlanDrillRowProps {
   status?: string;
   hasBookmarks?: boolean;
   showTopicLabel?: boolean;
+  /** Journey accordion presentation: solid pastel thumb + duration/due/Completed meta. */
+  presentation?: "default" | "journey";
   onPrefetch?: (drillId: string) => void;
   /** Fires before navigation (e.g. activity tracking). */
   onNavigate?: () => void;
@@ -64,11 +88,13 @@ export function PlanDrillRow({
   status,
   hasBookmarks = false,
   showTopicLabel = false,
+  presentation = "default",
   onPrefetch,
   onNavigate,
   onBookmarkToggle,
 }: PlanDrillRowProps) {
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const isJourney = presentation === "journey";
   const typeInfo = getDrillTypeInfo(drill.type);
   const drillStatus = getDrillStatus({
     drill,
@@ -89,9 +115,14 @@ export function PlanDrillRow({
   const catClass =
     CATEGORY_TEXT[typeInfo.color] ?? CATEGORY_TEXT.gray!;
   const thumbGrad = THUMB_GRADIENT[typeInfo.color] ?? THUMB_GRADIENT.gray!;
+  const thumbSolid = THUMB_SOLID[typeInfo.color] ?? THUMB_SOLID.gray!;
   const topicTitle =
     showTopicLabel && typeof drill.topicTitle === "string"
       ? drill.topicTitle
+      : null;
+  const dueLabel =
+    !isCompleted && dueDate
+      ? formatDate(dueDate)
       : null;
 
   const handleBookmarkClick = async (e: React.MouseEvent) => {
@@ -114,7 +145,11 @@ export function PlanDrillRow({
       onClick={() => onNavigate?.()}
     >
       <div
-        className={`w-14 h-14 rounded-xl bg-gradient-to-br ${thumbGrad} flex items-center justify-center text-2xl shrink-0 shadow-inner`}
+        className={
+          isJourney
+            ? `size-12 rounded-[13px] ${thumbSolid} flex items-center justify-center text-xl shrink-0`
+            : `w-14 h-14 rounded-xl bg-gradient-to-br ${thumbGrad} flex items-center justify-center text-2xl shrink-0 shadow-inner`
+        }
       >
         {getDrillIcon(drill.type)}
       </div>
@@ -124,22 +159,41 @@ export function PlanDrillRow({
             {topicTitle}
           </p>
         ) : null}
-        <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
+        <h3
+          className={`text-foreground leading-snug line-clamp-2 ${
+            isJourney
+              ? "font-bold text-[13.5px] text-[#1e2939]"
+              : "font-semibold text-sm"
+          }`}
+        >
           {drill.title?.trim() || getDrillTypeLabel(drill.type)}
         </h3>
-        <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
-          • {getDrillTypeLabel(drill.type)}
-          {isInProgress && !isCompleted ? (
-            <span className="ml-1.5 text-sky-600">· In progress</span>
+        {!isJourney ? (
+          <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
+            • {getDrillTypeLabel(drill.type)}
+            {isInProgress && !isCompleted ? (
+              <span className="ml-1.5 text-sky-600">· In progress</span>
+            ) : null}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground mt-1">
+          <span className="inline-flex items-center gap-1">
+            <Clock3 className="w-3.5 h-3.5 shrink-0" />
+            {DRILL_ESTIMATED_DURATION_LABEL}
+          </span>
+          {dueLabel ? (
+            <span className="text-muted-foreground">· Due {dueLabel}</span>
           ) : null}
-        </p>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-          <Clock3 className="w-3.5 h-3.5 shrink-0" />
-          {DRILL_ESTIMATED_DURATION_LABEL}
+          {isJourney && isCompleted ? (
+            <span className="font-semibold text-[#22c55e]">· Completed</span>
+          ) : null}
+          {isJourney && isInProgress && !isCompleted ? (
+            <span className="text-sky-600">· In progress</span>
+          ) : null}
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {isCompleted ? (
+        {!isJourney && isCompleted ? (
           <CheckCircle2
             className="w-5 h-5 text-[#22c55e] shrink-0"
             aria-label="Completed"
