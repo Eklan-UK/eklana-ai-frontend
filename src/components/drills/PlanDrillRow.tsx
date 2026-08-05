@@ -12,6 +12,7 @@ import {
   DRILL_ESTIMATED_DURATION_LABEL,
   formatDate,
 } from "@/utils/drill";
+import { resolveDrillListTitle } from "@/lib/drill-display-label";
 
 const CATEGORY_TEXT: Record<string, string> = {
   green: "text-violet-600",
@@ -166,7 +167,9 @@ export function PlanDrillRow({
               : "font-semibold text-sm"
           }`}
         >
-          {drill.title?.trim() || getDrillTypeLabel(drill.type)}
+          {isJourney
+            ? resolveDrillListTitle(drill)
+            : drill.title?.trim() || getDrillTypeLabel(drill.type)}
         </h3>
         <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
           • {getDrillTypeLabel(drill.type)}

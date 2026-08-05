@@ -19,6 +19,8 @@ import {
   Headphones,
   ScrollText,
   Link2,
+  Mic,
+  PenLine,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -80,6 +82,8 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
       summary: <ScrollText {...iconProps} className="w-6 h-6 text-orange-500" />,
       sentence_writing: <PenTool {...iconProps} className="w-6 h-6 text-indigo-500" />,
       listening: <Headphones {...iconProps} className="w-6 h-6 text-cyan-500" />,
+      pronunciation: <Mic {...iconProps} className="w-6 h-6 text-violet-500" />,
+      fill_blank: <PenLine {...iconProps} className="w-6 h-6 text-amber-500" />,
     };
     return icons[type] || <BookOpen {...iconProps} className="w-6 h-6 text-gray-500" />;
   };
@@ -566,6 +570,86 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             )}
           </Card>
         )}
+
+        {drill.type === "pronunciation" &&
+          drill.pronunciation_items &&
+          drill.pronunciation_items.length > 0 && (
+            <Card className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Pronunciation Items ({drill.pronunciation_items.length})
+              </h2>
+              <div className="space-y-2">
+                {drill.pronunciation_items.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <p className="font-semibold text-gray-900">
+                      {item.sound} — {item.word}
+                    </p>
+                    {item.sentence && (
+                      <p className="text-sm text-gray-600 mt-1">{item.sentence}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+        {drill.type === "fill_blank" &&
+          drill.fill_blank_items &&
+          drill.fill_blank_items.length > 0 && (
+            <Card className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Fill in the Blank ({drill.fill_blank_items.length})
+              </h2>
+              <div className="space-y-4">
+                {drill.fill_blank_items.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3"
+                  >
+                    {item.context && (
+                      <p className="text-sm text-gray-600">{item.context}</p>
+                    )}
+                    <p className="font-semibold text-gray-900">{item.sentence}</p>
+                    {item.translation && (
+                      <p className="text-sm text-gray-500 italic">{item.translation}</p>
+                    )}
+                    {(item.blanks || []).length > 0 && (
+                      <div className="space-y-3">
+                        {(item.blanks || []).map((blank: any, blankIdx: number) => (
+                          <div key={blankIdx}>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">
+                              Blank {blankIdx + 1}
+                              {blank.hint ? ` — ${blank.hint}` : ""}
+                            </p>
+                            <ul className="space-y-1">
+                              {(blank.options || []).map(
+                                (opt: string, optIdx: number) => (
+                                  <li
+                                    key={optIdx}
+                                    className={`text-sm px-3 py-1.5 rounded-lg ${
+                                      opt === blank.correctAnswer
+                                        ? "bg-emerald-100 text-emerald-800 font-medium"
+                                        : "bg-white text-gray-700 border border-gray-100"
+                                    }`}
+                                  >
+                                    {opt}
+                                    {opt === blank.correctAnswer ? " ✓" : ""}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
         {/* Assigned Students List */}
         {assignments.length > 0 && (
