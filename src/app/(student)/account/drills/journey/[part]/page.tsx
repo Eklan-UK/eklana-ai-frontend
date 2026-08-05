@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Card } from "@/components/ui/Card";
 import { useLearnerDrills, usePrefetchDrill } from "@/hooks/useDrills";
 import { useMyMissionEnrollments } from "@/hooks/useMissionEnrollments";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useDrillBookmarkToggle } from "@/hooks/useDrillBookmarkToggle";
+import { LearningJourneyTopicAccordion } from "@/components/drills/LearningJourneyTopicAccordion";
 import { PlanDrillRow } from "@/components/drills/PlanDrillRow";
 import { PlanFreeTalkRow } from "@/components/drills/PlanFreeTalkRow";
+import { isCompletedPlanItem } from "@/lib/learner-assigned-plan";
 import { isFreeTalkPlanItem } from "@/lib/learning-journey/group-journey-drills";
 import {
   getMissionNumberLabel,
@@ -93,7 +94,7 @@ export default function LearningJourneyPartPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-8">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-2">
         {drillsLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-[#22c55e]" />
@@ -103,73 +104,73 @@ export default function LearningJourneyPartPage() {
             Something went wrong loading your drills. Please refresh.
           </div>
         ) : (
-          topicGroups.map(({ topic, items }) => (
-            <section key={topic.id}>
-              <h2 className="text-base font-bold text-foreground mb-3">{topic.title}</h2>
-              {items.length === 0 ? (
-                <Card className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">No drills assigned for this topic yet.</p>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {items.map((item) => {
-                    const key = String(
-                      item.assignmentId ?? (item.drill as { _id?: string })?._id ?? "",
-                    );
-                    if (isFreeTalkPlanItem(item)) {
-                      const drill = item.drill as {
-                        _id?: string;
-                        title?: string;
-                        scenarioType?: string;
-                        completionDate?: string;
-                      };
-                      return (
-                        <PlanFreeTalkRow
-                          key={`free-talk-${key}`}
-                          scenarioId={key}
-                          title={drill?.title ?? "Free Talk"}
-                          scenarioType={drill?.scenarioType ?? ""}
-                          completionDate={drill?.completionDate ?? item.dueDate}
-                          completedAt={item.completedAt}
-                        />
-                      );
-                    }
+          topicGroups.map(({ topic, items }) => {
+            const completed = items.filter((item) => isCompletedPlanItem(item)).length;
+            return (
+              <LearningJourneyTopicAccordion
+                key={topic.id}
+                topic={topic}
+                completed={completed}
+                total={items.length}
+              >
+                {items.map((item) => {
+                  const key = String(
+                    item.assignmentId ?? (item.drill as { _id?: string })?._id ?? "",
+                  );
+                  if (isFreeTalkPlanItem(item)) {
                     const drill = item.drill as {
-                      _id: string;
-                      title: string;
-                      type: string;
-                      date: string;
+                      _id?: string;
+                      title?: string;
+                      scenarioType?: string;
+                      completionDate?: string;
                     };
                     return (
-                      <PlanDrillRow
-                        key={key}
-                        drill={drill}
-                        assignmentId={
-                          item.assignmentId != null ? String(item.assignmentId) : undefined
-                        }
-                        dueDate={item.dueDate != null ? String(item.dueDate) : undefined}
-                        completedAt={
-                          item.completedAt != null ? String(item.completedAt) : undefined
-                        }
-                        status={item.status}
-                        hasBookmarks={item.hasBookmarks === true}
-                        onPrefetch={prefetchDrill}
-                        onBookmarkToggle={handleBookmarkToggle}
-                        onNavigate={() =>
-                          trackActivity("drill", drill._id, "started", {
-                            title: drill.title,
-                            drillTitle: drill.title,
-                            type: drill.type,
-                            assignmentId: item.assignmentId,
-                          })
-                        }
+                      <PlanFreeTalkRow
+                        key={`free-talk-${key}`}
+                        scenarioId={key}
+                        title={drill?.title ?? "Free Talk"}
+                        scenarioType={drill?.scenarioType ?? ""}
+                        completionDate={drill?.completionDate ?? item.dueDate}
+                        completedAt={item.completedAt}
                       />
                     );
-                  })}
-                </div>
-              )}
-            </section>
-          ))
+                  }
+                  const drill = item.drill as {
+                    _id: string;
+                    title: string;
+                    type: string;
+                    date: string;
+                  };
+                  return (
+                    <PlanDrillRow
+                      key={key}
+                      drill={drill}
+                      assignmentId={
+                        item.assignmentId != null ? String(item.assignmentId) : undefined
+                      }
+                      dueDate={item.dueDate != null ? String(item.dueDate) : undefined}
+                      completedAt={
+                        item.completedAt != null ? String(item.completedAt) : undefined
+                      }
+                      status={item.status}
+                      hasBookmarks={item.hasBookmarks === true}
+                      presentation="journey"
+                      onPrefetch={prefetchDrill}
+                      onBookmarkToggle={handleBookmarkToggle}
+                      onNavigate={() =>
+                        trackActivity("drill", drill._id, "started", {
+                          title: drill.title,
+                          drillTitle: drill.title,
+                          type: drill.type,
+                          assignmentId: item.assignmentId,
+                        })
+                      }
+                    />
+                  );
+                })}
+              </LearningJourneyTopicAccordion>
+            );
+          })
         )}
       </div>
 
