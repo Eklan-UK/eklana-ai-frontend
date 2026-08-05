@@ -142,6 +142,7 @@ const createDrillSchema = z.object({
 	ai_character_name: z.string().optional(),
 	ai_character_names: z.array(z.string()).optional(),
 	ai_character_voice_keys: z.array(z.string()).optional(),
+	ai_character_avatars: z.array(z.string()).optional(),
 	drill_intro: z.string().max(5000).optional(),
 	matching_pairs: z.array(matchingPairSchema).optional(),
 	definition_items: z.array(definitionItemSchema).optional(),
@@ -300,6 +301,9 @@ async function postHandler(
 	if (validated.ai_character_names !== undefined) drillData.ai_character_names = validated.ai_character_names;
 	if (validated.ai_character_voice_keys !== undefined) {
 		drillData.ai_character_voice_keys = validated.ai_character_voice_keys;
+	}
+	if (validated.ai_character_avatars !== undefined) {
+		drillData.ai_character_avatars = validated.ai_character_avatars;
 	}
 	if (validated.drill_intro !== undefined) drillData.drill_intro = validated.drill_intro;
 	if (validated.matching_pairs !== undefined) drillData.matching_pairs = validated.matching_pairs;

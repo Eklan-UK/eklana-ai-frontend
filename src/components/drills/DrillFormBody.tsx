@@ -25,6 +25,7 @@ import type {
   KeyPhraseItem,
 } from "@/components/drills/drill-draft.types";
 import { ACCENT_VOICE_OPTIONS } from "@/services/tts-accent-voices";
+import { RoleAvatarPicker } from "@/components/drills/RoleAvatarPicker";
 
 export interface DrillFormBodyProps {
   draft: DrillDraft;
@@ -165,6 +166,7 @@ export function DrillFormBody({
     patchDraft({
       aiCharacterNames: [...draft.aiCharacterNames, ""],
       aiCharacterVoiceKeys: [...(draft.aiCharacterVoiceKeys ?? []), ""],
+      aiCharacterAvatars: [...(draft.aiCharacterAvatars ?? []), ""],
     });
   };
 
@@ -173,6 +175,9 @@ export function DrillFormBody({
       patchDraft({
         aiCharacterNames: draft.aiCharacterNames.filter((_, i) => i !== index),
         aiCharacterVoiceKeys: (draft.aiCharacterVoiceKeys ?? []).filter(
+          (_, i) => i !== index,
+        ),
+        aiCharacterAvatars: (draft.aiCharacterAvatars ?? []).filter(
           (_, i) => i !== index,
         ),
       });
@@ -749,6 +754,17 @@ export function DrillFormBody({
                 </div>
                 {draft.aiCharacterNames.map((name, idx) => (
                   <div key={idx} className="flex items-center gap-2 mb-2">
+                    <RoleAvatarPicker
+                      value={draft.aiCharacterAvatars?.[idx] ?? ""}
+                      characterLabel={name.trim() || `Character ${idx + 1}`}
+                      onChange={(url) => {
+                        const avatars = draft.aiCharacterNames.map(
+                          (_, i) => draft.aiCharacterAvatars?.[i] ?? "",
+                        );
+                        avatars[idx] = url;
+                        patchDraft({ aiCharacterAvatars: avatars });
+                      }}
+                    />
                     <input
                       type="text"
                       value={name}

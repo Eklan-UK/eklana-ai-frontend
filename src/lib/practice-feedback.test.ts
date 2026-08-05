@@ -145,6 +145,54 @@ describe("practice-feedback", () => {
     assert.equal(playMock.mock.callCount(), 1);
   });
 
+  it("playDrillEndCelebration defaults to the pass confetti variant", async () => {
+    const playMock = mock.fn(async () => undefined);
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
+    const { playDrillEndCelebration } = await import("./practice-feedback");
+    const { getDrillConfettiOptions } = await import("./drill-celebration");
+
+    assert.doesNotThrow(() => playDrillEndCelebration());
+    assert.deepEqual(getDrillConfettiOptions("pass").colors, [
+      "#22c55e",
+      "#16a34a",
+      "#4ade80",
+      "#86efac",
+    ]);
+  });
+
+  it("playDrillEndCelebration forwards the perfect confetti variant", async () => {
+    const playMock = mock.fn(async () => undefined);
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
+    const { playDrillEndCelebration } = await import("./practice-feedback");
+    const { getDrillConfettiOptions } = await import("./drill-celebration");
+
+    assert.doesNotThrow(() =>
+      playDrillEndCelebration(undefined, { confettiVariant: "perfect" }),
+    );
+    const perfectOptions = getDrillConfettiOptions("perfect");
+    assert.deepEqual(perfectOptions.colors, ["#fbbf24", "#f59e0b", "#d97706", "#92400e"]);
+    assert.equal(perfectOptions.particleCount, 200);
+    assert.equal(perfectOptions.spread, 120);
+  });
+
   it("playDrillEndFailure triggers failure haptic", async () => {
     const { playDrillEndFailure } = await import("./practice-feedback");
     assert.doesNotThrow(() => playDrillEndFailure());

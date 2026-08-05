@@ -169,6 +169,22 @@ export const drillAPI = {
     });
   },
 
+  /** Upload a roleplay AI character avatar image (admin/tutor). Returns Cloudinary URL. */
+  uploadRoleAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    return apiClient.post('/drills/role-avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then((response) => response.data as {
+      code: string;
+      message: string;
+      data: { url: string };
+    });
+  },
+
   // Delete drill
   delete: (drillId: string) => {
     return apiRequest<{ message: string }>(`/drills/${drillId}`, {
@@ -361,7 +377,11 @@ export const drillAPI = {
           completedAt: string;
         };
         badgesUnlocked?: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[];
-        effects?: { soundUrl: string; triggerConfetti: boolean };
+        effects?: {
+          soundUrl: string;
+          triggerConfetti: boolean;
+          confettiVariant: 'pass' | 'perfect';
+        };
       };
     }>(`/drills/${drillId}/complete`, {
       method: 'POST',

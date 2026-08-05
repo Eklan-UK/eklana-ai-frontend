@@ -10,10 +10,12 @@
 
 When a learner **passes** a drill, the app plays a **celebration MP3** (hosted on Vercel Blob), triggers **success haptics**, and shows **confetti** once.
 
+When the score is a **perfect 100** (`Math.round(score) >= 100`), the same MP3 and haptic play, but confetti is **gold** instead of green — mirroring the badge-unlock celebration.
+
 | Layer | Responsibility |
 |-------|----------------|
-| **API** | `POST /drills/:drillId/complete` returns `effects.soundUrl` + `effects.triggerConfetti` when `passed: true` |
-| **Mobile client** | Play that URL via `expo-av`; do **not** hardcode the asset in production (use API URL; keep default constant only as offline fallback) |
+| **API** | `POST /drills/:drillId/complete` returns `effects.soundUrl` + `effects.triggerConfetti` + `effects.confettiVariant` (`'pass' \| 'perfect'`) when `passed: true` |
+| **Mobile client** | Play that URL via `expo-av`; do **not** hardcode the asset in production (use API URL; keep default constant only as offline fallback). Use `effects.confettiVariant` to pick the confetti color palette — gold for `perfect`, green for `pass`. |
 
 **Scope**: Assigned My Plan drills (`POST /drills/:drillId/complete`). Weekly challenge completion does **not** return `effects` today.
 
@@ -28,6 +30,16 @@ When a learner **passes** a drill, the app plays a **celebration MP3** (hosted o
 | End-of-drill sound was synthesized Web Audio tones | End-of-drill sound is the **Celebration MP3** from `effects.soundUrl` |
 | Complete response: `{ attempt, badgesUnlocked }` | Adds `drillId`, `passed`, optional `effects` |
 | Mobile had no server-driven asset | Server config `CELEBRATION_SOUND_URL` controls the URL returned in `effects` |
+
+### 2.1 What changed (August 2026) — gold "perfect score" confetti
+
+| Before | After (web + API) |
+|--------|-------------------|
+| Pass confetti was always green, regardless of score | Confetti is **gold** when `Math.round(score) >= 100`, green otherwise. Same MP3 + haptic either way. |
+| `effects: { soundUrl, triggerConfetti }` | Adds `effects.confettiVariant: 'pass' \| 'perfect'` |
+| N/A | Trigger rule: `passed && Math.round(score) >= 100` → `'perfect'` (gold), else `'pass'` (green) |
+
+**Not in scope**: Roleplay's **per-turn** confetti during the drill (separate from end-of-drill review) stays green/unchanged — this only affects the end-of-drill / end-of-review celebration.
 
 Default asset (when env unset):
 
@@ -66,9 +78,20 @@ Request body unchanged — see [`MOBILE_MY_PLAN.md`](MOBILE_MY_PLAN.md) §5. Alw
     "badgesUnlocked": [],
     "effects": {
       "soundUrl": "https://mrsxoheopyanhton.public.blob.vercel-storage.com/Celebration%20_Sound.mp3",
-      "triggerConfetti": true
+      "triggerConfetti": true,
+      "confettiVariant": "pass"
     }
   }
+}
+```
+
+`confettiVariant` is `"perfect"` instead of `"pass"` when `Math.round(attempt.score) >= 100`:
+
+```json
+"effects": {
+  "soundUrl": "https://mrsxoheopyanhton.public.blob.vercel-storage.com/Celebration%20_Sound.mp3",
+  "triggerConfetti": true,
+  "confettiVariant": "perfect"
 }
 ```
 
@@ -80,9 +103,13 @@ When `passed` is `false`, **`effects` is omitted** — no celebration audio or c
 export const DEFAULT_CELEBRATION_SOUND_URL =
   'https://mrsxoheopyanhton.public.blob.vercel-storage.com/Celebration%20_Sound.mp3';
 
+export type DrillConfettiVariant = 'pass' | 'perfect';
+
 export type DrillCompletionEffects = {
   soundUrl: string;
   triggerConfetti: boolean;
+  /** 'perfect' (gold) when Math.round(score) >= 100, else 'pass' (green). */
+  confettiVariant: DrillConfettiVariant;
 };
 
 export type CompleteDrillResponse = {
@@ -148,7 +175,9 @@ Celebration when the **performance review** (or fill-blank results screen) appea
 
 **Sound URL at this moment**: API not called yet → use `DEFAULT_CELEBRATION_SOUND_URL` (same default the server uses). Web: `getClientCelebrationSoundUrl()` in [`celebration-sound-url.ts`](../src/lib/drill/celebration-sound-url.ts).
 
-**Mobile**: `playDrillEndCelebration({ soundUrl: DEFAULT_CELEBRATION_SOUND_URL, triggerConfetti: true })` when review mounts with pass. Do **not** celebrate again in complete `onSuccess`.
+**Confetti variant at this moment**: API not called yet → derive client-side from the same overall review score shown in the donut: `Math.round(avgScore) >= 100 ? 'perfect' : 'pass'`. This mirrors web [`DrillPerformanceReview`](../src/components/drills/shared/DrillPerformanceReview.tsx), which passes `avgScore` into `useDrillScoreCelebration`.
+
+**Mobile**: `playDrillEndCelebration({ soundUrl: DEFAULT_CELEBRATION_SOUND_URL, triggerConfetti: true, confettiVariant })` when review mounts with pass. Do **not** celebrate again in complete `onSuccess`.
 
 ### Pattern B — Complete API **before** completion screen
 
@@ -161,7 +190,9 @@ Celebration when the **completion screen** mounts after a successful complete ca
 
 **Sound URL**: `data.effects.soundUrl` from the complete response.
 
-**Mobile**: Pass `effects` from complete result into the completion screen; call `playDrillEndCelebration(effects)` on mount when `celebrate` is true.
+**Confetti variant**: `data.effects.confettiVariant` from the complete response — do **not** re-derive from score on Pattern B; the server already computed it from `attempt.score`.
+
+**Mobile**: Pass `effects` (including `confettiVariant`) from complete result into the completion screen; call `playDrillEndCelebration(effects)` on mount when `celebrate` is true.
 
 ### Drills with no end celebration on web
 
@@ -205,15 +236,22 @@ export async function unloadDrillCelebrationSound(): Promise<void> {
   celebrationSound = null;
 }
 
+// Same gold palette as web BadgeUnlockModal / triggerDrillEndConfetti('perfect').
+export const PERFECT_CONFETTI_COLORS = ['#fbbf24', '#f59e0b', '#d97706', '#92400e'];
+export const PASS_CONFETTI_COLORS = ['#22c55e', '#16a34a', '#4ade80', '#86efac'];
+
 /**
  * End-of-drill pass: MP3 + success haptic + confetti.
- * Mirrors web `playDrillEndCelebration(soundUrl?)`.
+ * Mirrors web `playDrillEndCelebration(soundUrl?, { confettiVariant })`.
+ * `confettiVariant` defaults to `'pass'` (green); pass `'perfect'` (gold) when
+ * `Math.round(score) >= 100` — see §4 for how to derive it per pattern.
  */
 export async function playDrillEndCelebration(
   effects?: DrillCompletionEffects | null,
 ): Promise<void> {
   const soundUrl = effects?.soundUrl?.trim() || DEFAULT_CELEBRATION_SOUND_URL;
   const triggerConfetti = effects?.triggerConfetti ?? true;
+  const confettiVariant = effects?.confettiVariant ?? 'pass';
 
   try {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -240,7 +278,9 @@ export async function playDrillEndCelebration(
   }
 
   if (triggerConfetti) {
-    // Your confetti imperative API, e.g. confettiRef.current?.start()
+    const colors =
+      confettiVariant === 'perfect' ? PERFECT_CONFETTI_COLORS : PASS_CONFETTI_COLORS;
+    // Your confetti imperative API, e.g. confettiRef.current?.start({ colors })
   }
 }
 ```
@@ -257,19 +297,22 @@ import { playPracticeFeedback } from '@/lib/practice-feedback'; // failure: hapt
 export function useDrillScoreCelebration(
   passed: boolean | null | undefined,
   effects?: DrillCompletionEffects | null,
+  score?: number,
 ) {
   useEffect(() => {
     if (passed == null) return;
     if (passed) {
-      void playDrillEndCelebration(effects);
+      const confettiVariant =
+        typeof score === 'number' && Math.round(score) >= 100 ? 'perfect' : 'pass';
+      void playDrillEndCelebration({ ...effects, confettiVariant } as DrillCompletionEffects);
     } else {
       void playPracticeFeedback('failure');
     }
-  }, [passed, effects]);
+  }, [passed, effects, score]);
 }
 ```
 
-Wire this on **Pattern A** score-review screens when `avgScore >= passThreshold`.
+Wire this on **Pattern A** score-review screens when `avgScore >= passThreshold`, passing `avgScore` as the third argument so a perfect score fires gold confetti (mirrors web `useDrillScoreCelebration(passed, celebrationSoundUrl, score)`).
 
 ### 5.4 Complete helper — Pattern B
 
@@ -337,6 +380,19 @@ export function DrillCompletionScreen({
 
 When `triggerConfetti === true`, fire confetti in the same call as the MP3 (web: [`src/lib/drill-celebration.ts`](../src/lib/drill-celebration.ts) `triggerDrillEndConfetti`). Start within ~100ms of audio play.
 
+### 7.1 Gold vs green (perfect score)
+
+Use `confettiVariant` to pick the color palette. **Gold replaces green on a perfect score — never fire both.**
+
+| `confettiVariant` | Colors | Web reference |
+|--------------------|--------|----------------|
+| `'pass'` (default) | `#22c55e`, `#16a34a`, `#4ade80`, `#86efac` | `triggerDrillEndConfetti('pass')` |
+| `'perfect'` | `#fbbf24`, `#f59e0b`, `#d97706`, `#92400e` (same gold as badge unlock) | `triggerDrillEndConfetti('perfect')`, [`BadgeUnlockModal.tsx`](../src/components/badges/BadgeUnlockModal.tsx) |
+
+Web also uses a slightly richer burst for `'perfect'` (`particleCount: 200`, `spread: 120` vs `150`/`100` for `'pass'`) — optional to mirror exactly, but keep the color swap.
+
+**Trigger rule**: `passed && Math.round(score) >= 100` → `'perfect'`; otherwise `'pass'`. Same MP3 and haptic in both cases — only the confetti color (and optionally burst size) changes.
+
 ---
 
 ## 8. Error and edge cases
@@ -358,6 +414,10 @@ When `triggerConfetti === true`, fire confetti in the same call as the MP3 (web:
 - [ ] **Pattern B**: Matching → MP3 uses `effects.soundUrl` from complete response on completion screen
 - [ ] **Pattern B**: Definition score &lt; 70 → no celebration
 - [ ] Summary / Listening → `passed: true` and effects from API
+- [ ] **Pattern A**: Score review with `Math.round(avgScore) >= 100` → gold confetti, not green
+- [ ] **Pattern B**: Matching/Listening/Definition complete with score 100 → `effects.confettiVariant === 'perfect'` → gold confetti
+- [ ] Score 99 (rounds to 99) and 99.5 (rounds to 100) → confirm the `Math.round` boundary matches web
+- [ ] Roleplay per-turn confetti during the drill stays green regardless of score — only end-of-drill/review confetti turns gold
 - [ ] Physical device: audio with silent switch (iOS) per product rules
 - [ ] Unmount completion screen → sound unloaded
 - [ ] Weekly challenge complete → no crash when `effects` missing

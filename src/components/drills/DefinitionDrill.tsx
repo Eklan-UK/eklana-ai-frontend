@@ -18,6 +18,7 @@ import {
 } from "@/lib/drill/drill-checkpoint";
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
+import type { DrillConfettiVariant } from "@/lib/drill-celebration";
 
 interface DefinitionDrillProps {
   drill: any;
@@ -37,6 +38,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
   const [isCompleted, setIsCompleted] = useState(false);
   const [completionScore, setCompletionScore] = useState(0);
   const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
+  const [confettiVariant, setConfettiVariant] = useState<DrillConfettiVariant>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
@@ -206,6 +208,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
       });
 
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+      setConfettiVariant(result.data?.effects?.confettiVariant);
 
       void clearCheckpoint(String(drill._id), assignmentId);
       localProgress.clear();
@@ -262,6 +265,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
         drillType="definition"
         celebrate={completionScore >= 70}
         celebrationSoundUrl={celebrationSoundUrl}
+        confettiVariant={confettiVariant}
       />
     );
   }

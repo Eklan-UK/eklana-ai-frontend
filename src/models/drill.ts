@@ -414,6 +414,11 @@ export interface IDrill extends Document {
    * Empty string = fall back to drill tts_voice_key / system default.
    */
   ai_character_voice_keys?: string[];
+  /**
+   * Parallel to ai_character_names: avatar URL per AI character.
+   * Empty string / missing = Bot/initials fallback in roleplay UI.
+   */
+  ai_character_avatars?: string[];
   /** Shown to learners on the roleplay pre-start screen before "Let's Get Started" */
   drill_intro?: string;
 
@@ -651,6 +656,13 @@ const drillSchema = new Schema<IDrill>(
       default: [],
       description:
         "Accent/gender key per AI character (parallel to ai_character_names); empty = drill tts_voice_key",
+    },
+
+    ai_character_avatars: {
+      type: [String],
+      default: [],
+      description:
+        "Avatar URL per AI character (parallel to ai_character_names); empty = Bot/initials fallback",
     },
 
     drill_intro: {

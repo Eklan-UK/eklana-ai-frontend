@@ -1,6 +1,12 @@
 import { unlockAudioContext } from "@/lib/ios-audio-utils";
-import { triggerDrillEndConfetti } from "@/lib/drill-celebration";
+import { triggerDrillEndConfetti, type DrillConfettiVariant } from "@/lib/drill-celebration";
 import { getClientCelebrationSoundUrl } from "@/lib/drill/celebration-sound-url";
+
+export type { DrillConfettiVariant } from "@/lib/drill-celebration";
+
+export type PlayDrillEndCelebrationOptions = {
+  confettiVariant?: DrillConfettiVariant;
+};
 
 export type PracticeFeedbackKind = "success" | "failure" | "neutral";
 
@@ -108,10 +114,13 @@ async function playCelebrationSound(soundUrl?: string): Promise<void> {
 }
 
 /** End-of-drill pass: celebration MP3, haptics, and confetti. */
-export function playDrillEndCelebration(soundUrl?: string): void {
+export function playDrillEndCelebration(
+  soundUrl?: string,
+  options?: PlayDrillEndCelebrationOptions,
+): void {
   triggerHaptic("success");
   void playCelebrationSound(soundUrl);
-  triggerDrillEndConfetti();
+  triggerDrillEndConfetti(options?.confettiVariant ?? "pass");
 }
 
 export function playDrillEndFailure(): void {

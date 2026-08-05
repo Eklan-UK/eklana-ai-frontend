@@ -135,6 +135,8 @@ export default function FillBlankDrill({
 
   useDrillScoreCelebration(
     submittedResults === null ? null : submittedResults.passed,
+    undefined,
+    submittedResults?.score,
   );
 
   // Parse sentence to extract blank positions

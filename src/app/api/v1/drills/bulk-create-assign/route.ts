@@ -104,6 +104,9 @@ function mapContentFields(
       const storedVoices = Array.isArray(content.ai_character_voice_keys)
         ? content.ai_character_voice_keys
         : [];
+      const storedAvatars = Array.isArray(content.ai_character_avatars)
+        ? content.ai_character_avatars
+        : [];
       return {
         roleplay_scenes: normalizeRoleplayScenes(
           content.roleplay_scenes ?? [],
@@ -114,6 +117,9 @@ function mapContentFields(
         ai_character_names: aiCharacterNames,
         ai_character_voice_keys: aiCharacterNames.map(
           (_: string, i: number) => storedVoices[i] ?? ""
+        ),
+        ai_character_avatars: aiCharacterNames.map(
+          (_: string, i: number) => storedAvatars[i] ?? ""
         ),
         drill_intro: content.drill_intro ?? "",
       };

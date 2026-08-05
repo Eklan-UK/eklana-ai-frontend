@@ -68,6 +68,12 @@ export function applyParsedContentToDraft(
           next.aiCharacterVoiceKeys = next.aiCharacterNames.map(
             (_, i) => storedVoices[i] ?? "",
           );
+          const storedAvatars = Array.isArray(first.ai_character_avatars)
+            ? (first.ai_character_avatars as string[])
+            : [];
+          next.aiCharacterAvatars = next.aiCharacterNames.map(
+            (_, i) => storedAvatars[i] ?? "",
+          );
         }
         if (first.context) next.context = String(first.context);
         if (first.drill_intro) next.drillIntro = String(first.drill_intro);
@@ -385,6 +391,9 @@ export function buildDrillPayloadFromDraft(
     payload.ai_character_voice_keys = draft.aiCharacterNames.map(
       (_, i) => (draft.aiCharacterVoiceKeys[i] ?? "").trim(),
     );
+    payload.ai_character_avatars = draft.aiCharacterNames.map(
+      (_, i) => (draft.aiCharacterAvatars?.[i] ?? "").trim(),
+    );
     payload.drill_intro = draft.drillIntro.trim();
   } else if (drillType === "matching") {
     payload.matching_pairs = draft.matchingPairs
@@ -448,6 +457,7 @@ export function buildBulkContentFromDraft(draft: DrillDraft): Record<string, unk
         student_character_name: payload.student_character_name,
         ai_character_names: payload.ai_character_names,
         ai_character_voice_keys: payload.ai_character_voice_keys,
+        ai_character_avatars: payload.ai_character_avatars,
         drill_intro: payload.drill_intro,
         context: draft.context,
       };

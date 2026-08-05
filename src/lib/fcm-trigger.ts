@@ -477,12 +477,12 @@ export const getNotificationTemplate = (
       body: "Keep your streak going — your drills are waiting",
     },
     [NotificationType.WEEKLY_DRILL_DIGEST]: {
-      title: "Your new drills are ready",
-      body: "You have new drills this week. Open your plan to get started.",
+      title: "Your Outstanding Drills",
+      body: "You have outstanding drills. Open your plan to get started.",
     },
     [NotificationType.WEEKLY_CHALLENGE_READY]: {
       title: "Your weekly challenge is ready",
-      body: "Personalized drills based on your practice this week. Start your challenge now.",
+      body: "Personalized drills based on your practice over the past 7 days. Start your challenge now.",
     },
   };
 

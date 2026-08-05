@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout, CheckpointScreen } from "./shared";
+import type { DrillConfettiVariant } from "@/lib/drill-celebration";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 import {
@@ -124,6 +125,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
   const [incorrectAttempts, setIncorrectAttempts] = useState<Set<string>>(new Set());
   const [isCompleted, setIsCompleted] = useState(false);
   const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
+  const [confettiVariant, setConfettiVariant] = useState<DrillConfettiVariant>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [showCheckpoint, setShowCheckpoint] = useState(false);
@@ -436,6 +438,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
       });
 
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+      setConfettiVariant(result.data?.effects?.confettiVariant);
 
       void clearCheckpoint(String(drill._id), assignmentId);
       localProgress.clear();
@@ -488,6 +491,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         drillType="matching"
         celebrate
         celebrationSoundUrl={celebrationSoundUrl}
+        confettiVariant={confettiVariant}
       />
     );
   }

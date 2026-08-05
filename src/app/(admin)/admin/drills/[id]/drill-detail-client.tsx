@@ -298,6 +298,41 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Roleplay Scenes ({drill.roleplay_scenes.length})
               </h2>
+              {Array.isArray(drill.ai_character_names) &&
+                drill.ai_character_names.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-3">
+                    {drill.ai_character_names.map(
+                      (name: string, idx: number) => {
+                        const avatarUrl =
+                          Array.isArray(drill.ai_character_avatars)
+                            ? drill.ai_character_avatars[idx]
+                            : undefined;
+                        return (
+                          <div
+                            key={idx}
+                            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1.5"
+                          >
+                            {avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatarUrl}
+                                alt=""
+                                className="h-7 w-7 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-600">
+                                {(name || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                            <span className="text-sm font-medium text-gray-800">
+                              {name || `AI ${idx + 1}`}
+                            </span>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
               <div className="space-y-4">
                 {drill.roleplay_scenes.map((scene: any, idx: number) => (
                   <div

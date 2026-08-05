@@ -9,7 +9,11 @@ import Drill from '@/models/drill';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import User from '@/models/user';
 import UserStreak from '@/models/user-streak';
-import { toUserIdCandidates } from '@/lib/api/user-id';
+import {
+  isObjectId,
+  toUserIdCandidates,
+  toUserIdQuery,
+} from '@/lib/api/user-id';
 import {
   BADGE_DEFINITIONS,
   BADGE_BY_ID,
@@ -156,28 +160,58 @@ function longestConsecutiveInSameMonth(
   };
 }
 
+/** UserStreak filter for reads (Mixed userId may be string or ObjectId). */
+function userStreakReadFilter(userId: string) {
+  return { userId: { $in: toUserIdCandidates(userId) } };
+}
+
+/** UserStreak filter for writes/upserts (canonical storage form). */
+function userStreakWriteFilter(userId: string) {
+  return { userId: toUserIdQuery(userId) };
+}
+
+/**
+ * ObjectId-only collections (DailyFocusCompletion, DrillAssignment) cannot
+ * safely query UUID learners — return null instead of throwing.
+ */
+function objectIdOnlyUserId(userId: string): Types.ObjectId | null {
+  if (!isObjectId(userId)) return null;
+  return new Types.ObjectId(userId);
+}
+
+function masterCollectorFromBookmarkCount(bookmarkCount: number): EvalResult {
+  const earned = bookmarkCount >= 1;
+  return {
+    earned,
+    progress: earned ? null : { current: 0, target: 1 },
+  };
+}
+
 async function buildPracticeSecondsByDate(
   userId: string
 ): Promise<Map<string, number>> {
-  const uid = new Types.ObjectId(userId);
   const map = new Map<string, number>();
+  const learnerFilter = { $in: toUserIdCandidates(userId) };
+  const objectIdUid = objectIdOnlyUserId(userId);
 
   const [attempts, focusCompletions] = await Promise.all([
     DrillAttempt.find({
-      learnerId: uid,
+      learnerId: learnerFilter,
       completedAt: { $exists: true, $ne: null },
       score: { $gte: PASSING_SCORE },
     })
       .select('completedAt timeSpent')
       .lean()
       .exec(),
-    DailyFocusCompletion.find({
-      userId: uid,
-      score: { $gte: PASSING_SCORE },
-    })
-      .select('dateString timeSpent')
-      .lean()
-      .exec(),
+    objectIdUid
+      ? DailyFocusCompletion.find({
+          userId: objectIdUid,
+          score: { $gte: PASSING_SCORE },
+        })
+          .select('dateString timeSpent')
+          .lean()
+          .exec()
+      : Promise.resolve([]),
   ]);
 
   for (const a of attempts) {
@@ -196,18 +230,20 @@ async function buildPracticeSecondsByDate(
 type EvalResult = { earned: boolean; progress: BadgeProgress | null };
 
 async function evaluateFirstSteps(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
+  const objectIdUid = objectIdOnlyUserId(userId);
   const [drillCount, focusCount] = await Promise.all([
     DrillAttempt.countDocuments({
-      learnerId: uid,
+      learnerId: { $in: toUserIdCandidates(userId) },
       score: { $gte: PASSING_SCORE },
       completedAt: { $exists: true, $ne: null },
     }).exec(),
-    DailyFocusCompletion.countDocuments({
-      userId: uid,
-      isFirstCompletion: true,
-      score: { $gte: PASSING_SCORE },
-    }).exec(),
+    objectIdUid
+      ? DailyFocusCompletion.countDocuments({
+          userId: objectIdUid,
+          isFirstCompletion: true,
+          score: { $gte: PASSING_SCORE },
+        }).exec()
+      : Promise.resolve(0),
   ]);
   const total = drillCount + focusCount;
   return {
@@ -230,7 +266,12 @@ async function evaluateSevenDayStretch(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateDoneAndDusted(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
+  const uid = objectIdOnlyUserId(userId);
+  if (!uid) {
+    // DrillAssignment.learnerId is ObjectId-only until a future migration.
+    return { earned: false, progress: { current: 0, target: 1 } };
+  }
+
   const { start, end } = getIsoWeekBounds();
 
   const weekAssignments = await DrillAssignment.find({
@@ -327,26 +368,12 @@ async function evaluateMasterCollector(userId: string): Promise<EvalResult> {
     .lean()
     .exec();
 
-  if (bookmarks.length === 0) {
-    return { earned: false, progress: { current: 0, target: 1 } };
-  }
-
-  const drillIds = bookmarks.map((b) => b.drillId);
-  const advancedCount = await Drill.countDocuments({
-    _id: { $in: drillIds },
-    difficulty: 'advanced',
-  }).exec();
-
-  return {
-    earned: advancedCount >= 1,
-    progress: advancedCount >= 1 ? null : { current: 0, target: 1 },
-  };
+  return masterCollectorFromBookmarkCount(bookmarks.length);
 }
 
 async function evaluateMedicationMaster(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
   const attempts = await DrillAttempt.find({
-    learnerId: uid,
+    learnerId: { $in: toUserIdCandidates(userId) },
     score: { $gte: PASSING_SCORE },
     $or: [
       { 'vocabularyResults.wordScores': { $exists: true, $ne: [] } },
@@ -380,9 +407,8 @@ async function evaluateMedicationMaster(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateHandoverHero(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
   const count = await FreeTalkAttempt.countDocuments({
-    learnerId: uid,
+    learnerId: { $in: toUserIdCandidates(userId) },
     scenarioType: 'handover',
     'gradeResult.overallScore': { $gte: PASSING_SCORE },
   }).exec();
@@ -396,7 +422,7 @@ async function evaluateHandoverHero(userId: string): Promise<EvalResult> {
 async function evaluateNightingaleAward(userId: string): Promise<EvalResult> {
   // Award if currently on Challenge, or completed a Challenge window (end date in the past
   // with start set) — keeps the badge after expiry without a separate history field.
-  const user = await User.findById(userId)
+  const user = await User.findById(toUserIdQuery(userId))
     .select('zeroPauseProducts zeroPauseDate zeroPauseEndDate')
     .lean()
     .exec();
@@ -414,7 +440,12 @@ async function evaluateNightingaleAward(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateSkillKeeper(userId: string): Promise<EvalResult> {
-  const uid = new Types.ObjectId(userId);
+  const uid = objectIdOnlyUserId(userId);
+  if (!uid) {
+    // DailyFocusCompletion.userId is ObjectId-only until a future migration.
+    return { earned: false, progress: { current: 0, target: 1 } };
+  }
+
   const count = await DailyFocusCompletion.countDocuments({
     userId: uid,
     isFirstCompletion: true,
@@ -492,13 +523,16 @@ function pickFeaturedBadge(badges: BadgeView[]): BadgeView {
 export class BadgeService {
   static async evaluateAndUnlock(userId: string): Promise<BadgeId[]> {
     await connectToDatabase();
-    const uid = new Types.ObjectId(userId);
 
-    const userStreak = await UserStreak.findOne({ userId: uid }).lean().exec();
+    const userStreak = await UserStreak.findOne(userStreakReadFilter(userId))
+      .lean()
+      .exec();
     const stored = normalizeStoredBadges((userStreak?.badges as StoredBadge[]) ?? []);
     const unlockedIds = new Set(stored.map((b) => b.badgeId));
 
     const newlyUnlocked: BadgeId[] = [];
+    const writeFilter = userStreakWriteFilter(userId);
+    let streakDocId = userStreak?._id ?? null;
 
     for (const def of BADGE_DEFINITIONS) {
       if (unlockedIds.has(def.badgeId)) continue;
@@ -513,11 +547,21 @@ export class BadgeService {
           unlockedAt: new Date(),
         };
 
-        await UserStreak.findOneAndUpdate(
-          { userId: uid },
-          { $push: { badges: newBadge } },
-          { upsert: true }
-        ).exec();
+        // Prefer updating the existing Mixed-format row when present; otherwise
+        // upsert with the canonical toUserIdQuery form.
+        if (streakDocId) {
+          await UserStreak.updateOne(
+            { _id: streakDocId },
+            { $push: { badges: newBadge } }
+          ).exec();
+        } else {
+          const upserted = await UserStreak.findOneAndUpdate(
+            writeFilter,
+            { $push: { badges: newBadge } },
+            { upsert: true, new: true }
+          ).exec();
+          streakDocId = upserted?._id ?? null;
+        }
 
         unlockedIds.add(def.badgeId);
         newlyUnlocked.push(def.badgeId);
@@ -538,9 +582,10 @@ export class BadgeService {
 
   static async getBadgeState(userId: string): Promise<BadgeStateResponse> {
     await connectToDatabase();
-    const uid = new Types.ObjectId(userId);
 
-    const userStreak = await UserStreak.findOne({ userId: uid }).lean().exec();
+    const userStreak = await UserStreak.findOne(userStreakReadFilter(userId))
+      .lean()
+      .exec();
     const storedMap = new Map(
       normalizeStoredBadges((userStreak?.badges as StoredBadge[]) ?? []).map((b) => [
         b.badgeId,
@@ -590,6 +635,10 @@ export const __test__ = {
   longestConsecutiveQualifyingDays,
   pickFeaturedBadge,
   toBadgeView,
+  masterCollectorFromBookmarkCount,
+  userStreakReadFilter,
+  userStreakWriteFilter,
+  objectIdOnlyUserId,
   MIN_PRACTICE_SECONDS,
   SEVEN_DAY_TARGET,
 };

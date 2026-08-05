@@ -33,6 +33,7 @@ import {
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { preloadTTSAudio } from "@/hooks/useTTS";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface KeyPhrasesDrillProps {
@@ -694,7 +695,12 @@ export default function KeyPhrasesDrill({
                 audioUrl={currentItem.promptAudioUrl}
                 className="shrink-0"
               />
-              <DrillBookmarkToggle drillId={String(drill._id)} />
+              <BookmarkButton
+                itemType="sentence"
+                content={currentItem.prompt}
+                context={currentItem.correctAnswer}
+                sourceDrillId={String(drill._id)}
+              />
             </div>
           </div>
         </Card>

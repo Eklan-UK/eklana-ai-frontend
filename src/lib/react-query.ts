@@ -86,6 +86,8 @@ export const queryKeys = {
   bookmarks: {
     all: ["bookmarks"] as const,
     drillStatus: () => [...queryKeys.bookmarks.all, "drill-status"] as const,
+    byType: (type?: "word" | "sentence" | "drill") =>
+      [...queryKeys.bookmarks.all, "type", type ?? "all"] as const,
   },
   weeklyChallenge: {
     all: ['weeklyChallenge'] as const,
