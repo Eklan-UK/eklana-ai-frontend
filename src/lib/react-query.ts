@@ -86,6 +86,8 @@ export const queryKeys = {
   bookmarks: {
     all: ["bookmarks"] as const,
     drillStatus: () => [...queryKeys.bookmarks.all, "drill-status"] as const,
+    byType: (type?: "word" | "sentence" | "drill") =>
+      [...queryKeys.bookmarks.all, "type", type ?? "all"] as const,
   },
   weeklyChallenge: {
     all: ['weeklyChallenge'] as const,
@@ -144,6 +146,15 @@ export const queryKeys = {
     tutorAvailability: ["tutor", "availability"] as const,
     learnerTutorAvailability: (tutorId: string) =>
       ["learner", "tutor", tutorId, "availability"] as const,
+  },
+  precisionClinic: {
+    all: ["precision-clinic"] as const,
+    lists: () => [...queryKeys.precisionClinic.all, "list"] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.precisionClinic.lists(), filters] as const,
+    details: () => [...queryKeys.precisionClinic.all, "detail"] as const,
+    detail: (id: string) =>
+      [...queryKeys.precisionClinic.details(), id] as const,
   },
 };
 

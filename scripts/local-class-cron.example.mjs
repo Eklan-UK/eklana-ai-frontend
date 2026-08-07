@@ -16,7 +16,7 @@
  *   class-session-nps             — post-class NPS email + in-app + push (every minute)
  *   drill-streak-reminder         — streak rolling nudge (every 30 min in prod)
  *   drill-daily-practice-reminder — hourly local 6 PM practice nudge (0 * * * * UTC)
- *   weekly-drill-digest           — weekly new-drill digest at Monday 09:00 UTC
+ *   weekly-drill-digest           — weekly outstanding-drills digest at Monday 09:00 UTC
  *
  * Usage:
  *   npm run dev:cron

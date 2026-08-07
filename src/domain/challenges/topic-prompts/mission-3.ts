@@ -1,5 +1,6 @@
 // Mission 3: Communication with Doctors, Families and Friends
-// TODO: replace placeholder prompt strings with real per-topic prompt copy.
+// Real per-topic prompt copy for providing_updates_doctor, doctor_rounds,
+// answering_family_questions, and discharging_patients.
 export const mission3Prompts: Record<string, {
 	pronunciation: string;
 	vocabulary: string;
@@ -1654,6 +1655,416 @@ Return only valid JSON.
 No markdown.
 No explanation.
 
+`,
+	},
+	discharging_patients: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a pronunciation drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week: {{weak_phonemes}}
+
+The student struggled with the following words this week: {{weak_words}}
+
+Generate 10 - 15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Important Requirements
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}) first.
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used during patient discharges.
+- Every word must clearly contain the target phoneme.
+- Do not repeat the same word.
+- Use vocabulary that nurses commonly pronounce while reviewing discharge instructions, medications, follow-up appointments, warning signs, home care, and answering patient questions.
+
+3. Clinical Context
+
+- Every sentence must sound like authentic communication in hospitals in {{country}}.
+- Avoid textbook examples or dictionary definitions.
+- Every sentence should naturally reflect patient discharge conversations.
+- Use realistic patient names, medications, follow-up appointments, warning signs, home arrangements, mobility instructions, or hospital procedures where appropriate.
+- The pronunciation practice should reinforce professional nursing communication rather than isolated vocabulary.
+
+4. Competency Alignment
+
+The selected words and sentences should naturally reinforce the learner's ability to:
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult medical terminology.
+- Include words from different clinical categories such as:
+  - medications
+  - follow-up care
+  - warning signs
+  - home instructions
+  - mobility and safety
+  - professional communication
+- Avoid extremely rare medical terminology unless it is directly relevant to patient discharges.
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural clinical sentence}}"
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses preparing to work in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+- Competencies: {{competencies}}
+- The student struggled with these words this week: {{fill_blank_evidence}}
+
+The goal is to strengthen the learner's clinical vocabulary while reinforcing the communication competencies required for this topic.
+
+Generate 10-15 fill-in-the-blank questions according to the following rules.
+
+1. Vocabulary Selection
+
+- Use the student's weak words: {{fill_blank_evidence}}.
+- If fewer than 10 words are provided, supplement with other vocabulary commonly used during patient discharges.
+- Every vocabulary item must be directly relevant to the topic.
+- Prioritize vocabulary that nurses actively use during discharge education, medication review, follow-up planning, safety instructions, and patient questions.
+- Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
+- Every sentence must contain enough clinical context that only one answer is correct.
+
+2. Competency Alignment
+
+The vocabulary should naturally reinforce the following competencies:
+
+{{competencies}}
+
+Every question should require vocabulary that supports one or more of these competencies.
+
+For example, vocabulary may relate to:
+
+- discharge instructions
+- medications and dosages
+- follow-up appointments
+- warning signs
+- home care and safety
+- mobility and activity restrictions
+- wound care or equipment
+- patient education
+- professional clinical terminology
+
+The competency should be demonstrated through the clinical situation rather than explicitly stated.
+
+3. Sentence Design
+
+- Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}.
+- Replace only the target vocabulary with the blank.
+- Every sentence must describe a realistic discharge situation in a hospital in {{country}}.
+- Include sufficient clinical context such as:
+  - medications
+  - follow-up appointments
+  - warning signs
+  - home arrangements
+  - activity restrictions
+  - patient questions
+  - physician orders
+- The sentence should contain enough information that only one answer is clinically appropriate.
+- Avoid dictionary-style definitions or generic example sentences.
+- The sentence should sound like something a nurse would hear, say, document, or read during discharge.
+
+4. Answer Options
+
+- Provide four answer choices.
+- Exactly one option must be correct.
+- All incorrect options must be legitimate clinical vocabulary.
+- Incorrect options should be plausible but incorrect for the specific discharge situation because of:
+  - incorrect medication instruction
+  - incorrect follow-up advice
+  - incorrect warning sign
+  - incorrect safety guidance
+  - incorrect clinical meaning
+- Do not use nonsense words.
+- Do not use synonyms of the correct answer.
+- Do not use different grammatical forms of the correct answer.
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+5. Medical Terminology
+
+- Do not use acronyms as the correct answer.
+- Always use the full clinical term.
+
+Example:
+
+Correct:
+"follow-up appointment"
+
+Incorrect:
+"F/U appointment"
+
+- Use terminology commonly used by nurses in {{country}}.
+
+6. Difficulty
+
+- Include a balanced mix of straightforward and moderately challenging questions.
+- Prioritize clinical reasoning over simple vocabulary recall.
+- Ensure the learner must understand the clinical context to identify the correct answer.
+
+7. Learning Objective
+
+The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during patient discharges while improving professional communication.
+
+- Every option must be authentic medical vocabulary.
+- The correct answer must be unambiguously correct for the specific discharge scenario.
+- Incorrect answers should be plausible but incorrect because of incorrect patient identification, discharge instruction, medication advice, follow-up planning, or clinical meaning.
+- Every sentence should reflect realistic patient discharge situations in hospitals.
+
+8. Output Format
+
+Return only valid JSON.
+
+[
+  {
+    "vocabulary": "{{term}}",
+    "sentence": "{{sentence with ______}}",
+    "correctAnswer": "{{term}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON.
+
+Do not include markdown.
+
+Do not include explanations.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a key phrases drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week: {{missed_phrases}}
+
+Generate 10 - 15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Respondent says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Important Requirements
+
+- The conversation should reflect a realistic patient discharge situation in a hospital in {{country}}.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication between nurses, patients, family members, and physicians where appropriate.
+- Every correct answer must contain at least one authentic phrase from {{missed_phrases}} whenever possible.
+
+3. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two answers that a competent nurse could realistically say.
+- The learner must identify the MOST professional, concise, patient-centred, and appropriate response for the discharge situation.
+
+- The correct answer should demonstrate one or more of the following competencies:
+
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+4. Balanced Answer Distribution
+
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+5. Learning Objective
+
+The learner's objective is to develop automatic, confident, and professional communication during patient discharges through repeated practice in realistic clinical scenarios.
+
+- Every option should sound like something a professional nurse could realistically say.
+- The correct answer must be unambiguously the best response for the specific discharge scenario.
+- Incorrect answers should be plausible but incorrect because of incomplete patient identification, insufficient explanation, unclear medication or follow-up instructions, poor sequencing of the discharge process, or missed opportunities to encourage patient questions—not because they sound unprofessional.
+- Every prompt must contain enough clinical detail that only one response is the best choice.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{who is speaking to the nurse — e.g. Patient, Family Member, Doctor, Incoming Nurse}}",
+    "prompt": "{{what they say to the nurse}}",
+    "correctAnswer": "{{the correct nursing response}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic patient discharge situations in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same communication skills in a new discharge scenario.
+- The student always plays the nurse.
+- The scenario should progress naturally from greeting the patient to reviewing discharge instructions, answering questions, and confirming the patient is ready to leave safely.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for their roles.
+Examples:
+  - Mr. David Thompson
+  - Mrs. Linda Garcia
+  - Dr. James Wilson
+  - Emily Rodriguez
+  - Sarah Chen
+- Never use role titles as names.
+- Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete, natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during discharges in hospitals in {{country}}.
+- Each scene must contain at least 6 dialogue turns.
+- The student must speak at least 3 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+5. Realism
+
+- Include realistic discharge activities such as verifying patient identity, reviewing medications and dosages, confirming follow-up appointments, explaining warning signs that require urgent care, discussing activity restrictions, confirming transportation or home support, and answering patient or family questions where appropriate.
+- Patients should naturally ask questions about medications, when to return, what symptoms to watch for, wound care, diet, mobility, or what will happen next.
+- Include natural interruptions and clarifying questions that reflect real discharge conversations.
+
+6. Learning Objective
+
+The learner's objective is to develop automatic, confident, and natural communication during patient discharges.
+
+The roleplay should encourage the learner to:
+
+- introduce themselves clearly
+- explain the discharge process clearly
+- confirm patient identity safely
+- give clear medication and follow-up instructions
+- invite and answer patient questions
+- maintain patient safety and professionalism throughout the discharge process
+
+7. Output Format
+
+Return only valid JSON.
+
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{AI Character 1}}",
+    "{{AI Character 2}}"
+  ],
+  "context": "{{Brief scenario description}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
+
+Return only valid JSON. No markdown. No explanation.
 `,
 	},
 };

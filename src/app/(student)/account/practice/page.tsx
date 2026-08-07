@@ -2,7 +2,7 @@
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
-import { ChevronRight, Lock } from "lucide-react";
+import { ChevronRight, Lock, Trophy } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -10,11 +10,13 @@ import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
+import type { ReactNode } from "react";
 
 function PracticeCard({
   href,
   iconBg,
   iconSrc,
+  icon,
   title,
   subtitle,
   meta,
@@ -25,7 +27,8 @@ function PracticeCard({
 }: {
   href: string;
   iconBg: string;
-  iconSrc: string;
+  iconSrc?: string;
+  icon?: ReactNode;
   title: string;
   subtitle: string;
   meta: string[];
@@ -45,13 +48,16 @@ function PracticeCard({
       <div
         className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
       >
-        <Image
-          src={iconSrc}
-          alt={title}
-          width={iconWidth}
-          height={iconHeight}
-          className={iconImageClassName}
-        />
+        {icon ??
+          (iconSrc ? (
+            <Image
+              src={iconSrc}
+              alt={title}
+              width={iconWidth}
+              height={iconHeight}
+              className={iconImageClassName}
+            />
+          ) : null)}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
@@ -127,7 +133,7 @@ export default function PracticePage() {
           <PracticeCard
             href="/account/practice/weekly-challenge"
             iconBg="bg-emerald-700"
-            iconSrc="/icons/logo-yellow.svg"
+            icon={<Trophy className="w-6 h-6 text-white" aria-hidden />}
             title={tWeekly("practiceCardTitle")}
             subtitle={tWeekly("practiceCardSubtitle")}
             meta={[]}

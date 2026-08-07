@@ -25,6 +25,7 @@ import {
 } from "@/lib/learning-journey/group-journey-drills";
 import { trackActivity } from "@/utils/activity-cache";
 import { toast } from "sonner";
+import { resolveRealDrillTitle } from "@/lib/drill-display-label";
 
 export default function LearningJourneyPartPage() {
   const router = useRouter();
@@ -128,7 +129,11 @@ export default function LearningJourneyPartPage() {
                       <PlanFreeTalkRow
                         key={`free-talk-${key}`}
                         scenarioId={key}
-                        title={drill?.title ?? "Free Talk"}
+                        title={
+                          resolveRealDrillTitle(drill?.title) ??
+                          topic.title ??
+                          "Free Talk"
+                        }
                         scenarioType={drill?.scenarioType ?? ""}
                         completionDate={drill?.completionDate ?? item.dueDate}
                         completedAt={item.completedAt}

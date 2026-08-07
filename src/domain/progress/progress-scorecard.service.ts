@@ -3,7 +3,7 @@
  *
  * Computes the four learner-facing metrics defined in docs/progress-scorecard.md:
  *
- *   Pronunciation = avg Speechace scores across all completed drills
+ *   Clarity (pronunciation field) = avg Speechace scores across all completed drills
  *   Accuracy      = avg score across completed key_phrases + fill_blank assigned drills
  *   Fluency       = avg overallScore across Eklan Free Talk scenarios
  *   Confidence    = avg of whichever of the three pillars have data

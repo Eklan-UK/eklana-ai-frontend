@@ -340,10 +340,12 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					],
 				},
 			],
+			// No default: a nested default here contaminated EVERY DrillAttempt.create
+			// (roleplay/key_phrases/etc.) with grammarResults.reviewStatus='pending'.
+			// Submit payloads set 'pending' only for real grammar drills.
 			reviewStatus: {
 				type: String,
 				enum: ['pending', 'reviewed'],
-				default: 'pending',
 			},
 			patternReviews: [
 				{
@@ -394,10 +396,10 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 					],
 				},
 			],
+			// No default — set only when sentence submit payload includes it.
 			reviewStatus: {
 				type: String,
 				enum: ['pending', 'reviewed'],
-				default: 'pending',
 			},
 			sentenceReviews: [
 				{
@@ -421,10 +423,10 @@ const drillAttemptSchema = new Schema<IDrillAttempt>(
 			wordCount: Number,
 			score: Number,
 			qualityScore: Number,
+			// No default — set only when summary submit payload includes it.
 			reviewStatus: {
 				type: String,
 				enum: ['pending', 'reviewed'],
-				default: 'pending',
 			},
 			review: {
 				feedback: String,

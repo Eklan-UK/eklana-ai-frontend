@@ -37,19 +37,25 @@ async function handler(
       );
     }
 
-    if (!part || !topic) {
-      return NextResponse.json(
-        { code: "ValidationError", message: "part and topic are required" },
-        { status: 400 }
-      );
-    }
-
-    const journeyPart = parseLearningJourneyPartId(part);
-    if (!journeyPart || !isValidPartTopicPair(journeyPart, String(topic))) {
-      return NextResponse.json(
-        { code: "ValidationError", message: "Invalid learning journey mission/topic pair" },
-        { status: 400 }
-      );
+    // part/topic are optional (Precision Clinic AI modal omits them). When either
+    // is provided, both must form a valid journey pair.
+    let journeyPart: ReturnType<typeof parseLearningJourneyPartId> | undefined;
+    let resolvedTopic: string | undefined;
+    if (part || topic) {
+      if (!part || !topic) {
+        return NextResponse.json(
+          { code: "ValidationError", message: "part and topic are required together" },
+          { status: 400 }
+        );
+      }
+      journeyPart = parseLearningJourneyPartId(part);
+      if (!journeyPart || !isValidPartTopicPair(journeyPart, String(topic))) {
+        return NextResponse.json(
+          { code: "ValidationError", message: "Invalid learning journey mission/topic pair" },
+          { status: 400 }
+        );
+      }
+      resolvedTopic = String(topic);
     }
 
     logger.info("Generating AI drill content", {
@@ -104,27 +110,31 @@ async function handler(
 
     const templatePromptByDrillType = new Map<string, string>();
 
-    if (topic && part) {
+    if (resolvedTopic && journeyPart != null) {
       await Promise.all(
         drillTypes.map(async (dt) => {
           try {
             await connectToDatabase();
-            const templateDoc = await PromptTemplate.findOne({ drillType: dt, topic, part }).lean();
+            const templateDoc = await PromptTemplate.findOne({
+              drillType: dt,
+              topic: resolvedTopic,
+              part: journeyPart,
+            }).lean();
             if (templateDoc) {
               templatePromptByDrillType.set(
                 dt,
                 templateDoc.template
                   .replace(/\{\{difficulty\}\}/g, difficulty ?? "intermediate")
                   .replace(/\{\{context\}\}/g, drillContext ?? "")
-                  .replace(/\{\{topic\}\}/g, topic)
-                  .replace(/\{\{part\}\}/g, part)
+                  .replace(/\{\{topic\}\}/g, resolvedTopic)
+                  .replace(/\{\{part\}\}/g, String(journeyPart))
               );
             }
           } catch (templateErr: any) {
             logger.warn("Failed to fetch prompt template", {
               drillType: dt,
-              topic,
-              part,
+              topic: resolvedTopic,
+              part: journeyPart,
               error: templateErr.message,
             });
           }
@@ -134,8 +144,8 @@ async function handler(
 
     let competencyFramework: string | undefined;
 
-    if (topic) {
-      const competencies = getCompetenciesForTopic(String(topic));
+    if (resolvedTopic) {
+      const competencies = getCompetenciesForTopic(resolvedTopic);
       if (competencies && competencies.length > 0) {
         competencyFramework =
           "Competency framework for this topic:\n" +
@@ -193,8 +203,8 @@ async function handler(
           difficulty: difficulty ?? "intermediate",
           context: drillContext ?? "",
           prompt,
-          topic,
-          part,
+          topic: resolvedTopic,
+          part: journeyPart != null ? String(journeyPart) : undefined,
           studentContext,
           drillWeaknesses,
           templatePrompt: templatePromptByDrillType.get(dt),

@@ -103,7 +103,7 @@ The entire Assigned Drills + tabs block is **gone**. Bookmarked drills now live 
 
 #### Unchanged
 
-- **Your Progress** heading and metric cards (Confidence, Pronunciation, Accurate Sentence, Response Speed)
+- **Your Progress** heading and metric cards (Confidence, Clarity, Accurate Sentence, Response Speed)
 - **Assigned Drills** section below Saved Drills — still shows top **4** active/incomplete drills with "See all" link to My Plans
 - Today's Focus, greeting header, push notification prompt, bottom nav
 
@@ -268,13 +268,13 @@ When navigating to My Plans with deep link / hash `#saved-drills`, the section *
 │  ┌─ PlanDrillRow ────────────────────┐  │
 │  └───────────────────────────────────┘  │
 │                                         │
-│  Follow-up with Patients                │  ← topic heading
+│  Admitting a Patient                    │  ← topic heading
 │  ┌───────────────────────────────────┐  │
 │  │ No drills assigned for this topic   │  │
 │  │ yet.                              │  │
 │  └───────────────────────────────────┘  │
 │                                         │
-│  Admitting a Patient                    │
+│  Follow-up with Patients                │
 │  ...                                    │
 │                                         │
 ├─────────────────────────────────────────┤
@@ -621,8 +621,8 @@ Summary card for one Mission on My Plans.
 | Order | Topic ID | Title | Free Talk scenario type |
 |---|---|---|---|
 | 1 | `handling_emergency_critical` | Handling Emergency/Critical Situation | `icu_emergency` |
-| 2 | `patient_follow_up` | Follow-up with Patients | `patient_follow_up` |
-| 3 | `admitting_patient` | Admitting a Patient | `admission` |
+| 2 | `admitting_patient` | Admitting a Patient | `admission` |
+| 3 | `patient_follow_up` | Follow-up with Patients | `patient_follow_up` |
 | 4 | `small_talk_patient` | Small Talk with a Patient | `small_talk_patient` |
 
 #### Mission 2: Communication with Colleagues
@@ -641,6 +641,7 @@ Summary card for one Mission on My Plans.
 | 1 | `providing_updates_doctor` | Providing Updates to a Doctor | `phone_doctor` |
 | 2 | `doctor_rounds` | Going on Rounds with Doctors | `doctor_rounds` |
 | 3 | `answering_family_questions` | Answering Families and Friend's Questions | `family_questions` |
+| 4 | `discharging_patients` | Discharging Patients | `discharge` |
 
 #### Mission 4: Interview Preparation
 
@@ -663,8 +664,7 @@ Summary card for one Mission on My Plans.
 | 2 | `phone_other_departments` | Phone Communication with Other Departments | `phone_department` |
 | 3 | `phone_patient_families` | Phone Communication with the Patient's Families | `phone_family` |
 | 4 | `conducting_cpr` | Conducting CPR | `cpr` |
-| 5 | `discharging_patients` | Discharging Patients | `discharge` |
-| 6 | `grammar` | Grammar | `grammar` |
+| 5 | `grammar` | Grammar | `grammar` |
 
 #### Drill-to-topic mapping (server-side fields)
 
@@ -1369,8 +1369,8 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
     title: "Communication with Patients",
     topics: [
       { id: "handling_emergency_critical", title: "Handling Emergency/Critical Situation", order: 1, freeTalkScenarioType: "icu_emergency" },
-      { id: "patient_follow_up",           title: "Follow-up with Patients",               order: 2, freeTalkScenarioType: "patient_follow_up" },
-      { id: "admitting_patient",           title: "Admitting a Patient",                   order: 3, freeTalkScenarioType: "admission" },
+      { id: "admitting_patient",           title: "Admitting a Patient",                   order: 2, freeTalkScenarioType: "admission" },
+      { id: "patient_follow_up",           title: "Follow-up with Patients",               order: 3, freeTalkScenarioType: "patient_follow_up" },
       { id: "small_talk_patient",          title: "Small Talk with a Patient",             order: 4, freeTalkScenarioType: "small_talk_patient" },
     ],
   },
@@ -1391,6 +1391,7 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
       { id: "providing_updates_doctor",  title: "Providing Updates to a Doctor",               order: 1, freeTalkScenarioType: "phone_doctor" },
       { id: "doctor_rounds",             title: "Going on Rounds with Doctors",                order: 2, freeTalkScenarioType: "doctor_rounds" },
       { id: "answering_family_questions",title: "Answering Families and Friend's Questions",   order: 3, freeTalkScenarioType: "family_questions" },
+      { id: "discharging_patients",      title: "Discharging Patients",                        order: 4, freeTalkScenarioType: "discharge" },
     ],
   },
   {
@@ -1415,8 +1416,7 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
       { id: "phone_other_departments",title: "Phone Communication with Other Departments",           order: 2, freeTalkScenarioType: "phone_department" },
       { id: "phone_patient_families", title: "Phone Communication with the Patient's Families",      order: 3, freeTalkScenarioType: "phone_family" },
       { id: "conducting_cpr",         title: "Conducting CPR",                                        order: 4, freeTalkScenarioType: "cpr" },
-      { id: "discharging_patients",   title: "Discharging Patients",                                  order: 5, freeTalkScenarioType: "discharge" },
-      { id: "grammar",                title: "Grammar",                                              order: 6, freeTalkScenarioType: "grammar" },
+      { id: "grammar",                title: "Grammar",                                              order: 5, freeTalkScenarioType: "grammar" },
     ],
   },
 ];

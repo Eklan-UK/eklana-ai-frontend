@@ -24,6 +24,8 @@ export interface AIGenerationFormValues {
   journeyTopic: string;
   context: string;
   prompt: string;
+  /** Optional title applied to generated draft(s); kept for persisted form state. */
+  drillTitle?: string;
 }
 
 export type AIGenerationFormScalarField = Exclude<
@@ -56,7 +58,7 @@ interface AIGenerationFormProps {
 }
 
 const selectClass =
-  "w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20";
+  "w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-background dark:border-border dark:text-foreground";
 
 function AiStudentMultiSelect({
   students,
@@ -117,14 +119,14 @@ function AiStudentMultiSelect({
           {selectedStudents.map((s) => (
             <span
               key={s.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
             >
               {s.label}
               <button
                 type="button"
                 onClick={() => toggleStudent(s.id)}
                 disabled={disabled}
-                className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50"
+                className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50 dark:text-emerald-400 dark:hover:text-emerald-200"
                 aria-label={`Remove ${s.label}`}
               >
                 <X className="w-3 h-3" />
@@ -142,7 +144,7 @@ function AiStudentMultiSelect({
           onChange={(e) => setSearch(e.target.value)}
           disabled={loading || disabled}
           placeholder="Search students by name or email…"
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-background dark:text-foreground"
         />
       </div>
 
@@ -155,8 +157,8 @@ function AiStudentMultiSelect({
           No students match your search.
         </p>
       ) : (
-        <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50">
-          <label className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-white sticky top-0 cursor-pointer">
+        <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 dark:border-border dark:bg-muted/30">
+          <label className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-white sticky top-0 cursor-pointer dark:border-border dark:bg-card">
             <input
               type="checkbox"
               checked={allFilteredSelected}
@@ -164,19 +166,19 @@ function AiStudentMultiSelect({
               disabled={disabled}
               className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
             />
-            <span className="text-xs font-medium text-gray-600">
+            <span className="text-xs font-medium text-gray-600 dark:text-muted-foreground">
               {search.trim()
                 ? `Select all shown (${filteredStudents.length})`
                 : "Select all students"}
             </span>
           </label>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-border">
             {filteredStudents.map((student) => {
               const isSelected = selectedSet.has(student.id);
               return (
                 <label
                   key={student.id}
-                  className={`flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-white ${
+                  className={`flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-white dark:hover:bg-muted ${
                     !isSelected ? "opacity-70" : ""
                   }`}
                 >
@@ -188,11 +190,11 @@ function AiStudentMultiSelect({
                     className="w-4 h-4 mt-0.5 rounded text-emerald-600 accent-emerald-600 shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-gray-900 truncate dark:text-foreground">
                       {student.label}
                     </p>
                     {student.email && (
-                      <p className="text-xs text-gray-400 truncate">
+                      <p className="text-xs text-gray-400 truncate dark:text-muted-foreground">
                         {student.email}
                       </p>
                     )}
@@ -284,14 +286,14 @@ function AiDrillTypeMultiSelect({
           {AI_DRILL_TYPES.filter((t) => selectedSet.has(t.value)).map((t) => (
             <span
               key={t.value}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-medium rounded-lg border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
             >
               {t.label}
               <button
                 type="button"
                 onClick={() => toggleType(t.value)}
                 disabled={disabled}
-                className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50"
+                className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50 dark:text-emerald-400 dark:hover:text-emerald-200"
                 aria-label={`Remove ${t.label}`}
               >
                 <X className="w-3 h-3" />
@@ -302,8 +304,8 @@ function AiDrillTypeMultiSelect({
       )}
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          <label className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 sticky top-0 cursor-pointer">
+        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-border dark:bg-card">
+          <label className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50 sticky top-0 cursor-pointer dark:border-border dark:bg-muted">
             <input
               type="checkbox"
               checked={allSelected}
@@ -311,17 +313,17 @@ function AiDrillTypeMultiSelect({
               disabled={disabled}
               className="w-4 h-4 rounded text-emerald-600 accent-emerald-600"
             />
-            <span className="text-xs font-medium text-gray-600">
+            <span className="text-xs font-medium text-gray-600 dark:text-muted-foreground">
               Select all types
             </span>
           </label>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-border">
             {AI_DRILL_TYPES.map((t) => {
               const isSelected = selectedSet.has(t.value);
               return (
                 <label
                   key={t.value}
-                  className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${
+                  className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-muted ${
                     !isSelected ? "opacity-80" : ""
                   }`}
                 >
@@ -332,7 +334,7 @@ function AiDrillTypeMultiSelect({
                     disabled={disabled}
                     className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 shrink-0"
                   />
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-gray-900 dark:text-foreground">
                     {t.label}
                   </span>
                 </label>
@@ -383,7 +385,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
   const fields = (
     <div className="space-y-4">
       <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+        <Label className="block text-xs font-bold text-gray-600 dark:text-muted-foreground mb-1.5">
           Students <span className="text-red-500">*</span>
         </Label>
         {isStudentLocked ? (
@@ -416,7 +418,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
       </div>
 
       <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+        <Label className="block text-xs font-bold text-gray-600 dark:text-muted-foreground mb-1.5">
           Drill Types <span className="text-red-500">*</span>
         </Label>
         <AiDrillTypeMultiSelect
@@ -427,7 +429,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
       </div>
 
       <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+        <Label className="block text-xs font-bold text-gray-600 dark:text-muted-foreground mb-1.5">
           Difficulty <span className="text-red-500">*</span>
         </Label>
         <select
@@ -461,7 +463,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
       />
 
       <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+        <Label className="block text-xs font-bold text-gray-600 dark:text-muted-foreground mb-1.5">
           Context / Scenario <span className="text-red-500">*</span>
         </Label>
         <Textarea
@@ -479,7 +481,7 @@ export const AIGenerationForm: React.FC<AIGenerationFormProps> = ({
       </div>
 
       <div>
-        <Label className="block text-xs font-bold text-gray-600 mb-1.5">
+        <Label className="block text-xs font-bold text-gray-600 dark:text-muted-foreground mb-1.5">
           Prompt <span className="text-red-500">*</span>
         </Label>
         <Textarea

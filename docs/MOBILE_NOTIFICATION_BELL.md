@@ -452,7 +452,7 @@ Weekly challenge paths use `encodeURIComponent(weekStartDate)` on the server —
 | `achievement` | Achievement Unlocked! 🏆 | Badge earned | `Achievements` | `/account/achievements` |
 | `class_session_reminder` | Class starts in N minutes | Class cron | `Classes` | `/account/classes` |
 | `class_nps_form` | How was your class? | Post-class NPS email cron | `NpsForm` | External form URL |
-| `weekly_drill_digest` | Your new drills are ready | Weekly digest cron | `MyPlan` | `/account/drills` |
+| `weekly_drill_digest` | Your Outstanding Drills | Weekly digest cron | `MyPlan` | `/account/drills` |
 | `weekly_challenge_ready` | Your weekly challenge is ready | Challenge generation | `WeeklyChallenge` | `/account/practice/weekly-challenge/{encodedWeekStart}` |
 | `system` | (varies) | Admin announcement | `Notifications` | custom or `/account/notifications` |
 

@@ -14,6 +14,10 @@ export interface ParsedQueryParams {
   isBookmarked?: boolean;
   learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
   learningJourneyTopic?: string;
+  /** Only return drills tagged with this source (currently only 'precision_clinic'). */
+  source?: 'precision_clinic';
+  /** Exclude drills tagged with this source (e.g. hide Precision Clinic drills from other drill surfaces). */
+  excludeSource?: 'precision_clinic';
   [key: string]: any;
 }
 
@@ -69,6 +73,16 @@ export const parseQueryParams = (req: NextRequest): ParsedQueryParams => {
     if (part === 1 || part === 2 || part === 3 || part === 4 || part === 5) {
       params.learningJourneyPart = part;
     }
+  }
+
+  const source = searchParams.get('source');
+  if (source === 'precision_clinic') {
+    params.source = source;
+  }
+
+  const excludeSource = searchParams.get('excludeSource');
+  if (excludeSource === 'precision_clinic') {
+    params.excludeSource = excludeSource;
   }
   
   return params;

@@ -45,8 +45,68 @@ import {
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
+import { useAuthStore } from "@/store/auth-store";
+import { getUserInitials } from "@/utils/user";
+
+/** Avatar URL for an AI dialogue speaker (`ai_N` → avatars[N]); empty/missing → undefined. */
+function resolveTurnAvatarUrl(
+  speaker: string,
+  avatars?: string[],
+): string | undefined {
+  const aiMatch = /^ai_(\d+)$/.exec(speaker);
+  if (!aiMatch || !Array.isArray(avatars)) return undefined;
+  const url = avatars[Number(aiMatch[1])]?.trim();
+  return url || undefined;
+}
+
+function RoleplayAvatarChip({
+  imageUrl,
+  initials,
+  fallback = "bot",
+  size = "sm",
+  className = "",
+}: {
+  imageUrl?: string | null;
+  initials?: string;
+  fallback?: "bot" | "user";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const dim =
+    size === "lg" ? "w-20 h-20" : size === "md" ? "w-10 h-10" : "w-6 h-6";
+  const iconClass =
+    size === "lg" ? "w-10 h-10" : size === "md" ? "w-5 h-5" : "w-3 h-3";
+
+  if (imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageUrl}
+        alt=""
+        className={`${dim} rounded-full object-cover shrink-0 ${className}`}
+      />
+    );
+  }
+
+  if (fallback === "user" && initials) {
+    return (
+      <span
+        className={`${dim} rounded-full bg-white/25 flex items-center justify-center text-[10px] font-bold shrink-0 ${className}`}
+        aria-hidden
+      >
+        {initials}
+      </span>
+    );
+  }
+
+  if (fallback === "user") {
+    return <User className={`${iconClass} shrink-0 ${className}`} />;
+  }
+
+  return <Bot className={`${iconClass} shrink-0 ${className}`} />;
+}
 
 interface RoleplayDrillProps {
   drill: any;
@@ -172,6 +232,9 @@ export default function RoleplayDrill({
   weeklyChallengeMeta,
 }: RoleplayDrillProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const studentAvatarUrl = user?.avatar || user?.image || undefined;
+  const studentInitials = getUserInitials(user);
   const localProgress = useLocalDrillProgress({
     drillId: String(drill._id ?? weeklyChallengeMeta?.challengeId ?? "roleplay"),
     drillType: "roleplay",
@@ -300,6 +363,10 @@ export default function RoleplayDrill({
     },
     [drill.ai_character_voice_keys, drill.tts_voice_key],
   );
+
+  const aiCharacterAvatars = Array.isArray(drill.ai_character_avatars)
+    ? (drill.ai_character_avatars as string[])
+    : undefined;
 
   const currentTurn = dialogue[currentTurnIndex];
 
@@ -1145,9 +1212,13 @@ export default function RoleplayDrill({
         ]);
 
         if (passed) {
-          playPracticeFeedback("success");
-          // Trigger confetti celebration
-          triggerConfetti();
+          if (Math.round(score) >= 100) {
+            playPerfectItemCelebration();
+          } else {
+            playPracticeFeedback("success");
+            // Trigger confetti celebration
+            triggerConfetti();
+          }
           toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
         } else {
           playPracticeFeedback("failure");
@@ -1653,9 +1724,22 @@ export default function RoleplayDrill({
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {isUserMessage ? (
-                        <User className="w-3 h-3" />
+                        <RoleplayAvatarChip
+                          imageUrl={studentAvatarUrl}
+                          initials={studentInitials}
+                          fallback="user"
+                          size="sm"
+                          className="ring-1 ring-white/30"
+                        />
                       ) : (
-                        <Bot className="w-3 h-3" />
+                        <RoleplayAvatarChip
+                          imageUrl={resolveTurnAvatarUrl(
+                            message.speaker,
+                            aiCharacterAvatars,
+                          )}
+                          fallback="bot"
+                          size="sm"
+                        />
                       )}
                       <span className="text-xs font-semibold opacity-90">
                         {displayName}
@@ -1686,14 +1770,49 @@ export default function RoleplayDrill({
           {/* AI Turn - Show loading/playing state */}
           {isAITurn && (
             <div className="text-center py-8">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center mb-4">
-                {isTTSGenerating ? (
-                  <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-                ) : isPlayingAI || isTTSPlaying ? (
-                  <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
-                ) : (
-                  <Bot className="w-10 h-10 text-blue-600" />
-                )}
+              <div className="w-20 h-20 mx-auto mb-4 relative">
+                {(() => {
+                  const partnerAvatar = resolveTurnAvatarUrl(
+                    currentTurn.speaker,
+                    aiCharacterAvatars,
+                  );
+                  if (isTTSGenerating) {
+                    return (
+                      <div className="w-20 h-20 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center">
+                        <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+                      </div>
+                    );
+                  }
+                  if (isPlayingAI || isTTSPlaying) {
+                    return partnerAvatar ? (
+                      <div className="relative w-20 h-20">
+                        <RoleplayAvatarChip
+                          imageUrl={partnerAvatar}
+                          fallback="bot"
+                          size="lg"
+                          className="ring-2 ring-blue-400/50"
+                        />
+                        <Volume2 className="w-5 h-5 text-blue-600 absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5 animate-pulse" />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center">
+                        <Volume2 className="w-10 h-10 text-blue-600 animate-pulse" />
+                      </div>
+                    );
+                  }
+                  return partnerAvatar ? (
+                    <RoleplayAvatarChip
+                      imageUrl={partnerAvatar}
+                      fallback="bot"
+                      size="lg"
+                      className="ring-2 ring-sky-200 mx-auto"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 rounded-full flex items-center justify-center">
+                      <Bot className="w-10 h-10 text-blue-600" />
+                    </div>
+                  );
+                })()}
               </div>
               <p className="text-lg font-semibold text-foreground mb-2">
                 {getSpeakerName(currentTurn.speaker)} is speaking...
@@ -1712,7 +1831,14 @@ export default function RoleplayDrill({
             <div className="py-6">
               {/* Character Label */}
               <div className="text-center mb-4">
-                <div className="inline-flex items-center gap-2 px-1 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                <div className="inline-flex items-center gap-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                  <RoleplayAvatarChip
+                    imageUrl={studentAvatarUrl}
+                    initials={studentInitials}
+                    fallback="user"
+                    size="sm"
+                    className="bg-emerald-600/20 text-emerald-800"
+                  />
                   Your turn !
                   {roleMode === "swapped" && (
                     <span className="ml-1 px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">

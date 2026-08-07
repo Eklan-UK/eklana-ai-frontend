@@ -13,7 +13,7 @@ Achievement badges learners unlock through practice, consistency, and drill mile
 | 3 | Done & Dusted | 🏆 | Complete all drills for the week |
 | 4 | Déjà Vu | 🔭 | Practise a difficult drill at least 10 times |
 | 5 | Monthly Challenge | 📅 | Practise for at least 5 minutes every day for 14 consecutive days within a single month |
-| 6 | Master Collector | 📚 | Save difficult drills to revisit and master later |
+| 6 | Master Collector | 📚 | Save a drill to revisit and master later |
 | 7 | Medication Master | 💊 | Correctly practise 50 medication names and explanations |
 | 8 | Handover Hero | 📋 | Complete handover drills |
 | 9 | Nightingale Award | 👑 | Complete Zero Pause Challenge |
@@ -65,6 +65,8 @@ Achievement badges learners unlock through practice, consistency, and drill mile
 - **Outcome description:** You've earned this award for practising a difficult drill at least 10 times.
 - **Humorous line:** If this drill could talk, it would know your voice by now.
 
+**Implementation note:** “Difficult” means a drill the learner has bookmarked (`type: 'drill'`) **or** a drill with `difficulty === 'advanced'`. Passes on either surface count toward the 10-attempt target.
+
 ---
 
 ### 5. Monthly Challenge 📅
@@ -80,12 +82,12 @@ Achievement badges learners unlock through practice, consistency, and drill mile
 
 ### 6. Master Collector 📚
 
-**Before completion:** You earn this award for saving difficult drills to revisit and master later.
+**Before completion:** You earn this award for saving a drill to revisit and master later.
 
 **After completion**
 
-- **Outcome description:** You've earned this award for saving difficult drills to revisit and master later.
-- **Humorous line:** This difficult drill is already getting nervous. We love seeing it.
+- **Outcome description:** You've earned this award for saving a drill to revisit and master later.
+- **Humorous line:** This drill is already getting nervous. We love seeing it.
 
 ---
 
@@ -120,6 +122,8 @@ Achievement badges learners unlock through practice, consistency, and drill mile
 - **Outcome description:** You've earned this award for completing Zero Pause Challenge.
 - **Humorous line:** Florence is looking down on you and smiling.
 
+**Implementation note:** Also awarded when the learner has a completed Challenge window (`zeroPauseDate` set and `zeroPauseEndDate` in the past), so the badge remains after the Challenge period ends.
+
 ---
 
 ### 10. Skill Keeper 🔄
@@ -142,12 +146,12 @@ Technical unlock criteria used by [`src/domain/badges/badge.service.ts`](../src/
 | `first-steps` | ≥1 passing drill attempt (`score >= 70`) or first daily-focus completion (`score >= 70`) |
 | `seven-day-stretch` | 7 consecutive UTC days with ≥5 minutes practice (sum of drill `timeSpent` + daily-focus `timeSpent` per day) |
 | `done-and-dusted` | All drill assignments with `dueDate` in the current ISO week (Mon–Sun UTC) have `status === 'completed'` |
-| `deja-vu` | ≥10 passing attempts on the same drill where `difficulty === 'advanced'` or the drill is bookmarked |
+| `deja-vu` | ≥10 passing attempts on the same drill that is bookmarked (`type: 'drill'`) **or** has `difficulty === 'advanced'` |
 | `monthly-challenge` | 14 consecutive UTC days within the same calendar month with ≥5 minutes practice per day |
-| `master-collector` | ≥1 bookmarked drill where drill `difficulty === 'advanced'` |
+| `master-collector` | ≥1 learner bookmark with `type: 'drill'` (any difficulty) |
 | `medication-master` | 50 unique vocabulary/definition words with per-word `score >= 70` across drill attempts |
 | `handover-hero` | ≥1 free-talk attempt with `scenarioType === 'handover'` and `gradeResult.overallScore >= 70` |
-| `nightingale-award` | User `zeroPauseProducts` includes `'challenge'` |
+| `nightingale-award` | User `zeroPauseProducts` includes `'challenge'`, **or** completed Challenge window (`zeroPauseDate` set and `zeroPauseEndDate` in the past) |
 | `skill-keeper` | ≥1 daily-focus first completion with `score >= 70` |
 
 **API:** `GET /api/v1/badges` — returns all badges, progress, and `featuredBadge` (most recently unlocked, or first locked).

@@ -290,10 +290,10 @@ The `sentence` field description explicitly states: *"The sentence MUST contain 
 ```ts
 {
   key_phrase_items: Array<{
-    prompt: string;
-    respondentName: string;
+    prompt: string;            // Situation / Scenario text
     options: string[];
-    correctAnswer: string;   // must exactly match one entry in options[]
+    correctAnswer: string;     // must exactly match one entry in options[]
+    respondentName?: string;   // deprecated; optional for legacy payloads only
   }>
 }
 ```
@@ -338,7 +338,7 @@ The Excel/CSV import parser (`POST /api/v1/drills/parse-document`) was updated a
 | `grammar` | Pattern, Hint, Example |
 | `sentence_writing` | Word, Hint |
 | `fill_blank` | Context, Sentence, Correct Answer, Option 2, Option 3, Hint |
-| `key_phrases` | Prompt, Respondent, Option 1–4, Correct Answer |
+| `key_phrases` | Prompt, Correct Answer, Option 2–3 |
 | `summary` | Title, Content |
 
 ---
