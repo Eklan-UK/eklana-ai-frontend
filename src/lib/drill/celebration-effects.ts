@@ -1,4 +1,7 @@
-import { getCelebrationSoundUrl } from '@/lib/drill/celebration-sound-url';
+import {
+  getCelebrationSoundUrl,
+  getPerfectCelebrationSoundUrl,
+} from '@/lib/drill/celebration-sound-url';
 
 export { getCelebrationSoundUrl } from '@/lib/drill/celebration-sound-url';
 
@@ -10,15 +13,19 @@ export type DrillCompletionEffects = {
   confettiVariant: DrillConfettiVariant;
 };
 
-/** `score` drives gold vs green confetti: `Math.round(score) >= 100` → `perfect`. */
+/** `score` drives gold vs green confetti + perfect vs normal MP3: `Math.round(score) >= 100` → `perfect`. */
 export function buildDrillCompletionEffects(
   passed: boolean,
   score?: number,
 ): DrillCompletionEffects | null {
   if (!passed) return null;
-  const confettiVariant: DrillConfettiVariant =
-    typeof score === 'number' && Math.round(score) >= 100 ? 'perfect' : 'pass';
-  return { soundUrl: getCelebrationSoundUrl(), triggerConfetti: true, confettiVariant };
+  const isPerfect = typeof score === 'number' && Math.round(score) >= 100;
+  const confettiVariant: DrillConfettiVariant = isPerfect ? 'perfect' : 'pass';
+  return {
+    soundUrl: isPerfect ? getPerfectCelebrationSoundUrl() : getCelebrationSoundUrl(),
+    triggerConfetti: true,
+    confettiVariant,
+  };
 }
 
 export type DrillCompleteBodyForPassed = {

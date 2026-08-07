@@ -19,8 +19,8 @@ interface GenerateDrillParams {
   difficulty: string;
   context: string;
   prompt: string;
-  topic: string;
-  part: string;
+  topic?: string;
+  part?: string;
   studentContext?: object;
   drillWeaknesses?: object[];
   templatePrompt?: string;
@@ -292,15 +292,17 @@ const tools: Record<DrillType, FunctionTool> = {
             items: {
               type: 'object',
               properties: {
-                prompt: { type: 'string' },
-                respondentName: { type: 'string' },
+                prompt: {
+                  type: 'string',
+                  description: 'Situation / scenario text shown to the learner',
+                },
                 options: {
                   type: 'array',
                   items: { type: 'string' },
                 },
                 correctAnswer: { type: 'string' },
               },
-              required: ['prompt', 'respondentName', 'options', 'correctAnswer'],
+              required: ['prompt', 'options', 'correctAnswer'],
             },
           },
         },
@@ -406,7 +408,9 @@ export async function generateDrill(
       {
         role: 'system',
         content: [
-          `This drill is for ${params.part}, Topic: ${params.topic}. Only include Korean translations for vocabulary drills (drill type: vocabulary). For all other drill types, do not include any translation fields. Do NOT copy or extract words directly from the prompt or context. Use the prompt and context only to understand the scenario and learning objectives. Generate original, clinically appropriate content that a nurse would realistically use in that situation.`,
+          params.part && params.topic
+            ? `This drill is for ${params.part}, Topic: ${params.topic}. Only include Korean translations for vocabulary drills (drill type: vocabulary). For all other drill types, do not include any translation fields. Do NOT copy or extract words directly from the prompt or context. Use the prompt and context only to understand the scenario and learning objectives. Generate original, clinically appropriate content that a nurse would realistically use in that situation.`
+            : `Only include Korean translations for vocabulary drills (drill type: vocabulary). For all other drill types, do not include any translation fields. Do NOT copy or extract words directly from the prompt or context. Use the prompt and context only to understand the scenario and learning objectives. Generate original, clinically appropriate content that a nurse would realistically use in that situation.`,
           params.drillType === 'roleplay'
             ? `For roleplay drills, the student_character_name must always be set to ${params.studentName ? `"${params.studentName}"` : '{studentName}'} if provided. Every dialogue turn must have its speaker field set to exactly one of the declared character names. CRITICAL: The dialogue MUST alternate between the student character and the AI characters. It is FORBIDDEN for all dialogue turns to use the same speaker. Every scene must have turns spoken by the student_character_name AND at least one ai_character_name. If you use 3 characters, distribute turns across all 3.`
             : null,

@@ -139,6 +139,8 @@ const updateDrillSchema = z.object({
 	})).optional(),
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
+	/** Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic). */
+	source: z.enum(["precision_clinic"]).optional(),
 }).superRefine((data, ctx) => {
 	refineLearningJourneyFields(data, ctx);
 });
@@ -254,6 +256,8 @@ async function putHandler(
 	if (validated.learning_journey_topic !== undefined) {
 		updateData.learning_journey_topic = validated.learning_journey_topic;
 	}
+	// Omitted (undefined) leaves the existing `source` untouched — drills keep their origin once created.
+	if (validated.source !== undefined) updateData.source = validated.source;
 
 	const finalType = (validated.type !== undefined ? validated.type : existing.type) as string;
 	const mergedTarget =

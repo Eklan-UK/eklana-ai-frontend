@@ -147,6 +147,15 @@ export const queryKeys = {
     learnerTutorAvailability: (tutorId: string) =>
       ["learner", "tutor", tutorId, "availability"] as const,
   },
+  precisionClinic: {
+    all: ["precision-clinic"] as const,
+    lists: () => [...queryKeys.precisionClinic.all, "list"] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [...queryKeys.precisionClinic.lists(), filters] as const,
+    details: () => [...queryKeys.precisionClinic.all, "detail"] as const,
+    detail: (id: string) =>
+      [...queryKeys.precisionClinic.details(), id] as const,
+  },
 };
 
 

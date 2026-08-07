@@ -32,8 +32,8 @@ Each item supports:
 
 | Field | Schema / API | Role |
 |--------|----------------|------|
-| `prompt` | String, **required** | Stimulus shown to the learner (situation / question / line from another speaker). |
-| `respondentName` | String, optional | Speaker label above the prompt (e.g. “Waiter”, “Colleague”). UI default: **“Speaker says”** if empty after trim. |
+| `prompt` | String, **required** | Situation / scenario text shown to the learner. |
+| `respondentName` | String, optional | **Deprecated / ignored in UI.** Kept optional in API for legacy drills and old Excel/AI payloads. Not collected in admin authoring. |
 | `options` | `string[]`, **≥ 2** non-empty strings | Multiple-choice responses (labeled A, B, C, … in the UI). |
 | `correctAnswer` | String, **required** | Must **exactly match** one entry in `options` (validated on create). |
 | `promptAudioUrl` | Optional | Pre-generated TTS URL for the **prompt** (not for options). |
@@ -311,7 +311,7 @@ Within question loop for `currentIndex`:
 4. **Analyzed** — show pass/fail, `DrillLineReviewAccordion` when score exists.
 5. **Advance** — **Next Question** / **Review** only if `isCorrect && pronunciationScore >= 65`.
 
-**Try again** (failed): clears score/recording; if choice was wrong, also clears `selectedOption`; resets `attempts` counter for the question.
+**Try again** (failed): clears score/recording **and** that item’s result/analytics; if choice was wrong, also clears `selectedOption`; **does not** reset `attempts` (attempts accumulate until **Next** / **Practice again**).
 
 ---
 
@@ -329,7 +329,7 @@ Empty list → **“No key phrase items found for this drill.”**
 
 ### 8.2 Prompt block
 
-- Heading: `{respondentName} says` or **“Speaker says”**.
+- Heading: **“Situation / Scenario”** (fixed; `respondentName` is not shown).
 - Body: `currentItem.prompt`.
 - `TTSButton` with `text={prompt}`, `audioUrl={promptAudioUrl}`.
 - On mount / when `items` changes, web **pre-warms** TTS: `preloadTTSAudio(prompt)` or preloads `promptAudioUrl`.
@@ -446,7 +446,7 @@ Mobile should mirror this layout on `completed.tsx`.
 |------|------|
 | Header | Drill title; optional bookmark on prompt (`itemType: sentence`, id `{drillId}-kp-{index}`) |
 | Progress | `Question {n} of {total}` |
-| Prompt card | Respondent line + prompt text + play (TTS or `promptAudioUrl`) |
+| Prompt card | **Situation / Scenario** header + prompt text + play (TTS or `promptAudioUrl`) |
 | Options | Vertical list; min touch height ~60pt; letter badges A–Z |
 | Selection | Highlight selected; disable re-tap after scoring |
 | Post-select | Show “Read your chosen response aloud” + selected text |
@@ -541,7 +541,7 @@ sequenceDiagram
 - **`correctAnswer` not in options:** Rejected at create time; would break scoring if present in legacy data.
 - **High pronunciation, wrong option:** `pronunciationScore` stored as **0**; learner must pick correctly.
 - **Correct option, low pronunciation:** `isCorrect` true but cannot advance until ≥ 65%.
-- **Double-counting attempts:** `attempts` increments each analysis on current question; reset on **Try again** / **Next**.
+- **Double-counting attempts:** `attempts` increments each analysis on current question; accumulates across **Try again**; reset on **Next** / **Practice again**.
 - **Streak:** Requires submitted `score >= 70`; average of zeros on wrong choices lowers streak eligibility.
 - **Tutor review:** Not required; completed page treats key phrases as **reviewed** automatically via `keyPhrasesResults`.
 

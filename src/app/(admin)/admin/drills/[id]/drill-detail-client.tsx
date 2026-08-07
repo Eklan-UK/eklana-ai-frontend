@@ -38,18 +38,41 @@ import {
 interface DrillDetailClientProps {
   drill: any;
   drillId: string;
+  /**
+   * Optional path overrides (Precision Clinic view page).
+   * Defaults preserve existing admin Drill Builder detail links.
+   */
+  paths?: {
+    list?: string;
+    /** Base create path; `?drillId=` is appended. */
+    create?: string;
+    assignment?: string;
+  };
 }
 
-export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
+export function DrillDetailClient({
+  drill,
+  drillId,
+  paths,
+}: DrillDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const defaultListPath = paths?.list ?? "/admin/drill";
+  const createPath = paths?.create ?? "/admin/drills/create";
+  const assignmentPath =
+    paths?.assignment ?? "/admin/drills/assignment";
   const drillListReturnPath =
-    sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill";
+    sanitizeReturnTo(searchParams.get("returnTo")) ?? defaultListPath;
   const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
   const [showAssignedModal, setShowAssignedModal] = useState(false);
   const { data: assignmentsData } = useDrillAssignments(drillId);
   const assignments = assignmentsData?.assignments || [];
+
+  const editHref = returnToParam
+    ? appendReturnTo(`${createPath}?drillId=${drillId}`, returnToParam)
+    : `${createPath}?drillId=${drillId}`;
+  const assignmentHref = `${assignmentPath}?drillId=${drillId}`;
 
   const handleDelete = async () => {
     if (
@@ -137,16 +160,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             </Button>
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              href={
-                returnToParam
-                  ? appendReturnTo(
-                      `/admin/drills/create?drillId=${drillId}`,
-                      returnToParam,
-                    )
-                  : `/admin/drills/create?drillId=${drillId}`
-              }
-            >
+            <Link href={editHref}>
               <Button variant="outline" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
@@ -522,11 +536,9 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Question {idx + 1}
                       </p>
-                      {item.respondentName?.trim() && (
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">
-                          Respondent: {item.respondentName.trim()}
-                        </p>
-                      )}
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                        Situation / Scenario
+                      </p>
                       <p className="font-semibold text-gray-900">{item.prompt}</p>
                     </div>
                     <div>
@@ -664,7 +676,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                   {assignedCount} total
                 </p>
               </div>
-              <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+              <Link href={assignmentHref}>
                 <Button variant="outline" size="sm">
                   <Users className="w-4 h-4 mr-2" />
                   Manage Assignments
@@ -832,7 +844,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 <p className="text-gray-500">
                   No students assigned to this drill yet
                 </p>
-                <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+                <Link href={assignmentHref}>
                   <Button variant="primary" size="sm" className="mt-4">
                     Assign Students
                   </Button>

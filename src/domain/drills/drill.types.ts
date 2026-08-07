@@ -2,6 +2,13 @@ import { Types } from 'mongoose';
 
 export type LearningJourneyPartFilter = 1 | 2 | 3 | 4 | 5;
 
+/**
+ * Optional discriminator for drills created via a dedicated product surface
+ * (e.g. Eklan Precision Clinic) that reuses the regular Drill Builder
+ * infrastructure. Absent = regular drill.
+ */
+export type DrillSource = 'precision_clinic';
+
 export interface Drill {
   _id: Types.ObjectId;
   title: string;
@@ -16,6 +23,7 @@ export interface Drill {
   learning_journey_topic?: string;
   is_bookmarked?: boolean;
   bookmarked_at?: Date | null;
+  source?: DrillSource;
   [key: string]: any;
 }
 
@@ -31,6 +39,10 @@ export interface DrillListFilters {
   isBookmarked?: boolean;
   learningJourneyPart?: LearningJourneyPartFilter;
   learningJourneyTopic?: string;
+  /** Only return drills tagged with this source (e.g. 'precision_clinic'). */
+  source?: DrillSource;
+  /** Exclude drills tagged with this source (e.g. hide 'precision_clinic' from other drill surfaces). */
+  excludeSource?: DrillSource;
   limit?: number;
   offset?: number;
 }
@@ -52,6 +64,7 @@ export interface CreateDrillData {
   bookmarked_at?: Date | null;
   learning_journey_part?: LearningJourneyPartFilter;
   learning_journey_topic?: string;
+  source?: DrillSource;
   [key: string]: any;
 }
 

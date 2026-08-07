@@ -258,11 +258,9 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Question {idx + 1}
                       </p>
-                      {item.respondentName?.trim() && (
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">
-                          Respondent: {item.respondentName.trim()}
-                        </p>
-                      )}
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                        Situation / Scenario
+                      </p>
                       <p className="font-semibold text-gray-900">{item.prompt}</p>
                     </div>
                     <div>

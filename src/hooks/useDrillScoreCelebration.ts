@@ -5,10 +5,13 @@ import {
   playDrillEndCelebration,
   playDrillEndFailure,
 } from "@/lib/practice-feedback";
+import { getClientPerfectCelebrationSoundUrl } from "@/lib/drill/celebration-sound-url";
 
 /**
  * Fire end-of-drill celebration (or failure sound) once when the score screen appears.
- * When `passed` and `Math.round(score) >= 100`, gold "perfect" confetti replaces green "pass" confetti.
+ * When `passed` and `Math.round(score) >= 100`, gold "perfect" confetti replaces green "pass"
+ * confetti, and — unless the caller passed an explicit `celebrationSoundUrl` — the perfect-score
+ * MP3 replaces the normal pass MP3.
  */
 export function useDrillScoreCelebration(
   passed: boolean | null | undefined,
@@ -18,9 +21,11 @@ export function useDrillScoreCelebration(
   useEffect(() => {
     if (passed == null) return;
     if (passed) {
-      const confettiVariant =
-        typeof score === "number" && Math.round(score) >= 100 ? "perfect" : "pass";
-      playDrillEndCelebration(celebrationSoundUrl, { confettiVariant });
+      const isPerfect = typeof score === "number" && Math.round(score) >= 100;
+      const confettiVariant = isPerfect ? "perfect" : "pass";
+      const soundUrl =
+        celebrationSoundUrl ?? (isPerfect ? getClientPerfectCelebrationSoundUrl() : undefined);
+      playDrillEndCelebration(soundUrl, { confettiVariant });
     } else {
       playDrillEndFailure();
     }

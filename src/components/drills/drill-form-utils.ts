@@ -170,8 +170,14 @@ export function draftFromBulkPendingItem(
     journeyPart: item.journeyPart,
     journeyTopic: item.journeyTopic,
     completionDate: item.completionDate ?? "",
+    drillTitle: item.drillTitle?.trim() || "",
   });
-  return applyParsedContentToDraft(base, item.parsed);
+  const withContent = applyParsedContentToDraft(base, item.parsed);
+  // Explicit AI-form title wins over any title parsed from generated content.
+  if (item.drillTitle?.trim()) {
+    withContent.drillTitle = item.drillTitle.trim();
+  }
+  return withContent;
 }
 
 export function validateDrillDraft(
@@ -432,7 +438,6 @@ export function buildDrillPayloadFromDraft(
       .filter((item) => item.prompt.trim())
       .map((item) => ({
         prompt: item.prompt.trim(),
-        respondentName: item.respondentName?.trim() || undefined,
         options: item.options.filter((o) => o.trim()),
         correctAnswer: item.correctAnswer.trim(),
       }));

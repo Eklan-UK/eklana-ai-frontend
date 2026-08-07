@@ -26,9 +26,23 @@ import {
   Video,
   MessageSquare,
   List,
+  Target,
+  Trophy,
+  type LucideIcon,
 } from "lucide-react";
 
 const STORAGE_KEY = "admin-sidebar-collapsed";
+
+interface NavItem {
+  name: string;
+  icon: LucideIcon;
+  path: string;
+}
+
+interface NavGroup {
+  heading?: string;
+  items: NavItem[];
+}
 
 const Sidebar: React.FC = () => {
   const pathname = usePathname();
@@ -59,23 +73,49 @@ const Sidebar: React.FC = () => {
     });
   };
 
-  const navItems = [
-    { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-    { name: "Learners", icon: Users, path: "/admin/Learners" },
-    { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
-    { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
-    { name: "Drill Builder", icon: Hammer, path: "/admin/drills" },
-    { name: "Bookmark Drills", icon: Bookmark, path: "/admin/drills/bookmarked" },
-    { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/drill/free-talk" },
-    { name: "Old Drill Builder", icon: List, path: "/admin/drill" },
-    { name: "Classes", icon: Video, path: "/admin/classes" },
-    { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
-    { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
-    { name: "Grammar Reviews", icon: FileText, path: "/admin/drills/grammar-reviews" },
-    { name: "Summary Reviews", icon: BookOpen, path: "/admin/drills/summary-reviews" },
-    { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
-    { name: "Analytics", icon: BarChart2, path: "/admin/analytics" },
-    { name: "Settings", icon: Settings, path: "/admin/settings" },
+  const navGroups: NavGroup[] = [
+    {
+      items: [
+        { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+      ],
+    },
+    {
+      heading: "Learning",
+      items: [
+        { name: "Learners", icon: Users, path: "/admin/Learners" },
+        { name: "Classes", icon: Video, path: "/admin/classes" },
+        { name: "Tutor", icon: UserPlus, path: "/admin/tutor" },
+      ],
+    },
+    {
+      heading: "Content",
+      items: [
+        { name: "Drill Builder", icon: Hammer, path: "/admin/drills" },
+        { name: "Eklan Precision Clinic", icon: Target, path: "/admin/precision-clinic" },
+        { name: "Bookmark Drills", icon: Bookmark, path: "/admin/drills/bookmarked" },
+        { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/drill/free-talk" },
+        { name: "Weekly Challenge", icon: Trophy, path: "/admin/weekly-challenge" },
+        { name: "Old Drill Builder", icon: List, path: "/admin/drill" },
+        { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
+      ],
+    },
+    {
+      heading: "Reviews",
+      items: [
+        { name: "Sentence Reviews", icon: FileCheck, path: "/admin/drills/sentence-reviews" },
+        { name: "Grammar Reviews", icon: FileText, path: "/admin/drills/grammar-reviews" },
+        { name: "Summary Reviews", icon: BookOpen, path: "/admin/drills/summary-reviews" },
+      ],
+    },
+    {
+      heading: "Business",
+      items: [
+        { name: "Subscriptions", icon: CreditCard, path: "/admin/subscriptions" },
+        { name: "Discovery Calls", icon: PhoneCall, path: "/admin/discovery-call" },
+        { name: "Analytics", icon: BarChart2, path: "/admin/analytics" },
+        { name: "Settings", icon: Settings, path: "/admin/settings" },
+      ],
+    },
   ];
 
   return (
@@ -121,49 +161,64 @@ const Sidebar: React.FC = () => {
       </div>
 
       <nav
-        className={`min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-y-contain ${
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain ${
           collapsed ? "px-2" : "px-4"
         }`}
         aria-label="Admin"
       >
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.path || pathname?.startsWith(item.path + "/");
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              title={collapsed ? item.name : undefined}
-              className={`group flex items-center rounded-lg text-sm transition-colors ${
-                collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-3"
-              } ${
-                isActive
-                  ? "bg-primary-100 font-semibold text-primary-700 dark:bg-primary-900/40 dark:font-semibold dark:text-primary-300"
-                  : "font-normal text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
-              }`}
-            >
-              {item.name === "Classes" && isActive ? (
-                <img
-                  src="/images/classes_icon.svg"
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="h-5 w-5 shrink-0"
-                  aria-hidden
-                />
-              ) : (
-                <item.icon
-                  className={`h-5 w-5 shrink-0 ${
-                    isActive
-                      ? "text-primary-700 dark:text-primary-300"
-                      : "text-gray-500 group-hover:text-gray-700 dark:text-muted-foreground dark:group-hover:text-foreground"
-                  }`}
-                />
-              )}
-              {!collapsed && <span className="truncate">{item.name}</span>}
-            </Link>
-          );
-        })}
+        {navGroups.map((group, groupIndex) => (
+          <div
+            key={group.heading ?? `group-${groupIndex}`}
+            className={groupIndex === 0 ? "" : "mt-4"}
+          >
+            {group.heading && !collapsed && (
+              <p className="mb-1 px-4 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-muted-foreground">
+                {group.heading}
+              </p>
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive =
+                  pathname === item.path ||
+                  pathname?.startsWith(item.path + "/");
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    title={collapsed ? item.name : undefined}
+                    className={`group flex items-center rounded-full text-sm transition-colors ${
+                      collapsed ? "justify-center px-2 py-3" : "gap-3 px-4 py-3"
+                    } ${
+                      isActive
+                        ? "bg-primary-100 font-semibold text-primary-700 dark:bg-primary-900/40 dark:font-semibold dark:text-primary-300"
+                        : "font-normal text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                    }`}
+                  >
+                    {item.name === "Classes" && isActive ? (
+                      <img
+                        src="/images/classes_icon.svg"
+                        alt=""
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 shrink-0"
+                        aria-hidden
+                      />
+                    ) : (
+                      <item.icon
+                        className={`h-5 w-5 shrink-0 ${
+                          isActive
+                            ? "text-primary-700 dark:text-primary-300"
+                            : "text-gray-500 group-hover:text-gray-700 dark:text-muted-foreground dark:group-hover:text-foreground"
+                        }`}
+                      />
+                    )}
+                    {!collapsed && <span className="truncate">{item.name}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {!collapsed && (

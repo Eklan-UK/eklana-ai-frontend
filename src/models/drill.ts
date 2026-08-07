@@ -369,6 +369,12 @@ export interface IDrill extends Document {
   audio_example_url?: string;
   /** Accent/gender key for ElevenLabs pre-gen TTS (see tts-accent-voices). */
   tts_voice_key?: string;
+  /**
+   * Optional discriminator for drills created via a dedicated product surface
+   * (e.g. Eklan Precision Clinic) that reuses the regular Drill Builder
+   * infrastructure. Absent = regular drill; fully backward-compatible.
+   */
+  source?: "precision_clinic";
 
   // Vocabulary Drill Fields (word + sentence practice)
   target_sentences: Array<{
@@ -605,6 +611,14 @@ const drillSchema = new Schema<IDrill>(
       default: null,
       description:
         "Accent/gender key for ElevenLabs pre-generated TTS (e.g. british_female)",
+    },
+
+    source: {
+      type: String,
+      enum: ['precision_clinic'],
+      required: false,
+      description:
+        "Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic); absent = regular drill",
     },
 
     // Vocabulary Drill Fields
@@ -859,6 +873,7 @@ drillSchema.index({ assigned_to: 1, date: -1 }); // Keep for backward compatibil
 drillSchema.index({ created_by: 1 }); // Keep for backward compatibility
 drillSchema.index({ createdById: 1, created_date: -1 }); // New preferred index
 drillSchema.index({ type: 1 });
+drillSchema.index({ source: 1 });
 drillSchema.index({ is_active: 1, date: 1 });
 drillSchema.index({ learning_journey_part: 1, learning_journey_topic: 1 });
 drillSchema.index({ is_bookmarked: 1, bookmarked_at: -1 });

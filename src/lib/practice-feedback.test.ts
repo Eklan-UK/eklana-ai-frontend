@@ -199,4 +199,90 @@ describe("practice-feedback", () => {
     assert.equal(vibrateMock.mock.callCount(), 1);
     assert.deepEqual(vibrateMock.mock.calls[0]?.arguments, [[120, 60, 120]]);
   });
+
+  it("playDrillEndCelebration plays the perfect sound URL when confettiVariant is perfect and no soundUrl is given", async () => {
+    const playMock = mock.fn(async () => undefined);
+    const constructedUrls: string[] = [];
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+      constructor(url: string) {
+        constructedUrls.push(url);
+      }
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
+    const { playDrillEndCelebration } = await import("./practice-feedback");
+    const { DEFAULT_PERFECT_CELEBRATION_SOUND_URL } = await import(
+      "./drill/celebration-sound-url"
+    );
+
+    assert.doesNotThrow(() =>
+      playDrillEndCelebration(undefined, { confettiVariant: "perfect" }),
+    );
+    assert.equal(constructedUrls.at(-1), DEFAULT_PERFECT_CELEBRATION_SOUND_URL);
+  });
+
+  it("playDrillEndCelebration prefers an explicit soundUrl even when confettiVariant is perfect", async () => {
+    const playMock = mock.fn(async () => undefined);
+    const constructedUrls: string[] = [];
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+      constructor(url: string) {
+        constructedUrls.push(url);
+      }
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
+    const { playDrillEndCelebration } = await import("./practice-feedback");
+
+    assert.doesNotThrow(() =>
+      playDrillEndCelebration("https://example.com/custom.mp3", {
+        confettiVariant: "perfect",
+      }),
+    );
+    assert.equal(constructedUrls.at(-1), "https://example.com/custom.mp3");
+  });
+
+  it("playPerfectItemCelebration triggers success haptic, the perfect sound, and gold confetti", async () => {
+    const playMock = mock.fn(async () => undefined);
+    const constructedUrls: string[] = [];
+    class MockAudio {
+      src = "";
+      play = playMock;
+      pause = mock.fn();
+      constructor(url: string) {
+        constructedUrls.push(url);
+      }
+    }
+    Object.defineProperty(globalThis, "Audio", {
+      configurable: true,
+      value: MockAudio,
+    });
+
+    const { playPerfectItemCelebration } = await import("./practice-feedback");
+    const { getDrillConfettiOptions } = await import("./drill-celebration");
+    const { DEFAULT_PERFECT_CELEBRATION_SOUND_URL } = await import(
+      "./drill/celebration-sound-url"
+    );
+
+    assert.doesNotThrow(() => playPerfectItemCelebration());
+    assert.deepEqual(vibrateMock.mock.calls.at(-1)?.arguments, [[40, 30, 40]]);
+    assert.equal(constructedUrls.at(-1), DEFAULT_PERFECT_CELEBRATION_SOUND_URL);
+    assert.deepEqual(getDrillConfettiOptions("perfect").colors, [
+      "#fbbf24",
+      "#f59e0b",
+      "#d97706",
+      "#92400e",
+    ]);
+  });
 });

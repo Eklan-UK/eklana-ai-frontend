@@ -27,7 +27,7 @@ import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 
 interface FillBlankDrillProps {
   drill: any;
@@ -222,7 +222,11 @@ export default function FillBlankDrill({
                         },
                       });
                       if (value) {
-                        playPracticeFeedback("success");
+                        if (value === (blank.correctAnswer || "")) {
+                          playPerfectItemCelebration();
+                        } else {
+                          playPracticeFeedback("failure");
+                        }
                       }
                     }}
                     className="px-3 py-1.5 border-2 border-blue-500 rounded bg-card min-w-[120px] text-base focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-80 disabled:bg-muted/40"

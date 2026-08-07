@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildDrillCompletionEffects, resolveDrillPassed } from "./celebration-effects";
+import {
+  DEFAULT_CELEBRATION_SOUND_URL,
+  DEFAULT_PERFECT_CELEBRATION_SOUND_URL,
+} from "./celebration-sound-url";
 
 describe("buildDrillCompletionEffects", () => {
   it("returns null when not passed", () => {
@@ -31,6 +35,26 @@ describe("buildDrillCompletionEffects", () => {
   it("does not treat a rounded-down 99 as perfect", () => {
     const effects = buildDrillCompletionEffects(true, 99.4);
     assert.equal(effects?.confettiVariant, "pass");
+  });
+
+  it("uses the normal celebration sound below a perfect score", () => {
+    const effects = buildDrillCompletionEffects(true, 92);
+    assert.equal(effects?.soundUrl, DEFAULT_CELEBRATION_SOUND_URL);
+  });
+
+  it("uses the perfect celebration sound at exactly 100", () => {
+    const effects = buildDrillCompletionEffects(true, 100);
+    assert.equal(effects?.soundUrl, DEFAULT_PERFECT_CELEBRATION_SOUND_URL);
+  });
+
+  it("uses the perfect celebration sound when the score rounds up to 100", () => {
+    const effects = buildDrillCompletionEffects(true, 99.6);
+    assert.equal(effects?.soundUrl, DEFAULT_PERFECT_CELEBRATION_SOUND_URL);
+  });
+
+  it("uses the normal celebration sound when no score is provided", () => {
+    const effects = buildDrillCompletionEffects(true);
+    assert.equal(effects?.soundUrl, DEFAULT_CELEBRATION_SOUND_URL);
   });
 });
 

@@ -73,6 +73,10 @@ export const drillAPI = {
     isBookmarked?: boolean;
     learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
     learningJourneyTopic?: string;
+    /** Only return drills tagged with this source (e.g. Eklan Precision Clinic). */
+    source?: 'precision_clinic';
+    /** Exclude drills tagged with this source (e.g. hide Precision Clinic drills from other drill surfaces). */
+    excludeSource?: 'precision_clinic';
   }) => {
     return apiRequest<{ 
       code?: string;
@@ -153,7 +157,7 @@ export const drillAPI = {
     }>(`/drills/${drillId}`);
   },
 
-  // Create drill
+  // Create drill. `data.source` (e.g. 'precision_clinic') is passed through as-is.
   create: (data: any) => {
     return apiRequest<{ message: string; drill: any }>('/drills', {
       method: 'POST',
@@ -410,6 +414,138 @@ export const drillAPI = {
     }>(`/drills/${drillId}/assign`, {
       method: 'POST',
       data,
+    });
+  },
+};
+
+// Precision Clinic API — dedicated collection `precision_clinic_drills`
+export const precisionClinicAPI = {
+  getAll: (params?: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    type?: string;
+    difficulty?: string;
+    status?: 'published' | 'draft';
+    includeArchived?: boolean;
+    isArchived?: boolean;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        drills: any[];
+        total?: number;
+        limit?: number;
+        offset?: number;
+        stats?: {
+          total: number;
+          practiceItems: number;
+          published: number;
+          assigned: number;
+        };
+      };
+    }>('/precision-clinic', {
+      method: 'GET',
+      params,
+    });
+  },
+
+  getById: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/precision-clinic/${id}`);
+  },
+
+  create: (data: Record<string, unknown>) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>('/precision-clinic', {
+      method: 'POST',
+      data,
+    });
+  },
+
+  update: (id: string, data: Record<string, unknown>) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+      drill?: any;
+    }>(`/precision-clinic/${id}`, {
+      method: 'PUT',
+      data,
+    });
+  },
+
+  delete: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+    }>(`/precision-clinic/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  assign: (id: string, data: { userIds: string[] }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+    }>(`/precision-clinic/${id}/assign`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  duplicate: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+    }>(`/precision-clinic/${id}/duplicate`, {
+      method: 'POST',
+    });
+  },
+
+  archive: (id: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: { drill: any };
+    }>(`/precision-clinic/${id}/archive`, {
+      method: 'POST',
+    });
+  },
+
+  aiGenerate: (data: {
+    students?: string[];
+    studentIds?: string[];
+    studentId?: string;
+    title?: string;
+    drillTypes: string[];
+    difficulty?: 'beginner' | 'intermediate' | 'advanced';
+    context?: string;
+    prompt: string;
+  }) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: Array<{
+        drillType: string;
+        title?: string;
+        content: Record<string, unknown>;
+      }>;
+    }>('/precision-clinic/ai-generate', {
+      method: 'POST',
+      data,
+      cache: false,
     });
   },
 };

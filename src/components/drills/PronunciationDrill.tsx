@@ -35,7 +35,7 @@ import {
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
@@ -490,7 +490,11 @@ export default function PronunciationDrill({
         });
 
         if (passed) {
-          playPracticeFeedback("success");
+          if (Math.round(score) >= 100) {
+            playPerfectItemCelebration();
+          } else {
+            playPracticeFeedback("success");
+          }
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"

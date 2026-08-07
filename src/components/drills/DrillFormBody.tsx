@@ -1504,18 +1504,7 @@ export function DrillFormBody({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Respondent name (optional)</label>
-                    <input
-                      type="text"
-                      value={item.respondentName || ""}
-                      onChange={(e) => updateKeyPhraseField(itemIndex, "respondentName", e.target.value)}
-                      placeholder="e.g. Waiter, Colleague, Interviewer"
-                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Prompt (situation / question)<span className="text-red-500">*</span></label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Situation / Scenario<span className="text-red-500">*</span></label>
                     <textarea
                       rows={2}
                       value={item.prompt}

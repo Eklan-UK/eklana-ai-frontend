@@ -137,6 +137,8 @@ function AdminDrillPageContent() {
         resolvedStudentIds && resolvedStudentIds.length > 0
           ? resolvedStudentIds
           : undefined,
+      // Precision Clinic drills are managed on their own admin surface.
+      excludeSource: "precision_clinic" as const,
     }),
     [filters.offset, filters.q, filters.type, filters.status, resolvedStudentIds]
   );

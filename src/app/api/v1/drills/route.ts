@@ -161,6 +161,8 @@ const createDrillSchema = z.object({
 	is_active: z.boolean().optional(),
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
+	/** Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic). */
+	source: z.enum(['precision_clinic']).optional(),
 	/** Drill-builder week context — places assignedAt in that week when set. */
 	weekNumber: z.number().int().min(1).optional(),
 }).superRefine((data, ctx) => {
@@ -224,6 +226,8 @@ async function getHandler(
 		isBookmarked: queryParams.isBookmarked,
 		learningJourneyPart: queryParams.learningJourneyPart,
 		learningJourneyTopic: queryParams.learningJourneyTopic,
+		source: queryParams.source,
+		excludeSource: queryParams.excludeSource,
 		limit: queryParams.limit,
 		offset: queryParams.offset,
 	});
@@ -326,6 +330,7 @@ async function postHandler(
 	if (validated.learning_journey_topic !== undefined) {
 		drillData.learning_journey_topic = validated.learning_journey_topic;
 	}
+	if (validated.source !== undefined) drillData.source = validated.source;
 
 	// Create drill
 	const result = await drillService.createDrill({

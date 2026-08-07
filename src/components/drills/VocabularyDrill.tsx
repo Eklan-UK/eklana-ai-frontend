@@ -33,7 +33,7 @@ import {
 } from "./shared";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { BookmarkButton } from "@/components/common/BookmarkButton";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
@@ -455,7 +455,11 @@ export default function VocabularyDrill({
         });
 
         if (passed) {
-          playPracticeFeedback("success");
+          if (Math.round(score) >= 100) {
+            playPerfectItemCelebration();
+          } else {
+            playPracticeFeedback("success");
+          }
           toast.success(
             `Great! You scored ${score.toFixed(0)}% - ${
               currentScreen === "word" ? "Word" : "Sentence"

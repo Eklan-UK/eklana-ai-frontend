@@ -45,7 +45,7 @@ import {
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserInitials } from "@/utils/user";
@@ -1212,9 +1212,13 @@ export default function RoleplayDrill({
         ]);
 
         if (passed) {
-          playPracticeFeedback("success");
-          // Trigger confetti celebration
-          triggerConfetti();
+          if (Math.round(score) >= 100) {
+            playPerfectItemCelebration();
+          } else {
+            playPracticeFeedback("success");
+            // Trigger confetti celebration
+            triggerConfetti();
+          }
           toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
         } else {
           playPracticeFeedback("failure");

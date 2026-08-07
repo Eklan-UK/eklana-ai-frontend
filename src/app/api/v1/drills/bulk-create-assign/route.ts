@@ -33,6 +33,8 @@ interface BulkDrillInput {
   mission?: unknown;
   /** Drill-builder week context — places assignedAt in that week when set. */
   weekNumber?: number;
+  /** Tags Precision Clinic drills. */
+  source?: "precision_clinic";
 }
 
 // Builds a map from character name to its normalized speaker key
@@ -185,6 +187,7 @@ async function handler(
             part,
             mission,
             weekNumber,
+            source,
           } = item;
           const rawPart = part ?? mission;
           const extractedPart = typeof rawPart === 'string' ? rawPart.match(/\d+/)?.[0] : rawPart;
@@ -260,6 +263,7 @@ async function handler(
 
           if (validatedPart !== undefined) drillData.learning_journey_part = validatedPart;
           if (validatedTopic !== undefined) drillData.learning_journey_topic = validatedTopic;
+          if (source === "precision_clinic") drillData.source = source;
 
           const drill = await Drill.create(drillData);
 
