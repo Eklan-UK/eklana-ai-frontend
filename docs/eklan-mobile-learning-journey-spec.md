@@ -691,16 +691,19 @@ completed = those where isCompletedPlanItem(item) === true
 
 ---
 
-### 4.6 Mission Detail topic section
+### 4.6 Mission Detail topic accordion
 
-Composable section, not a standalone file on web but worth naming for mobile:
+Each catalog topic is an independent accordion (default **collapsed**; multiple may be open). Chevron **right** when closed, **down** when open. A light vertical rail appears under the pastel circular topic icon only while expanded.
 
 | Element | Spec |
 |---|---|
-| Wrapper | `<section>` keyed by `topic.id` |
-| Heading | `topic.title`, bold, `mb-3` |
-| Content | Drill row list OR empty card |
-| Spacing | `space-y-8` between topic sections |
+| Wrapper | Accordion section keyed by `topic.id` |
+| Header | 48px pastel circular `iconBg` + Figma `iconKey` asset, ExtraBold title (~14px), muted 11px progress (`X of Y drills completed` / `No drills yet`), chevron |
+| Expanded | Vertical rail under icon + drill / Free Talk rows (`gap ~10px`) |
+| Empty expanded | “No drills assigned for this topic yet.” |
+| Drill rows | Journey presentation: soft solid pastel type thumb, duration (+ due when present), green **Completed** when done, trailing chevron |
+| Catalog | Shared `iconKey` / `iconBg` / titles on web + mobile; topic IDs unchanged |
+| Spacing | Tight vertical stack between topic accordions |
 
 ---
 

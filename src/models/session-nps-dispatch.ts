@@ -14,7 +14,7 @@ const schema = new Schema<ISessionNpsDispatch>(
       type: Schema.Types.ObjectId,
       ref: 'ClassSession',
       required: true,
-      index: true,
+      // unique index declared via schema.index() below — avoid duplicate {sessionId:1}
     },
     sentAt: { type: Date, default: Date.now },
   },

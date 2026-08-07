@@ -2,13 +2,58 @@ export type LearningJourneyPartId = 1 | 2 | 3 | 4 | 5;
 
 export type LearningJourneyTopicId = string;
 
+/** Figma topic accordion icon keys → `/public/icons/journey/{key}.svg`. */
+export type TopicIconKey =
+  | "first_aid"
+  | "calendar_check"
+  | "folder_plus"
+  | "chat_green"
+  | "clipboard_plus"
+  | "plane"
+  | "shield"
+  | "chat_yellow"
+  | "clipboard_task"
+  | "stethoscope"
+  | "ask_question"
+  | "target"
+  | "medical_files"
+  | "scales"
+  | "clipboard_check_1"
+  | "clipboard_check_2"
+  | "clipboard_check_3"
+  | "clipboard_check_4"
+  | "clipboard_check_5"
+  | "phone_blue"
+  | "phone_purple"
+  | "phone_yellow"
+  | "heart"
+  | "book"
+  | "discharge";
+
 export type LearningJourneyTopic = {
   id: LearningJourneyTopicId;
   title: string;
   order: number;
+  /** Figma pastel circle fill behind the topic icon */
+  iconBg: string;
+  /** Asset key under `/icons/journey/` */
+  iconKey: TopicIconKey;
   /** Optional alignment with Free Talk scenario types */
   freeTalkScenarioType?: string;
 };
+
+/** Collapsed accordion progress copy (Figma). */
+export function formatTopicProgressLabel(
+  completed: number,
+  total: number,
+): string {
+  if (total <= 0) return "No drills yet";
+  return `${completed} of ${total} drills completed`;
+}
+
+export function topicIconSrc(iconKey: TopicIconKey): string {
+  return `/icons/journey/${iconKey}.svg`;
+}
 
 /** Lucide icon keys for mission timeline nodes (Figma accents). */
 export type MissionThemeIconKey =
@@ -105,24 +150,32 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         id: "handling_emergency_critical",
         title: "Handling Emergency/Critical Situation",
         order: 1,
+        iconKey: "first_aid",
+        iconBg: "#fef9c3",
         freeTalkScenarioType: "icu_emergency",
       },
       {
         id: "patient_follow_up",
         title: "Follow-up with Patients",
         order: 2,
+        iconKey: "calendar_check",
+        iconBg: "#eff6ff",
         freeTalkScenarioType: "patient_follow_up",
       },
       {
         id: "admitting_patient",
         title: "Admitting a Patient",
         order: 3,
+        iconKey: "folder_plus",
+        iconBg: "#ede9fe",
         freeTalkScenarioType: "admission",
       },
       {
         id: "small_talk_patient",
         title: "Small Talk with a Patient",
         order: 4,
+        iconKey: "chat_green",
+        iconBg: "#dcfce7",
         freeTalkScenarioType: "small_talk_patient",
       },
     ],
@@ -135,26 +188,34 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
     topics: [
       {
         id: "receiving_handover",
-        title: "Receiving an Handover",
+        title: "Receiving a Handover",
         order: 1,
+        iconKey: "clipboard_plus",
+        iconBg: "#eff6ff",
         freeTalkScenarioType: "handover_receive",
       },
       {
         id: "giving_handover",
-        title: "Giving an Handover",
+        title: "Giving a Handover",
         order: 2,
+        iconKey: "plane",
+        iconBg: "#dcfce7",
         freeTalkScenarioType: "handover",
       },
       {
         id: "declining_request",
         title: "Declining a Request and Professionally Saying No",
         order: 3,
+        iconKey: "shield",
+        iconBg: "#ffe4e6",
         freeTalkScenarioType: "decline_request",
       },
       {
         id: "small_talk_colleagues",
         title: "Small Talk with Colleagues",
         order: 4,
+        iconKey: "chat_yellow",
+        iconBg: "#fef9c3",
         freeTalkScenarioType: "small_talk_colleague",
       },
     ],
@@ -169,18 +230,24 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         id: "providing_updates_doctor",
         title: "Providing Updates to a Doctor",
         order: 1,
+        iconKey: "clipboard_task",
+        iconBg: "#dcfce7",
         freeTalkScenarioType: "phone_doctor",
       },
       {
         id: "doctor_rounds",
         title: "Going on Rounds with Doctors",
         order: 2,
+        iconKey: "stethoscope",
+        iconBg: "#eff6ff",
         freeTalkScenarioType: "doctor_rounds",
       },
       {
         id: "answering_family_questions",
-        title: "Answering Families and Friend's Questions",
+        title: "Answering Families' and Friends' Questions",
         order: 3,
+        iconKey: "ask_question",
+        iconBg: "#ede9fe",
         freeTalkScenarioType: "family_questions",
       },
     ],
@@ -195,41 +262,57 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         id: "motivation_prep",
         title: "Motivation prep",
         order: 1,
+        iconKey: "target",
+        iconBg: "#fef9c3",
       },
       {
         id: "technical_prep",
         title: "Technical prep",
         order: 2,
+        iconKey: "medical_files",
+        iconBg: "#eff6ff",
       },
       {
         id: "situation_judgement_prep",
         title: "Situation Judgement Prep",
         order: 3,
+        iconKey: "scales",
+        iconBg: "#ede9fe",
       },
       {
         id: "mock_1",
         title: "Mock 1",
         order: 4,
+        iconKey: "clipboard_check_1",
+        iconBg: "#dcfce7",
       },
       {
         id: "mock_2",
         title: "Mock 2",
         order: 5,
+        iconKey: "clipboard_check_2",
+        iconBg: "#eff6ff",
       },
       {
         id: "mock_3",
         title: "Mock 3",
         order: 6,
+        iconKey: "clipboard_check_3",
+        iconBg: "#fef9c3",
       },
       {
         id: "mock_4",
         title: "Mock 4",
         order: 7,
+        iconKey: "clipboard_check_4",
+        iconBg: "#f3e8ff",
       },
       {
         id: "mock_5",
         title: "Mock 5",
         order: 8,
+        iconKey: "clipboard_check_5",
+        iconBg: "#ccfbf1",
       },
     ],
   },
@@ -243,36 +326,48 @@ export const LEARNING_JOURNEY_PARTS: LearningJourneyPart[] = [
         id: "phone_colleagues",
         title: "Phone Communication with Colleagues",
         order: 1,
+        iconKey: "phone_blue",
+        iconBg: "#eff6ff",
         freeTalkScenarioType: "phone_colleague",
       },
       {
         id: "phone_other_departments",
         title: "Phone Communication with Other Departments",
         order: 2,
+        iconKey: "phone_purple",
+        iconBg: "#f3e8ff",
         freeTalkScenarioType: "phone_department",
       },
       {
         id: "phone_patient_families",
         title: "Phone Communication with the Patient's Families",
         order: 3,
+        iconKey: "phone_yellow",
+        iconBg: "#fef9c3",
         freeTalkScenarioType: "phone_family",
       },
       {
         id: "conducting_cpr",
         title: "Conducting CPR",
         order: 4,
+        iconKey: "heart",
+        iconBg: "#ffe4e6",
         freeTalkScenarioType: "cpr",
       },
       {
         id: "discharging_patients",
         title: "Discharging Patients",
         order: 5,
+        iconKey: "discharge",
+        iconBg: "#dcfce7",
         freeTalkScenarioType: "discharge",
       },
       {
         id: "grammar",
         title: "Grammar",
         order: 6,
+        iconKey: "book",
+        iconBg: "#fef9c3",
         freeTalkScenarioType: "grammar",
       },
     ],

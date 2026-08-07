@@ -63,6 +63,8 @@ const BADGE_COLORS: Record<FreeTalkScenarioType, string> = {
   phone_department: "bg-violet-100 text-violet-700",
   family_questions: "bg-pink-100 text-pink-700",
   phone_family: "bg-fuchsia-100 text-fuchsia-700",
+  discharge: "bg-lime-100 text-lime-700",
+  grammar: "bg-slate-100 text-slate-700",
 };
 
 const emptyForm = () => ({
