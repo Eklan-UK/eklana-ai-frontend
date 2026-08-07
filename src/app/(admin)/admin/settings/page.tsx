@@ -24,14 +24,7 @@ import { profileService } from "@/services/profile.service";
 import { authService } from "@/services/auth.service";
 import { PrivacyPolicyAccordion } from "@/components/legal/PrivacyPolicyAccordion";
 import { NpsFormSettingsSection } from "@/components/admin/NpsFormSettingsSection";
-
-const PRESET_AVATARS: string[] = Array.from(
-  { length: 30 },
-  (_, i) =>
-    `https://api.dicebear.com/9.x/avataaars/png?seed=eklan${
-      i + 1
-    }&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&size=128`
-);
+import { PRESET_AVATARS } from "@/lib/preset-avatars";
 
 type SettingsSectionId = "profile" | "password" | "privacy" | "nps";
 

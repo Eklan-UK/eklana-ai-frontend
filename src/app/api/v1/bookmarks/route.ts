@@ -72,8 +72,15 @@ async function createBookmark(req: NextRequest, context: { userId: string; userR
     });
 
     if (existing) {
+      let badgesUnlocked: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[] = [];
+      try {
+        const { triggerBadgeEvaluation } = await import('@/services/streak.service');
+        badgesUnlocked = await triggerBadgeEvaluation(context.userId);
+      } catch {
+        // badges must not fail bookmark idempotency
+      }
       return NextResponse.json(
-        { message: 'Already bookmarked', bookmark: existing },
+        { message: 'Already bookmarked', bookmark: existing, badgesUnlocked },
         { status: 200 } // Or 409 Conflict, but 200 is often safer for idempotency
       );
     }

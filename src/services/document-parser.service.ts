@@ -700,24 +700,49 @@ class DocumentParserService {
     return items;
   }
 
-  private parseExcelKeyPhrases(data: any[][], startRow: number): { respondentName: string; prompt: string; options: string[]; correctAnswer: string }[] {
-    const items: { respondentName: string; prompt: string; options: string[]; correctAnswer: string }[] = [];
+  private parseExcelKeyPhrases(data: any[][], startRow: number): { respondentName?: string; prompt: string; options: string[]; correctAnswer: string }[] {
+    const headerRow = data[0] ?? [];
+    const hasRespondentHeader = headerRow.some((cell) =>
+      String(cell || "").trim().toLowerCase().includes("respondent"),
+    );
+
+    const items: { respondentName?: string; prompt: string; options: string[]; correctAnswer: string }[] = [];
     for (let i = startRow; i < data.length; i++) {
       const row = data[i];
       if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
       const stripPrefix = (s: string) => s.replace(/^[A-Da-d]\.\s*/, "").trim();
       const prompt = String(row[0] || "").trim();
       if (!prompt) continue;
-      const respondentName = String(row[1] || "").trim();
-      const correctAnswer = stripPrefix(String(row[2] || "").trim());
-      const option2 = stripPrefix(String(row[3] || "").trim());
-      const option3 = stripPrefix(String(row[4] || "").trim());
+
+      let respondentName: string | undefined;
+      let correctAnswer: string;
+      let option2: string;
+      let option3: string;
+
+      if (hasRespondentHeader) {
+        // Legacy: Prompt | Respondent Name | Correct Answer | Option 2 | Option 3
+        respondentName = String(row[1] || "").trim() || undefined;
+        correctAnswer = stripPrefix(String(row[2] || "").trim());
+        option2 = stripPrefix(String(row[3] || "").trim());
+        option3 = stripPrefix(String(row[4] || "").trim());
+      } else {
+        // Current: Prompt | Correct Answer | Option 2 | Option 3
+        correctAnswer = stripPrefix(String(row[1] || "").trim());
+        option2 = stripPrefix(String(row[2] || "").trim());
+        option3 = stripPrefix(String(row[3] || "").trim());
+      }
+
       const options = [correctAnswer, option2, option3].filter(Boolean);
       for (let j = options.length - 1; j > 0; j--) {
         const k = Math.floor(Math.random() * (j + 1));
         [options[j], options[k]] = [options[k], options[j]];
       }
-      items.push({ respondentName, prompt, options: options.length > 0 ? options : ["", ""], correctAnswer });
+      items.push({
+        ...(respondentName ? { respondentName } : {}),
+        prompt,
+        options: options.length > 0 ? options : ["", ""],
+        correctAnswer,
+      });
     }
     return items;
   }

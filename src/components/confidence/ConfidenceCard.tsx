@@ -137,7 +137,7 @@ export function ConfidenceCard() {
 
           {/* Sub-score bars — three pillars */}
           <div className="space-y-2">
-            <SubBar label="Pronunciation" value={scorecard.pronunciation} color="#22c55e" />
+            <SubBar label="Clarity" value={scorecard.pronunciation} color="#22c55e" />
             <SubBar label="Accuracy" value={scorecard.accuracy} color="#0284c7" />
             <SubBar label="Fluency" value={scorecard.fluency} color="#7c3aed" />
           </div>
@@ -146,7 +146,7 @@ export function ConfidenceCard() {
 
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-satoshi">
-        <span>Average of Pronunciation, Accuracy, and Fluency</span>
+        <span>Average of Clarity, Accuracy, and Fluency</span>
       </div>
     </Card>
   );

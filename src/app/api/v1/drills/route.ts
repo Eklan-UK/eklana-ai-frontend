@@ -142,6 +142,7 @@ const createDrillSchema = z.object({
 	ai_character_name: z.string().optional(),
 	ai_character_names: z.array(z.string()).optional(),
 	ai_character_voice_keys: z.array(z.string()).optional(),
+	ai_character_avatars: z.array(z.string()).optional(),
 	drill_intro: z.string().max(5000).optional(),
 	matching_pairs: z.array(matchingPairSchema).optional(),
 	definition_items: z.array(definitionItemSchema).optional(),
@@ -160,6 +161,8 @@ const createDrillSchema = z.object({
 	is_active: z.boolean().optional(),
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
+	/** Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic). */
+	source: z.enum(['precision_clinic']).optional(),
 	/** Drill-builder week context — places assignedAt in that week when set. */
 	weekNumber: z.number().int().min(1).optional(),
 }).superRefine((data, ctx) => {
@@ -223,6 +226,8 @@ async function getHandler(
 		isBookmarked: queryParams.isBookmarked,
 		learningJourneyPart: queryParams.learningJourneyPart,
 		learningJourneyTopic: queryParams.learningJourneyTopic,
+		source: queryParams.source,
+		excludeSource: queryParams.excludeSource,
 		limit: queryParams.limit,
 		offset: queryParams.offset,
 	});
@@ -301,6 +306,9 @@ async function postHandler(
 	if (validated.ai_character_voice_keys !== undefined) {
 		drillData.ai_character_voice_keys = validated.ai_character_voice_keys;
 	}
+	if (validated.ai_character_avatars !== undefined) {
+		drillData.ai_character_avatars = validated.ai_character_avatars;
+	}
 	if (validated.drill_intro !== undefined) drillData.drill_intro = validated.drill_intro;
 	if (validated.matching_pairs !== undefined) drillData.matching_pairs = validated.matching_pairs;
 	if (validated.definition_items !== undefined) drillData.definition_items = validated.definition_items;
@@ -322,6 +330,7 @@ async function postHandler(
 	if (validated.learning_journey_topic !== undefined) {
 		drillData.learning_journey_topic = validated.learning_journey_topic;
 	}
+	if (validated.source !== undefined) drillData.source = validated.source;
 
 	// Create drill
 	const result = await drillService.createDrill({

@@ -60,10 +60,10 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     icon: '📚',
     sortOrder: 6,
     beforeDescription:
-      'You earn this award for saving difficult drills to revisit and master later.',
+      'You earn this award for saving a drill to revisit and master later.',
     afterOutcome:
-      "You've earned this award for saving difficult drills to revisit and master later.",
-    humorousLine: 'This difficult drill is already getting nervous. We love seeing it.',
+      "You've earned this award for saving a drill to revisit and master later.",
+    humorousLine: 'This drill is already getting nervous. We love seeing it.',
   },
   {
     badgeId: 'medication-master',

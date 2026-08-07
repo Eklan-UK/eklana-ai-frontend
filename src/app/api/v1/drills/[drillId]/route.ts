@@ -65,6 +65,7 @@ const updateDrillSchema = z.object({
 	student_character_name: z.string().optional(),
 	ai_character_names: z.array(z.string()).optional(),
 	ai_character_voice_keys: z.array(z.string()).optional(),
+	ai_character_avatars: z.array(z.string()).optional(),
 	drill_intro: z.string().max(5000).optional(),
 	roleplay_scenes: z.array(z.object({
 		scene_name: z.string(),
@@ -138,6 +139,8 @@ const updateDrillSchema = z.object({
 	})).optional(),
 	learning_journey_part: learningJourneyPartSchema.optional(),
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
+	/** Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic). */
+	source: z.enum(["precision_clinic"]).optional(),
 }).superRefine((data, ctx) => {
 	refineLearningJourneyFields(data, ctx);
 });
@@ -228,6 +231,9 @@ async function putHandler(
 	if (validated.ai_character_voice_keys !== undefined) {
 		updateData.ai_character_voice_keys = validated.ai_character_voice_keys;
 	}
+	if (validated.ai_character_avatars !== undefined) {
+		updateData.ai_character_avatars = validated.ai_character_avatars;
+	}
 	if (validated.drill_intro !== undefined) updateData.drill_intro = validated.drill_intro;
 	if (validated.roleplay_scenes !== undefined) updateData.roleplay_scenes = validated.roleplay_scenes;
 	if (validated.matching_pairs !== undefined) updateData.matching_pairs = validated.matching_pairs;
@@ -250,6 +256,8 @@ async function putHandler(
 	if (validated.learning_journey_topic !== undefined) {
 		updateData.learning_journey_topic = validated.learning_journey_topic;
 	}
+	// Omitted (undefined) leaves the existing `source` untouched — drills keep their origin once created.
+	if (validated.source !== undefined) updateData.source = validated.source;
 
 	const finalType = (validated.type !== undefined ? validated.type : existing.type) as string;
 	const mergedTarget =

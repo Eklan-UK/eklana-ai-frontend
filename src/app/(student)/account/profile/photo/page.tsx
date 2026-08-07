@@ -8,18 +8,7 @@ import { profileService } from "@/services/profile.service";
 import { toast } from "sonner";
 import Image from "next/image";
 import { X, Camera, Image as ImageIcon } from "lucide-react";
-
-/**
- * 30 preset cartoon avatars powered by DiceBear (stable, free, diverse).
- * These can be swapped out for Cloudinary-hosted images later.
- */
-const PRESET_AVATARS: string[] = Array.from(
-  { length: 30 },
-  (_, i) =>
-    `https://api.dicebear.com/9.x/avataaars/png?seed=eklan${
-      i + 1
-    }&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&size=128`
-);
+import { PRESET_AVATARS } from "@/lib/preset-avatars";
 
 type Sheet = "none" | "photoUpdate" | "camera";
 

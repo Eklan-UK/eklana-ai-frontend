@@ -4,7 +4,7 @@ import { toUserIdQuery } from '@/lib/api/user-id';
 import type { Drill as DrillType, CreateDrillData, DrillListFilters } from './drill.types';
 
 const DRILL_LIST_PROJECTION =
-  'title type difficulty date duration_days context audio_example_url created_date is_active assigned_to totalAssignments createdById created_by learning_journey_part learning_journey_topic is_bookmarked bookmarked_at';
+  'title type difficulty date duration_days context audio_example_url created_date updated_date is_active assigned_to totalAssignments createdById created_by learning_journey_part learning_journey_topic is_bookmarked bookmarked_at source target_sentences pronunciation_items matching_pairs definition_items grammar_items sentence_writing_items fill_blank_items key_phrase_items roleplay_scenes roleplay_dialogue listening_drill_title listening_drill_content article_title article_content sentence_drill_word';
 
 /**
  * Build Mongo query for drill list/count. Exported for unit tests.
@@ -49,6 +49,11 @@ export function buildDrillListQuery(filters: DrillListFilters): Record<string, u
   }
   if (filters.learningJourneyTopic) {
     query.learning_journey_topic = filters.learningJourneyTopic;
+  }
+  if (filters.source) {
+    query.source = filters.source;
+  } else if (filters.excludeSource) {
+    query.source = { $ne: filters.excludeSource };
   }
   if (filters.q) {
     const regex = new RegExp(filters.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');

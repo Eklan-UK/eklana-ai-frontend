@@ -36,10 +36,11 @@ export function useDrillBookmarkToggle() {
             toast.info("Already bookmarked");
           } else {
             toast.success("Added to bookmarks!");
-            celebrateBadgesFromApiResponse(data);
-            await queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
-            await queryClient.invalidateQueries({ queryKey: ["user-streak"] });
           }
+          celebrateBadgesFromApiResponse(data);
+          await queryClient.invalidateQueries({ queryKey: queryKeys.badges.all });
+          await queryClient.invalidateQueries({ queryKey: ["user-streak"] });
+
         }
 
         await queryClient.invalidateQueries({

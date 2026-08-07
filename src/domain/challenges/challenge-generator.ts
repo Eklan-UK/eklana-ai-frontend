@@ -167,10 +167,9 @@ CONSTRAINT: If any question references the student by name or professional role,
 "key_phrases" → {
   "key_phrase_items": [
     {
-      "prompt": "<what an incoming nurse, patient, or doctor says>",
+      "prompt": "<situation / scenario the nurse must respond to>",
       "options": ["<response A>", "<response B>", "<response C>", "<response D>"],
-      "correctAnswer": "<must exactly match one element of options[]>",
-      "respondentName": "<e.g. 'Incoming Nurse', 'Patient', 'Doctor'>"
+      "correctAnswer": "<must exactly match one element of options[]>"
     }
   ]
 }

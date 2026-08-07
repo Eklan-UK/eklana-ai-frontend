@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useLearnerDrillAssignments } from "@/hooks/useAdmin";
-import { drillDisplayLabel } from "@/lib/drill-display-label";
+import { resolveDrillListTitle } from "@/lib/drill-display-label";
 import { SpeakingPracticeAttemptDetails } from "@/components/drills/SpeakingPracticeAttemptDetails";
 import {
   DrillPerformanceReview,
@@ -45,6 +45,17 @@ function parsePerformanceReviewSnapshot(raw: unknown): PerformanceReviewSnapshot
 interface DrillSubmissionsComponentProps {
   learnerId: string;
   learnerName?: string;
+}
+
+/** Profile "needs review" only applies to Grammar drills. */
+function getDrillType(drill: any): string {
+  return String(drill?.drill?.type || drill?.type || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isGrammarPendingReview(drill: any): boolean {
+  return getDrillType(drill) === "grammar" && drill?.requiresReview === true;
 }
 
 /**
@@ -83,9 +94,7 @@ export function DrillSubmissionsComponent({
       inProgress: drills.filter((d: any) => d.status === "in-progress"),
       completed: drills.filter((d: any) => d.status === "completed"),
       overdue: drills.filter((d: any) => d.status === "overdue"),
-      review: drills.filter(
-        (d: any) => d.requiresReview === true || d.reviewStatus === "pending",
-      ),
+      review: drills.filter((d: any) => isGrammarPendingReview(d)),
     };
   }, [drills]);
 
@@ -116,7 +125,12 @@ export function DrillSubmissionsComponent({
 
   const completionRate = drillStatistics?.completionRate ?? 0;
   const averageScoreValue = drillStatistics?.averageScore ?? 0;
-  const pendingReviewCount = drillStatistics?.pendingReview ?? 0;
+  // Prefer API stats, but never exceed grammar-only local count (UI harden).
+  const grammarPendingReviewCount = categorizedDrills.review.length;
+  const pendingReviewCount =
+    drillStatistics?.pendingReview != null
+      ? Math.min(drillStatistics.pendingReview, grammarPendingReviewCount)
+      : grammarPendingReviewCount;
   const completedCount = drillStatistics?.completed ?? categorizedDrills.completed.length;
   const totalCount = drillStatistics?.total ?? drills.length;
 
@@ -402,10 +416,17 @@ export function DrillSubmissionsComponent({
                       </span>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 truncate">
-                          {drill.drill?.title ||
-                            drillDisplayLabel(drill.drill) ||
-                            drill.title ||
-                            "Untitled Drill"}
+                          {resolveDrillListTitle({
+                            title: drill.drill?.title || drill.title,
+                            type: drill.drill?.type || drill.type,
+                            learning_journey_topic:
+                              drill.drill?.learning_journey_topic ??
+                              drill.learning_journey_topic,
+                            topicTitle:
+                              drill.drill?.topicTitle ?? drill.topicTitle,
+                            scenarioType:
+                              drill.drill?.scenarioType ?? drill.scenarioType,
+                          })}
                         </h4>
                         <p className="text-xs text-gray-500 capitalize">
                           {drill.drill?.type || drill.type || "N/A"} •{" "}
@@ -415,7 +436,7 @@ export function DrillSubmissionsComponent({
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {getStatusBadge(drill.status)}
-                      {drill.requiresReview && (
+                      {isGrammarPendingReview(drill) && (
                         <span className="flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
                           <AlertCircle className="w-3 h-3" /> Review Pending
                         </span>
@@ -600,7 +621,7 @@ export function DrillSubmissionsComponent({
                       </div>
                     )}
 
-                    {drill.requiresReview && (
+                    {isGrammarPendingReview(drill) && (
                       <div className="bg-orange-50 rounded-lg p-3 border border-orange-200 flex items-start gap-2">
                         <AlertCircle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
                         <div>

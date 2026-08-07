@@ -254,7 +254,7 @@ async function handler(
 		}).catch(() => {});
 	}
 
-	// Fire-and-forget: recompute metrics, streak, and badges in background
+	// Fire-and-forget: recompute metrics and streak in background
 	// Do not await — this must not block or throw to the user
 	const userId = context.userId.toString();
 	const userScore = validated.score;
@@ -266,15 +266,21 @@ async function handler(
 			context.userRole === 'user'
 				? StreakService.recordDrillCompletion(userId, userScore).catch(() => {})
 				: Promise.resolve(),
-			context.userRole === 'user'
-				? import('@/services/streak.service')
-						.then(({ triggerBadgeEvaluation }) => triggerBadgeEvaluation(userId).catch(() => {}))
-				: Promise.resolve(),
 		]);
 	});
 
+	let badgesUnlocked: import('@/lib/badges/badge-unlock').BadgeUnlockCelebration[] = [];
+	if (context.userRole === 'user') {
+		try {
+			const { triggerBadgeEvaluation } = await import('@/services/streak.service');
+			badgesUnlocked = await triggerBadgeEvaluation(userId);
+		} catch {
+			badgesUnlocked = [];
+		}
+	}
+
 	const passed = resolveDrillPassed(validated.score, validated);
-	const effects = buildDrillCompletionEffects(passed);
+	const effects = buildDrillCompletionEffects(passed, validated.score);
 
 	return apiResponse.success({
 		drillId,
@@ -285,7 +291,7 @@ async function handler(
 			timeSpent: result.attempt.timeSpent,
 			completedAt: result.attempt.completedAt?.toISOString(),
 		},
-		badgesUnlocked: [],
+		badgesUnlocked,
 		...(effects ? { effects } : {}),
 	});
 }

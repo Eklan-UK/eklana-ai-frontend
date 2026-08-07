@@ -96,11 +96,11 @@ function buildExcelRows(drillType: string, content: Record<string, unknown>): un
     case "key_phrases": {
       const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
       return [
-        ["Prompt", "Respondent Name", "Correct Answer", "Option 2", "Option 3"],
+        ["Prompt", "Correct Answer", "Option 2", "Option 3"],
         ...items.map((item) => {
           const opts = (item.options as string[]) ?? [];
           const distractors = opts.filter((o) => o !== item.correctAnswer);
-          return [String(item.prompt ?? ""), String(item.respondentName ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? ""];
+          return [String(item.prompt ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? ""];
         }),
       ];
     }

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { resolveDrillListTitle } from "@/lib/drill-display-label";
 
 export type ReviewType = "sentence" | "grammar" | "summary";
 export type ReviewStatus = "pending" | "reviewed" | "all";
@@ -15,6 +16,7 @@ interface BaseSubmission {
     _id: string;
     title: string;
     type: string;
+    learning_journey_topic?: string | null;
   };
   completedAt: string;
   score?: number;
@@ -123,10 +125,18 @@ function transformAttemptsToSubmissions(attempts: any[]): LearnerSubmissions[] {
       ? attempt.learnerId?.email || ''
       : '';
 
+    const drillType = attempt.drillId.type || 'unknown';
+    const learningJourneyTopic =
+      attempt.drillId.learning_journey_topic ?? null;
     const drill = {
       _id: attempt.drillId._id?.toString() || '',
-      title: attempt.drillId.title || 'Untitled Drill',
-      type: attempt.drillId.type || 'unknown',
+      title: resolveDrillListTitle({
+        title: attempt.drillId.title,
+        type: drillType,
+        learning_journey_topic: learningJourneyTopic,
+      }),
+      type: drillType,
+      learning_journey_topic: learningJourneyTopic,
     };
 
     const submission: Submission = {

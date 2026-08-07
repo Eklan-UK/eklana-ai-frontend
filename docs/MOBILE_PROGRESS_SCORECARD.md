@@ -15,7 +15,7 @@ The **Progress Scorecard** powers the four metric cards on the Home screen (and 
 | Home card label | Scorecard field | Weekly delta field |
 |-----------------|-----------------|--------------------|
 | Confidence | `confidence` | `confidenceWeeklyChange` |
-| Pronunciation | `pronunciation` | `pronunciationWeeklyChange` |
+| Clarity | `pronunciation` | `pronunciationWeeklyChange` |
 | Accurate Sentence Usage | `accuracy` | `accuracyWeeklyChange` |
 | Response Speed (Fluency) | `fluency` | `fluencyWeeklyChange` |
 
@@ -116,7 +116,7 @@ Mobile displays values as returned. Computation lives in `src/domain/progress/pr
 
 | Metric | Source data | Notes |
 |--------|-------------|-------|
-| **Pronunciation** | Avg Speechace score per completed drill attempt | Uses `vocabularyResults`, `pronunciationResults`, or `roleplayResults` word/scene scores. Only scores `> 0` count. One avg per drill, then avg across drills. |
+| **Clarity** (`pronunciation`) | Avg Speechace score per completed drill attempt | Uses `vocabularyResults`, `pronunciationResults`, or `roleplayResults` word/scene scores. Only scores `> 0` count. One avg per drill, then avg across drills. |
 | **Accuracy** | Avg score from assigned **Key Phrases** and **Fill-in-the-blank** drills | Requires `drillAssignmentId` on the attempt. Uses `keyPhrasesResults.score` or `fillBlankResults.score`. |
 | **Fluency** | Avg `gradeResult.overallScore` from **Free Talk** attempts | Stays `0` until at least one graded Free Talk session exists. |
 | **Confidence** | Average of pronunciation, accuracy, and fluency **only where data exists** | e.g. only pronunciation data → confidence equals pronunciation. Empty pillars show `0` on the card. |
@@ -164,7 +164,7 @@ const { data: scorecard, isLoading } = useProgressScorecard();
 const confidence = scorecard?.confidence ?? 0;
 const confidenceDelta = scorecard?.confidenceWeeklyChange ?? 0;
 
-// Pronunciation card
+// Clarity card (API field: pronunciation)
 const pronunciation = scorecard?.pronunciation ?? 0;
 const pronunciationDelta = scorecard?.pronunciationWeeklyChange ?? 0;
 
