@@ -225,6 +225,7 @@ function extractAccuracySignals(
 	drillType: 'fill_blank' | 'matching' | 'definition'
 ): WeaknessSignal[] {
 	const accuracies: number[] = [];
+	const missedFillBlanks: string[] = [];
 
 	for (const attempt of attempts) {
 		let accuracy: number | undefined;
@@ -233,6 +234,15 @@ function extractAccuracySignals(
 			const r = attempt.fillBlankResults;
 			if (r?.totalBlanks && r.totalBlanks > 0) {
 				accuracy = r.score ?? ((r.correctBlanks ?? 0) / r.totalBlanks) * 100;
+			}
+			for (const item of r?.items ?? []) {
+				for (const blank of item.blanks ?? []) {
+					if (!blank.isCorrect) {
+						missedFillBlanks.push(
+							`Missed: "${blank.correctAnswer}" in "${item.sentence}" (chose: "${blank.selectedAnswer}")`
+						);
+					}
+				}
 			}
 		} else if (drillType === 'matching') {
 			const r = attempt.matchingResults;
@@ -256,12 +266,17 @@ function extractAccuracySignals(
 		definition: 'vocabulary',
 	};
 
+	const uniqueMissedFillBlanks = [...new Set(missedFillBlanks)].slice(0, 10);
+
 	return [
 		{
 			drillType,
 			category: categoryMap[drillType],
 			severity: severityFromScore(avg),
-			evidence: [`Average accuracy: ${avg.toFixed(1)}%`],
+			evidence: [
+				`Average accuracy: ${avg.toFixed(1)}%`,
+				...(drillType === 'fill_blank' ? uniqueMissedFillBlanks : []),
+			],
 			label: `${drillType.replace('_', ' ')} accuracy`,
 		},
 	];
@@ -323,8 +338,13 @@ function buildPronunciationFrequencySignal(
 			if (p) phonemeFreq.set(p, (phonemeFreq.get(p) ?? 0) + 1);
 		}
 		for (const ws of attempt.wordScores ?? []) {
-			if (ws.score < 90 && ws.word) {
-				wordFreq.set(ws.word, (wordFreq.get(ws.word) ?? 0) + 1);
+			// Only surface words 5+ characters long — short common words (the, to,
+			// and, a, I, you, your, will) are structurally unlikely to be the actual
+			// reason a pronunciation score is low; genuine target words are almost
+			// always longer. Length alone is the filter, no stopword list.
+			if (ws.score < 90 && ws.word && ws.word.length >= 5) {
+				const key = ws.word.toLowerCase();
+				wordFreq.set(key, (wordFreq.get(key) ?? 0) + 1);
 			}
 		}
 	}
