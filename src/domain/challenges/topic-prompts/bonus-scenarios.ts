@@ -144,7 +144,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -188,7 +188,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication between healthcare professionals.
 - Use authentic clinical vocabulary rather than textbook terminology.
 
@@ -694,7 +694,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -737,7 +737,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication with hospital departments.
 - Use authentic clinical and operational vocabulary.
 
@@ -1244,7 +1244,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -1286,7 +1286,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication with patients' families.
 - Use authentic clinical and communication vocabulary.
 
@@ -1741,8 +1741,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 - Mission: {{mission}}
 - Topic: {{topic}}
-- Competencies: {{competencies}}
-- The student struggled with these words this week: {{weak_words}}
+- Competencies: {{fill_blank_evidence}}
+- The student struggled with these words this week: {{fill_blank_evidence}}
 
 The goal is to strengthen the learner's clinical vocabulary while reinforcing the communication competencies required for this topic.
 
@@ -1750,7 +1750,7 @@ Generate 10-15 fill-in-the-blank questions according to the following rules.
 
 1. Vocabulary Selection
 
-- Use the student's weak words: {{weak_words}}.
+- Use the student's weak words: {{fill_blank_evidence}}.
 - If fewer than 10 words are provided, create more sentences for the weak words to be used in.
 - Every vocabulary item must be directly relevant to the topic.
 - Prioritize vocabulary that nurses actively use during patient care, communication, assessment, documentation, and collaboration.
@@ -1761,7 +1761,7 @@ Generate 10-15 fill-in-the-blank questions according to the following rules.
 
 The vocabulary should naturally reinforce the following competencies:
 
-{{competencies}}
+{{fill_blank_evidence}}
 
 Every question should require vocabulary that supports one or more of these competencies.
 
@@ -2093,7 +2093,7 @@ Generate a grammar pronunciation drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following grammar topics this week:
-{{grammar_topics}}
+{{weak_vocabulary}}
 
 The student struggled with the following phonemes this week:
 {{weak_phonemes}}
@@ -2116,7 +2116,7 @@ Sentence:
 2. Pronunciation Selection
 
 - Prioritize the student's weak phonemes ({{weak_phonemes}}).
-- Generate sentences that naturally reinforce the student's grammar topics ({{grammar_topics}}).
+- Generate sentences that naturally reinforce the student's grammar topics ({{weak_vocabulary}}).
 - Every sentence must clearly contain one or more target phonemes while also demonstrating correct grammar.
 - Do not repeat the same grammar structure excessively.
 - Do not repeat sentences.
@@ -2205,7 +2205,7 @@ Generate a grammar fill-in-the-blank drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following grammar topics this week:
-{{grammar_topics}}
+{{fill_blank_evidence}}
 
 Generate 10–15 grammar questions according to the following rules:
 
@@ -2247,7 +2247,7 @@ Include realistic situations such as:
 
 3. Grammar Focus
 
-Generate questions based on the student's grammar topics ({{grammar_topics}}).
+Generate questions based on the student's grammar topics ({{fill_blank_evidence}}).
 
 Examples include:
 
@@ -2346,7 +2346,7 @@ Generate a grammar key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following grammar topics this week:
-{{grammar_topics}}
+{{weak_vocabulary}}
 
 Generate 10–15 key phrase questions according to the following rules:
 
@@ -2372,7 +2372,7 @@ D. {{Response}}
 - Every conversation should reflect realistic communication in hospitals in {{country}}.
 - The learner always plays the nurse.
 - The AI may play a doctor, nurse, patient, family member, pharmacist, therapist, or another healthcare professional.
-- Adapt the conversations naturally according to the target grammar topic ({{grammar_topics}}).
+- Adapt the conversations naturally according to the target grammar topic ({{weak_vocabulary}}).
 - Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
 - Use authentic healthcare communication commonly heard in hospitals.
 
@@ -2380,7 +2380,7 @@ D. {{Response}}
 
 - Every question should require the learner to recognise the response with the most grammatically accurate and natural English.
 - The grammar should be reinforced through realistic communication rather than explicit grammar instruction.
-- Depending on {{grammar_topics}}, focus on grammar such as:
+- Depending on {{weak_vocabulary}}, focus on grammar such as:
   - verb tenses
   - articles
   - prepositions
@@ -2475,7 +2475,7 @@ Generate a grammar roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced the following grammar topics this week:
-{{practiced_grammar}}
+{{weak_vocabulary}}
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -2483,7 +2483,7 @@ Generate a multi-scene roleplay according to the following rules:
 
 - Create 2–3 connected scenes that reflect realistic communication in a hospital in {{country}}.
 - The roleplay should naturally require the learner to use the target grammar rather than explicitly teaching grammar rules.
-- Base the scenario on the student's practiced grammar topics ({{practiced_grammar}}), but do not copy previous scenarios exactly.
+- Base the scenario on the student's practiced grammar topics ({{weak_vocabulary}}), but do not copy previous scenarios exactly.
 - The learner should demonstrate correct grammar while communicating professionally in authentic nursing situations.
 - The student always plays the nurse.
 - The AI may play patients, nurses, doctors, family members, or other healthcare professionals depending on the scenario.

@@ -36,7 +36,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_vocabulary',
-      description: 'Generate vocabulary drill content',
+      description: 'Generate vocabulary drill content based off of the roleplay scenario. The target_sentences array should contain sentences that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each sentence should include a target word and its translation, as well as the full sentence and its translation. The target word should be a key term or phrase that is important for the nurse to know in that context, and the sentence should provide a clear example of how to use that word in a real-life situation. The translation fields should provide accurate translations of the target word and sentence into the target language, ensuring that the content is accessible to learners who may not be fluent in the source language. ',
       parameters: {
         type: 'object',
         properties: {
@@ -63,7 +63,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_pronunciation',
-      description: 'Generate pronunciation drill content',
+      description: 'Generate pronunciation drill content based off of the roleplay scenario. The pronunciation_items array should contain items that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each item should include a sound, word, and sentence, providing learners with clear examples of how to pronounce key terms and phrases in the target language. The sound field should provide an audio representation of the pronunciation, while the word and sentence fields should provide written examples of how to use the term in context. This will help learners improve their pronunciation skills and build confidence in using the target language in real-life situations.',
       parameters: {
         type: 'object',
         properties: {
@@ -238,7 +238,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_fill_blank',
-      description: 'Generate fill-in-the-blank drill content',
+      description: 'Generate fill-in-the-blank drill content based off of the roleplay scenario. The fill_blank_items array should contain items that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each item should include a context, sentence, translation, and blanks array.',
       parameters: {
         type: 'object',
         properties: {
@@ -283,7 +283,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_key_phrases',
-      description: 'Generate key phrases drill content',
+      description: 'Generate key phrases drill content based off of the roleplay scenario. The key_phrase_items array should contain items that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each item should include a prompt, respondentName, options, and correctAnswer.',
       parameters: {
         type: 'object',
         properties: {

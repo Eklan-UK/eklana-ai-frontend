@@ -92,7 +92,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Mission: {{mission}}
 - Topic: {{topic}}
 
-The student struggled with the following words this week: {{weak_words}}
+The student struggled with the following words this week: {{fill_blank_evidence}}
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -128,7 +128,7 @@ D. {{Option}}.
 
 2. Important Requirements
 
-- Use the student's weak words ({{weak_words}}).
+- Use the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, create more sentences for the weak words to be used in.
 - Every sentence should sound like authentic communication or documentation used in hospitals in {{country}}.
 - Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
@@ -496,7 +496,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Mission: {{mission}}
 - Topic: {{topic}}
 
-The student struggled with the following words this week: {{weak_words}}
+The student struggled with the following words this week: {{fill_blank_evidence}}
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -532,7 +532,7 @@ D. {{Option}}
 
 2. Important Requirements
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with other vocabulary commonly used during patient follow-up conversations.
 - Every sentence should sound like authentic communication or documentation used in hospitals in {{country}}.
 - Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
@@ -911,7 +911,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Mission: {{mission}}
 - Topic: {{topic}}
 
-The student struggled with the following words this week: {{weak_words}}
+The student struggled with the following words this week: {{fill_blank_evidence}}
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -949,7 +949,7 @@ D. {{Option}}
 
 2. Important Requirements
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with other vocabulary commonly used during patient admissions.
 - Every sentence should sound like authentic communication or documentation used in hospitals in {{country}}.
 - Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
@@ -1318,7 +1318,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Mission: {{mission}}
 - Topic: {{topic}}
 
-The student struggled with the following words this week: {{weak_words}}
+The student struggled with the following words this week: {{fill_blank_evidence}}
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -1355,7 +1355,7 @@ D. {{Option}}
 
 2. Important Requirements
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with other vocabulary commonly used during bedside conversations and patient interactions.
 - Every sentence should sound like authentic communication used in hospitals in {{country}}.
 - Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
