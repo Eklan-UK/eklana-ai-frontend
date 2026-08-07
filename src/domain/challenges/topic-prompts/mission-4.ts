@@ -226,7 +226,7 @@ Generate a fill-in-the-blank interview vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -260,7 +260,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during nursing interviews.
 - Use authentic interview and clinical vocabulary.
 
