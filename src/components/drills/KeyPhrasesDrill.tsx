@@ -33,7 +33,8 @@ import {
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { preloadTTSAudio } from "@/hooks/useTTS";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback } from "@/lib/practice-feedback";
+import { BookmarkButton } from "@/components/common/BookmarkButton";
+import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 
 interface KeyPhrasesDrillProps {
   drill: any;
@@ -340,7 +341,11 @@ export default function KeyPhrasesDrill({
           `Wrong choice — the correct answer was "${currentItem.correctAnswer}". Score: 0.`
         );
       } else if (passed) {
-        playPracticeFeedback("success");
+        if (Math.round(score) >= 100) {
+          playPerfectItemCelebration();
+        } else {
+          playPracticeFeedback("success");
+        }
         toast.success(`Correct! Pronunciation: ${score.toFixed(0)}% ✓`);
       } else {
         playPracticeFeedback("failure");
@@ -366,10 +371,17 @@ export default function KeyPhrasesDrill({
   const handleTryAgain = () => {
     setPronunciationScore(null);
     discardPendingRecording();
+    setItemResults((prev) => {
+      const next = { ...prev };
+      delete next[currentIndex];
+      return next;
+    });
+    setSessionReviewAnalytics((prev) =>
+      prev.filter((r) => !(r.sceneIndex === currentIndex && r.turnIndex === 0))
+    );
     if (currentResult && !currentResult.isCorrect) {
       setSelectedOption(null);
     }
-    setAttempts(0);
   };
 
   const handleNext = () => {
@@ -680,9 +692,7 @@ export default function KeyPhrasesDrill({
 
         <Card padding="sm" className={`${KP_GHOST_CARD} space-y-2`}>
           <p className="text-sm font-semibold text-foreground">
-            {currentItem.respondentName?.trim()
-              ? `${currentItem.respondentName.trim()} says`
-              : "Speaker says"}
+            Situation / Scenario
           </p>
           <div className="flex items-start justify-between gap-4">
             <p className="min-w-0 flex-1 text-lg font-semibold text-foreground leading-snug break-words pr-1">
@@ -694,7 +704,12 @@ export default function KeyPhrasesDrill({
                 audioUrl={currentItem.promptAudioUrl}
                 className="shrink-0"
               />
-              <DrillBookmarkToggle drillId={String(drill._id)} />
+              <BookmarkButton
+                itemType="sentence"
+                content={currentItem.prompt}
+                context={currentItem.correctAnswer}
+                sourceDrillId={String(drill._id)}
+              />
             </div>
           </div>
         </Card>

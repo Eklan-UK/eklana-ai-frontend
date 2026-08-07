@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   deriveMissionStates,
   getTopicById,
+  getTopicsForPart,
   getViewDetailsPart,
   isKnownLearningJourneyTopicId,
   isLearningJourneyPartId,
@@ -33,6 +34,25 @@ describe("learning-journey.catalog", () => {
     assert.equal(parseLearningJourneyPartId(5), 5);
   });
 
+  it("orders Mission 1 topics with admitting before follow-up", () => {
+    const topics = getTopicsForPart(1);
+    assert.deepEqual(
+      topics.map((t) => t.id),
+      [
+        "handling_emergency_critical",
+        "admitting_patient",
+        "patient_follow_up",
+        "small_talk_patient",
+      ],
+    );
+    assert.deepEqual(
+      topics.map((t) => t.order),
+      [1, 2, 3, 4],
+    );
+    assert.equal(getTopicById("admitting_patient")?.order, 2);
+    assert.equal(getTopicById("patient_follow_up")?.order, 3);
+  });
+
   it("resolves Mission 4 interview prep topic titles", () => {
     assert.equal(getTopicById("motivation_prep")?.title, "Motivation prep");
     assert.equal(getTopicById("technical_prep")?.title, "Technical prep");
@@ -44,7 +64,7 @@ describe("learning-journey.catalog", () => {
     assert.equal(getTopicById("mock_5")?.part, 4);
   });
 
-  it("resolves Mission 5 bonus topic titles", () => {
+  it("resolves Mission 3 discharging_patients and Mission 5 bonus topic titles", () => {
     assert.equal(getTopicById("grammar")?.title, "Grammar");
     assert.equal(
       getTopicById("phone_colleagues")?.title,
@@ -55,19 +75,22 @@ describe("learning-journey.catalog", () => {
       "Discharging Patients",
     );
     assert.equal(getTopicById("grammar")?.part, 5);
+    assert.equal(getTopicById("grammar")?.order, 5);
     assert.equal(getTopicById("phone_colleagues")?.part, 5);
-    assert.equal(getTopicById("discharging_patients")?.part, 5);
+    assert.equal(getTopicById("discharging_patients")?.part, 3);
+    assert.equal(getTopicById("discharging_patients")?.order, 4);
     assert.equal(getTopicById("discharging_patients")?.freeTalkScenarioType, "discharge");
     assert.equal(getTopicById("grammar")?.freeTalkScenarioType, "grammar");
   });
 
-  it("validates Mission 4 interview prep and Mission 5 bonus part/topic pairs", () => {
+  it("validates Mission 3 discharge, Mission 4 interview prep, and Mission 5 bonus pairs", () => {
     assert.equal(isValidPartTopicPair(4, "mock_3"), true);
     assert.equal(isValidPartTopicPair(4, "motivation_prep"), true);
     assert.equal(isValidPartTopicPair(5, "mock_3"), false);
     assert.equal(isValidPartTopicPair(5, "grammar"), true);
     assert.equal(isValidPartTopicPair(5, "phone_colleagues"), true);
-    assert.equal(isValidPartTopicPair(5, "discharging_patients"), true);
+    assert.equal(isValidPartTopicPair(3, "discharging_patients"), true);
+    assert.equal(isValidPartTopicPair(5, "discharging_patients"), false);
     assert.equal(isValidPartTopicPair(4, "grammar"), false);
     assert.equal(isValidPartTopicPair(4, "phone_colleagues"), false);
     assert.equal(isValidPartTopicPair(4, "discharging_patients"), false);

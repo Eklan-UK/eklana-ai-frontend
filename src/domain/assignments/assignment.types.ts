@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import type { DrillSource } from '@/domain/drills/drill.types';
 
 // learnerId accepts Types.ObjectId (legacy/mobile users) or a UUID string
 // (Better Auth web sign-up, incl. Google/Apple OAuth) — see
@@ -23,6 +24,7 @@ export interface CreateAssignmentData {
   assignedBy: Types.ObjectId | string;
   assignedAt: Date;
   builderWeekNumber?: number | null;
+  source?: DrillSource;
   dueDate?: Date;
   status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
 }

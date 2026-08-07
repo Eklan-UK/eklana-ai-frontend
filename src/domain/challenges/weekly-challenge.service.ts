@@ -57,6 +57,75 @@ export interface WeeklyChallengeCompleteResponse {
 	totalItems: number;
 }
 
+/** Learner progress through a week's drills (distinct from generation `status`). */
+export type WeeklyChallengeProgressStatus =
+	| 'pending'
+	| 'in_progress'
+	| 'completed'
+	| 'not_available';
+
+export interface WeeklyChallengeProgressResult {
+	status: WeeklyChallengeProgressStatus;
+	totalDrills: number;
+	completedCount: number;
+}
+
+export interface StaffWeeklyChallengeItem {
+	challengeId: string | null;
+	weekStartDate: string;
+	weekNumber?: number;
+	generationStatus: 'ready' | 'generating' | 'failed' | 'unavailable';
+	status: WeeklyChallengeProgressStatus;
+	totalDrills: number;
+	completedCount: number;
+	summaryMessage?: string;
+	generatedAt?: string | null;
+}
+
+export interface StaffWeeklyChallengeHistoryResponse {
+	challenges: StaffWeeklyChallengeItem[];
+	statistics: {
+		pending: number;
+		inProgress: number;
+		completed: number;
+		notAvailable: number;
+		total: number;
+	};
+}
+
+/**
+ * Derive learner progress from completedItemIndexes vs drillSequence length.
+ * Document `status` remains generation-only (`ready` / `generating` / `failed`).
+ */
+export function computeWeeklyChallengeProgressStatus(
+	doc: IWeeklyChallenge | null | undefined,
+): WeeklyChallengeProgressResult {
+	if (!doc) {
+		return { status: 'not_available', totalDrills: 0, completedCount: 0 };
+	}
+
+	const totalDrills = doc.content?.drillSequence?.length ?? 0;
+	const completedSet = new Set(
+		(doc.completedItemIndexes ?? []).filter(
+			(index) => Number.isInteger(index) && index >= 0 && index < totalDrills,
+		),
+	);
+	const completedCount = completedSet.size;
+
+	// Not ready, generating, failed, pending, or empty sequence → not available
+	if (doc.status !== 'ready' || totalDrills === 0) {
+		return { status: 'not_available', totalDrills, completedCount };
+	}
+
+	if (completedCount === 0) {
+		return { status: 'pending', totalDrills, completedCount };
+	}
+	if (completedCount >= totalDrills) {
+		return { status: 'completed', totalDrills, completedCount: totalDrills };
+	}
+	return { status: 'in_progress', totalDrills, completedCount };
+}
+
 export function toListResponse(
 	doc: IWeeklyChallenge | null,
 	now: Date,
@@ -343,6 +412,71 @@ export async function getWeeklyChallengeHistory(
 	);
 
 	return { challenges };
+}
+
+/**
+ * Read-only weekly challenge history for admin/tutor profiles.
+ * Does NOT call ensureCurrentWeekChallenge / generation.
+ */
+export async function getStaffWeeklyChallengeHistory(
+	learnerId: Types.ObjectId,
+): Promise<StaffWeeklyChallengeHistoryResponse> {
+	const docs = await WeeklyChallengeModel.find({
+		learnerId,
+		status: { $in: ['ready', 'generating', 'failed'] },
+	})
+		.sort({ weekStartDate: -1 })
+		.exec();
+
+	const weekNumbers = assignWeekNumbers(docs);
+
+	const challenges: StaffWeeklyChallengeItem[] = docs.map((doc) => {
+		const progress = computeWeeklyChallengeProgressStatus(doc);
+		const generationStatus =
+			doc.status === 'ready' || doc.status === 'generating' || doc.status === 'failed'
+				? doc.status
+				: 'unavailable';
+		const weekNumber = weekNumbers.get(doc.weekStartDate.toISOString());
+
+		return {
+			challengeId: doc._id.toString(),
+			weekStartDate: doc.weekStartDate.toISOString(),
+			weekNumber: weekNumber && weekNumber > 0 ? weekNumber : undefined,
+			generationStatus,
+			status: progress.status,
+			totalDrills: progress.totalDrills,
+			completedCount: progress.completedCount,
+			summaryMessage: doc.content?.summaryMessage || undefined,
+			generatedAt: doc.generatedAt ? doc.generatedAt.toISOString() : null,
+		};
+	});
+
+	const statistics = {
+		pending: 0,
+		inProgress: 0,
+		completed: 0,
+		notAvailable: 0,
+		total: challenges.length,
+	};
+
+	for (const challenge of challenges) {
+		switch (challenge.status) {
+			case 'pending':
+				statistics.pending += 1;
+				break;
+			case 'in_progress':
+				statistics.inProgress += 1;
+				break;
+			case 'completed':
+				statistics.completed += 1;
+				break;
+			case 'not_available':
+				statistics.notAvailable += 1;
+				break;
+		}
+	}
+
+	return { challenges, statistics };
 }
 
 export async function getWeeklyChallengeForWeek(

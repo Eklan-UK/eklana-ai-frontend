@@ -10,6 +10,7 @@ import {
   badgeIdsToCelebrations,
   type BadgeUnlockCelebration,
 } from '@/lib/badges/badge-unlock';
+import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 
 /** Merged row for streak math (daily focus + login/drill activity days). */
 type StreakDayRow = { dateString: string; date: Date; score?: number };
@@ -146,7 +147,7 @@ export class StreakService {
 
       // Track last qualifying activity for rolling reminder cron
       await UserStreak.updateOne(
-        { userId: new Types.ObjectId(userId) },
+        { userId: { $in: toUserIdCandidates(userId) } },
         { $set: { lastDrillCompletedAt: new Date() } }
       ).exec();
 
@@ -244,10 +245,11 @@ export class StreakService {
     }
 
     try {
-      const uid = new Types.ObjectId(userId);
+      const streakFilter = { userId: { $in: toUserIdCandidates(userId) } };
+      const streakWrite = { userId: toUserIdQuery(userId) };
       const now = new Date();
 
-      const existing = await UserStreak.findOne({ userId: uid }).lean().exec();
+      const existing = await UserStreak.findOne(streakFilter).lean().exec();
       const lastAt: Date | null = existing?.lastDrillCompletedAt
         ? new Date(existing.lastDrillCompletedAt)
         : null;
@@ -270,15 +272,22 @@ export class StreakService {
 
       await this.recordActivityDayOnly(userId, score);
 
-      await UserStreak.findOneAndUpdate(
-        { userId: uid },
-        { $set: { lastDrillCompletedAt: now, lastActivityDate: now } },
-        { upsert: true, new: true }
-      ).exec();
+      if (existing?._id) {
+        await UserStreak.updateOne(
+          { _id: existing._id },
+          { $set: { lastDrillCompletedAt: now, lastActivityDate: now } }
+        ).exec();
+      } else {
+        await UserStreak.findOneAndUpdate(
+          streakWrite,
+          { $set: { lastDrillCompletedAt: now, lastActivityDate: now } },
+          { upsert: true, new: true }
+        ).exec();
+      }
 
       const streakUpdated = await this.recomputeStreakFromActivity(userId);
 
-      const updated = await UserStreak.findOne({ userId: uid }).lean().exec();
+      const updated = await UserStreak.findOne(streakFilter).lean().exec();
 
       logger.info('[StreakService] recordDrillCompletion', {
         userId,
@@ -408,21 +417,26 @@ export class StreakService {
   private static async recomputeStreakFromActivity(userId: string): Promise<boolean> {
     try {
       const completions = await this.getMergedStreakDayRows(userId);
-      const uid = new Types.ObjectId(userId);
+      const streakFilter = { userId: { $in: toUserIdCandidates(userId) } };
+      const streakWrite = { userId: toUserIdQuery(userId) };
+      const existing = await UserStreak.findOne(streakFilter).select('_id').lean().exec();
 
       if (completions.length === 0) {
-        await UserStreak.findOneAndUpdate(
-          { userId: uid },
-          {
-            $set: {
-              currentStreak: 0,
-              streakStartDate: null,
-              lastActivityDate: null,
-              weeklyActivity: this.getEmptyWeeklyActivity(),
-            },
-          },
-          { upsert: true, new: true }
-        ).exec();
+        const emptySet = {
+          currentStreak: 0,
+          streakStartDate: null,
+          lastActivityDate: null,
+          weeklyActivity: this.getEmptyWeeklyActivity(),
+        };
+        if (existing?._id) {
+          await UserStreak.updateOne({ _id: existing._id }, { $set: emptySet }).exec();
+        } else {
+          await UserStreak.findOneAndUpdate(
+            streakWrite,
+            { $set: emptySet },
+            { upsert: true, new: true }
+          ).exec();
+        }
         return false;
       }
 
@@ -430,20 +444,23 @@ export class StreakService {
         this.computeCurrentCalendarStreak(completions);
       const longestStreak = this.calculateLongestStreak(completions);
       const weeklyActivity = this.getWeeklyActivity(completions);
+      const filledSet = {
+        currentStreak,
+        streakStartDate,
+        lastActivityDate: completions[0]?.date || null,
+        longestStreak: Math.max(longestStreak, currentStreak),
+        weeklyActivity,
+      };
 
-      await UserStreak.findOneAndUpdate(
-        { userId: uid },
-        {
-          $set: {
-            currentStreak,
-            streakStartDate,
-            lastActivityDate: completions[0]?.date || null,
-            longestStreak: Math.max(longestStreak, currentStreak),
-            weeklyActivity,
-          },
-        },
-        { upsert: true, new: true }
-      ).exec();
+      if (existing?._id) {
+        await UserStreak.updateOne({ _id: existing._id }, { $set: filledSet }).exec();
+      } else {
+        await UserStreak.findOneAndUpdate(
+          streakWrite,
+          { $set: filledSet },
+          { upsert: true, new: true }
+        ).exec();
+      }
 
       return true;
     } catch (error: any) {
@@ -564,7 +581,7 @@ export class StreakService {
       await this.recomputeStreakFromActivity(userId);
 
       const userStreak = await UserStreak.findOne({
-        userId: new Types.ObjectId(userId),
+        userId: { $in: toUserIdCandidates(userId) },
       }).lean().exec();
 
       if (!userStreak) {

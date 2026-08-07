@@ -12,8 +12,11 @@ export interface Badge {
 
 export interface IUserStreak extends Document {
   _id: Types.ObjectId;
-  userId: Types.ObjectId; // Reference to User (unique)
-  
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId. Mixed so both formats
+  // can be stored/queried without a cast error.
+  userId: Types.ObjectId | string;
+
   // Current streak
   currentStreak: number; // days
   streakStartDate: Date | null;
@@ -24,29 +27,31 @@ export interface IUserStreak extends Document {
   lastDrillCompletedAt: Date | null;
   /** UTC timestamp of the last streak reminder sent. Used to deduplicate rolling reminders (max one per 23 h). */
   lastReminderSentAt: Date | null;
-  
+
   // Longest streak (all time)
   longestStreak: number;
-  
+
   // Badges
   badges: Badge[];
-  
+
   // Weekly activity (last 7 days) - cached for quick access
   weeklyActivity: Array<{
     date: string; // YYYY-MM-DD
     completed: boolean;
     score?: number;
   }>;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
 
 const userStreakSchema = new Schema<IUserStreak>(
   {
+    // Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up, incl.
+    // Google/Apple OAuth) can be stored without a cast error. No `ref`
+    // since populate cannot reliably resolve a mixed-type field.
     userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
+      type: Schema.Types.Mixed,
       required: true,
       unique: true,
       index: true,
@@ -102,4 +107,3 @@ const userStreakSchema = new Schema<IUserStreak>(
 );
 
 export default models?.UserStreak || model<IUserStreak>('UserStreak', userStreakSchema);
-

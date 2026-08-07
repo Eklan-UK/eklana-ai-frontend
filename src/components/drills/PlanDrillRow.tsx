@@ -12,6 +12,7 @@ import {
   DRILL_ESTIMATED_DURATION_LABEL,
   formatDate,
 } from "@/utils/drill";
+import { resolveDrillListTitle } from "@/lib/drill-display-label";
 
 const CATEGORY_TEXT: Record<string, string> = {
   green: "text-violet-600",
@@ -166,16 +167,16 @@ export function PlanDrillRow({
               : "font-semibold text-sm"
           }`}
         >
-          {drill.title?.trim() || getDrillTypeLabel(drill.type)}
+          {isJourney
+            ? resolveDrillListTitle(drill)
+            : drill.title?.trim() || getDrillTypeLabel(drill.type)}
         </h3>
-        {!isJourney ? (
-          <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
-            • {getDrillTypeLabel(drill.type)}
-            {isInProgress && !isCompleted ? (
-              <span className="ml-1.5 text-sky-600">· In progress</span>
-            ) : null}
-          </p>
-        ) : null}
+        <p className={`text-xs mt-0.5 font-medium ${catClass}`}>
+          • {getDrillTypeLabel(drill.type)}
+          {!isJourney && isInProgress && !isCompleted ? (
+            <span className="ml-1.5 text-sky-600">· In progress</span>
+          ) : null}
+        </p>
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground mt-1">
           <span className="inline-flex items-center gap-1">
             <Clock3 className="w-3.5 h-3.5 shrink-0" />

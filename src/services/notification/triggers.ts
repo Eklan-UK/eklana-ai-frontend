@@ -773,8 +773,8 @@ export async function onWeeklyDrillDigest(
   },
 ) {
   const { drillCount, weekKey } = params;
-  const title = 'Your new drills are ready';
-  const body = `You have ${drillCount} new drill${drillCount === 1 ? '' : 's'} this week. Open your plan to get started.`;
+  const title = 'Your Outstanding Drills';
+  const body = `You have ${drillCount} outstanding drill${drillCount === 1 ? '' : 's'}. Open your plan to get started.`;
   const notifData = {
     screen: 'MyPlan',
     url: '/account/drills',
@@ -840,7 +840,7 @@ export async function onWeeklyChallengeReady(
   const { drillCount, weekStartDate } = params;
   const title = 'Your weekly challenge is ready';
   const drillWord = drillCount === 1 ? 'drill' : 'drills';
-  const body = `${drillCount} personalized ${drillWord} based on your practice this week. Start your challenge now.`;
+  const body = `${drillCount} personalized ${drillWord} based on your practice over the past 7 days. Start your challenge now.`;
   const challengePath = `/account/practice/weekly-challenge/${encodeWeekStartDate(weekStartDate)}`;
   const notifData = {
     screen: 'WeeklyChallenge',

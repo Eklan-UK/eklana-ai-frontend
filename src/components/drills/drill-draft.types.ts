@@ -67,6 +67,8 @@ export interface DrillDraft {
   aiCharacterNames: string[];
   /** Parallel to aiCharacterNames; empty = drill-level ttsVoiceKey / default */
   aiCharacterVoiceKeys: string[];
+  /** Parallel to aiCharacterNames; empty = Bot/initials fallback in roleplay UI */
+  aiCharacterAvatars: string[];
   drillIntro: string;
   roleplayScenes: RoleplayScene[];
   matchingPairs: MatchingPair[];
@@ -111,6 +113,7 @@ export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraf
     studentCharacterName: "",
     aiCharacterNames: [""],
     aiCharacterVoiceKeys: [""],
+    aiCharacterAvatars: [""],
     drillIntro: "",
     roleplayScenes: [
       {

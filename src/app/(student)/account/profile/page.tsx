@@ -139,7 +139,7 @@ export default function ProfilePage() {
             <p className="text-2xl md:text-3xl font-bold text-foreground">
               {pronLoading ? "—" : overall !== null ? overall : "—"}
             </p>
-            <p className="text-xs md:text-sm text-muted-foreground">Pronunciation</p>
+            <p className="text-xs md:text-sm text-muted-foreground">Clarity</p>
           </Card>
           <Card className="text-center">
             <div className="flex justify-center mb-2">

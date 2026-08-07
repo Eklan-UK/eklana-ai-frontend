@@ -293,7 +293,7 @@ Use API payload when present. Fallback catalog:
 | `done-and-dusted` | Done & Dusted | 🏆 | You've earned this award for completing all drills for the week. | And they all lived happily ever after... or not. Next? |
 | `deja-vu` | Déjà Vu | 🔭 | You've earned this award for practising a difficult drill at least 10 times. | If this drill could talk, it would know your voice by now. |
 | `monthly-challenge` | Monthly Challenge | 📅 | You've earned this award for practicing at least 5 minutes everyday for 14 consecutive days within a single month. | Not every hero wears a cape... Turns out consistency is a superpower. |
-| `master-collector` | Master Collector | 📚 | You've earned this award for saving difficult drills to revisit and master later. | This difficult drill is already getting nervous. We love seeing it. |
+| `master-collector` | Master Collector | 📚 | You've earned this award for saving a drill to revisit and master later. | This drill is already getting nervous. We love seeing it. |
 | `medication-master` | Medication Master | 💊 | You've earned this award for correctly practicing 50 medication names and explanations. | Metoprolol is even scared of you now... You're in charge. |
 | `handover-hero` | Handover Hero | 📋 | You've earned this award for completing handover drills. | Clear. Concise. Complete. Look at you! |
 | `nightingale-award` | Nightingale Award | 👑 | You've earned this award for completing Zero Pause Challenge. | Florence is looking down on you and smiling. |

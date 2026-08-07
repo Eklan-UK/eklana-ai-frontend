@@ -90,6 +90,8 @@ export interface AIDrillBulkPendingItem {
   journeyPart: LearningJourneyPartId | "";
   journeyTopic: string;
   completionDate?: string;
+  /** Optional title from AI form (Precision Clinic). */
+  drillTitle?: string;
 }
 
 export interface AIDrillInitialContext {
@@ -150,6 +152,9 @@ export function useAIDrillCreationWorkflow({
   );
   const [aiPrompt, setAiPrompt] = useState(
     () => persistedOnMount?.formValues.prompt ?? "",
+  );
+  const [aiDrillTitle, setAiDrillTitle] = useState(
+    () => persistedOnMount?.formValues.drillTitle ?? "",
   );
   const [isGeneratingDrill, setIsGeneratingDrill] = useState(false);
   const [aiGeneratedResults, setAiGeneratedResults] = useState<
@@ -265,6 +270,7 @@ export function useAIDrillCreationWorkflow({
       journeyTopic: aiJourneyTopic,
       context: aiContext,
       prompt: aiPrompt,
+      drillTitle: aiDrillTitle,
     }),
     [
       aiStudentIds,
@@ -274,6 +280,7 @@ export function useAIDrillCreationWorkflow({
       aiJourneyTopic,
       aiContext,
       aiPrompt,
+      aiDrillTitle,
     ],
   );
 
@@ -292,6 +299,7 @@ export function useAIDrillCreationWorkflow({
           journeyTopic: aiJourneyTopic,
           context: aiContext,
           prompt: aiPrompt,
+          drillTitle: aiDrillTitle,
         },
         generatedResults: aiGeneratedResults,
         showPreview: showAiPreview,
@@ -307,6 +315,7 @@ export function useAIDrillCreationWorkflow({
     aiJourneyTopic,
     aiContext,
     aiPrompt,
+    aiDrillTitle,
     aiGeneratedResults,
     showAiPreview,
   ]);
@@ -350,6 +359,9 @@ export function useAIDrillCreationWorkflow({
         case "prompt":
           setAiPrompt(value as string);
           break;
+        case "drillTitle":
+          setAiDrillTitle(value as string);
+          break;
       }
     },
     [markUserEdited],
@@ -382,20 +394,21 @@ export function useAIDrillCreationWorkflow({
     }
     try {
       setIsGeneratingDrill(true);
+      const body: Record<string, unknown> = {
+        drillTypes: aiDrillTypes,
+        difficulty: aiDifficulty,
+        context: aiContext,
+        prompt: aiPrompt,
+        studentId: aiStudentIds[0],
+        studentIds: aiStudentIds,
+        part: aiJourneyPart,
+        topic: aiJourneyTopic,
+      };
       const res = await fetch("/api/v1/drills/ai-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          drillTypes: aiDrillTypes,
-          difficulty: aiDifficulty,
-          context: aiContext,
-          prompt: aiPrompt,
-          part: aiJourneyPart,
-          topic: aiJourneyTopic,
-          studentId: aiStudentIds[0],
-          studentIds: aiStudentIds,
-        }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -463,6 +476,7 @@ export function useAIDrillCreationWorkflow({
         journeyPart: aiJourneyPart,
         journeyTopic: aiJourneyTopic,
         completionDate: undefined,
+        drillTitle: aiDrillTitle.trim() || undefined,
       }),
     );
 
@@ -481,6 +495,7 @@ export function useAIDrillCreationWorkflow({
     aiStudentIds,
     aiJourneyPart,
     aiJourneyTopic,
+    aiDrillTitle,
     onBulkReady,
   ]);
 

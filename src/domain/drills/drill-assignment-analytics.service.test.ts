@@ -13,6 +13,14 @@ import {
 const ASSIGNMENT_ID = '507f1f77bcf86cd799439011';
 const DRILL_ID = '507f1f77bcf86cd799439012';
 
+const GRAMMAR_PATTERNS = [
+	{
+		pattern: 'Present simple',
+		example: 'I walk',
+		sentences: [{ text: 'I walk every day', index: 0 }],
+	},
+];
+
 function makeAssignment(
 	overrides: Partial<DrillAssignmentLike> & { drillId?: unknown } = {}
 ): DrillAssignmentLike & { drillId?: unknown } {
@@ -35,6 +43,18 @@ function makeAttempt(overrides: Partial<DrillAttemptLike> = {}): DrillAttemptLik
 		completedAt: '2026-01-02T00:00:00.000Z',
 		...overrides,
 	};
+}
+
+function makeGrammarPendingAttempt(
+	overrides: Partial<DrillAttemptLike> = {}
+): DrillAttemptLike {
+	return makeAttempt({
+		grammarResults: {
+			reviewStatus: 'pending',
+			patterns: GRAMMAR_PATTERNS,
+		},
+		...overrides,
+	});
 }
 
 describe('groupAttemptsByAssignmentId', () => {
@@ -101,42 +121,75 @@ describe('deriveEffectiveStatus', () => {
 });
 
 describe('deriveReviewStatus', () => {
-	it('derives pending review from sentenceResults', () => {
-		const result = deriveReviewStatus({
-			sentenceResults: { reviewStatus: 'pending' },
+	it('ignores pending sentenceResults (grammar-only profile review)', () => {
+		const result = deriveReviewStatus(
+			{ sentenceResults: { reviewStatus: 'pending' } },
+			'grammar'
+		);
+		assert.deepEqual(result, {
+			reviewStatus: null,
+			requiresReview: false,
 		});
+	});
+
+	it('ignores pending summaryResults (grammar-only profile review)', () => {
+		const result = deriveReviewStatus(
+			{ summaryResults: { reviewStatus: 'pending' } },
+			'grammar'
+		);
+		assert.deepEqual(result, {
+			reviewStatus: null,
+			requiresReview: false,
+		});
+	});
+
+	it('derives pending review when type is grammar with patterns', () => {
+		const result = deriveReviewStatus(
+			{
+				sentenceResults: { reviewStatus: 'reviewed' },
+				summaryResults: { reviewStatus: 'pending' },
+				grammarResults: {
+					reviewStatus: 'pending',
+					patterns: GRAMMAR_PATTERNS,
+				},
+			},
+			'grammar'
+		);
 		assert.deepEqual(result, {
 			reviewStatus: 'pending',
 			requiresReview: true,
 		});
 	});
 
-	it('prefers sentenceResults over summary and grammar results', () => {
-		const result = deriveReviewStatus({
-			sentenceResults: { reviewStatus: 'reviewed' },
-			summaryResults: { reviewStatus: 'pending' },
-			grammarResults: { reviewStatus: 'pending' },
-		});
-		assert.equal(result.reviewStatus, 'reviewed');
-		assert.equal(result.requiresReview, false);
-	});
-
-	it('falls back to summaryResults then grammarResults', () => {
+	it('uses grammarResults even when sentence/summary are pending', () => {
 		assert.deepEqual(
-			deriveReviewStatus({
-				summaryResults: { reviewStatus: 'pending' },
-				grammarResults: { reviewStatus: 'reviewed' },
-			}),
+			deriveReviewStatus(
+				{
+					sentenceResults: { reviewStatus: 'pending' },
+					summaryResults: { reviewStatus: 'pending' },
+					grammarResults: {
+						reviewStatus: 'reviewed',
+						patterns: GRAMMAR_PATTERNS,
+					},
+				},
+				'grammar'
+			),
 			{
-				reviewStatus: 'pending',
-				requiresReview: true,
+				reviewStatus: 'reviewed',
+				requiresReview: false,
 			}
 		);
 
 		assert.deepEqual(
-			deriveReviewStatus({
-				grammarResults: { reviewStatus: 'reviewed' },
-			}),
+			deriveReviewStatus(
+				{
+					grammarResults: {
+						reviewStatus: 'reviewed',
+						patterns: GRAMMAR_PATTERNS,
+					},
+				},
+				'grammar'
+			),
 			{
 				reviewStatus: 'reviewed',
 				requiresReview: false,
@@ -144,8 +197,70 @@ describe('deriveReviewStatus', () => {
 		);
 	});
 
+	it('does not require review for grammar without real patterns (contaminated default)', () => {
+		assert.deepEqual(
+			deriveReviewStatus(
+				{ grammarResults: { reviewStatus: 'pending' } },
+				'grammar'
+			),
+			{ reviewStatus: null, requiresReview: false }
+		);
+		assert.deepEqual(
+			deriveReviewStatus(
+				{ grammarResults: { reviewStatus: 'pending', patterns: [] } },
+				'grammar'
+			),
+			{ reviewStatus: null, requiresReview: false }
+		);
+	});
+
+	it('does not require review for non-grammar types even with contaminated grammarResults', () => {
+		const contaminated = {
+			grammarResults: { reviewStatus: 'pending' },
+		};
+
+		for (const type of [
+			'roleplay',
+			'key_phrases',
+			'vocabulary',
+			'pronunciation',
+			'sentence',
+			'summary',
+		]) {
+			assert.deepEqual(
+				deriveReviewStatus(contaminated, type),
+				{ reviewStatus: null, requiresReview: false },
+				`expected no review for type=${type}`
+			);
+		}
+	});
+
+	it('does not require review when drill type is missing', () => {
+		assert.deepEqual(
+			deriveReviewStatus(
+				{
+					grammarResults: {
+						reviewStatus: 'pending',
+						patterns: GRAMMAR_PATTERNS,
+					},
+				},
+				null
+			),
+			{ reviewStatus: null, requiresReview: false }
+		);
+		assert.deepEqual(
+			deriveReviewStatus({
+				grammarResults: {
+					reviewStatus: 'pending',
+					patterns: GRAMMAR_PATTERNS,
+				},
+			}),
+			{ reviewStatus: null, requiresReview: false }
+		);
+	});
+
 	it('returns no review requirement when attempt is missing', () => {
-		assert.deepEqual(deriveReviewStatus(null), {
+		assert.deepEqual(deriveReviewStatus(null, 'grammar'), {
 			reviewStatus: null,
 			requiresReview: false,
 		});
@@ -157,7 +272,11 @@ describe('enrichDrillAssignment', () => {
 		const enriched = enrichDrillAssignment(makeAssignment(), [
 			makeAttempt({
 				score: 72,
-				grammarResults: { reviewStatus: 'pending', accuracy: 72 },
+				grammarResults: {
+					reviewStatus: 'pending',
+					accuracy: 72,
+					patterns: GRAMMAR_PATTERNS,
+				},
 			}),
 		]);
 
@@ -167,7 +286,54 @@ describe('enrichDrillAssignment', () => {
 		assert.deepEqual(enriched.latestAttempt?.grammarResults, {
 			reviewStatus: 'pending',
 			accuracy: 72,
+			patterns: GRAMMAR_PATTERNS,
 		});
+	});
+
+	it('does not set requiresReview for roleplay with contaminated grammarResults', () => {
+		const enriched = enrichDrillAssignment(
+			makeAssignment({
+				drillId: {
+					_id: DRILL_ID,
+					title: 'Roleplay Drill',
+					type: 'roleplay',
+				},
+			}),
+			[
+				makeAttempt({
+					grammarResults: { reviewStatus: 'pending' },
+					roleplayResults: { sceneScores: [] },
+				}),
+			]
+		);
+
+		assert.equal(enriched.requiresReview, false);
+		assert.equal(enriched.reviewStatus, null);
+	});
+
+	it('does not set requiresReview for key_phrases with contaminated grammarResults', () => {
+		const enriched = enrichDrillAssignment(
+			makeAssignment({
+				drillId: {
+					_id: DRILL_ID,
+					title: 'Key Phrases Drill',
+					type: 'key_phrases',
+				},
+			}),
+			[makeAttempt({ grammarResults: { reviewStatus: 'pending' } })]
+		);
+
+		assert.equal(enriched.requiresReview, false);
+		assert.equal(enriched.reviewStatus, null);
+	});
+
+	it('does not set requiresReview for grammar when patterns are missing', () => {
+		const enriched = enrichDrillAssignment(makeAssignment(), [
+			makeAttempt({ grammarResults: { reviewStatus: 'pending' } }),
+		]);
+
+		assert.equal(enriched.requiresReview, false);
+		assert.equal(enriched.reviewStatus, null);
 	});
 
 	it('uses best attempt score for bestScore', () => {
@@ -214,14 +380,31 @@ describe('computeDrillAssignmentStatistics', () => {
 		assert.equal(stats.completionRate, 33.33);
 	});
 
-	it('counts pendingReview from derived requiresReview', () => {
+	it('counts pendingReview from derived requiresReview (grammar + patterns only)', () => {
 		const assignments = [
 			enrichDrillAssignment(makeAssignment({ _id: 'a1', status: 'completed' }), [
-				makeAttempt({ grammarResults: { reviewStatus: 'pending' } }),
+				makeGrammarPendingAttempt(),
 			]),
 			enrichDrillAssignment(makeAssignment({ _id: 'a2', status: 'completed' }), [
-				makeAttempt({ grammarResults: { reviewStatus: 'reviewed' } }),
+				makeAttempt({
+					grammarResults: {
+						reviewStatus: 'reviewed',
+						patterns: GRAMMAR_PATTERNS,
+					},
+				}),
 			]),
+			enrichDrillAssignment(
+				makeAssignment({
+					_id: 'a3',
+					status: 'completed',
+					drillId: {
+						_id: DRILL_ID,
+						title: 'Roleplay',
+						type: 'roleplay',
+					},
+				}),
+				[makeAttempt({ grammarResults: { reviewStatus: 'pending' } })]
+			),
 		];
 
 		const stats = computeDrillAssignmentStatistics(assignments);

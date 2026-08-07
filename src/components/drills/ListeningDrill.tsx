@@ -13,6 +13,7 @@ import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
+import type { DrillConfettiVariant } from "@/lib/drill-celebration";
 
 interface ListeningDrillProps {
   drill: any;
@@ -28,6 +29,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   });
   const [isCompleted, setIsCompleted] = useState(false);
   const [celebrationSoundUrl, setCelebrationSoundUrl] = useState<string>();
+  const [confettiVariant, setConfettiVariant] = useState<DrillConfettiVariant>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasListened, setHasListened] = useState(false);
@@ -194,6 +196,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       });
 
       setCelebrationSoundUrl(result.data?.effects?.soundUrl);
+      setConfettiVariant(result.data?.effects?.confettiVariant);
 
       localProgress.clear();
       setIsCompleted(true);
@@ -227,6 +230,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
         drillType="listening"
         celebrate
         celebrationSoundUrl={celebrationSoundUrl}
+        confettiVariant={confettiVariant}
       />
     );
   }

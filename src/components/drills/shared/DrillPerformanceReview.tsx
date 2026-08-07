@@ -225,6 +225,8 @@ export function DrillPerformanceReview({
 
   useDrillScoreCelebration(
     isViewer || !hasData ? null : avgScore >= passThreshold,
+    undefined,
+    avgScore,
   );
 
   const openIdx =
