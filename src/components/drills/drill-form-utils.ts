@@ -185,6 +185,8 @@ export function validateDrillDraft(
   options?: {
     requireUsers?: boolean;
     enrolledParts?: LearningJourneyPartId[];
+    /** Precision Clinic drills aren't curriculum-linked, so skip the learning journey mission/topic requirement entirely. */
+    skipLearningJourney?: boolean;
   },
 ): boolean {
   if (!draft.completionDate) {
@@ -192,23 +194,25 @@ export function validateDrillDraft(
     return false;
   }
 
-  if (!draft.journeyPart || !draft.journeyTopic) {
-    toast.error("Please select a learning journey mission and topic");
-    return false;
-  }
+  if (!options?.skipLearningJourney) {
+    if (!draft.journeyPart || !draft.journeyTopic) {
+      toast.error("Please select a learning journey mission and topic");
+      return false;
+    }
 
-  if (
-    options?.enrolledParts &&
-    draft.selectedUsers.length > 0 &&
-    !options.enrolledParts.includes(draft.journeyPart)
-  ) {
-    toast.error("Selected mission is not enrolled for all selected students");
-    return false;
-  }
+    if (
+      options?.enrolledParts &&
+      draft.selectedUsers.length > 0 &&
+      !options.enrolledParts.includes(draft.journeyPart)
+    ) {
+      toast.error("Selected mission is not enrolled for all selected students");
+      return false;
+    }
 
-  if (!isValidPartTopicPair(draft.journeyPart, draft.journeyTopic)) {
-    toast.error("Selected topic does not belong to the selected mission");
-    return false;
+    if (!isValidPartTopicPair(draft.journeyPart, draft.journeyTopic)) {
+      toast.error("Selected topic does not belong to the selected mission");
+      return false;
+    }
   }
 
   const { drillType } = draft;
@@ -339,6 +343,8 @@ export function buildDrillPayloadFromDraft(
     omitAssignment?: boolean;
     /** Drill-builder week context — places assignedAt in that week when set. */
     weekNumber?: number;
+    /** Tags the drill as created via a dedicated product surface (e.g. Precision Clinic) that bypasses the learning-journey requirement. */
+    source?: "precision_clinic";
   },
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -350,8 +356,11 @@ export function buildDrillPayloadFromDraft(
     context: draft.context || undefined,
     audio_example_url: draft.audioExampleUrl || undefined,
     tts_voice_key: draft.ttsVoiceKey || undefined,
-    learning_journey_part: draft.journeyPart,
-    learning_journey_topic: draft.journeyTopic,
+    // Falsy (unset) rather than always-included: Precision Clinic drills skip this
+    // requirement entirely and leave these blank, and the server schema only accepts
+    // a valid part/topic or an omitted field — never an empty string.
+    learning_journey_part: draft.journeyPart || undefined,
+    learning_journey_topic: draft.journeyTopic || undefined,
   };
 
   if (!options?.omitAssignment) {
@@ -369,6 +378,10 @@ export function buildDrillPayloadFromDraft(
     options.weekNumber >= 1
   ) {
     payload.weekNumber = Math.floor(options.weekNumber);
+  }
+
+  if (options?.source) {
+    payload.source = options.source;
   }
 
   const { drillType } = draft;

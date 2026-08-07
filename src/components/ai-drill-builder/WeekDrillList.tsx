@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { Edit, Trash2, Loader2, ChevronRight, Eye, X } from "lucide-react";
 import { toast } from "sonner";
 import { drillAPI } from "@/lib/api";
@@ -41,6 +44,16 @@ interface WeekDrillListProps {
   currentWeekNumber: number;
   /** Highest existing week slot for this student (1..currentWeek). */
   currentWeek: number;
+  /**
+   * When false, hides select-all / move-to-week UI and the sticky bottom bar /
+   * move dialog. Defaults to true for AI Drill Builder callers.
+   */
+  enableMove?: boolean;
+  /**
+   * Invalidation helper after delete / bookmark toggle. Defaults to the
+   * general Drill Builder student-weeks invalidator.
+   */
+  invalidate?: (queryClient: QueryClient, studentId: string) => Promise<void>;
 }
 
 export function WeekDrillList({
@@ -50,6 +63,8 @@ export function WeekDrillList({
   studentId,
   currentWeekNumber,
   currentWeek,
+  enableMove = true,
+  invalidate = invalidateStudentWeeks,
 }: WeekDrillListProps) {
   const queryClient = useQueryClient();
   const moveDrills = useMoveStudentWeekDrills(studentId);
@@ -64,10 +79,12 @@ export function WeekDrillList({
 
   const selectableAssignmentIds = useMemo(
     () =>
-      drills
-        .map((d) => (d.assignmentId ? String(d.assignmentId) : null))
-        .filter((id): id is string => Boolean(id)),
-    [drills],
+      enableMove
+        ? drills
+            .map((d) => (d.assignmentId ? String(d.assignmentId) : null))
+            .filter((id): id is string => Boolean(id))
+        : [],
+    [drills, enableMove],
   );
 
   // Every open week slot (1..currentWeek) except the source week being viewed.
@@ -143,7 +160,7 @@ export function WeekDrillList({
     try {
       await drillAPI.delete(drillId);
       toast.success("Drill deleted successfully");
-      await invalidateStudentWeeks(queryClient, studentId);
+      await invalidate(queryClient, studentId);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       toast.error("Failed to delete drill: " + message);
@@ -158,8 +175,10 @@ export function WeekDrillList({
     selectableAssignmentIds.every((id) => selectedIds.has(id));
 
   return (
-    <div className={`space-y-3 ${selectedCount > 0 ? "pb-20" : ""}`}>
-      {selectableAssignmentIds.length > 0 && (
+    <div
+      className={`space-y-3 ${enableMove && selectedCount > 0 ? "pb-20" : ""}`}
+    >
+      {enableMove && selectableAssignmentIds.length > 0 && (
         <div className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-white/95 backdrop-blur-sm border-b border-gray-100">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -215,7 +234,8 @@ export function WeekDrillList({
           ? String(drill.assignmentId)
           : null;
         const key = assignmentId ?? drillId ?? drill.title ?? drillType;
-        const isSelected = assignmentId ? selectedIds.has(assignmentId) : false;
+        const isSelected =
+          enableMove && assignmentId ? selectedIds.has(assignmentId) : false;
 
         const infoBlock = (
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -268,7 +288,7 @@ export function WeekDrillList({
             }`}
           >
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              {assignmentId && (
+              {enableMove && assignmentId && (
                 <Checkbox
                   checked={isSelected}
                   onChange={(e) =>
@@ -299,7 +319,7 @@ export function WeekDrillList({
                   drillId={drillId}
                   isBookmarked={Boolean(drill.isBookmarked)}
                   onToggled={() => {
-                    void invalidateStudentWeeks(queryClient, studentId);
+                    void invalidate(queryClient, studentId);
                   }}
                 />
                 <button
@@ -354,7 +374,7 @@ export function WeekDrillList({
         );
       })}
 
-      {selectedCount > 0 && (
+      {enableMove && selectedCount > 0 && (
         <div className="fixed bottom-4 inset-x-4 z-40 mx-auto max-w-3xl flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
           <p className="text-sm font-medium text-amber-900">
             {selectedCount} selected
@@ -384,7 +404,7 @@ export function WeekDrillList({
         </div>
       )}
 
-      {showMoveDialog && (
+      {enableMove && showMoveDialog && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={(e) => {

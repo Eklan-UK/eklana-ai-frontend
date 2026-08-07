@@ -47,7 +47,10 @@ async function getHandler(
         user,
       });
 
-    const assignments = await DrillAssignment.find({ learnerId: learnerIdQuery })
+    const assignments = await DrillAssignment.find({
+      learnerId: learnerIdQuery,
+      source: { $ne: "precision_clinic" },
+    })
       .populate(
         "drillId",
         "title type difficulty learning_journey_topic learning_journey_part is_active is_bookmarked",

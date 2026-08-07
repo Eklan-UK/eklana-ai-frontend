@@ -79,6 +79,7 @@ export async function getAssignmentMaxWeek(
 ): Promise<number> {
   const assignments = await DrillAssignment.find({
     learnerId: toUserIdQuery(learnerId),
+    source: { $ne: "precision_clinic" },
   })
     .select("assignedAt builderWeekNumber")
     .lean()
@@ -342,6 +343,7 @@ export async function deleteStudentWeeks(params: {
 
   const assignments = await DrillAssignment.find({
     learnerId: toUserIdQuery(learnerId),
+    source: { $ne: "precision_clinic" },
   })
     .select("_id assignedAt builderWeekNumber")
     .lean()

@@ -48,6 +48,8 @@ export interface DrillFormBodyProps {
   leadingContent?: React.ReactNode;
   sidebarLeadingContent?: React.ReactNode;
   onDrillTypeChange?: (newType: string) => void;
+  /** Hides the Learning Journey mission/topic fields (e.g. for Precision Clinic drills, which aren't curriculum-linked). */
+  hideLearningJourneyFields?: boolean;
 }
 
 export function DrillFormBody({
@@ -65,6 +67,7 @@ export function DrillFormBody({
   leadingContent,
   sidebarLeadingContent,
   onDrillTypeChange,
+  hideLearningJourneyFields = false,
 }: DrillFormBodyProps) {
   const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
   const [enrollmentFocusStudentId, setEnrollmentFocusStudentId] = useState<
@@ -1676,18 +1679,20 @@ export function DrillFormBody({
                 </div>
               </div>
 
-              <LearningJourneyPartTopicFields
-                journeyPart={draft.journeyPart}
-                journeyTopic={draft.journeyTopic}
-                onPartChange={(v) => patchDraft({ journeyPart: v })}
-                onTopicChange={(v) => patchDraft({ journeyTopic: v })}
-                required
-                enrolledParts={
-                  selectedStudentIds.length > 0 ? enrolledParts : undefined
-                }
-                selectedStudentIds={selectedStudentIds}
-                onOpenEnrollment={openEnrollment}
-              />
+              {!hideLearningJourneyFields && (
+                <LearningJourneyPartTopicFields
+                  journeyPart={draft.journeyPart}
+                  journeyTopic={draft.journeyTopic}
+                  onPartChange={(v) => patchDraft({ journeyPart: v })}
+                  onTopicChange={(v) => patchDraft({ journeyTopic: v })}
+                  required
+                  enrolledParts={
+                    selectedStudentIds.length > 0 ? enrolledParts : undefined
+                  }
+                  selectedStudentIds={selectedStudentIds}
+                  onOpenEnrollment={openEnrollment}
+                />
+              )}
 
               {draft.drillType !== "roleplay" && (
                 <div>

@@ -1,99 +1,4 @@
-import type { Types } from 'mongoose';
-import type {
-	PrecisionClinicDrillType,
-	PrecisionClinicDifficulty,
-	PrecisionClinicPublishStatus,
-	ClinicSoundGroup,
-	ClinicKeyPhraseQuestion,
-	ClinicMatchingPair,
-	ClinicGrammarPattern,
-	ClinicSentenceWritingWord,
-} from '@/models/precision-clinic-drill.shared';
-
-export type {
-	PrecisionClinicDrillType,
-	PrecisionClinicDifficulty,
-	PrecisionClinicPublishStatus,
-	ClinicSoundGroup,
-	ClinicKeyPhraseQuestion,
-	ClinicMatchingPair,
-	ClinicGrammarPattern,
-	ClinicSentenceWritingWord,
-} from '@/models/precision-clinic-drill.shared';
-
-export {
-	PRECISION_CLINIC_DRILL_TYPES,
-	PRECISION_CLINIC_DIFFICULTIES,
-	PRECISION_CLINIC_DRILL_TYPE_LABELS,
-} from '@/models/precision-clinic-drill.shared';
-
-/** Lean document shape returned by the repository. */
-export interface PrecisionClinicDrill {
-	_id: Types.ObjectId;
-	title: string;
-	type: PrecisionClinicDrillType;
-	difficulty: PrecisionClinicDifficulty;
-	context: string;
-	completionDate?: Date | null;
-	durationDays: number;
-	preGenerateAudio: boolean;
-	ttsVoiceKey?: string | null;
-	assignedLearnerIds: Array<Types.ObjectId | string>;
-	createdBy?: Types.ObjectId | string | null;
-	createdByEmail?: string;
-	isArchived: boolean;
-	soundGroups: ClinicSoundGroup[];
-	questions: ClinicKeyPhraseQuestion[];
-	pairs: ClinicMatchingPair[];
-	patterns: ClinicGrammarPattern[];
-	words: ClinicSentenceWritingWord[];
-	contentTitle: string;
-	content: string;
-	articleTitle: string;
-	articleContent: string;
-	createdAt: Date;
-	updatedAt: Date;
-}
-
-export interface PrecisionClinicListFilters {
-	q?: string;
-	type?: PrecisionClinicDrillType;
-	difficulty?: PrecisionClinicDifficulty;
-	/** published = assignedLearnerIds.length > 0; draft = empty */
-	status?: PrecisionClinicPublishStatus;
-	/** When true, include archived; default list excludes them. */
-	includeArchived?: boolean;
-	isArchived?: boolean;
-	limit?: number;
-	offset?: number;
-}
-
-export interface CreatePrecisionClinicDrillData {
-	title: string;
-	type: PrecisionClinicDrillType;
-	difficulty?: PrecisionClinicDifficulty;
-	context?: string;
-	completionDate?: Date | string | null;
-	durationDays?: number;
-	preGenerateAudio?: boolean;
-	ttsVoiceKey?: string | null;
-	assignedLearnerIds?: Array<string | Types.ObjectId>;
-	createdBy?: Types.ObjectId | string | null;
-	createdByEmail?: string;
-	isArchived?: boolean;
-	soundGroups?: ClinicSoundGroup[];
-	questions?: ClinicKeyPhraseQuestion[];
-	pairs?: ClinicMatchingPair[];
-	patterns?: ClinicGrammarPattern[];
-	words?: ClinicSentenceWritingWord[];
-	contentTitle?: string;
-	content?: string;
-	articleTitle?: string;
-	articleContent?: string;
-}
-
-export type UpdatePrecisionClinicDrillData = Partial<CreatePrecisionClinicDrillData>;
-
+/** Dashboard card counts from Drill / DrillAssignment (source=precision_clinic). */
 export interface PrecisionClinicStats {
 	total: number;
 	practiceItems: number;
@@ -101,10 +6,48 @@ export interface PrecisionClinicStats {
 	assigned: number;
 }
 
-export interface PrecisionClinicListResult {
-	drills: PrecisionClinicDrill[];
-	total: number;
-	limit: number;
-	offset: number;
-	stats: PrecisionClinicStats;
+export interface PrecisionClinicLearnerWeekListItem {
+	/** String(builderWeekNumber) — kept as `learnerWeekId` so student components don't need changes. */
+	learnerWeekId: string;
+	personalWeekNumber: number;
+	title: string;
+	status: 'ready';
+	totalItems: number;
+	/** Count of assignments with `status === 'completed'`. */
+	completedItems: number;
+	assignedAt: string;
+}
+
+export interface PrecisionClinicLearnerWeekHistoryResponse {
+	weeks: PrecisionClinicLearnerWeekListItem[];
+}
+
+export interface PrecisionClinicLearnerWeekDrillListItem {
+	index: number;
+	/** Assignment id (stable list key). */
+	itemId: string;
+	/** Same as `drillId` — kept for older clients. */
+	sourceDrillId: string;
+	/** Drill document id — used to open the practice player. */
+	drillId: string;
+	/** DrillAssignment id — passed as `?assignmentId=` to the player. */
+	assignmentId: string;
+	title: string;
+	/** General Drill `type` (Precision Clinic now reuses Drill Builder content). */
+	type: string;
+	difficulty: string;
+	/** True when assignment `status === 'completed'`. */
+	completed: boolean;
+	sortOrder: number;
+}
+
+export interface PrecisionClinicLearnerWeekDetailResponse {
+	learnerWeekId: string;
+	personalWeekNumber: number;
+	title: string;
+	status: 'ready';
+	totalItems: number;
+	completedItemIndexes: number[];
+	assignedAt: string;
+	drills: PrecisionClinicLearnerWeekDrillListItem[];
 }

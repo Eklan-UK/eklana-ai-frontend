@@ -2,7 +2,7 @@
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
-import { ChevronRight, Lock, Trophy } from "lucide-react";
+import { ChevronRight, Lock, Target, Trophy } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -105,6 +105,7 @@ function PracticeCard({
 
 export default function PracticePage() {
   const tWeekly = useTranslations("account.weeklyChallenge");
+  const tClinic = useTranslations("account.precisionClinic");
   const { data: me, isLoading } = useUserCurrent();
   // Default locked while loading to prevent flash of unlocked state.
   const isSubscribed = !isLoading && learnerHasProAccess(me?.user);
@@ -136,6 +137,16 @@ export default function PracticePage() {
             icon={<Trophy className="w-6 h-6 text-white" aria-hidden />}
             title={tWeekly("practiceCardTitle")}
             subtitle={tWeekly("practiceCardSubtitle")}
+            meta={[]}
+            locked={!isSubscribed}
+          />
+
+          <PracticeCard
+            href="/account/practice/precision-clinic"
+            iconBg="bg-teal-700"
+            icon={<Target className="w-6 h-6 text-white" aria-hidden />}
+            title={tClinic("practiceCardTitle")}
+            subtitle={tClinic("practiceCardSubtitle")}
             meta={[]}
             locked={!isSubscribed}
           />

@@ -109,6 +109,24 @@
       "summaryFallback": "Your personalized weekly challenge",
       "completed": "Completed",
       "backToAccount": "Back to account"
+    },
+    "precisionClinic": {
+      "badge": "Eklan Precision Clinic",
+      "pageTitle": "Eklan Precision Clinic",
+      "practiceCardTitle": "Eklan Precision Clinic",
+      "practiceCardSubtitle": "Targeted drills for your weak areas",
+      "weekLabel": "Week {number}",
+      "assignedOn": "Assigned {date}",
+      "drillCount": "{count, plural, one {# drill} other {# drills}}",
+      "progress": "{completed}/{total} completed",
+      "statusReady": "Ready",
+      "statusOngoing": "Ongoing",
+      "statusCompleted": "Completed",
+      "historyEmptyTitle": "No clinic weeks yet",
+      "historyEmptyDescription": "When your coach assigns a Precision Clinic week, it will show up here.",
+      "emptyTitle": "No drills in this week",
+      "emptyDescription": "This clinic week does not have any drills yet.",
+      "completed": "Completed"
     }
   },
   "nav": {
