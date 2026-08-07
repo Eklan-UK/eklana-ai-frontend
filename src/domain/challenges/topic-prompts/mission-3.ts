@@ -144,7 +144,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -186,7 +186,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used when updating physicians.
 - Use authentic clinical vocabulary rather than textbook terminology.
 
@@ -270,13 +270,13 @@ Return a JSON array:
   {
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
+    "correctAnswer": "{{correct vocabulary}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
@@ -404,13 +404,13 @@ Return a JSON array:
   {
     "doctorName": "{{Doctor Name}}",
     "prompt": "{{What the doctor says}}",
+    "correctAnswer": "{{the correct nursing response}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
@@ -697,7 +697,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -741,7 +741,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during doctors' rounds.
 - Use authentic clinical vocabulary rather than textbook terminology.
 
@@ -825,13 +825,13 @@ Return a JSON array:
   {
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
+    "correctAnswer": "{{correct vocabulary}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
@@ -959,13 +959,13 @@ Return a JSON array:
   {
     "doctorName": "{{Doctor Name}}",
     "prompt": "{{What the doctor says}}",
+    "correctAnswer": "{{the correct nursing response}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
@@ -1244,7 +1244,7 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week:
-{{weak_words}}
+{{fill_blank_evidence}}
 
 Generate 10–15 vocabulary questions according to the following rules:
 
@@ -1288,7 +1288,7 @@ D. {{Option}}
 
 3. Vocabulary Selection
 
-- Begin with the student's weak words ({{weak_words}}).
+- Begin with the student's weak words ({{fill_blank_evidence}}).
 - If fewer than 10 words are provided, supplement with vocabulary commonly used during telephone communication between healthcare professionals.
 - Use authentic clinical vocabulary rather than textbook terminology.
 
@@ -1372,13 +1372,13 @@ Return a JSON array:
   {
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
+    "correctAnswer": "{{correct vocabulary}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
@@ -1505,13 +1505,13 @@ Return a JSON array:
   {
     "respondentName": "{{Healthcare Professional Name}}",
     "prompt": "{{What the colleague says}}",
+    "correctAnswer": "{{the correct nursing response}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
-    ],
-    "correctOption": "{{A|B|C|D}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
   }
 ]
 
