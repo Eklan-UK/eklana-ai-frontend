@@ -124,6 +124,12 @@ export function DrillCreatePageContent({
   const preselectedStudentId = searchParams.get("student") || "";
   const preselectedWeek = searchParams.get("week") || "";
   const returnToParam = searchParams.get("returnTo");
+  // Precision Clinic drills reuse this general create form but aren't curriculum-linked,
+  // so this flag threads through to skip/hide the learning journey mission/topic requirement.
+  const source =
+    searchParams.get("source") === "precision_clinic"
+      ? "precision_clinic"
+      : undefined;
   const isEditMode = !!drillId;
   const contextWeekNumber = useMemo(() => {
     const weekNum = preselectedWeek ? parseInt(preselectedWeek, 10) : NaN;
@@ -398,6 +404,7 @@ export function DrillCreatePageContent({
           assignedTo,
           isActive: true,
           weekNumber: contextWeekNumber,
+          source,
         },
       );
 
@@ -485,17 +492,19 @@ export function DrillCreatePageContent({
   };
 
   const handleSaveDrill = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     try {
       setSaving(true);
       const payload = buildDrillPayloadFromDraft(
         draft,
         isAssignedDrill
-          ? { omitAssignment: true }
+          ? { omitAssignment: true, source }
           : {
               assignedTo: draft.selectedUsers,
               isActive: false,
               weekNumber: contextWeekNumber,
+              source,
             },
       );
 
@@ -525,7 +534,8 @@ export function DrillCreatePageContent({
   };
 
   const handleSubmit = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     if (draft.selectedUsers.length === 0) {
       toast.error("Please select at least one user");
       return;
@@ -538,12 +548,14 @@ export function DrillCreatePageContent({
   };
 
   const handleCopyDrill = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     setCopying(true);
     try {
       let payload = buildDrillPayloadFromDraft(draft, {
         assignedTo: [],
         isActive: false,
+        source,
       });
       if (isEditMode && drillData) {
         payload = mergeMediaFieldsFromSource(
@@ -687,6 +699,7 @@ export function DrillCreatePageContent({
         leadingContent={importSection}
         sidebarLeadingContent={generateAiButton}
         onDrillTypeChange={handleDrillTypeChange}
+        hideLearningJourneyFields={source === "precision_clinic"}
       />
 
       <div className="fixed bottom-0 left-64 right-0 bg-white border-t border-gray-100 p-6 flex gap-4 z-10">

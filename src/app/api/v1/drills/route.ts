@@ -166,7 +166,14 @@ const createDrillSchema = z.object({
 	/** Drill-builder week context — places assignedAt in that week when set. */
 	weekNumber: z.number().int().min(1).optional(),
 }).superRefine((data, ctx) => {
-	refineLearningJourneyFields(data, ctx, { requireAlways: true });
+	// Precision Clinic drills are remediation content, not curriculum-linked, so they fully
+	// bypass the learning journey mission/topic requirement (both flags false); every other
+	// drill keeps the existing "always required on create" behavior.
+	const isPrecisionClinic = data.source === 'precision_clinic';
+	refineLearningJourneyFields(data, ctx, {
+		requireAlways: !isPrecisionClinic,
+		requireWhenAssigned: !isPrecisionClinic,
+	});
 	if (data.type === 'vocabulary') {
 		if (!data.target_sentences || data.target_sentences.length < 1) {
 			ctx.addIssue({

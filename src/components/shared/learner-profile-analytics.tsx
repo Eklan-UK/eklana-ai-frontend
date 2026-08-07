@@ -5,6 +5,7 @@ import {
   Mic,
   MessageSquare,
   BarChart3,
+  Trophy,
 } from "lucide-react";
 import { PronunciationAnalyticsComponent } from "@/components/admin/pronunciation-analytics";
 import { GrammarAnalyticsComponent } from "@/components/admin/grammar-analytics";
@@ -14,6 +15,7 @@ import { FillBlankAnalyticsComponent } from "@/components/admin/fill-blank-analy
 import { KeyPhrasesAnalyticsComponent } from "@/components/admin/key-phrases-analytics";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
 import { LearnerFreeTalkAttemptsSection } from "@/components/admin/learner-free-talk-attempts";
+import { LearnerWeeklyChallengeStatus } from "@/components/admin/learner-weekly-challenge-status";
 import { LearnerProgressSummary } from "@/components/admin/learner-progress-summary";
 
 interface LearnerProfileAnalyticsProps {
@@ -45,6 +47,14 @@ export function LearnerProfileAnalytics({
           <MessageSquare className="w-5 h-5" /> Eklan Free Talk
         </h2>
         <LearnerFreeTalkAttemptsSection learnerId={learnerId} learnerName={learnerName} />
+      </div>
+
+      {/* Weekly Challenge Status */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <Trophy className="w-5 h-5" /> Weekly Challenges
+        </h2>
+        <LearnerWeeklyChallengeStatus learnerId={learnerId} learnerName={learnerName} />
       </div>
 
       {/* Drill Submissions & Analytics */}

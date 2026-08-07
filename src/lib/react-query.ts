@@ -149,12 +149,16 @@ export const queryKeys = {
   },
   precisionClinic: {
     all: ["precision-clinic"] as const,
-    lists: () => [...queryKeys.precisionClinic.all, "list"] as const,
-    list: (filters?: Record<string, unknown>) =>
-      [...queryKeys.precisionClinic.lists(), filters] as const,
-    details: () => [...queryKeys.precisionClinic.all, "detail"] as const,
-    detail: (id: string) =>
-      [...queryKeys.precisionClinic.details(), id] as const,
+    stats: () => [...queryKeys.precisionClinic.all, "stats"] as const,
+    studentWeeks: (studentId: string) =>
+      [...queryKeys.precisionClinic.all, "student-weeks", studentId] as const,
+  },
+  learnerPrecisionClinic: {
+    all: ["learner-precision-clinic"] as const,
+    history: () =>
+      [...queryKeys.learnerPrecisionClinic.all, "history"] as const,
+    week: (learnerWeekId: string) =>
+      [...queryKeys.learnerPrecisionClinic.all, "week", learnerWeekId] as const,
   },
 };
 

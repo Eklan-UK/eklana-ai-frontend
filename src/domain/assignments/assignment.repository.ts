@@ -235,7 +235,10 @@ export class AssignmentRepository {
   ): Promise<{ assignments: AssignmentType[]; total: number }> {
     try {
       const query: any = { learnerId: toUserIdQuery(learnerId) };
-      
+      // Home/My Plans/Learning Journey must never mix in Precision Clinic
+      // assignments — that surface has its own dedicated read path.
+      query.source = { $ne: 'precision_clinic' };
+
       if (filters?.status) {
         // Map frontend status to backend status format
         const statusMap: Record<string, string> = {

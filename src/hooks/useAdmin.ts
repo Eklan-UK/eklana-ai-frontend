@@ -347,6 +347,19 @@ export function useLearnerDrillAssignments(learnerId: string) {
   });
 }
 
+/** Weekly challenge progress for a learner (admin/tutor). Read-only. */
+export function useLearnerWeeklyChallenges(learnerId: string) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "weekly-challenges"],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerWeeklyChallenges(learnerId);
+      return response.data;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
 /** Grammar analytics for admin learner profile (optional date range). */
 export function useLearnerGrammarAnalytics(
   learnerId: string,

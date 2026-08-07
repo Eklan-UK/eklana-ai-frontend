@@ -365,6 +365,7 @@ export class DrillService {
         assignedBy: toUserIdQuery(params.assignedBy),
         assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
         ...(builderWeekNumber != null ? { builderWeekNumber } : {}),
+        ...(drill.source ? { source: drill.source } : {}),
         dueDate: dueDate!,
         status: 'pending' as const,
       }));
@@ -526,6 +527,7 @@ export class DrillService {
           assignedBy: toUserIdQuery(params.creatorId),
           assignedAt: resolveAssignmentAssignedAt(user, params.weekNumber),
           ...(builderWeekNumber != null ? { builderWeekNumber } : {}),
+          ...(params.drillData.source ? { source: params.drillData.source } : {}),
           dueDate: dueDate,
           status: 'pending' as const,
         }));

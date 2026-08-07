@@ -20,6 +20,7 @@ import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
+import { LearnerWeeklyChallengeStatus } from "@/components/admin/learner-weekly-challenge-status";
 import { appendReturnTo } from "@/lib/drill-list-filters";
 
 interface Student {
@@ -418,6 +419,16 @@ export default function StudentDetailPage() {
             </div>
             <div className="text-sm text-gray-600">Total Assigned</div>
           </Card>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">
+            Weekly Challenges
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Track whether this student has started or finished each week&apos;s challenge.
+          </p>
+          <LearnerWeeklyChallengeStatus learnerId={studentId} learnerName={student.name} />
         </div>
 
         <div className="mb-8">

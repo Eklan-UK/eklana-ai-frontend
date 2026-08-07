@@ -418,134 +418,55 @@ export const drillAPI = {
   },
 };
 
-// Precision Clinic API — dedicated collection `precision_clinic_drills`
+// Precision Clinic API — admin shell (stats + per-student weeks).
+// Drill CRUD now goes through the general drills API with source=precision_clinic.
 export const precisionClinicAPI = {
-  getAll: (params?: {
-    limit?: number;
-    offset?: number;
-    q?: string;
-    type?: string;
-    difficulty?: string;
-    status?: 'published' | 'draft';
-    includeArchived?: boolean;
-    isArchived?: boolean;
-  }) => {
+  /** Dashboard card counts from Drill / DrillAssignment (source=precision_clinic). */
+  getStats: () => {
     return apiRequest<{
       code?: string;
       message?: string;
       data?: {
-        drills: any[];
-        total?: number;
-        limit?: number;
-        offset?: number;
-        stats?: {
-          total: number;
-          practiceItems: number;
-          published: number;
-          assigned: number;
-        };
+        total: number;
+        practiceItems: number;
+        published: number;
+        assigned: number;
       };
-    }>('/precision-clinic', {
-      method: 'GET',
-      params,
-    });
+    }>('/precision-clinic/stats', { cache: false });
   },
 
-  getById: (id: string) => {
+  /** Per-student virtual week breakdown (+ anchorDate + currentWeek), mirrors studentAPI.getStudentWeeks. */
+  getStudentWeeks: (studentId: string) => {
     return apiRequest<{
       code?: string;
       message?: string;
-      data?: { drill: any };
-      drill?: any;
-    }>(`/precision-clinic/${id}`);
+      data?: {
+        anchorDate: string;
+        currentWeek: number;
+        weeks: Array<{
+          weekNumber: number;
+          weekStartDate: string;
+          weekEndDate: string;
+          drills: any[];
+        }>;
+      };
+    }>(`/precision-clinic/students/${studentId}/weeks`, { cache: false });
   },
 
-  create: (data: Record<string, unknown>) => {
+  /** Add the next virtual week ("+ Week") for a student, mirrors studentAPI.createStudentWeek. */
+  createStudentWeek: (studentId: string) => {
     return apiRequest<{
       code?: string;
       message?: string;
-      data?: { drill: any };
-      drill?: any;
-    }>('/precision-clinic', {
+      data?: {
+        weekNumber: number;
+        weekStartDate: string;
+        weekEndDate: string;
+        currentWeek: number;
+        anchorDate: string;
+      };
+    }>(`/precision-clinic/students/${studentId}/weeks`, {
       method: 'POST',
-      data,
-    });
-  },
-
-  update: (id: string, data: Record<string, unknown>) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: { drill: any };
-      drill?: any;
-    }>(`/precision-clinic/${id}`, {
-      method: 'PUT',
-      data,
-    });
-  },
-
-  delete: (id: string) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-    }>(`/precision-clinic/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  assign: (id: string, data: { userIds: string[] }) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: { drill: any };
-    }>(`/precision-clinic/${id}/assign`, {
-      method: 'POST',
-      data,
-    });
-  },
-
-  duplicate: (id: string) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: { drill: any };
-    }>(`/precision-clinic/${id}/duplicate`, {
-      method: 'POST',
-    });
-  },
-
-  archive: (id: string) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: { drill: any };
-    }>(`/precision-clinic/${id}/archive`, {
-      method: 'POST',
-    });
-  },
-
-  aiGenerate: (data: {
-    students?: string[];
-    studentIds?: string[];
-    studentId?: string;
-    title?: string;
-    drillTypes: string[];
-    difficulty?: 'beginner' | 'intermediate' | 'advanced';
-    context?: string;
-    prompt: string;
-  }) => {
-    return apiRequest<{
-      code?: string;
-      message?: string;
-      data?: Array<{
-        drillType: string;
-        title?: string;
-        content: Record<string, unknown>;
-      }>;
-    }>('/precision-clinic/ai-generate', {
-      method: 'POST',
-      data,
-      cache: false,
     });
   },
 };
@@ -1329,6 +1250,37 @@ export const adminAPI = {
       };
     }>(`/admin/learners/${learnerId}/drill-assignments?limit=${params?.limit ?? 0}`, {
       method: 'GET',
+    });
+  },
+
+  /** Weekly challenge progress history for a learner (admin/tutor). Read-only. */
+  getLearnerWeeklyChallenges: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        challenges: Array<{
+          challengeId: string | null;
+          weekStartDate: string;
+          weekNumber?: number;
+          generationStatus: 'ready' | 'generating' | 'failed' | 'unavailable';
+          status: 'pending' | 'in_progress' | 'completed' | 'not_available';
+          totalDrills: number;
+          completedCount: number;
+          summaryMessage?: string;
+          generatedAt?: string | null;
+        }>;
+        statistics: {
+          pending: number;
+          inProgress: number;
+          completed: number;
+          notAvailable: number;
+          total: number;
+        };
+      };
+    }>(`/admin/learners/${learnerId}/weekly-challenges`, {
+      method: 'GET',
+      cache: false,
     });
   },
 
@@ -2230,6 +2182,57 @@ export const weeklyChallengeAPI = {
 			method: 'DELETE',
 		});
 	},
+};
+
+export const learnerPrecisionClinicAPI = {
+  getHistory: () => {
+    return apiRequest<{
+      code?: string;
+      data?: {
+        weeks: Array<{
+          learnerWeekId: string;
+          personalWeekNumber: number;
+          title: string;
+          status: 'ready';
+          totalItems: number;
+          completedItems: number;
+          assignedAt: string;
+        }>;
+      };
+    }>('/learner/precision-clinic', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  /** learnerWeekId here is String(builderWeekNumber); route is keyed by [weekNumber] server-side. */
+  getWeek: (learnerWeekId: string) => {
+    return apiRequest<{
+      code?: string;
+      data?: {
+        learnerWeekId: string;
+        personalWeekNumber: number;
+        title: string;
+        status: 'ready';
+        totalItems: number;
+        completedItemIndexes: number[];
+        assignedAt: string;
+        drills: Array<{
+          index: number;
+          itemId: string;
+          sourceDrillId: string;
+          title: string;
+          type: string;
+          difficulty: string;
+          completed: boolean;
+          sortOrder: number;
+        }>;
+      };
+    }>(`/learner/precision-clinic/${encodeURIComponent(learnerWeekId)}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
 };
 
 // Student context & weeks (AI User Builder)
