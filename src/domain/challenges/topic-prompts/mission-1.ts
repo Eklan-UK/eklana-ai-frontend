@@ -158,16 +158,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of emergency and critical-care vocabulary while improving clinical communication during high-pressure situations.
-
-- Every option must be authentic medical vocabulary.
-- The correct answer must be unambiguously correct for the specific clinical situation.
-- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, procedure, equipment, medication, or clinical meaning.
-- Every sentence should reflect realistic emergency or ICU scenarios.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -185,7 +176,7 @@ The learner's objective is to strengthen recognition and understanding of emerge
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -201,7 +192,7 @@ The learner's objective is to strengthen recognition and understanding of emerge
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -216,7 +207,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -367,20 +358,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - AI characters should ask questions or provide updates that require the learner to communicate professionally.
 - Include natural interruptions and changes in patient condition that reflect real emergency situations.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and clinically appropriate communication while managing emergency and critical-care situations.
-
-The roleplay should encourage the learner to:
-
-- recognize patient deterioration quickly
-- prioritize immediate nursing interventions
-- communicate effectively with patients and the healthcare team
-- provide reassurance while maintaining professionalism
-- use accurate emergency and ICU terminology
-- remain calm under pressure
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -562,16 +540,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of patient follow-up vocabulary while improving communication during patient assessments and follow-up care.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific clinical situation.
-- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, medication, patient education, recovery guidance, monitoring, or clinical meaning.
-- Every sentence should reflect realistic patient follow-up situations in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -587,7 +556,7 @@ The learner's objective is to strengthen recognition and understanding of patien
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -602,7 +571,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -682,16 +651,6 @@ The correct answer should demonstrate one or more of the following competencies:
 - Do NOT place all correct answers in the same position.
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
-
-5. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional communication during patient follow-up conversations through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate timing, incomplete patient education, insufficient reassurance, inaccurate clinical information, weak prioritization, or poor communication—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, encouragement, or appropriate small talk while maintaining professional boundaries.
 
 Return a JSON array:
 
@@ -779,20 +738,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include opportunities for reassurance, patient education, and relationship-building through natural conversation.
 - Where appropriate, include brief, natural small talk that helps build rapport (e.g., family, hobbies, meals, weather, weekend plans), while maintaining professional boundaries and keeping the patient's care as the primary focus.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and natural communication during patient follow-up conversations.
-
-The roleplay should encourage the learner to:
-
-- recognize patient concerns and recovery needs
-- explain medications and treatment plans clearly
-- answer patient questions confidently
-- educate patients using easy-to-understand language
-- provide reassurance while maintaining professional boundaries
-- use accurate patient-care terminology naturally
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -979,16 +925,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during patient admissions while improving professional communication.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific admission scenario.
-- Incorrect answers should be plausible but incorrect because of incorrect patient identification, admission procedure, documentation, assessment, communication, or clinical meaning.
-- Every sentence should reflect realistic patient admission situations in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1004,7 +941,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1019,7 +956,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1101,16 +1038,6 @@ The correct answer should demonstrate one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during patient admissions through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific admission scenario.
-- Incorrect answers should be plausible but incorrect because of incomplete patient identification, insufficient explanation, poor communication, inappropriate sequencing of the admission process, or missed opportunities to encourage patient questions—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, reassurance, and respectful conversation while maintaining professional boundaries.
-
 Return a JSON array:
 
 [
@@ -1186,20 +1113,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Patients should naturally ask questions about the admission process, room arrangements, hospital routines, tests, medications, visiting hours, or what will happen next.
 - Include opportunities for the learner to reassure the patient, build rapport, and create a welcoming environment while maintaining professional boundaries.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and natural communication during patient admissions.
-
-The roleplay should encourage the learner to:
-
-- introduce themselves professionally
-- explain the admission process clearly
-- verify patient identity correctly
-- answer patient questions confidently
-- build rapport through warm, respectful communication
-- maintain patient safety and professionalism throughout the admission process
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1385,16 +1299,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during bedside conversations while improving natural communication with patients.
-
-- Every option must be authentic clinical or patient-care vocabulary.
-- The correct answer must be unambiguously correct for the specific situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate word choice, inaccurate clinical meaning, poor conversational fit, or incorrect patient communication.
-- Every sentence should reflect realistic conversations between nurses, patients, and family members in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1410,7 +1315,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1425,7 +1330,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1506,16 +1411,6 @@ The correct answer should demonstrate one or more of the following competencies:
 - Do NOT place all correct answers in the same position.
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
-
-5. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional bedside communication through repeated practice in realistic patient conversations.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific situation.
-- Incorrect answers should be plausible but incorrect because of poor conversational flow, insufficient empathy, inappropriate boundaries, incomplete patient education, or less effective communication—not because they sound unprofessional.
-- Every prompt must contain enough conversational and clinical context that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, encouragement, active listening, appropriate humour, or light conversation while maintaining professional boundaries.
 
 Return a JSON array:
 
@@ -1605,20 +1500,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include opportunities for the learner to build rapport through empathy, encouragement, appropriate humour, and friendly conversation while maintaining professional boundaries.
 - Family members may occasionally join the conversation and ask appropriate questions.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional bedside communication while building rapport with patients.
-
-The roleplay should encourage the learner to:
-
-- use natural conversational English
-- respond smoothly to patient comments and questions
-- build trust through empathy and active listening
-- reassure patients without making unrealistic promises
-- maintain professional boundaries
-- create a welcoming and supportive bedside environment
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 

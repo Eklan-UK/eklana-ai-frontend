@@ -314,11 +314,7 @@ The correct answer should reinforce one or more of the following:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during nursing job interviews while improving professional English communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
@@ -331,7 +327,7 @@ Examples:
 - "Patient ______ is always my highest priority during every shift."
 - "I believe effective ______ helps prevent misunderstandings within the multidisciplinary team."
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging interview vocabulary.
 - Require understanding of the interview context rather than simple vocabulary recognition.
@@ -343,12 +339,12 @@ Return a JSON array:
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -477,14 +473,6 @@ The mix of questions should naturally reflect the selected topic.
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during nursing job interviews.
-
-Every option should sound like something a qualified nurse could realistically say in an interview.
-
-The correct answer must be unambiguously the strongest response for the specific interview question.
-
 Return a JSON array:
 
 [
@@ -493,12 +481,12 @@ Return a JSON array:
     "role": "{{Interviewer Role}}",
     "prompt": "{{What the interviewer says}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -601,20 +589,7 @@ The mix of questions should naturally reflect the selected topic.
 
 Interviewers should occasionally ask follow-up questions requesting clarification or examples.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, natural English communication during nursing job interviews.
-
-The learner should practise:
-
-- answering interview questions fluently
-- explaining clinical reasoning clearly
-- giving structured behavioural examples
-- communicating professionally
-- responding confidently to unexpected follow-up questions
-- maintaining a conversational rather than memorised speaking style
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 

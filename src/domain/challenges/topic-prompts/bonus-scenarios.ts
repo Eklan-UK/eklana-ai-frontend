@@ -236,20 +236,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during professional telephone communication with healthcare colleagues.
-
-Every sentence should reinforce clear, concise, and safe communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during hospital telephone conversations.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -261,7 +255,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -273,12 +267,12 @@ Return a JSON array:
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -391,14 +385,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-Every option should sound like something a healthcare professional could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -406,12 +392,12 @@ Return a JSON array:
     "respondentName": "{{Healthcare Professional Name}}",
     "prompt": "{{What the colleague says}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -510,20 +496,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to ask clarification questions or repeat instructions to confirm understanding.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-The learner should naturally practise:
-
-- introducing themselves and identifying the patient
-- stating the reason for the call clearly
-- communicating concise and accurate clinical information
-- requesting assistance or recommendations appropriately
-- asking clarification questions when necessary
-- confirming responsibilities and agreed follow-up actions before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -785,20 +758,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used when communicating with hospital departments by telephone.
-
-Every sentence should reinforce clear, accurate, and efficient professional communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during hospital telephone calls.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -810,7 +777,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical and operational vocabulary.
 - Require understanding of both the clinical situation and the operational workflow to select the correct answer.
@@ -822,12 +789,12 @@ Return a JSON array:
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -940,14 +907,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with other hospital departments.
-
-Every option should sound like something a healthcare professional could realistically say.
-
-The correct answer must be unambiguously the best response for the specific situation.
-
 Return a JSON array:
 
 [
@@ -956,12 +915,12 @@ Return a JSON array:
     "department": "{{Department}}",
     "prompt": "{{What the department staff says}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -1060,21 +1019,7 @@ Include realistic information such as:
 
 Some information should require the learner to clarify timelines, repeat important information, or confirm departmental procedures.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication when speaking with other hospital departments by telephone.
-
-The learner should naturally practise:
-
-- introducing themselves and their unit
-- identifying the patient or service request
-- stating the reason for the call clearly
-- providing complete and relevant information
-- communicating urgency appropriately
-- asking clarification questions
-- confirming timelines, responsibilities, and follow-up actions before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1334,20 +1279,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during telephone conversations with patients' families while maintaining professional communication and patient confidentiality.
-
-Every sentence should reinforce safe, compassionate, and professional communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic telephone communication used in hospitals.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -1359,7 +1298,7 @@ Correct:
 Incorrect:
 "authorised rep"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical and communication vocabulary.
 - Require understanding of both the clinical situation and confidentiality requirements to identify the correct answer.
@@ -1371,12 +1310,12 @@ Return a JSON array:
     "vocabulary": "{{correct vocabulary}}",
     "sentence": "{{Sentence containing ______}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -1491,14 +1430,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, compassionate, and professional telephone communication with patients' families.
-
-Every option should sound like something a professional nurse could realistically say.
-
-The correct answer must be unambiguously the best response for the specific situation.
-
 Return a JSON array:
 
 [
@@ -1507,12 +1438,12 @@ Return a JSON array:
     "relationship": "{{Relationship to Patient}}",
     "prompt": "{{What the caller says}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -1608,22 +1539,7 @@ Include realistic clinical information such as:
 
 Some situations should require the learner to politely decline sharing confidential information, verify authorisation, or refer the caller to the physician or another appropriate healthcare professional.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, compassionate, and professional telephone communication with patients' families.
-
-The learner should naturally practise:
-
-- verifying the caller's identity and authorisation
-- providing appropriate patient updates
-- communicating clearly without unnecessary medical jargon
-- responding empathetically to concerns
-- protecting patient confidentiality
-- explaining professional boundaries
-- referring questions appropriately
-- confirming the next steps before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1848,22 +1764,13 @@ Incorrect:
 - Prioritize clinical reasoning over simple vocabulary recall.
 - Ensure the learner must understand the clinical context to identify the correct answer.
 
-7. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of emergency and critical-care vocabulary while improving clinical communication during high-pressure situations.
-
-- Every option must be authentic medical vocabulary.
-- The correct answer must be unambiguously correct for the specific clinical situation.
-- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, procedure, equipment, medication, or clinical meaning.
-- Every sentence should reflect realistic emergency or ICU scenarios.
-
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
 - Ensure the learner must understand the clinical context to identify the correct answer.
 
-9. Output Format
+8. Output Format
 
 Return only valid JSON.
 
@@ -1950,15 +1857,6 @@ Instead:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and clinically appropriate communication during CPR and cardiac arrest situations through repeated practice in realistic emergency scenarios.
-
-- Every option should sound like something a professional healthcare provider could realistically say.
-- The correct answer must be unambiguously the best response for the specific situation.
-- Incorrect answers should be plausible but incorrect because of incorrect timing, inappropriate intervention, incomplete assessment, inaccurate clinical information, or poor prioritization—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-
 Return a JSON array:
 
 [
@@ -2040,20 +1938,386 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - AI characters should ask realistic questions, provide clinical updates, or issue instructions that require the learner to respond professionally.
 - Include natural interruptions and rapidly changing patient conditions that reflect real CPR situations.
 
-6. Learning Objective
+6. Output Format
 
-The learner's objective is to develop automatic, confident, and clinically appropriate communication while participating in CPR and cardiac arrest management.
+Return only valid JSON.
 
-The roleplay should encourage the learner to:
+{
+  "student_character_name": "{{student_name}}",
+  "ai_character_names": [
+    "{{AI Character 1}}",
+    "{{AI Character 2}}"
+  ],
+  "context": "{{Brief scenario description}}",
+  "roleplay_scenes": [
+    {
+      "scene_title": "{{Scene Title}}",
+      "dialogue": [
+        {
+          "speaker": "student",
+          "text": "{{dialogue}}"
+        },
+        {
+          "speaker": "ai_0",
+          "text": "{{dialogue}}"
+        }
+      ]
+    }
+  ]
+}
 
-- recognize deterioration quickly
-- communicate effectively during emergencies
-- coordinate with the healthcare team
-- provide concise patient updates
-- use accurate CPR terminology
-- remain calm and professional under pressure
+Return only valid JSON. No markdown. No explanation.
+`,
+	},
+	discharging_patients: {
+		pronunciation: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a pronunciation drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student struggled with the following phonemes this week: {{weak_phonemes}}
+
+The student struggled with the following words this week: {{weak_words}}
+
+Generate 10 - 15 pronunciation items according to the following rules:
+
+1. Format
+
+Present each pronunciation item using the following structure:
+
+Sound:
+/{{phoneme}}/
+
+Word:
+{{word}}
+
+Sentence:
+{{example sentence}}
+
+2. Important Requirements
+
+- Prioritize the student's weak phonemes ({{weak_phonemes}}) first.
+- Prioritize the student's weak words ({{weak_words}}) whenever they contain one of the target phonemes.
+- If additional words are needed, supplement with vocabulary commonly used during patient discharges.
+- Every word must clearly contain the target phoneme.
+- Do not repeat the same word.
+- Use vocabulary that nurses commonly pronounce while reviewing discharge instructions, medications, follow-up appointments, warning signs, home care, and answering patient questions.
+
+3. Clinical Context
+
+- Every sentence must sound like authentic communication in hospitals in {{country}}.
+- Avoid textbook examples or dictionary definitions.
+- Every sentence should naturally reflect patient discharge conversations.
+- Use realistic patient names, medications, follow-up appointments, warning signs, home arrangements, mobility instructions, or hospital procedures where appropriate.
+- The pronunciation practice should reinforce professional nursing communication rather than isolated vocabulary.
+
+4. Competency Alignment
+
+The selected words and sentences should naturally reinforce the learner's ability to:
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
+
+5. Difficulty
+
+- Include a balanced mix of common nursing vocabulary and moderately difficult medical terminology.
+- Include words from different clinical categories such as:
+  - medications
+  - follow-up care
+  - warning signs
+  - home instructions
+  - mobility and safety
+  - professional communication
+- Avoid extremely rare medical terminology unless it is directly relevant to patient discharges.
+
+Return a JSON array:
+
+[
+  {
+    "sound": "/{{phoneme}}/",
+    "word": "{{clinical word}}",
+    "sentence": "{{natural clinical sentence}}"
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		vocabulary: `You are a clinical English language coach for Korean nurses preparing to work in {{country}}.
+
+Generate a fill-in-the-blank vocabulary drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+- Competencies: {{fill_blank_evidence}}
+- The student struggled with these words this week: {{fill_blank_evidence}}
+
+The goal is to strengthen the learner's clinical vocabulary while reinforcing the communication competencies required for this topic.
+
+Generate 10-15 fill-in-the-blank questions according to the following rules.
+
+1. Vocabulary Selection
+
+- Use the student's weak words: {{fill_blank_evidence}}.
+- If fewer than 10 words are provided, supplement with other vocabulary commonly used during patient discharges.
+- Every vocabulary item must be directly relevant to the topic.
+- Prioritize vocabulary that nurses actively use during discharge education, medication review, follow-up planning, safety instructions, and patient questions.
+- Avoid textbook definitions, isolated vocabulary lists, or generic example sentences.
+- Every sentence must contain enough clinical context that only one answer is correct.
+
+2. Competency Alignment
+
+The vocabulary should naturally reinforce the following competencies:
+
+{{fill_blank_evidence}}
+
+Every question should require vocabulary that supports one or more of these competencies.
+
+For example, vocabulary may relate to:
+
+- discharge instructions
+- medications and dosages
+- follow-up appointments
+- warning signs
+- home care and safety
+- mobility and activity restrictions
+- wound care or equipment
+- patient education
+- professional clinical terminology
+
+The competency should be demonstrated through the clinical situation rather than explicitly stated.
+
+3. Sentence Design
+
+- Present each question using the following structure:
+
+Sentence:
+{{Sentence containing one blank represented by ______}}
+
+A. {{Option}}
+
+B. {{Option}}
+
+C. {{Option}}
+
+D. {{Option}}.
+- Replace only the target vocabulary with the blank.
+- Every sentence must describe a realistic discharge situation in a hospital in {{country}}.
+- Include sufficient clinical context such as:
+  - medications
+  - follow-up appointments
+  - warning signs
+  - home arrangements
+  - activity restrictions
+  - patient questions
+  - physician orders
+- The sentence should contain enough information that only one answer is clinically appropriate.
+- Avoid dictionary-style definitions or generic example sentences.
+- The sentence should sound like something a nurse would hear, say, document, or read during discharge.
+
+4. Answer Options
+
+- Provide four answer choices.
+- Exactly one option must be correct.
+- All incorrect options must be legitimate clinical vocabulary.
+- Incorrect options should be plausible but incorrect for the specific discharge situation because of:
+  - incorrect medication instruction
+  - incorrect follow-up advice
+  - incorrect warning sign
+  - incorrect safety guidance
+  - incorrect clinical meaning
+- Do not use nonsense words.
+- Do not use synonyms of the correct answer.
+- Do not use different grammatical forms of the correct answer.
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+5. Medical Terminology
+
+- Do not use acronyms as the correct answer.
+- Always use the full clinical term.
+
+Example:
+
+Correct:
+"follow-up appointment"
+
+Incorrect:
+"F/U appointment"
+
+- Use terminology commonly used by nurses in {{country}}.
+
+6. Difficulty
+
+- Include a balanced mix of straightforward and moderately challenging questions.
+- Prioritize clinical reasoning over simple vocabulary recall.
+- Ensure the learner must understand the clinical context to identify the correct answer.
 
 7. Output Format
+
+Return only valid JSON.
+
+[
+  {
+    "vocabulary": "{{term}}",
+    "sentence": "{{sentence with ______}}",
+    "correctAnswer": "{{term}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON.
+
+Do not include markdown.
+
+Do not include explanations.
+
+`,
+		key_phrases: `You are a clinical English language coach for Korean nurses in {{country}}
+
+Generate a key phrases drill based on the following:
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student missed the following key phrases this week: {{missed_phrases}}
+
+Generate 10 - 15 key phrase questions according to the following rules:
+
+1. Format
+
+Present each question using the following structure:
+
+Respondent says:
+"{{Question or comment}}"
+
+You say:
+
+A. {{Response}}
+
+B. {{Response}}
+
+C. {{Response}}
+
+D. {{Response}}
+
+2. Important Requirements
+
+- The conversation should reflect a realistic patient discharge situation in a hospital in {{country}}.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication between nurses, patients, family members, and physicians where appropriate.
+- Every correct answer must contain at least one authentic phrase from {{missed_phrases}} whenever possible.
+
+3. Realistic Answer Choices
+
+Do NOT make the incorrect answers obviously wrong.
+
+Instead:
+
+- Make all four responses clinically reasonable.
+- At least half of the questions should contain two answers that a competent nurse could realistically say.
+- The learner must identify the MOST professional, concise, patient-centred, and appropriate response for the discharge situation.
+
+- The correct answer should demonstrate one or more of the following competencies:
+
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+4. Balanced Answer Distribution
+
+- Do NOT place all correct answers in the same position.
+- Randomly distribute the correct answers across A, B, C, and D.
+- The answer pattern should feel unpredictable.
+
+Return a JSON array:
+
+[
+  {
+    "respondentName": "{{who is speaking to the nurse — e.g. Patient, Family Member, Doctor, Incoming Nurse}}",
+    "prompt": "{{what they say to the nurse}}",
+    "correctAnswer": "{{the correct nursing response}}",
+    "options": [
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
+    ]
+  }
+]
+
+Return only valid JSON. No markdown. No explanation.
+
+
+`,
+		roleplay: `You are a clinical English language coach for Korean nurses in {{country}}.
+
+Generate a roleplay drill based on the following:
+
+- Mission: {{mission}}
+- Topic: {{topic}}
+
+The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+Generate a multi-scene roleplay according to the following rules:
+
+1. Scenario Design
+
+- Create 2–3 connected scenes that reflect realistic patient discharge situations in a hospital in {{country}}.
+- Base the scenario on the student's practiced scenarios ({{practiced_scenarios}}), but do not copy them exactly.
+- The learner should apply the same communication skills in a new discharge scenario.
+- The student always plays the nurse.
+- The scenario should progress naturally from greeting the patient to reviewing discharge instructions, answering questions, and confirming the patient is ready to leave safely.
+
+2. Characters
+
+- The student character must be named exactly {{student_name}}. Do not invent a different name for the student.
+- AI characters must have realistic names appropriate for their roles.
+Examples:
+  - Mr. David Thompson
+  - Mrs. Linda Garcia
+  - Dr. James Wilson
+  - Emily Rodriguez
+  - Sarah Chen
+- Never use role titles as names.
+- Characters should naturally address each other by name whenever appropriate.
+
+3. Dialogue Requirements
+
+- Every dialogue line must be a complete, natural sentence.
+- Never use blanks, placeholders, or bracketed text.
+- Avoid textbook language, scripted dialogue, robotic communication, and overly formal wording.
+- Use authentic communication commonly heard during discharges in hospitals in {{country}}.
+- Each scene must contain at least 6 dialogue turns.
+- The student must speak at least 3 times per scene.
+
+4. Clinical Competencies
+
+The roleplay should naturally allow the learner to demonstrate the following competencies:
+
+- Introduces themselves clearly by stating their name and role confidently and professionally.
+- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
+- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
+- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+
+5. Realism
+
+- Include realistic discharge activities such as verifying patient identity, reviewing medications and dosages, confirming follow-up appointments, explaining warning signs that require urgent care, discussing activity restrictions, confirming transportation or home support, and answering patient or family questions where appropriate.
+- Patients should naturally ask questions about medications, when to return, what symptoms to watch for, wound care, diet, mobility, or what will happen next.
+- Include natural interruptions and clarifying questions that reflect real discharge conversations.
+
+6. Output Format
 
 Return only valid JSON.
 
@@ -2294,13 +2558,7 @@ Do not include spelling mistakes or nonsense words.
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen grammatical accuracy while reading and producing professional nursing English.
-
-The learner should improve their ability to recognise correct grammar within realistic healthcare communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - The blank should test grammar, not vocabulary knowledge.
@@ -2314,7 +2572,7 @@ Examples:
 - "She ______ caring for postoperative patients since the beginning of her shift."
 - "The medication was administered ______ the physician's order."
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging grammar questions.
 - Require learners to understand both the grammar and the clinical context to identify the correct answer.
@@ -2326,12 +2584,12 @@ Return a JSON array:
     "grammarFocus": "{{grammar topic}}",
     "sentence": "{{Sentence containing ______}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -2438,14 +2696,6 @@ Include a balanced mix of conversations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to improve grammatical accuracy while communicating naturally in professional nursing situations.
-
-Every option should sound like something a nurse could realistically say.
-
-The correct answer must be the only response that is both grammatically correct and professionally appropriate.
-
 Return a JSON array:
 
 [
@@ -2455,12 +2705,12 @@ Return a JSON array:
     "grammarFocus": "{{grammar topic}}",
     "prompt": "{{What the speaker says}}",
     "options": [
-      "{{option1}}",
-      "{{option2}}",
-      "{{option3}}",
-      "{{option4}}"
+      "{{correctAnswer}}",
+      "{{wrong1}}",
+      "{{wrong2}}",
+      "{{wrong3}}"
     ],
-    "correctOption": "{{A|B|C|D}}"
+    "correctAnswer": "{{the correct option text, must exactly match one of options[]}}"
   }
 ]
 
@@ -2547,18 +2797,7 @@ Include realistic nursing situations such as:
 - telephone communication
 - multidisciplinary rounds
 
-6. Learning Objective
-
-The learner should develop automatic, grammatically accurate spoken English while communicating naturally in professional nursing situations.
-
-The learner should practise:
-
-- speaking fluently without focusing consciously on grammar
-- using correct grammar naturally in context
-- communicating clearly and professionally
-- responding confidently in realistic clinical conversations
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 

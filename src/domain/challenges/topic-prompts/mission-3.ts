@@ -235,20 +235,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used while providing patient updates to physicians.
-
-Every sentence should reinforce professional nurse-to-doctor communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should be realistic and sound like an actual conversation or documentation used in hospitals in {{country}}.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -260,7 +254,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -391,14 +385,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication while providing patient updates to physicians.
-
-Every option should sound like something a professional nurse could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -509,21 +495,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to ask clarification questions before carrying out the physician's orders.
 
-6. Learning Objective
-
-The learner should develop automatic, confident and professional communication when providing updates to physicians.
-
-The learner should naturally practise:
-
-- introducing themselves clearly
-- identifying the patient
-- stating the reason for the call promptly
-- presenting concise and relevant patient information
-- requesting recommendations or orders
-- clarifying unclear instructions
-- confirming and repeating back physician orders before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -790,20 +762,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during doctors' ward rounds while improving professional communication.
-
-Every sentence should reinforce participation in multidisciplinary discussions.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during ward rounds.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -815,7 +781,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -946,14 +912,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication while participating in doctors' ward rounds.
-
-Every option should sound like something a professional nurse could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -1061,22 +1019,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to clarify physician instructions or provide additional nursing observations.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication while participating in multidisciplinary ward rounds.
-
-The learner should naturally practise:
-
-- introducing themselves professionally
-- identifying the patient correctly
-- delivering concise patient summaries
-- highlighting nursing priorities
-- raising patient concerns
-- contributing relevant clinical information
-- asking clarification questions
-- confirming the agreed management plan before moving to the next patient
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1337,20 +1280,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during professional telephone communication with healthcare colleagues.
-
-Every sentence should reinforce clear, concise, and safe communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during hospital telephone conversations.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -1362,7 +1299,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -1492,14 +1429,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-Every option should sound like something a healthcare professional could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -1611,20 +1540,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to ask clarification questions or repeat instructions to confirm understanding.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-The learner should naturally practise:
-
-- introducing themselves and identifying the patient
-- stating the reason for the call clearly
-- communicating concise and accurate clinical information
-- requesting assistance or recommendations appropriately
-- asking clarification questions when necessary
-- confirming responsibilities and agreed follow-up actions before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
