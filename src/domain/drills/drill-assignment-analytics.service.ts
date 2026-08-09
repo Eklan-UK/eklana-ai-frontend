@@ -19,6 +19,7 @@ export interface DrillAttemptLike {
 	grammarResults?: {
 		reviewStatus?: string;
 		accuracy?: number;
+		patterns?: unknown[];
 		[key: string]: unknown;
 	};
 	sentenceResults?: {
@@ -112,27 +113,42 @@ export function deriveEffectiveStatus(
 	return assignment.status || 'pending';
 }
 
+/**
+ * Profile enrichment: only Grammar drills require review.
+ *
+ * Important: DrillAttempt.create historically applied a nested mongoose
+ * default of grammarResults.reviewStatus='pending' on EVERY attempt
+ * (including roleplay/key_phrases). Gate on drill type + real grammar
+ * content (patterns) — never trust reviewStatus alone.
+ *
+ * Sentence/Summary keep their own review queues and are not surfaced here.
+ */
 export function deriveReviewStatus(
-	latestAttempt: DrillAttemptLike | null
+	latestAttempt: DrillAttemptLike | null,
+	drillType?: string | null
 ): ReviewStatusResult {
 	if (!latestAttempt) {
 		return { reviewStatus: null, requiresReview: false };
 	}
 
-	let reviewStatus: 'pending' | 'reviewed' | null = null;
-	if (latestAttempt.sentenceResults?.reviewStatus) {
-		reviewStatus = latestAttempt.sentenceResults.reviewStatus as
-			| 'pending'
-			| 'reviewed';
-	} else if (latestAttempt.summaryResults?.reviewStatus) {
-		reviewStatus = latestAttempt.summaryResults.reviewStatus as
-			| 'pending'
-			| 'reviewed';
-	} else if (latestAttempt.grammarResults?.reviewStatus) {
-		reviewStatus = latestAttempt.grammarResults.reviewStatus as
-			| 'pending'
-			| 'reviewed';
+	const normalizedType =
+		typeof drillType === 'string' ? drillType.trim().toLowerCase() : null;
+
+	if (normalizedType !== 'grammar') {
+		return { reviewStatus: null, requiresReview: false };
 	}
+
+	const patterns = latestAttempt.grammarResults?.patterns;
+	const hasGrammarPatterns = Array.isArray(patterns) && patterns.length > 0;
+	if (!hasGrammarPatterns) {
+		return { reviewStatus: null, requiresReview: false };
+	}
+
+	const grammarStatus = latestAttempt.grammarResults?.reviewStatus;
+	const reviewStatus =
+		grammarStatus === 'pending' || grammarStatus === 'reviewed'
+			? grammarStatus
+			: null;
 
 	return {
 		reviewStatus,
@@ -175,8 +191,13 @@ export function enrichDrillAssignment(
 	const latestAttempt = sortedAttempts[0] || null;
 	const bestAttempt =
 		[...attempts].sort((a, b) => (b.score || 0) - (a.score || 0))[0] || null;
-	const { reviewStatus, requiresReview } = deriveReviewStatus(latestAttempt);
 	const drill = isPopulatedDrillRef(assignment.drillId) ? assignment.drillId : null;
+	const drillType =
+		typeof drill?.type === 'string' ? (drill.type as string) : null;
+	const { reviewStatus, requiresReview } = deriveReviewStatus(
+		latestAttempt,
+		drillType
+	);
 
 	return {
 		_id: assignment._id,

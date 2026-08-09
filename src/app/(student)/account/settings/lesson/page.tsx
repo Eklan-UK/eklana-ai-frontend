@@ -8,30 +8,29 @@ import { Header } from "@/components/layout/Header";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { userAPI } from "@/lib/api";
 import {
+  ACCENT_VOICE_GROUPS,
   ACCENT_VOICE_OPTIONS,
   DEFAULT_ENGLISH_ACCENT,
   normalizeEnglishAccent,
+  type AccentVoiceGroup,
 } from "@/services/tts-accent-voices";
 
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
-const ACCENT_FLAGS: Record<string, string> = {
-  aanu_afolabi: "🇨🇦",
-  american_male: "🇺🇸",
-  american_female: "🇺🇸",
-  british_male: "🇬🇧",
-  british_female: "🇬🇧",
-  australian_male: "🇦🇺",
-  australian_female: "🇦🇺",
-  canadian_male: "🇨🇦",
-  canadian_female: "🇨🇦",
+const ACCENT_GROUP_FLAGS: Record<AccentVoiceGroup, string> = {
+  featured: "🇨🇦",
+  american: "🇺🇸",
+  british: "🇬🇧",
+  australian: "🇦🇺",
+  canadian: "🇨🇦",
 };
 
 const ACCENT_OPTIONS = ACCENT_VOICE_OPTIONS.map((opt) => ({
   id: opt.key,
   label: opt.label,
-  flag: ACCENT_FLAGS[opt.key] ?? "",
+  flag: ACCENT_GROUP_FLAGS[opt.group],
   display: opt.label,
+  group: opt.group,
 }));
 
 const VOICE_OPTIONS = [
@@ -340,19 +339,32 @@ export default function LessonSettingsPage() {
         title="English type / accent"
         onClose={() => setActiveSheet(null)}
       >
-        <div className="flex flex-col gap-4">
-          {ACCENT_OPTIONS.map((opt) => (
-            <SelectionCard
-              key={opt.id}
-              label={opt.label}
-              prefix={opt.flag}
-              selected={prefs.englishAccent === opt.id}
-              onClick={() => {
-                persist({ englishAccent: opt.id });
-                setActiveSheet(null);
-              }}
-            />
-          ))}
+        <div className="flex flex-col gap-6">
+          {ACCENT_VOICE_GROUPS.map((group) => {
+            const options = ACCENT_OPTIONS.filter((o) => o.group === group.id);
+            if (options.length === 0) return null;
+            return (
+              <div key={group.id} className="flex flex-col gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </p>
+                <div className="flex flex-col gap-4">
+                  {options.map((opt) => (
+                    <SelectionCard
+                      key={opt.id}
+                      label={opt.label}
+                      prefix={opt.flag}
+                      selected={prefs.englishAccent === opt.id}
+                      onClick={() => {
+                        persist({ englishAccent: opt.id });
+                        setActiveSheet(null);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </BottomSheet>
 

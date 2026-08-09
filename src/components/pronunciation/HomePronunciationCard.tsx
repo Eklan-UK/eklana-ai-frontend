@@ -41,7 +41,7 @@ export function HomePronunciationCard() {
           </div>
           <div>
             <p className="text-sm font-bold font-satoshi text-foreground">
-              Pronunciation
+              Clarity
             </p>
             <div className={`text-xs flex items-center gap-1 mt-0.5 font-medium ${
               isPositive ? 'text-green-600' : 'text-red-500'

@@ -68,6 +68,12 @@ export function applyParsedContentToDraft(
           next.aiCharacterVoiceKeys = next.aiCharacterNames.map(
             (_, i) => storedVoices[i] ?? "",
           );
+          const storedAvatars = Array.isArray(first.ai_character_avatars)
+            ? (first.ai_character_avatars as string[])
+            : [];
+          next.aiCharacterAvatars = next.aiCharacterNames.map(
+            (_, i) => storedAvatars[i] ?? "",
+          );
         }
         if (first.context) next.context = String(first.context);
         if (first.drill_intro) next.drillIntro = String(first.drill_intro);
@@ -164,8 +170,14 @@ export function draftFromBulkPendingItem(
     journeyPart: item.journeyPart,
     journeyTopic: item.journeyTopic,
     completionDate: item.completionDate ?? "",
+    drillTitle: item.drillTitle?.trim() || "",
   });
-  return applyParsedContentToDraft(base, item.parsed);
+  const withContent = applyParsedContentToDraft(base, item.parsed);
+  // Explicit AI-form title wins over any title parsed from generated content.
+  if (item.drillTitle?.trim()) {
+    withContent.drillTitle = item.drillTitle.trim();
+  }
+  return withContent;
 }
 
 export function validateDrillDraft(
@@ -173,6 +185,8 @@ export function validateDrillDraft(
   options?: {
     requireUsers?: boolean;
     enrolledParts?: LearningJourneyPartId[];
+    /** Precision Clinic drills aren't curriculum-linked, so skip the learning journey mission/topic requirement entirely. */
+    skipLearningJourney?: boolean;
   },
 ): boolean {
   if (!draft.completionDate) {
@@ -180,23 +194,25 @@ export function validateDrillDraft(
     return false;
   }
 
-  if (!draft.journeyPart || !draft.journeyTopic) {
-    toast.error("Please select a learning journey mission and topic");
-    return false;
-  }
+  if (!options?.skipLearningJourney) {
+    if (!draft.journeyPart || !draft.journeyTopic) {
+      toast.error("Please select a learning journey mission and topic");
+      return false;
+    }
 
-  if (
-    options?.enrolledParts &&
-    draft.selectedUsers.length > 0 &&
-    !options.enrolledParts.includes(draft.journeyPart)
-  ) {
-    toast.error("Selected mission is not enrolled for all selected students");
-    return false;
-  }
+    if (
+      options?.enrolledParts &&
+      draft.selectedUsers.length > 0 &&
+      !options.enrolledParts.includes(draft.journeyPart)
+    ) {
+      toast.error("Selected mission is not enrolled for all selected students");
+      return false;
+    }
 
-  if (!isValidPartTopicPair(draft.journeyPart, draft.journeyTopic)) {
-    toast.error("Selected topic does not belong to the selected mission");
-    return false;
+    if (!isValidPartTopicPair(draft.journeyPart, draft.journeyTopic)) {
+      toast.error("Selected topic does not belong to the selected mission");
+      return false;
+    }
   }
 
   const { drillType } = draft;
@@ -327,6 +343,8 @@ export function buildDrillPayloadFromDraft(
     omitAssignment?: boolean;
     /** Drill-builder week context — places assignedAt in that week when set. */
     weekNumber?: number;
+    /** Tags the drill as created via a dedicated product surface (e.g. Precision Clinic) that bypasses the learning-journey requirement. */
+    source?: "precision_clinic";
   },
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -338,8 +356,11 @@ export function buildDrillPayloadFromDraft(
     context: draft.context || undefined,
     audio_example_url: draft.audioExampleUrl || undefined,
     tts_voice_key: draft.ttsVoiceKey || undefined,
-    learning_journey_part: draft.journeyPart,
-    learning_journey_topic: draft.journeyTopic,
+    // Falsy (unset) rather than always-included: Precision Clinic drills skip this
+    // requirement entirely and leave these blank, and the server schema only accepts
+    // a valid part/topic or an omitted field — never an empty string.
+    learning_journey_part: draft.journeyPart || undefined,
+    learning_journey_topic: draft.journeyTopic || undefined,
   };
 
   if (!options?.omitAssignment) {
@@ -357,6 +378,10 @@ export function buildDrillPayloadFromDraft(
     options.weekNumber >= 1
   ) {
     payload.weekNumber = Math.floor(options.weekNumber);
+  }
+
+  if (options?.source) {
+    payload.source = options.source;
   }
 
   const { drillType } = draft;
@@ -384,6 +409,9 @@ export function buildDrillPayloadFromDraft(
     payload.ai_character_names = draft.aiCharacterNames.map((n) => n.trim());
     payload.ai_character_voice_keys = draft.aiCharacterNames.map(
       (_, i) => (draft.aiCharacterVoiceKeys[i] ?? "").trim(),
+    );
+    payload.ai_character_avatars = draft.aiCharacterNames.map(
+      (_, i) => (draft.aiCharacterAvatars?.[i] ?? "").trim(),
     );
     payload.drill_intro = draft.drillIntro.trim();
   } else if (drillType === "matching") {
@@ -423,7 +451,6 @@ export function buildDrillPayloadFromDraft(
       .filter((item) => item.prompt.trim())
       .map((item) => ({
         prompt: item.prompt.trim(),
-        respondentName: item.respondentName?.trim() || undefined,
         options: item.options.filter((o) => o.trim()),
         correctAnswer: item.correctAnswer.trim(),
       }));
@@ -448,6 +475,7 @@ export function buildBulkContentFromDraft(draft: DrillDraft): Record<string, unk
         student_character_name: payload.student_character_name,
         ai_character_names: payload.ai_character_names,
         ai_character_voice_keys: payload.ai_character_voice_keys,
+        ai_character_avatars: payload.ai_character_avatars,
         drill_intro: payload.drill_intro,
         context: draft.context,
       };

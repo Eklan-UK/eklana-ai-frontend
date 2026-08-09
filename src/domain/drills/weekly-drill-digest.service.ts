@@ -8,8 +8,8 @@ import { sendWeeklyDrillDigestEmail } from '@/lib/api/email.service';
 import { formatDrillNotificationLabel } from '@/lib/drill-display-label';
 import { onWeeklyDrillDigest } from '@/services/notification/triggers';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const ACTIVE_STATUSES = ['pending', 'in-progress', 'completed'] as const;
+/** Incomplete assignments only — matches daily practice nudge outstanding count. */
+const OUTSTANDING_STATUSES = ['pending', 'in-progress'] as const;
 
 /** Monday 00:00 UTC through Sunday 23:59:59.999 UTC for the week containing `reference`. */
 function getIsoWeekBounds(reference = new Date()): { start: Date; end: Date } {
@@ -72,8 +72,9 @@ type LearnerAssignmentGroup = {
 
 export class WeeklyDrillDigestService {
   /**
-   * Monday cron: email + in-app/push digest for learners with new drill assignments
-   * in the rolling 7-day window. Deduped per learner per ISO week.
+   * Monday cron: email + in-app/push digest for learners with outstanding
+   * (pending / in-progress) drill assignments — all time, not a 7-day window.
+   * Deduped per learner per ISO week.
    */
   async runWeeklyDigest(
     now: Date = new Date(),
@@ -93,11 +94,9 @@ export class WeeklyDrillDigestService {
     const includeDebug = options?.debug === true;
     const weekKey = getIsoWeekKey(now);
     const weekLabel = formatWeekLabel(now);
-    const windowStart = new Date(now.getTime() - SEVEN_DAYS_MS);
 
     const match: Record<string, unknown> = {
-      assignedAt: { $gte: windowStart },
-      status: { $in: [...ACTIVE_STATUSES] },
+      status: { $in: [...OUTSTANDING_STATUSES] },
     };
     if (options?.learnerId) {
       match.learnerId = options.learnerId;
@@ -124,7 +123,6 @@ export class WeeklyDrillDigestService {
 
     logger.info('[WeeklyDrillDigestService] runWeeklyDigest start', {
       weekKey,
-      windowStart: windowStart.toISOString(),
       learnerCount: learnerGroups.length,
     });
 

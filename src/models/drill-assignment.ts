@@ -24,6 +24,13 @@ export interface IDrillAssignment extends Document {
 	 * do not affect learner challenge timing or other assignedAt-based features.
 	 */
 	builderWeekNumber?: number | null;
+	/**
+	 * Denormalized copy of the owning Drill's `source` (see src/models/drill.ts).
+	 * Tag-only — lets shared queries (AI Drill Builder week counting, Home/My
+	 * Plans/Learning Journey lists) exclude Precision Clinic assignments
+	 * without an extra Drill join. Kept in sync with the Drill by DrillService.
+	 */
+	source?: 'precision_clinic';
 	dueDate?: Date;
 	status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped';
 	completedAt?: Date;
@@ -66,6 +73,12 @@ const drillAssignmentSchema = new Schema<IDrillAssignment>(
 			type: Number,
 			default: null,
 			min: 1,
+		},
+		source: {
+			type: String,
+			enum: ['precision_clinic'],
+			required: false,
+			index: true,
 		},
 		dueDate: {
 			type: Date,

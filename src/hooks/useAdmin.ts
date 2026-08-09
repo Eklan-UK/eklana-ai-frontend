@@ -16,8 +16,14 @@ export type AdminDrillListFilters = {
   assignmentStatus?: 'saved' | 'assigned';
   assignedToIds?: string[];
   isBookmarked?: boolean;
+  /** Filter by Drill.is_active (e.g. exclude archived). */
+  isActive?: boolean;
   learningJourneyPart?: 1 | 2 | 3 | 4 | 5;
   learningJourneyTopic?: string;
+  /** Only return drills tagged with this source (e.g. Eklan Precision Clinic). */
+  source?: 'precision_clinic';
+  /** Exclude drills tagged with this source (e.g. hide Precision Clinic drills from other drill surfaces). */
+  excludeSource?: 'precision_clinic';
 };
 
 // Get all drills (admin) — paginated, 50 per page by default
@@ -40,8 +46,11 @@ export function useAllDrills(
         assignmentStatus: filters?.assignmentStatus,
         assignedToIds: joinedIds,
         isBookmarked: filters?.isBookmarked,
+        isActive: filters?.isActive,
         learningJourneyPart: filters?.learningJourneyPart,
         learningJourneyTopic: filters?.learningJourneyTopic,
+        source: filters?.source,
+        excludeSource: filters?.excludeSource,
       });
       const drills =
         response.data?.drills ??
@@ -331,6 +340,19 @@ export function useLearnerDrillAssignments(learnerId: string) {
     queryKey: ["learners", learnerId, "drill-assignments"],
     queryFn: async () => {
       const response = await adminAPI.getLearnerDrillAssignments(learnerId);
+      return response.data;
+    },
+    enabled: !!learnerId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+/** Weekly challenge progress for a learner (admin/tutor). Read-only. */
+export function useLearnerWeeklyChallenges(learnerId: string) {
+  return useQuery({
+    queryKey: ["learners", learnerId, "weekly-challenges"],
+    queryFn: async () => {
+      const response = await adminAPI.getLearnerWeeklyChallenges(learnerId);
       return response.data;
     },
     enabled: !!learnerId,

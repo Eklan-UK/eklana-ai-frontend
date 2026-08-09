@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
 	formatDrillNotificationLabel,
 	getDrillTopicTitle,
+	resolveDrillListTitle,
 	resolveRealDrillTitle,
 } from './drill-display-label';
 
@@ -63,6 +64,65 @@ describe('resolveRealDrillTitle', () => {
 	});
 });
 
+describe('resolveDrillListTitle', () => {
+	it('returns a real title when present', () => {
+		assert.equal(
+			resolveDrillListTitle({
+				title: ' Soft palate practice ',
+				type: 'vocabulary',
+				learning_journey_topic: 'patient_follow_up',
+			}),
+			'Soft palate practice',
+		);
+	});
+
+	it('falls back to topic for blank titles', () => {
+		assert.equal(
+			resolveDrillListTitle({
+				title: '',
+				type: 'vocabulary',
+				learning_journey_topic: 'patient_follow_up',
+			}),
+			'Follow-up with Patients',
+		);
+	});
+
+	it('falls back to topic for Untitled Drill', () => {
+		assert.equal(
+			resolveDrillListTitle({
+				title: 'Untitled Drill',
+				type: 'vocabulary',
+				learning_journey_topic: 'handling_emergency_critical',
+			}),
+			'Handling Emergency/Critical Situation',
+		);
+	});
+
+	it('prefers topicTitle over catalog slug lookup', () => {
+		assert.equal(
+			resolveDrillListTitle({
+				title: 'Untitled',
+				type: 'grammar',
+				topicTitle: ' Custom Topic Label ',
+				learning_journey_topic: 'patient_follow_up',
+			}),
+			'Custom Topic Label',
+		);
+	});
+
+	it('falls back to type label when topic is missing', () => {
+		assert.equal(
+			resolveDrillListTitle({
+				title: 'Untitled Drill',
+				type: 'vocabulary',
+			}),
+			'Vocabulary',
+		);
+		assert.equal(resolveDrillListTitle({ title: '' }), 'Practice');
+		assert.equal(resolveDrillListTitle(null), 'Practice');
+	});
+});
+
 describe('formatDrillNotificationLabel', () => {
 	it('joins type, mission, and topic when title is empty', () => {
 		assert.equal(
@@ -96,7 +156,7 @@ describe('formatDrillNotificationLabel', () => {
 				learning_journey_part: 2,
 				learning_journey_topic: 'giving_handover',
 			}),
-			'Pronunciation · Mission 2 · Giving an Handover',
+			'Pronunciation · Mission 2 · Giving a Handover',
 		);
 	});
 

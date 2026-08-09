@@ -20,6 +20,7 @@ import { useParams } from "next/navigation";
 import { tutorAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { DrillSubmissionsComponent } from "@/components/admin/drill-submissions";
+import { LearnerWeeklyChallengeStatus } from "@/components/admin/learner-weekly-challenge-status";
 import { appendReturnTo } from "@/lib/drill-list-filters";
 
 interface Student {
@@ -66,6 +67,11 @@ function DrillCard({
   showReviewButton?: boolean;
   returnTo?: string;
 }) {
+  const isGrammar = String(drill.type || "").trim().toLowerCase() === "grammar";
+  const isGrammarPendingReview =
+    isGrammar && drill.reviewStatus === "pending";
+  const isGrammarReviewed = isGrammar && drill.reviewStatus === "reviewed";
+
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
@@ -75,9 +81,11 @@ function DrillCard({
             <span
               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 drill.status === "completed"
-                  ? drill.reviewStatus === "reviewed"
+                  ? isGrammarReviewed
                     ? "bg-green-100 text-green-700"
-                    : "bg-yellow-100 text-yellow-700"
+                    : isGrammarPendingReview
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700"
                   : drill.status === "in-progress"
                   ? "bg-blue-100 text-blue-700"
                   : drill.status === "overdue"
@@ -86,9 +94,11 @@ function DrillCard({
               }`}
             >
               {drill.status === "completed"
-                ? drill.reviewStatus === "reviewed"
+                ? isGrammarReviewed
                   ? "Reviewed"
-                  : "Pending Review"
+                  : isGrammarPendingReview
+                  ? "Pending Review"
+                  : "Completed"
                 : drill.status === "in-progress"
                 ? "In Progress"
                 : drill.status === "overdue"
@@ -130,7 +140,7 @@ function DrillCard({
         </div>
         {drill.drillId && (
           <div className="flex items-center gap-2 shrink-0">
-            {showReviewButton && (
+            {showReviewButton && isGrammarPendingReview && (
               <Link href={`/tutor/drills/${drill.drillId}/review?assignmentId=${drill.id}`}>
                 <Button variant="outline" size="sm">
                   <FileCheck className="w-4 h-4 mr-1" />
@@ -409,6 +419,16 @@ export default function StudentDetailPage() {
             </div>
             <div className="text-sm text-gray-600">Total Assigned</div>
           </Card>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">
+            Weekly Challenges
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Track whether this student has started or finished each week&apos;s challenge.
+          </p>
+          <LearnerWeeklyChallengeStatus learnerId={studentId} learnerName={student.name} />
         </div>
 
         <div className="mb-8">

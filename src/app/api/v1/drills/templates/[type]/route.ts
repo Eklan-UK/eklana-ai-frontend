@@ -173,8 +173,8 @@ function generateTemplate(type: string): { data: any[][] } {
     case "key_phrases":
       return {
         data: [
-          ["Prompt", "Respondent Name", "Correct Answer", "Option 2", "Option 3"],
-          ["What do you say when you arrive at a hotel?", "Receptionist", "I'd like to check in, please.", "Do you have a room?", "Where is my room?"],
+          ["Prompt", "Correct Answer", "Option 2", "Option 3"],
+          ["A guest arrives at the hotel front desk.", "I'd like to check in, please.", "Do you have a room?", "Where is my room?"],
         ],
       };
 

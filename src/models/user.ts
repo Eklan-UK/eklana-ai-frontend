@@ -122,6 +122,12 @@ export interface IUser extends Document<Types.ObjectId | string> {
    * created manually via POST /students/:id/weeks. Null/unset = not seeded yet.
    */
   drillBuilderWeekCount?: number | null;
+  /**
+   * Admin/tutor Precision Clinic week cap for this learner. Mirrors
+   * `drillBuilderWeekCount` but tracked separately so the two builders
+   * don't interfere with each other's week counts.
+   */
+  precisionClinicWeekCount?: number | null;
   // Zero Pause add-on products (admin-assigned). `mastery` is legacy storage only.
   zeroPauseProducts?: ("challenge" | "maintainer" | "mastery")[];
   /** Zero Pause Challenge trial window start. */
@@ -361,6 +367,11 @@ const userSchema = new Schema<IUser>(
       index: true,
     },
     drillBuilderWeekCount: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
+    precisionClinicWeekCount: {
       type: Number,
       default: null,
       min: 1,

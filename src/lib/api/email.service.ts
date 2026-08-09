@@ -206,7 +206,7 @@ This is an automated notification from Eklan.
         : "";
 
     return {
-      subject: "Your outstanding drills for this week",
+      subject: "Your outstanding drills",
       html: `
 			<!DOCTYPE html>
 			<html>
@@ -229,7 +229,7 @@ This is an automated notification from Eklan.
 						</div>
 						<div style="padding: 30px;">
 							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
-							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You have <strong>${data.drillCount}</strong> outstanding drill${data.drillCount === 1 ? "" : "s"} this week. Open your plan to get started.</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">You have <strong>${data.drillCount}</strong> outstanding drill${data.drillCount === 1 ? "" : "s"}. Open your plan to get started.</p>
 							<div style="background-color: #f0fdf4; border: 2px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 25px 0;">
 								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #166534;">Outstanding drills</h2>
 								<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>
@@ -251,9 +251,9 @@ This is an automated notification from Eklan.
       text: `
 Hi ${data.studentName},
 
-Your outstanding drills for this week (week of ${data.weekLabel}).
+Your outstanding drills (week of ${data.weekLabel}).
 
-You have ${data.drillCount} outstanding drill${data.drillCount === 1 ? "" : "s"} this week.
+You have ${data.drillCount} outstanding drill${data.drillCount === 1 ? "" : "s"}.
 
 ${listed.map((t) => `- ${t}`).join("\n")}${remaining > 0 ? `\n...and ${remaining} more` : ""}
 
@@ -306,7 +306,7 @@ This is an automated notification from Eklan.
 						</div>
 						<div style="padding: 30px;">
 							<p style="margin: 0 0 20px 0; font-size: 16px;">Hi <strong>${data.studentName}</strong>,</p>
-							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">Your personalized weekly challenge is ready with <strong>${data.drillCount}</strong> drill${data.drillCount === 1 ? "" : "s"} based on your practice this week.</p>
+							<p style="margin: 0 0 25px 0; font-size: 16px; color: #4b5563;">Your personalized weekly challenge is ready with <strong>${data.drillCount}</strong> drill${data.drillCount === 1 ? "" : "s"} based on your practice over the past 7 days.</p>
 							<div style="background-color: #fffbeb; border: 2px solid #fde68a; border-radius: 12px; padding: 20px; margin: 25px 0;">
 								<h2 style="margin: 0 0 15px 0; font-size: 18px; color: #92400e;">This week's drills</h2>
 								<ul style="margin: 0; padding-left: 20px;">${listItems}</ul>
@@ -329,7 +329,7 @@ Hi ${data.studentName},
 
 Your weekly challenge is ready (week of ${data.weekLabel}).
 
-You have ${data.drillCount} personalized drill${data.drillCount === 1 ? "" : "s"} based on your practice this week.
+You have ${data.drillCount} personalized drill${data.drillCount === 1 ? "" : "s"} based on your practice over the past 7 days.
 
 ${data.drillTypes.map((t) => `- ${t}`).join("\n")}
 

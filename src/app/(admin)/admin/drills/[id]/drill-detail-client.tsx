@@ -19,6 +19,8 @@ import {
   Headphones,
   ScrollText,
   Link2,
+  Mic,
+  PenLine,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -36,18 +38,41 @@ import {
 interface DrillDetailClientProps {
   drill: any;
   drillId: string;
+  /**
+   * Optional path overrides (Precision Clinic view page).
+   * Defaults preserve existing admin Drill Builder detail links.
+   */
+  paths?: {
+    list?: string;
+    /** Base create path; `?drillId=` is appended. */
+    create?: string;
+    assignment?: string;
+  };
 }
 
-export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
+export function DrillDetailClient({
+  drill,
+  drillId,
+  paths,
+}: DrillDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const defaultListPath = paths?.list ?? "/admin/drill";
+  const createPath = paths?.create ?? "/admin/drills/create";
+  const assignmentPath =
+    paths?.assignment ?? "/admin/drills/assignment";
   const drillListReturnPath =
-    sanitizeReturnTo(searchParams.get("returnTo")) ?? "/admin/drill";
+    sanitizeReturnTo(searchParams.get("returnTo")) ?? defaultListPath;
   const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
   const [showAssignedModal, setShowAssignedModal] = useState(false);
   const { data: assignmentsData } = useDrillAssignments(drillId);
   const assignments = assignmentsData?.assignments || [];
+
+  const editHref = returnToParam
+    ? appendReturnTo(`${createPath}?drillId=${drillId}`, returnToParam)
+    : `${createPath}?drillId=${drillId}`;
+  const assignmentHref = `${assignmentPath}?drillId=${drillId}`;
 
   const handleDelete = async () => {
     if (
@@ -80,6 +105,8 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
       summary: <ScrollText {...iconProps} className="w-6 h-6 text-orange-500" />,
       sentence_writing: <PenTool {...iconProps} className="w-6 h-6 text-indigo-500" />,
       listening: <Headphones {...iconProps} className="w-6 h-6 text-cyan-500" />,
+      pronunciation: <Mic {...iconProps} className="w-6 h-6 text-violet-500" />,
+      fill_blank: <PenLine {...iconProps} className="w-6 h-6 text-amber-500" />,
     };
     return icons[type] || <BookOpen {...iconProps} className="w-6 h-6 text-gray-500" />;
   };
@@ -133,16 +160,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             </Button>
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              href={
-                returnToParam
-                  ? appendReturnTo(
-                      `/admin/drills/create?drillId=${drillId}`,
-                      returnToParam,
-                    )
-                  : `/admin/drills/create?drillId=${drillId}`
-              }
-            >
+            <Link href={editHref}>
               <Button variant="outline" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
@@ -298,6 +316,41 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 Roleplay Scenes ({drill.roleplay_scenes.length})
               </h2>
+              {Array.isArray(drill.ai_character_names) &&
+                drill.ai_character_names.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-3">
+                    {drill.ai_character_names.map(
+                      (name: string, idx: number) => {
+                        const avatarUrl =
+                          Array.isArray(drill.ai_character_avatars)
+                            ? drill.ai_character_avatars[idx]
+                            : undefined;
+                        return (
+                          <div
+                            key={idx}
+                            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1.5"
+                          >
+                            {avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatarUrl}
+                                alt=""
+                                className="h-7 w-7 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-600">
+                                {(name || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                            <span className="text-sm font-medium text-gray-800">
+                              {name || `AI ${idx + 1}`}
+                            </span>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
               <div className="space-y-4">
                 {drill.roleplay_scenes.map((scene: any, idx: number) => (
                   <div
@@ -483,11 +536,9 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Question {idx + 1}
                       </p>
-                      {item.respondentName?.trim() && (
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">
-                          Respondent: {item.respondentName.trim()}
-                        </p>
-                      )}
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-1">
+                        Situation / Scenario
+                      </p>
                       <p className="font-semibold text-gray-900">{item.prompt}</p>
                     </div>
                     <div>
@@ -532,6 +583,86 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           </Card>
         )}
 
+        {drill.type === "pronunciation" &&
+          drill.pronunciation_items &&
+          drill.pronunciation_items.length > 0 && (
+            <Card className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Pronunciation Items ({drill.pronunciation_items.length})
+              </h2>
+              <div className="space-y-2">
+                {drill.pronunciation_items.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <p className="font-semibold text-gray-900">
+                      {item.sound} — {item.word}
+                    </p>
+                    {item.sentence && (
+                      <p className="text-sm text-gray-600 mt-1">{item.sentence}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+        {drill.type === "fill_blank" &&
+          drill.fill_blank_items &&
+          drill.fill_blank_items.length > 0 && (
+            <Card className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Fill in the Blank ({drill.fill_blank_items.length})
+              </h2>
+              <div className="space-y-4">
+                {drill.fill_blank_items.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3"
+                  >
+                    {item.context && (
+                      <p className="text-sm text-gray-600">{item.context}</p>
+                    )}
+                    <p className="font-semibold text-gray-900">{item.sentence}</p>
+                    {item.translation && (
+                      <p className="text-sm text-gray-500 italic">{item.translation}</p>
+                    )}
+                    {(item.blanks || []).length > 0 && (
+                      <div className="space-y-3">
+                        {(item.blanks || []).map((blank: any, blankIdx: number) => (
+                          <div key={blankIdx}>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">
+                              Blank {blankIdx + 1}
+                              {blank.hint ? ` — ${blank.hint}` : ""}
+                            </p>
+                            <ul className="space-y-1">
+                              {(blank.options || []).map(
+                                (opt: string, optIdx: number) => (
+                                  <li
+                                    key={optIdx}
+                                    className={`text-sm px-3 py-1.5 rounded-lg ${
+                                      opt === blank.correctAnswer
+                                        ? "bg-emerald-100 text-emerald-800 font-medium"
+                                        : "bg-white text-gray-700 border border-gray-100"
+                                    }`}
+                                  >
+                                    {opt}
+                                    {opt === blank.correctAnswer ? " ✓" : ""}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
         {/* Assigned Students List */}
         {assignments.length > 0 && (
           <Card>
@@ -545,7 +676,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                   {assignedCount} total
                 </p>
               </div>
-              <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+              <Link href={assignmentHref}>
                 <Button variant="outline" size="sm">
                   <Users className="w-4 h-4 mr-2" />
                   Manage Assignments
@@ -713,7 +844,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 <p className="text-gray-500">
                   No students assigned to this drill yet
                 </p>
-                <Link href={`/admin/drills/assignment?drillId=${drillId}`}>
+                <Link href={assignmentHref}>
                   <Button variant="primary" size="sm" className="mt-4">
                     Assign Students
                   </Button>

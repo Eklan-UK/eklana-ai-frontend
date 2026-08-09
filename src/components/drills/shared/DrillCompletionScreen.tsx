@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { playDrillEndCelebration } from "@/lib/practice-feedback";
+import type { DrillConfettiVariant } from "@/lib/drill-celebration";
 
 interface DrillCompletionScreenProps {
   title?: string;
@@ -18,6 +19,8 @@ interface DrillCompletionScreenProps {
   celebrate?: boolean;
   /** Override celebration MP3 (e.g. from POST /complete `effects.soundUrl`). */
   celebrationSoundUrl?: string;
+  /** Gold vs green confetti (e.g. from POST /complete `effects.confettiVariant`). Defaults to `pass`. */
+  confettiVariant?: DrillConfettiVariant;
   /** Optional content below the default message (e.g. session transcripts). */
   extraContent?: ReactNode;
 }
@@ -30,6 +33,7 @@ export function DrillCompletionScreen({
   returnLabel = "Continue Learning",
   celebrate = false,
   celebrationSoundUrl,
+  confettiVariant,
   extraContent,
 }: DrillCompletionScreenProps) {
   const router = useRouter();
@@ -37,9 +41,9 @@ export function DrillCompletionScreen({
 
   useEffect(() => {
     if (celebrate) {
-      playDrillEndCelebration(celebrationSoundUrl);
+      playDrillEndCelebration(celebrationSoundUrl, { confettiVariant });
     }
-  }, [celebrate, celebrationSoundUrl]);
+  }, [celebrate, celebrationSoundUrl, confettiVariant]);
 
   const handleContinue = () => {
     router.push(returnPath);

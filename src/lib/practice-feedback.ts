@@ -1,6 +1,15 @@
 import { unlockAudioContext } from "@/lib/ios-audio-utils";
-import { triggerDrillEndConfetti } from "@/lib/drill-celebration";
-import { getClientCelebrationSoundUrl } from "@/lib/drill/celebration-sound-url";
+import { triggerDrillEndConfetti, type DrillConfettiVariant } from "@/lib/drill-celebration";
+import {
+  getClientCelebrationSoundUrl,
+  getClientPerfectCelebrationSoundUrl,
+} from "@/lib/drill/celebration-sound-url";
+
+export type { DrillConfettiVariant } from "@/lib/drill-celebration";
+
+export type PlayDrillEndCelebrationOptions = {
+  confettiVariant?: DrillConfettiVariant;
+};
 
 export type PracticeFeedbackKind = "success" | "failure" | "neutral";
 
@@ -89,10 +98,15 @@ export function playPracticeFeedback(kind: PracticeFeedbackKind): void {
   void playTone(kind);
 }
 
-async function playCelebrationSound(soundUrl?: string): Promise<void> {
+async function playCelebrationSound(
+  soundUrl?: string,
+  variant: DrillConfettiVariant = "pass",
+): Promise<void> {
   if (typeof window === "undefined") return;
 
-  const url = soundUrl?.trim() || getClientCelebrationSoundUrl();
+  const fallbackUrl =
+    variant === "perfect" ? getClientPerfectCelebrationSoundUrl() : getClientCelebrationSoundUrl();
+  const url = soundUrl?.trim() || fallbackUrl;
   try {
     if (celebrationAudio) {
       celebrationAudio.pause();
@@ -107,11 +121,24 @@ async function playCelebrationSound(soundUrl?: string): Promise<void> {
   }
 }
 
-/** End-of-drill pass: celebration MP3, haptics, and confetti. */
-export function playDrillEndCelebration(soundUrl?: string): void {
+/**
+ * End-of-drill pass: celebration MP3, haptics, and confetti.
+ * When `confettiVariant` is `"perfect"` and no explicit `soundUrl` is passed, the perfect-score
+ * MP3 (`getClientPerfectCelebrationSoundUrl`) plays instead of the normal pass sound.
+ */
+export function playDrillEndCelebration(
+  soundUrl?: string,
+  options?: PlayDrillEndCelebrationOptions,
+): void {
+  const confettiVariant = options?.confettiVariant ?? "pass";
   triggerHaptic("success");
-  void playCelebrationSound(soundUrl);
-  triggerDrillEndConfetti();
+  void playCelebrationSound(soundUrl, confettiVariant);
+  triggerDrillEndConfetti(confettiVariant);
+}
+
+/** Mid-item perfect score (100%): haptic + perfect MP3 + gold confetti, without leaving the drill. */
+export function playPerfectItemCelebration(): void {
+  playDrillEndCelebration(undefined, { confettiVariant: "perfect" });
 }
 
 export function playDrillEndFailure(): void {

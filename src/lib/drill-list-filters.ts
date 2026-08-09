@@ -22,6 +22,7 @@ const ALLOWED_RETURN_PREFIXES = [
   "/admin/ai-drill-builder",
   "/admin/ai-user-builder",
   "/admin/learners",
+  "/admin/precision-clinic",
   "/tutor/drills",
   "/tutor/drills/all",
   "/tutor/ai-drill-builder",

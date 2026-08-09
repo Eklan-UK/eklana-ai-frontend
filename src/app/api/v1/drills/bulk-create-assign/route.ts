@@ -33,6 +33,8 @@ interface BulkDrillInput {
   mission?: unknown;
   /** Drill-builder week context — places assignedAt in that week when set. */
   weekNumber?: number;
+  /** Tags Precision Clinic drills. */
+  source?: "precision_clinic";
 }
 
 // Builds a map from character name to its normalized speaker key
@@ -104,6 +106,9 @@ function mapContentFields(
       const storedVoices = Array.isArray(content.ai_character_voice_keys)
         ? content.ai_character_voice_keys
         : [];
+      const storedAvatars = Array.isArray(content.ai_character_avatars)
+        ? content.ai_character_avatars
+        : [];
       return {
         roleplay_scenes: normalizeRoleplayScenes(
           content.roleplay_scenes ?? [],
@@ -114,6 +119,9 @@ function mapContentFields(
         ai_character_names: aiCharacterNames,
         ai_character_voice_keys: aiCharacterNames.map(
           (_: string, i: number) => storedVoices[i] ?? ""
+        ),
+        ai_character_avatars: aiCharacterNames.map(
+          (_: string, i: number) => storedAvatars[i] ?? ""
         ),
         drill_intro: content.drill_intro ?? "",
       };
@@ -179,6 +187,7 @@ async function handler(
             part,
             mission,
             weekNumber,
+            source,
           } = item;
           const rawPart = part ?? mission;
           const extractedPart = typeof rawPart === 'string' ? rawPart.match(/\d+/)?.[0] : rawPart;
@@ -254,6 +263,7 @@ async function handler(
 
           if (validatedPart !== undefined) drillData.learning_journey_part = validatedPart;
           if (validatedTopic !== undefined) drillData.learning_journey_topic = validatedTopic;
+          if (source === "precision_clinic") drillData.source = source;
 
           const drill = await Drill.create(drillData);
 

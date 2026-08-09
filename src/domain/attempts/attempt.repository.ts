@@ -257,7 +257,11 @@ export class AttemptRepository {
 
       const attempts = await DrillAttempt.find(query)
         .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
-        .populate({ path: 'drillId', model: Drill, select: 'title type sentence_drill_word sentence_writing_items' })
+        .populate({
+          path: 'drillId',
+          model: Drill,
+          select: 'title type learning_journey_topic sentence_drill_word sentence_writing_items',
+        })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)
@@ -297,7 +301,11 @@ export class AttemptRepository {
 
       const attempts = await DrillAttempt.find(query)
         .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
-        .populate({ path: 'drillId', model: Drill, select: 'title type grammar_items' })
+        .populate({
+          path: 'drillId',
+          model: Drill,
+          select: 'title type learning_journey_topic grammar_items',
+        })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)
@@ -338,7 +346,11 @@ export class AttemptRepository {
 
       const attempts = await DrillAttempt.find(query)
         .populate({ path: 'learnerId', model: User, select: 'firstName lastName email' })
-        .populate({ path: 'drillId', model: Drill, select: 'title type article_title' })
+        .populate({
+          path: 'drillId',
+          model: Drill,
+          select: 'title type learning_journey_topic article_title',
+        })
         .sort({ completedAt: -1 })
         .limit(filters.limit || 50)
         .skip(filters.offset || 0)

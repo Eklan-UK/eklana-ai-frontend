@@ -111,7 +111,9 @@ export interface DrillCreatePageContentProps {
   variant: DrillCreateVariant;
 }
 
-export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps) {
+export function DrillCreatePageContent({
+  variant,
+}: DrillCreatePageContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -122,6 +124,12 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   const preselectedStudentId = searchParams.get("student") || "";
   const preselectedWeek = searchParams.get("week") || "";
   const returnToParam = searchParams.get("returnTo");
+  // Precision Clinic drills reuse this general create form but aren't curriculum-linked,
+  // so this flag threads through to skip/hide the learning journey mission/topic requirement.
+  const source =
+    searchParams.get("source") === "precision_clinic"
+      ? "precision_clinic"
+      : undefined;
   const isEditMode = !!drillId;
   const contextWeekNumber = useMemo(() => {
     const weekNum = preselectedWeek ? parseInt(preselectedWeek, 10) : NaN;
@@ -129,7 +137,8 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   }, [preselectedWeek]);
 
   const drillListReturnPath = useMemo(
-    () => sanitizeReturnTo(returnToParam) ?? getDrillCreateDefaultReturn(variant),
+    () =>
+      sanitizeReturnTo(returnToParam) ?? getDrillCreateDefaultReturn(variant),
     [returnToParam, variant],
   );
 
@@ -225,8 +234,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
     if (!pending?.length) return;
     setBulkDrafts(pending.map(draftFromBulkPendingItem));
     setBulkReturnTo(
-      sanitizeReturnTo(returnToParam) ??
-        getDrillCreateDefaultReturn(variant),
+      sanitizeReturnTo(returnToParam) ?? getDrillCreateDefaultReturn(variant),
     );
     clearPendingBulkAiDrillApply();
   }, [isEditMode, returnToParam, variant]);
@@ -392,7 +400,12 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
 
       let drillPayload: Record<string, unknown> = buildDrillPayloadFromDraft(
         draft,
-        { assignedTo, isActive: true, weekNumber: contextWeekNumber },
+        {
+          assignedTo,
+          isActive: true,
+          weekNumber: contextWeekNumber,
+          source,
+        },
       );
 
       if (draft.generateTTSAudio) {
@@ -463,7 +476,9 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         );
         await invalidateStudentWeeks(queryClient, assignedTo);
         router.push(
-          returnToParam ? drillListReturnPath : getDrillPostCreatePath(variant),
+          returnToParam
+            ? drillListReturnPath
+            : getDrillPostCreatePath(variant),
         );
       }
     } catch (error: unknown) {
@@ -477,17 +492,19 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   };
 
   const handleSaveDrill = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     try {
       setSaving(true);
       const payload = buildDrillPayloadFromDraft(
         draft,
         isAssignedDrill
-          ? { omitAssignment: true }
+          ? { omitAssignment: true, source }
           : {
               assignedTo: draft.selectedUsers,
               isActive: false,
               weekNumber: contextWeekNumber,
+              source,
             },
       );
 
@@ -517,7 +534,8 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   };
 
   const handleSubmit = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     if (draft.selectedUsers.length === 0) {
       toast.error("Please select at least one user");
       return;
@@ -530,12 +548,14 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
   };
 
   const handleCopyDrill = async () => {
-    if (!validateDrillDraft(draft)) return;
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
     setCopying(true);
     try {
       let payload = buildDrillPayloadFromDraft(draft, {
         assignedTo: [],
         isActive: false,
+        source,
       });
       if (isEditMode && drillData) {
         payload = mergeMediaFieldsFromSource(
@@ -640,15 +660,15 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         <button
           type="button"
           onClick={() => router.back()}
-          className="p-3 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors"
+          className="p-3 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors dark:bg-card dark:border-border dark:hover:bg-muted"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-muted-foreground" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground">
             {isEditMode ? "Edit Drill" : "Create New Drill"}
           </h1>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 text-sm dark:text-muted-foreground">
             {isEditMode
               ? "Update drill details and assignments"
               : "Upload a PDF or fill in the form manually"}
@@ -679,6 +699,7 @@ export function DrillCreatePageContent({ variant }: DrillCreatePageContentProps)
         leadingContent={importSection}
         sidebarLeadingContent={generateAiButton}
         onDrillTypeChange={handleDrillTypeChange}
+        hideLearningJourneyFields={source === "precision_clinic"}
       />
 
       <div className="fixed bottom-0 left-64 right-0 bg-white border-t border-gray-100 p-6 flex gap-4 z-10">

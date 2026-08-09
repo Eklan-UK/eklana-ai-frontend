@@ -32,6 +32,33 @@ export function resolveRealDrillTitle(title?: string | null): string | null {
 	return trimmed;
 }
 
+export interface DrillListTitleInput {
+	title?: string | null;
+	type?: string | null;
+	topicTitle?: string | null;
+	learning_journey_topic?: string | null;
+	scenarioType?: string | null;
+}
+
+/**
+ * List-row title: real drill title, else topic name, else type label.
+ * Used for Learning Journey section navs and admin review lists (display-only; no DB writes).
+ */
+export function resolveDrillListTitle(
+	drill: DrillListTitleInput | null | undefined,
+): string {
+	const realTitle = resolveRealDrillTitle(drill?.title);
+	if (realTitle) return realTitle;
+
+	const topicFromProp = drill?.topicTitle?.trim();
+	if (topicFromProp) return topicFromProp;
+
+	const topicFromCatalog = getDrillTopicTitle(drill);
+	if (topicFromCatalog) return topicFromCatalog;
+
+	return getDrillTypeLabel(drill?.type);
+}
+
 /**
  * Returns the catalog topic title for a drill, e.g. "Handling Emergency/Critical Situation".
  * Resolves from learning_journey_topic slug, or Free Talk scenarioType via catalog mapping.
