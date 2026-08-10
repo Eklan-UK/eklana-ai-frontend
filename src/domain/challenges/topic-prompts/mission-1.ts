@@ -17,6 +17,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -93,6 +95,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -239,6 +243,8 @@ Generate  key phrases drill based on the following:
 
 The student missed the following key phrases this week: {{missed_phrases}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 key phrases according to the following  rules:
 
 1. Format
@@ -305,6 +311,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -399,6 +407,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -475,6 +485,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -603,6 +615,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week: {{missed_phrases}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 key phrase questions according to the following rules:
 
 1. Format
@@ -679,6 +693,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -781,6 +797,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -858,6 +876,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -989,6 +1009,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week: {{missed_phrases}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 key phrase questions according to the following rules:
 
 1. Format
@@ -1065,6 +1087,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1156,6 +1180,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -1233,6 +1259,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -1363,6 +1391,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week: {{missed_phrases}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 key phrase questions according to the following rules:
 
 1. Format
@@ -1439,6 +1469,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
