@@ -464,7 +464,7 @@ export default function FillBlankDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Vocabulary" : "fill_blank"}
+        drillType={weeklyChallengeMeta ? "Vocabulary/Phrase" : "fill_blank"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}

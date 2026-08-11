@@ -152,7 +152,7 @@ export function resolveDrillPracticeType(drill: {
 
 /** Human-readable labels for learner-facing drill lists. */
 export const DRILL_TYPE_LABELS: Record<string, string> = {
-  vocabulary: "Vocabulary",
+  vocabulary: "Vocabulary/Phrase",
   pronunciation: "Pronunciation",
   roleplay: "Speaking",
   matching: "Matching",

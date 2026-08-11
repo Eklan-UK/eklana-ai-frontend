@@ -9,7 +9,7 @@ export interface WeeklyChallengeMeta {
 
 const DRILL_TYPE_TITLE: Record<string, string> = {
 	pronunciation: 'Pronunciation',
-	vocabulary: 'Vocabulary',
+	vocabulary: 'Vocabulary/Phrase',
 	roleplay: 'Role-play',
 	key_phrases: 'Key Phrases',
 };

@@ -10,7 +10,7 @@ import type { ChallengeDrillItem } from './types';
 
 const DRILL_TYPE_LABELS: Record<string, string> = {
 	pronunciation: 'Pronunciation',
-	vocabulary: 'Vocabulary',
+	vocabulary: 'Vocabulary/Phrase',
 	roleplay: 'Roleplay',
 	key_phrases: 'Key Phrases',
 	fill_blank: 'Fill in the Blank',

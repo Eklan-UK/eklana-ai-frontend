@@ -614,7 +614,7 @@ export class DrillService {
       return {
         drill,
         assignment: {
-          assignmentId: foundAssignment._id,
+          assignmentId: String(foundAssignment._id),
           status: foundAssignment.status,
           dueDate: foundAssignment.dueDate,
           completedAt: foundAssignment.completedAt,
@@ -650,7 +650,15 @@ export class DrillService {
       throw new ForbiddenError('You do not have access to this drill');
     }
 
-    return { drill };
+    return {
+      drill,
+      assignment: {
+        assignmentId: String(assignments[0]._id),
+        status: assignments[0].status,
+        dueDate: assignments[0].dueDate,
+        completedAt: assignments[0].completedAt,
+      },
+    };
   }
 
   /**
