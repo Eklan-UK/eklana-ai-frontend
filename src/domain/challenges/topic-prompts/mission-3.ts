@@ -998,10 +998,7 @@ Characters should naturally address each other by name whenever appropriate.
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Clearly identifies themselves, their role, and the patient being discussed.
-- Delivers a concise and accurate patient update, including diagnosis, current condition, assessment findings, vital signs, treatments, and significant changes.
-- Communicates nursing priorities, safety concerns, patient or family concerns, barriers to care, and discharge considerations.
-- Participates in care planning by contributing relevant information, asking clarification questions when needed, and confirming physician orders, follow-up actions, and the agreed plan of care.
+{{competencies}}
 
 5. Realism
 
@@ -1645,10 +1642,7 @@ Sentence:
 4. Competency Alignment
 
 The selected words and sentences should naturally reinforce the learner's ability to:
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -1873,10 +1867,7 @@ Instead:
 
 - The correct answer should demonstrate one or more of the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1960,10 +1951,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 5. Realism
 

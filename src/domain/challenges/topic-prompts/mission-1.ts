@@ -276,10 +276,7 @@ Make many answer choices clinically reasonable.
 Make at least half of the questions contain two answers that could realistically be said by a nurse.
 The learner must identify which answer is the MOST professional, concise, collaborative, and appropriate emergency situation
 The correct should be the one that demonstrates the following:
-Recognizes patient deterioration quickly by identifying emergency signs such as low oxygen saturation, chest pain, respiratory distress, hypotension, or confusion without delay
-Provides immediate appropriate intervention by initiating correct first actions such as increasing oxygen, monitoring vital signs, positioning patient safely, or assessing symptoms
-Gives clear patient instructions by using short, direct instructions such as "Take slow deep breaths" or "Please stay still"
-Correctly uses professional ICU terminology like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm.
+{{competencies}}
 
 4. Balanced Answer Distribution
 - Do NOT place all correct answers in the same position.
@@ -445,10 +442,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Recognize patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provide appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Give clear, calm, reassuring, and patient-friendly communication while answering questions, providing education, and giving instructions.
-- Use professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -541,10 +535,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Uses clear, calm, reassuring, and patient-friendly language while answering questions, providing education, and giving instructions.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -655,10 +646,7 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care information by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Gives clear, calm, reassuring, and patient-friendly responses while answering questions, providing education, and giving instructions.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -732,10 +720,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Uses clear, calm, reassuring, and patient-friendly language while answering questions, giving instructions, providing education, and maintaining a professional bedside manner.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 5. Realism
 
@@ -835,10 +820,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Introduce themselves clearly by stating their name and role confidently and professionally.
-- Explain the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirm the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourage the patient to ask questions or express concerns and respond in a supportive and professional manner.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -934,10 +916,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Introduce themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and respond in a supportive and professional manner.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1049,10 +1028,7 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and responds in a supportive, respectful, and professional manner.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1126,10 +1102,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and responds in a supportive and professional manner.
+{{competencies}}
 
 5. Realism
 
@@ -1218,10 +1191,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Use appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Respond naturally in conversation by maintaining smooth conversational flow while adapting to patient questions and comments.
-- Maintain professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourage patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -1316,10 +1286,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow while addressing patient questions or comments.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1431,10 +1398,7 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow and adapting appropriately to the patient's comments or questions.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1508,10 +1472,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow and adapting to the patient's comments and questions.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and comfortable continuing the conversation.
+{{competencies}}
 
 5. Realism
 

@@ -1114,10 +1114,7 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Maintains a respectful and calm tone by communicating professionally without sounding rude, dismissive, irritated, or emotional.
-- States limitations or refusals clearly by explaining concerns or declining requests directly, confidently, and respectfully without excessive apologising.
-- Avoids confrontation or defensive language by remaining solution-focused and avoiding blame, arguments, or emotional escalation.
-- Provides alternative solutions or assistance by suggesting reasonable compromises, offering different options, or proposing practical next steps whenever appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1250,10 +1247,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Maintains a respectful and calm tone by speaking politely and professionally without sounding rude, dismissive, irritated, or emotional.
-- States limitations or refusals clearly by explaining why a request cannot reasonably be accepted without being vague or excessively apologetic.
-- Avoids confrontation or defensive language by remaining composed, respectful, and solution-focused throughout the discussion.
-- Provides alternative solutions or assistance by suggesting compromises, proposing reasonable alternatives, or identifying appropriate next steps whenever possible.
+{{competencies}}
 
 5. Realism
 

@@ -1524,10 +1524,7 @@ Characters should naturally address each other by name whenever appropriate.
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Verifies the identity of the caller and confirms they are authorised to receive patient information before discussing the patient's care.
-- Provides accurate, appropriate, and understandable information within the nurse's scope of practice.
-- Demonstrates empathy by listening actively, acknowledging concerns, and communicating calmly, respectfully, and professionally.
-- Protects patient confidentiality, sets appropriate boundaries when information cannot be shared, and clearly explains follow-up actions or referrals when additional information is needed.
+{{competencies}}
 
 5. Realism
 
@@ -1644,10 +1641,7 @@ Sentence:
 4. Competency Alignment
 
 The selected words and sentences should naturally reinforce the learner's ability to:
-- Recognizes cardiac arrest and patient deterioration quickly, identifying critical signs such as unresponsiveness, absent pulse, respiratory failure, or sudden collapse.
-- Initiates immediate emergency response, including activating Code Blue, starting high-quality CPR, providing oxygen, and preparing defibrillation.
-- Communicates CPR instructions clearly and calmly, giving concise, professional directions while maintaining leadership during emergencies.
-- Uses accurate ICU and CPR terminology, applying appropriate clinical language throughout emergency assessment and treatment.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -1705,7 +1699,7 @@ Generate 10-15 fill-in-the-blank questions according to the following rules.
 
 The vocabulary should naturally reinforce the following competencies:
 
-{{fill_blank_evidence}}
+{{competencies}}
 
 Every question should require vocabulary that supports one or more of these competencies.
 
@@ -2049,10 +2043,7 @@ Sentence:
 4. Competency Alignment
 
 The selected words and sentences should naturally reinforce the learner's ability to:
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -2110,7 +2101,7 @@ Generate 10-15 fill-in-the-blank questions according to the following rules.
 
 The vocabulary should naturally reinforce the following competencies:
 
-{{fill_blank_evidence}}
+{{competencies}}
 
 Every question should require vocabulary that supports one or more of these competencies.
 
@@ -2268,10 +2259,7 @@ Instead:
 
 - The correct answer should demonstrate one or more of the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -2346,10 +2334,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 5. Realism
 

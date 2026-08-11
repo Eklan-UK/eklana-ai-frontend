@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { generateChallengeCompletion } from '@/services/openai.service';
 import { topicPrompts } from './topic-prompts';
+import { getCompetenciesForTopic } from '@/config/competency-framework';
 import type { WeaknessProfile, WeeklyChallenge, ChallengeDrillItem } from './types';
 
 type TopicDrillType = 'pronunciation' | 'vocabulary' | 'key_phrases' | 'roleplay';
@@ -252,6 +253,21 @@ function extractEvidenceContaining(
 	return unique.length > 0 ? unique.join('; ') : 'None recorded this week';
 }
 
+/**
+ * Formats a topic's competencies (from the central COMPETENCY_FRAMEWORK) as a
+ * short bulleted list for splicing into prompt templates via {{competencies}}.
+ * Returns an empty string when the topic has no framework entry (or no topic
+ * was detected), so templates without a matching {{competencies}} usage are
+ * unaffected and templates that do use it degrade to nothing rather than a
+ * literal "null".
+ */
+function buildCompetenciesText(topicId: string | null | undefined): string {
+	if (!topicId) return '';
+	const competencies = getCompetenciesForTopic(topicId);
+	if (!competencies) return '';
+	return competencies.map((c) => `- ${c.name}: ${c.description}`).join('\n');
+}
+
 function substitutePlaceholders(
 	template: string,
 	profile: WeaknessProfile,
@@ -272,6 +288,7 @@ function substitutePlaceholders(
 			profile,
 			(w) => w.drillType === 'roleplay' || w.drillType === 'free_talk'
 		),
+		competencies: buildCompetenciesText(profile.primaryTopic),
 	};
 
 	return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => values[key] ?? match);
