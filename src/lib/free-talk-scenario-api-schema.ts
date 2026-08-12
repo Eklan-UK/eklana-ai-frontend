@@ -3,6 +3,7 @@ import { FREE_TALK_SCENARIO_TYPES } from '@/models/free-talk-scenario.shared';
 import { normalizeFreeTalkScenarioStringList } from '@/lib/free-talk-scenario-lists';
 import { normalizeAssignedLearnerIds } from '@/lib/free-talk-scenario-assignment';
 import { parseFreeTalkCompletionDateInput } from '@/lib/free-talk-scenario-completion';
+import { assignmentFields, refineAssignment } from '@/lib/assignment-schema';
 import { Types } from 'mongoose';
 
 const completionDateField = z
@@ -13,28 +14,6 @@ const listField = z
 	.union([z.string(), z.array(z.coerce.string()), z.null()])
 	.optional()
 	.transform((v) => normalizeFreeTalkScenarioStringList(v));
-
-const assignmentFields = {
-	allLearners: z.boolean().optional().default(true),
-	assignedLearnerIds: z
-		.array(z.string())
-		.optional()
-		.default([])
-		.transform((ids) => normalizeAssignedLearnerIds(ids)),
-};
-
-function refineAssignment(
-	data: { allLearners: boolean; assignedLearnerIds: Array<Types.ObjectId | string> },
-	ctx: z.RefinementCtx,
-) {
-	if (!data.allLearners && data.assignedLearnerIds.length === 0) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: 'Select at least one learner, or choose Everyone',
-			path: ['assignedLearnerIds'],
-		});
-	}
-}
 
 export const freeTalkScenarioBodySchema = z
 	.object({
