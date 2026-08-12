@@ -10,7 +10,7 @@ import { GRADING_RUBRICS, type GradingBehaviour } from '@/domain/free-talk/free-
 const ffmpegBin: string = require('ffmpeg-static');
 
 // Initialize old SDK (for non-drill functions that still use generateContent)
-let genAI: GoogleGenerativeAI | null = null;
+export let genAI: GoogleGenerativeAI | null = null;
 
 // Initialize new SDK (for Live API — drill practice, transcription)
 let genAINew: GoogleGenAI | null = null;
@@ -24,7 +24,7 @@ if (config.GEMINI_API_KEY) {
 
 // Text model (for non-drill functions — transcription, chat)
 // gemini-2.5-flash-lite: 20 req/day on the free tier; upgrade Gemini billing for higher limits
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+export const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
 /** Low-latency chat + streaming (see config.GEMINI_CHAT_MODEL). */
 const CHAT_MODEL = config.GEMINI_CHAT_MODEL;

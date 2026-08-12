@@ -14,6 +14,7 @@ import {
 let pdfParse: any;
 let mammoth: any;
 let XLSX: any;
+let officeParser: any;
 
 // Lazy load these modules only when needed (server-side)
 async function loadPdfParse() {
@@ -55,6 +56,19 @@ async function loadXLSX() {
     }
   }
   return XLSX;
+}
+
+async function loadOfficeParser() {
+  if (!officeParser) {
+    try {
+      officeParser = await import("officeparser");
+    } catch (error) {
+      throw new Error(
+        "officeparser package is not available. This function can only run on the server."
+      );
+    }
+  }
+  return officeParser;
 }
 
 export interface ParsedContent {
@@ -140,6 +154,8 @@ class DocumentParserService {
         case "docx":
         case "doc":
           return await this.parseWord(file, drillType);
+        case "pptx":
+          return await this.parsePptx(file, drillType);
         case "xlsx":
         case "xls":
         case "csv":
@@ -184,6 +200,21 @@ class DocumentParserService {
     const text = result.value;
 
     const fileName = file instanceof File ? file.name : "document.docx";
+    return this.parseTextContent(text, fileName, drillType);
+  }
+
+  /**
+   * Parse PowerPoint document
+   */
+  private async parsePptx(file: File | Blob, drillType?: string): Promise<ParsedContent> {
+    const officeParserModule = await loadOfficeParser();
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const ast = await officeParserModule.parseOffice(buffer);
+    const text = ast.toText();
+
+    const fileName = file instanceof File ? file.name : "document.pptx";
     return this.parseTextContent(text, fileName, drillType);
   }
 

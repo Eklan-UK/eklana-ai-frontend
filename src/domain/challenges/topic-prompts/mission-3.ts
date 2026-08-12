@@ -21,6 +21,8 @@ The student struggled with the following phonemes this week:
 The student struggled with the following words this week:
 {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10–15 pronunciation items according to the following rules:
 
 1. Format
@@ -147,6 +149,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 The student struggled with the following words this week:
 {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10–15 vocabulary questions according to the following rules:
 
 1. Format
@@ -235,20 +239,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used while providing patient updates to physicians.
-
-Every sentence should reinforce professional nurse-to-doctor communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should be realistic and sound like an actual conversation or documentation used in hospitals in {{country}}.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -260,7 +258,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -295,6 +293,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week:
 {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10–15 key phrase questions according to the following rules:
 
@@ -391,14 +391,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication while providing patient updates to physicians.
-
-Every option should sound like something a professional nurse could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -429,6 +421,8 @@ Generate a roleplay drill based on the following:
 
 The student practiced these clinical scenarios this week:
 {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -509,21 +503,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to ask clarification questions before carrying out the physician's orders.
 
-6. Learning Objective
-
-The learner should develop automatic, confident and professional communication when providing updates to physicians.
-
-The learner should naturally practise:
-
-- introducing themselves clearly
-- identifying the patient
-- stating the reason for the call promptly
-- presenting concise and relevant patient information
-- requesting recommendations or orders
-- clarifying unclear instructions
-- confirming and repeating back physician orders before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -569,6 +549,8 @@ The student struggled with the following phonemes this week:
 
 The student struggled with the following words this week:
 {{weak_words}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10–15 pronunciation items according to the following rules:
 
@@ -700,6 +682,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 The student struggled with the following words this week:
 {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10–15 vocabulary questions according to the following rules:
 
 1. Format
@@ -790,20 +774,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during doctors' ward rounds while improving professional communication.
-
-Every sentence should reinforce participation in multidisciplinary discussions.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during ward rounds.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -815,7 +793,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -850,6 +828,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week:
 {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10–15 key phrase questions according to the following rules:
 
@@ -946,14 +926,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication while participating in doctors' ward rounds.
-
-Every option should sound like something a professional nurse could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -984,6 +956,8 @@ Generate a roleplay drill based on the following:
 
 The student practiced these clinical scenarios this week:
 {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1024,10 +998,7 @@ Characters should naturally address each other by name whenever appropriate.
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Clearly identifies themselves, their role, and the patient being discussed.
-- Delivers a concise and accurate patient update, including diagnosis, current condition, assessment findings, vital signs, treatments, and significant changes.
-- Communicates nursing priorities, safety concerns, patient or family concerns, barriers to care, and discharge considerations.
-- Participates in care planning by contributing relevant information, asking clarification questions when needed, and confirming physician orders, follow-up actions, and the agreed plan of care.
+{{competencies}}
 
 5. Realism
 
@@ -1061,22 +1032,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to clarify physician instructions or provide additional nursing observations.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication while participating in multidisciplinary ward rounds.
-
-The learner should naturally practise:
-
-- introducing themselves professionally
-- identifying the patient correctly
-- delivering concise patient summaries
-- highlighting nursing priorities
-- raising patient concerns
-- contributing relevant clinical information
-- asking clarification questions
-- confirming the agreed management plan before moving to the next patient
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1123,6 +1079,8 @@ The student struggled with the following phonemes this week:
 
 The student struggled with the following words this week:
 {{weak_words}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10–15 pronunciation items according to the following rules:
 
@@ -1247,6 +1205,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 The student struggled with the following words this week:
 {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10–15 vocabulary questions according to the following rules:
 
 1. Format
@@ -1337,20 +1297,14 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C and D.
 - Do not follow a predictable pattern.
 
-6. Learning Objective
-
-The learner should strengthen recognition and understanding of vocabulary commonly used during professional telephone communication with healthcare colleagues.
-
-Every sentence should reinforce clear, concise, and safe communication.
-
-7. Sentence Design
+6. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary.
 - Every sentence should sound like authentic communication used during hospital telephone conversations.
 - Avoid dictionary definitions or generic examples.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Use full clinical terminology rather than abbreviations whenever possible.
 
@@ -1362,7 +1316,7 @@ Correct:
 Incorrect:
 "IV fluids"
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of common and moderately difficult clinical vocabulary.
 - Require understanding of the clinical context rather than simple word recognition.
@@ -1397,6 +1351,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week:
 {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10–15 key phrase questions according to the following rules:
 
@@ -1492,14 +1448,6 @@ Include a balanced mix of situations involving:
 - Randomly distribute the correct answers across A, B, C, and D.
 - Do not follow a predictable answer pattern.
 
-7. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-Every option should sound like something a healthcare professional could realistically say.
-
-The correct answer must be unambiguously the best response for the specific clinical situation.
-
 Return a JSON array:
 
 [
@@ -1530,6 +1478,8 @@ Generate a roleplay drill based on the following:
 
 The student practiced these clinical scenarios this week:
 {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1611,20 +1561,7 @@ Include realistic clinical information such as:
 
 Some information should require the learner to ask clarification questions or repeat instructions to confirm understanding.
 
-6. Learning Objective
-
-The learner should develop automatic, confident, and professional communication during telephone conversations with healthcare colleagues.
-
-The learner should naturally practise:
-
-- introducing themselves and identifying the patient
-- stating the reason for the call clearly
-- communicating concise and accurate clinical information
-- requesting assistance or recommendations appropriately
-- asking clarification questions when necessary
-- confirming responsibilities and agreed follow-up actions before ending the call
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1668,6 +1605,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -1703,10 +1642,7 @@ Sentence:
 4. Competency Alignment
 
 The selected words and sentences should naturally reinforce the learner's ability to:
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -1744,6 +1680,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 - Competencies: {{competencies}}
 - The student struggled with these words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 The goal is to strengthen the learner's clinical vocabulary while reinforcing the communication competencies required for this topic.
 
@@ -1889,6 +1827,8 @@ Generate a key phrases drill based on the following:
 
 The student missed the following key phrases this week: {{missed_phrases}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 key phrase questions according to the following rules:
 
 1. Format
@@ -1927,10 +1867,7 @@ Instead:
 
 - The correct answer should demonstrate one or more of the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1976,6 +1913,8 @@ Generate a roleplay drill based on the following:
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
 
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
+
 Generate a multi-scene roleplay according to the following rules:
 
 1. Scenario Design
@@ -2012,10 +1951,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the discharge, what will happen during the process, and what the patient should expect at home.
-- Confirms patient identity correctly using at least two identifiers (e.g., name and date of birth) before reviewing discharge instructions.
-- Encourages the patient to ask questions about medications, follow-up care, warning signs, or home arrangements.
+{{competencies}}
 
 5. Realism
 
