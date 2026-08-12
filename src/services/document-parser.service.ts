@@ -14,7 +14,7 @@ import {
 let pdfParse: any;
 let mammoth: any;
 let XLSX: any;
-let officeParser: any;
+export let officeParser: any;
 
 // Lazy load these modules only when needed (server-side)
 async function loadPdfParse() {
@@ -58,7 +58,7 @@ async function loadXLSX() {
   return XLSX;
 }
 
-async function loadOfficeParser() {
+export async function loadOfficeParser() {
   if (!officeParser) {
     try {
       officeParser = await import("officeparser");
