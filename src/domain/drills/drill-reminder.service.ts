@@ -15,6 +15,7 @@ import {
   hasQualifyingDrillTodayLocal,
   isLocalHour18,
 } from '@/lib/timezone/drill-practice-day';
+import { outstandingAssignmentMongoMatch } from '@/domain/drills/outstanding-drill-assignments';
 
 export type DrillReminderVariant = 'daily' | 'streak';
 
@@ -168,10 +169,9 @@ export class DrillReminderService {
             continue;
           }
 
-          const pendingCount = await DrillAssignment.countDocuments({
-            learnerId,
-            status: { $in: ['pending', 'in-progress'] },
-          });
+          const pendingCount = await DrillAssignment.countDocuments(
+            outstandingAssignmentMongoMatch({ learnerId }),
+          );
 
           let streakDays = 0;
           try {
@@ -369,10 +369,9 @@ export class DrillReminderService {
     }
 
     if (variant === 'daily') {
-      const pendingCount = await DrillAssignment.countDocuments({
-        learnerId,
-        status: { $in: ['pending', 'in-progress'] },
-      });
+      const pendingCount = await DrillAssignment.countDocuments(
+        outstandingAssignmentMongoMatch({ learnerId }),
+      );
 
       let streakDays = 0;
       try {

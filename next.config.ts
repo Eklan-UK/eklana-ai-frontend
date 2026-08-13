@@ -155,8 +155,11 @@ const nextConfig: NextConfig = {
   // Low SSG concurrency avoids loading many page/API graphs in parallel (OOM/SIGKILL).
   experimental: {
     webpackMemoryOptimizations: true,
-    webpackBuildWorker: true,
+    // false: parent+worker doubles peak RSS and was still getting SIGKILL after Sentry upload.
+    webpackBuildWorker: false,
     serverSourceMaps: false,
+    // Cap parallel workers — default uses all CPUs and OOMs on 8GB containers.
+    cpus: 1,
     // 1 page at a time per worker — safer on Vercel default ~8GB than the default of 8.
     staticGenerationMaxConcurrency: 1,
     staticGenerationMinPagesPerWorker: 50,
@@ -251,6 +254,12 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Preview/staging builds: skip Sentry source-map work to stay under Vercel's 8GB limit.
+// Production (main) still uploads for readable stack traces.
+const isVercelProduction =
+  process.env.VERCEL_ENV === 'production' ||
+  process.env.VERCEL_GIT_COMMIT_REF === 'main';
+
 export default withSentryConfig(withPWA(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
@@ -267,6 +276,15 @@ export default withSentryConfig(withPWA(nextConfig), {
 
   // Keep false on Vercel — widenClientFileUpload spikes RAM and was contributing to OOM kills.
   widenClientFileUpload: false,
+
+  // Upload after compile instead of during webpack — lowers peak RAM (Sentry OOM guidance).
+  useRunAfterProductionCompileHook: true,
+
+  sourcemaps: {
+    // Skip map gen/upload on preview/staging; production still gets maps.
+    disable: process.env.VERCEL === '1' && !isVercelProduction,
+    deleteSourcemapsAfterUpload: true,
+  },
 
   // Uncomment to route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.

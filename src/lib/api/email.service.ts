@@ -193,7 +193,8 @@ This is an automated notification from Eklan.
     const drillsUrl = `${appUrl}/account/drills`;
     const maxListed = 5;
     const listed = data.drillTitles.slice(0, maxListed);
-    const remaining = data.drillCount - listed.length;
+    // Remaining is vs assignment-row drillCount (same set titles were taken from).
+    const remaining = Math.max(0, data.drillCount - listed.length);
     const listItems = listed
       .map(
         (title) =>

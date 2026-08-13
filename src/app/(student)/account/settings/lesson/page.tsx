@@ -8,29 +8,19 @@ import { Header } from "@/components/layout/Header";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { userAPI } from "@/lib/api";
 import {
-  ACCENT_VOICE_GROUPS,
-  ACCENT_VOICE_OPTIONS,
   DEFAULT_ENGLISH_ACCENT,
-  normalizeEnglishAccent,
-  type AccentVoiceGroup,
+  ONBOARDING_ACCENT_OPTIONS,
+  toStudentLessonAccent,
 } from "@/services/tts-accent-voices";
 
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
-const ACCENT_GROUP_FLAGS: Record<AccentVoiceGroup, string> = {
-  featured: "🇨🇦",
-  american: "🇺🇸",
-  british: "🇬🇧",
-  australian: "🇦🇺",
-  canadian: "🇨🇦",
-};
-
-const ACCENT_OPTIONS = ACCENT_VOICE_OPTIONS.map((opt) => ({
+/** Same country male/female accents as onboarding (no named characters). */
+const ACCENT_OPTIONS = ONBOARDING_ACCENT_OPTIONS.map((opt) => ({
   id: opt.key,
   label: opt.label,
-  flag: ACCENT_GROUP_FLAGS[opt.group],
+  flag: opt.flag,
   display: opt.label,
-  group: opt.group,
 }));
 
 const VOICE_OPTIONS = [
@@ -191,9 +181,9 @@ function BottomSheet({
         aria-hidden
       />
       {/* Sheet */}
-      <div className="relative z-10 w-full bg-card rounded-t-[32px] border border-border shadow-[0px_4px_6px_-1px_rgba(18,18,23,0.08),0px_2px_4px_-1px_rgba(18,18,23,0.06)] pb-6 pt-5 px-4 max-w-lg mx-auto">
+      <div className="relative z-10 w-full bg-card rounded-t-[32px] border border-border shadow-[0px_4px_6px_-1px_rgba(18,18,23,0.08),0px_2px_4px_-1px_rgba(18,18,23,0.06)] pb-6 pt-5 px-4 max-w-lg mx-auto max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 pr-1">
+        <div className="flex items-center justify-between mb-6 pr-1 shrink-0">
           <h2 className="text-base font-bold text-foreground leading-6">{title}</h2>
           <button
             type="button"
@@ -204,7 +194,7 @@ function BottomSheet({
             <X className="w-5 h-5" />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto min-h-0">{children}</div>
       </div>
     </div>
   );
@@ -260,8 +250,7 @@ export default function LessonSettingsPage() {
     setPrefs({
       eklanTalks: stored?.eklanTalks ?? DEFAULTS.eklanTalks,
       chatTranslation: stored?.chatTranslation ?? DEFAULTS.chatTranslation,
-      englishAccent:
-        normalizeEnglishAccent(stored?.englishAccent) ?? DEFAULTS.englishAccent,
+      englishAccent: toStudentLessonAccent(stored?.englishAccent),
       voiceTone: stored?.voiceTone ?? DEFAULTS.voiceTone,
       speakingSpeed: stored?.speakingSpeed ?? DEFAULTS.speakingSpeed,
     });
@@ -339,32 +328,19 @@ export default function LessonSettingsPage() {
         title="English type / accent"
         onClose={() => setActiveSheet(null)}
       >
-        <div className="flex flex-col gap-6">
-          {ACCENT_VOICE_GROUPS.map((group) => {
-            const options = ACCENT_OPTIONS.filter((o) => o.group === group.id);
-            if (options.length === 0) return null;
-            return (
-              <div key={group.id} className="flex flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {group.label}
-                </p>
-                <div className="flex flex-col gap-4">
-                  {options.map((opt) => (
-                    <SelectionCard
-                      key={opt.id}
-                      label={opt.label}
-                      prefix={opt.flag}
-                      selected={prefs.englishAccent === opt.id}
-                      onClick={() => {
-                        persist({ englishAccent: opt.id });
-                        setActiveSheet(null);
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex flex-col gap-2">
+          {ACCENT_OPTIONS.map((opt) => (
+            <SelectionCard
+              key={opt.id}
+              label={opt.label}
+              prefix={opt.flag}
+              selected={prefs.englishAccent === opt.id}
+              onClick={() => {
+                persist({ englishAccent: opt.id });
+                setActiveSheet(null);
+              }}
+            />
+          ))}
         </div>
       </BottomSheet>
 

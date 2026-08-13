@@ -10,7 +10,7 @@ import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout, CheckpointScreen } from "./shared";
 import type { DrillConfettiVariant } from "@/lib/drill-celebration";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
   saveCheckpoint,
@@ -330,7 +330,7 @@ export default function MatchingDrill({ drill, assignmentId }: MatchingDrillProp
         return newSet;
       });
 
-      playPerfectItemCelebration();
+      playPracticeFeedback("success");
 
       localProgress.persist({
         resumeFromIndex: newMatchedCount,

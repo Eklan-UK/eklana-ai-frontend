@@ -25,12 +25,6 @@ async function getDrill(drillId: string, assignmentId?: string) {
       ? `${origin}/api/v1/drills/${drillId}?assignmentId=${assignmentId}`
       : `${origin}/api/v1/drills/${drillId}`;
 
-    console.log(
-      `Fetching drill: ${drillId}${
-        assignmentId ? ` with assignment ${assignmentId}` : ""
-      }`
-    );
-
     const response = await fetch(url, {
       method: "GET",
       credentials: "include",
@@ -53,15 +47,13 @@ async function getDrill(drillId: string, assignmentId?: string) {
     }
 
     const data = await response.json();
-    const drillData = data?.data
-    console.log(drillData)
+    const drillData = data?.data;
 
     if (!drillData) {
       console.error("No drill data in response:", data);
       return null;
     }
 
-    console.log("Successfully fetched drill:", drillData.drill._id);
     // Return full response including assignment info if available
     return drillData;
   } catch (error: any) {
@@ -85,8 +77,6 @@ export default async function DrillDetailPage({
   const { id } = await params;
   const { assignmentId } = await searchParams;
 
-  console.log("DrillDetailPage - ID:", id, "AssignmentId:", assignmentId);
-
   if (!id) {
     return notFound();
   }
@@ -97,8 +87,6 @@ export default async function DrillDetailPage({
   }
 
   const drillData = await getDrill(id, assignmentId);
-  console.log("drillData",drillData)
-  console.log(drillData)
 
   if (!drillData) {
     console.error(`Drill not found for ID: ${id}`);
@@ -110,7 +98,11 @@ export default async function DrillDetailPage({
   const assignmentInfo = drillData.assignment;
 
   // Verify assignment matches drill if both are provided
-  let validAssignmentId = assignmentId || assignmentInfo?.assignmentId;
+  let validAssignmentId =
+    assignmentId ||
+    (assignmentInfo?.assignmentId != null
+      ? String(assignmentInfo.assignmentId)
+      : undefined);
   if (validAssignmentId && assignmentInfo) {
     const assignmentDrillId = assignmentInfo.drillId || assignmentInfo.drill?._id;
     const currentDrillId = drill._id || drill.id || id;

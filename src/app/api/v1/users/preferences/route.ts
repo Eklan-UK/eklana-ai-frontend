@@ -8,6 +8,7 @@ import { logger } from '@/lib/api/logger';
 import { validateTimezone } from '@/lib/timezone/validate-timezone';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { toStudentLessonAccent } from '@/services/tts-accent-voices';
 
 const preferencesSchema = z.object({
 	nationality: z.string().optional(),
@@ -131,6 +132,16 @@ async function patchHandler(
 		}
 
 		const update: Record<string, unknown> = { ...validated };
+
+		// Coerce student lesson accent to country male/female keys only.
+		if (validated.lessonPreferences?.englishAccent !== undefined) {
+			update.lessonPreferences = {
+				...validated.lessonPreferences,
+				englishAccent: toStudentLessonAccent(
+					validated.lessonPreferences.englishAccent,
+				),
+			};
+		}
 
 		// Bootstrap only: do not overwrite an existing timezone choice.
 		if (validated.timezone) {

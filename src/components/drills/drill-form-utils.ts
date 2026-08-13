@@ -521,7 +521,7 @@ export function getMissingCompletionDateLabels(drafts: DrillDraft[]): string[] {
 // only the first selected student (`selectedUsers[0]`) would ever get assigned.
 export function buildBulkAssignPayload(
   drafts: DrillDraft[],
-  options?: { weekNumber?: number },
+  options?: { weekNumber?: number; source?: "precision_clinic" },
 ) {
   const weekNumber =
     options?.weekNumber != null &&
@@ -543,6 +543,7 @@ export function buildBulkAssignPayload(
       topic: draft.journeyTopic || undefined,
       part: draft.journeyPart ? getPartLabel(draft.journeyPart) : undefined,
       ...(weekNumber != null ? { weekNumber } : {}),
+      ...(options?.source ? { source: options.source } : {}),
     }));
   });
 }

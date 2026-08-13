@@ -598,6 +598,7 @@ export function DrillCreatePageContent({
         users={users}
         loadingUsers={loadingUsers}
         weekNumber={contextWeekNumber}
+        source={source}
       />
     );
   }
