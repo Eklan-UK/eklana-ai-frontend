@@ -3,8 +3,8 @@ import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import Bookmark from '@/models/bookmark';
-// Side-effect import: registers the Drill model so populate('drillId') can resolve ref: 'Drill'
-import '@/models/drill';
+// Also registers the Drill model so populate('drillId') can resolve ref: 'Drill'
+import DrillModel from '@/models/drill';
 import StudentContext from '@/models/studentContext';
 import UserModel from '@/models/user';
 import type { IDrillAttempt } from '@/models/drill-attempt';
@@ -178,7 +178,49 @@ function extractVocabularySignals(
 	];
 }
 
-function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
+const MAX_DRILL_INTRO_EVIDENCE_LENGTH = 300;
+
+function mostRecentTimestamp(attempt: IDrillAttempt): number {
+	const date = attempt.completedAt ?? attempt.createdAt;
+	return date ? new Date(date).getTime() : 0;
+}
+
+// Picks the single most recently completed roleplay attempt and returns
+// evidence built from just that drill's drill_intro/scene names — the
+// "primary scenario" for the week, not every distinct scenario practiced.
+async function fetchRoleplayScenarioEvidence(attempts: IDrillAttempt[]): Promise<string[]> {
+	if (attempts.length === 0) return [];
+
+	const mostRecentAttempt = attempts.reduce((latest, attempt) =>
+		mostRecentTimestamp(attempt) > mostRecentTimestamp(latest) ? attempt : latest
+	);
+
+	const drill = await DrillModel.findById(mostRecentAttempt.drillId)
+		.select('drill_intro roleplay_scenes.scene_name')
+		.lean<{ _id: Types.ObjectId; drill_intro?: string; roleplay_scenes?: Array<{ scene_name: string }> } | null>();
+
+	if (!drill) return [];
+
+	const evidence: string[] = [];
+
+	const intro = drill.drill_intro?.trim();
+	if (intro) {
+		const truncated =
+			intro.length > MAX_DRILL_INTRO_EVIDENCE_LENGTH
+				? `${intro.slice(0, MAX_DRILL_INTRO_EVIDENCE_LENGTH)}…`
+				: intro;
+		evidence.push(`Practised scenario: ${truncated}`);
+	}
+
+	const sceneNames = (drill.roleplay_scenes ?? []).map((s) => s.scene_name).filter(Boolean);
+	if (sceneNames.length > 0) {
+		evidence.push(`Scenes: ${sceneNames.join(', ')}`);
+	}
+
+	return evidence;
+}
+
+async function extractRoleplaySignals(attempts: IDrillAttempt[]): Promise<WeaknessSignal[]> {
 	let fluencyTotal = 0;
 	let pronTotal = 0;
 	let count = 0;
@@ -193,6 +235,8 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 
 	if (count === 0) return [];
 
+	const scenarioEvidence = await fetchRoleplayScenarioEvidence(attempts);
+
 	const avgFluency = fluencyTotal / count;
 	const avgPron = pronTotal / count;
 	const signals: WeaknessSignal[] = [];
@@ -202,7 +246,7 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 			drillType: 'roleplay',
 			category: 'fluency',
 			severity: severityFromScore(avgFluency),
-			evidence: [`Average roleplay fluency: ${avgFluency.toFixed(1)}`],
+			evidence: [`Average roleplay fluency: ${avgFluency.toFixed(1)}`, ...scenarioEvidence],
 			label: 'Roleplay fluency',
 		});
 	}
@@ -212,8 +256,22 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 			drillType: 'roleplay',
 			category: 'pronunciation',
 			severity: severityFromScore(avgPron),
-			evidence: [`Average roleplay pronunciation: ${avgPron.toFixed(1)}`],
+			evidence: [`Average roleplay pronunciation: ${avgPron.toFixed(1)}`, ...scenarioEvidence],
 			label: 'Roleplay pronunciation',
+		});
+	}
+
+	// Scores can be fine (no fluency/pronunciation signal above) while the scenario
+	// content is still useful context for the weekly challenge generator. Keep this
+	// signal even when severity is negligible so it survives downstream filtering,
+	// but only add it when neither signal above already carries the scenario evidence.
+	if (signals.length === 0 && scenarioEvidence.length > 0) {
+		signals.push({
+			drillType: 'roleplay',
+			category: 'fluency',
+			severity: Math.max(severityFromScore(Math.min(avgFluency, avgPron)), 0.01),
+			evidence: scenarioEvidence,
+			label: 'Roleplay scenario practice',
 		});
 	}
 
@@ -607,12 +665,13 @@ export async function aggregateWeaknesses(
 
 	const freqSignal = buildPronunciationFrequencySignal(recentPronAttempts);
 	const bmSignal = buildBookmarkSignal(recentBookmarks as Array<{ content: string }>);
+	const roleplaySignals = await extractRoleplaySignals(byType.get('roleplay') ?? []);
 
 	const allSignals: WeaknessSignal[] = [
 		...extractPronunciationSignals(pronAttempts),
 		...extractVocabularySignals(byType.get('vocabulary') ?? [], 'vocabulary'),
 		...extractVocabularySignals(byType.get('key_phrases') ?? [], 'key_phrases'),
-		...extractRoleplaySignals(byType.get('roleplay') ?? []),
+		...roleplaySignals,
 		...extractAccuracySignals(byType.get('fill_blank') ?? [], 'fill_blank'),
 		...extractAccuracySignals(byType.get('matching') ?? [], 'matching'),
 		...extractAccuracySignals(byType.get('definition') ?? [], 'definition'),

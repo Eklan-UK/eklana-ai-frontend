@@ -17,6 +17,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -94,6 +96,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 vocabulary questions according to the following rules:
 
 1. Format
@@ -158,16 +162,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of emergency and critical-care vocabulary while improving clinical communication during high-pressure situations.
-
-- Every option must be authentic medical vocabulary.
-- The correct answer must be unambiguously correct for the specific clinical situation.
-- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, procedure, equipment, medication, or clinical meaning.
-- Every sentence should reflect realistic emergency or ICU scenarios.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -185,7 +180,7 @@ The learner's objective is to strengthen recognition and understanding of emerge
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -201,7 +196,7 @@ The learner's objective is to strengthen recognition and understanding of emerge
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -216,7 +211,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -247,6 +242,8 @@ Generate  key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrases according to the following  rules:
 
@@ -279,10 +276,7 @@ Make many answer choices clinically reasonable.
 Make at least half of the questions contain two answers that could realistically be said by a nurse.
 The learner must identify which answer is the MOST professional, concise, collaborative, and appropriate emergency situation
 The correct should be the one that demonstrates the following:
-Recognizes patient deterioration quickly by identifying emergency signs such as low oxygen saturation, chest pain, respiratory distress, hypotension, or confusion without delay
-Provides immediate appropriate intervention by initiating correct first actions such as increasing oxygen, monitoring vital signs, positioning patient safely, or assessing symptoms
-Gives clear patient instructions by using short, direct instructions such as "Take slow deep breaths" or "Please stay still"
-Correctly uses professional ICU terminology like oxygen saturation, blood pressure, respiratory distress, chest tightness, or heart rhythm.
+{{competencies}}
 
 4. Balanced Answer Distribution
 - Do NOT place all correct answers in the same position.
@@ -314,6 +308,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -367,20 +363,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - AI characters should ask questions or provide updates that require the learner to communicate professionally.
 - Include natural interruptions and changes in patient condition that reflect real emergency situations.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and clinically appropriate communication while managing emergency and critical-care situations.
-
-The roleplay should encourage the learner to:
-
-- recognize patient deterioration quickly
-- prioritize immediate nursing interventions
-- communicate effectively with patients and the healthcare team
-- provide reassurance while maintaining professionalism
-- use accurate emergency and ICU terminology
-- remain calm under pressure
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -421,6 +404,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -457,10 +442,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Recognize patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provide appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Give clear, calm, reassuring, and patient-friendly communication while answering questions, providing education, and giving instructions.
-- Use professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -497,6 +479,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -551,10 +535,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Uses clear, calm, reassuring, and patient-friendly language while answering questions, providing education, and giving instructions.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -562,16 +543,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of patient follow-up vocabulary while improving communication during patient assessments and follow-up care.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific clinical situation.
-- Incorrect answers should be plausible but incorrect because of incorrect assessment, intervention, medication, patient education, recovery guidance, monitoring, or clinical meaning.
-- Every sentence should reflect realistic patient follow-up situations in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -587,7 +559,7 @@ The learner's objective is to strengthen recognition and understanding of patien
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -602,7 +574,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -633,6 +605,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -672,26 +646,13 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care information by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Gives clear, calm, reassuring, and patient-friendly responses while answering questions, providing education, and giving instructions.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
 - Do NOT place all correct answers in the same position.
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
-
-5. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional communication during patient follow-up conversations through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate timing, incomplete patient education, insufficient reassurance, inaccurate clinical information, weak prioritization, or poor communication—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, encouragement, or appropriate small talk while maintaining professional boundaries.
 
 Return a JSON array:
 
@@ -720,6 +681,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -757,10 +720,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Recognizes patient concerns, symptoms, emotional distress, recovery progress, medication concerns, discharge questions, or changes in condition during follow-up conversations.
-- Provides appropriate follow-up care by explaining medications, monitoring, recovery expectations, discharge planning, safety precautions, and next steps clearly and professionally.
-- Uses clear, calm, reassuring, and patient-friendly language while answering questions, giving instructions, providing education, and maintaining a professional bedside manner.
-- Uses professional patient-care terminology accurately, including medications, monitoring, recovery, discharge planning, vital signs, oxygen therapy, fall prevention, patient assessment, and cardiac care where appropriate.
+{{competencies}}
 
 5. Realism
 
@@ -779,20 +739,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include opportunities for reassurance, patient education, and relationship-building through natural conversation.
 - Where appropriate, include brief, natural small talk that helps build rapport (e.g., family, hobbies, meals, weather, weekend plans), while maintaining professional boundaries and keeping the patient's care as the primary focus.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and natural communication during patient follow-up conversations.
-
-The roleplay should encourage the learner to:
-
-- recognize patient concerns and recovery needs
-- explain medications and treatment plans clearly
-- answer patient questions confidently
-- educate patients using easy-to-understand language
-- provide reassurance while maintaining professional boundaries
-- use accurate patient-care terminology naturally
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -835,6 +782,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -871,10 +820,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Introduce themselves clearly by stating their name and role confidently and professionally.
-- Explain the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirm the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourage the patient to ask questions or express concerns and respond in a supportive and professional manner.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -912,6 +858,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -968,10 +916,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Introduce themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and respond in a supportive and professional manner.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -979,16 +924,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during patient admissions while improving professional communication.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific admission scenario.
-- Incorrect answers should be plausible but incorrect because of incorrect patient identification, admission procedure, documentation, assessment, communication, or clinical meaning.
-- Every sentence should reflect realistic patient admission situations in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1004,7 +940,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1019,7 +955,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1051,6 +987,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -1090,26 +1028,13 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and responds in a supportive, respectful, and professional manner.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
 - Do NOT place all correct answers in the same position.
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
-
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during patient admissions through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific admission scenario.
-- Incorrect answers should be plausible but incorrect because of incomplete patient identification, insufficient explanation, poor communication, inappropriate sequencing of the admission process, or missed opportunities to encourage patient questions—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, reassurance, and respectful conversation while maintaining professional boundaries.
 
 Return a JSON array:
 
@@ -1138,6 +1063,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1175,10 +1102,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Introduces themselves clearly by stating their name and role confidently and professionally.
-- Explains the purpose of the admission, what will happen during the process, and what the patient should expect.
-- Confirms the patient's identity correctly using at least two identifiers, such as the patient's full name and date of birth, before providing care.
-- Encourages the patient to ask questions or express concerns and responds in a supportive and professional manner.
+{{competencies}}
 
 5. Realism
 
@@ -1186,20 +1110,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Patients should naturally ask questions about the admission process, room arrangements, hospital routines, tests, medications, visiting hours, or what will happen next.
 - Include opportunities for the learner to reassure the patient, build rapport, and create a welcoming environment while maintaining professional boundaries.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and natural communication during patient admissions.
-
-The roleplay should encourage the learner to:
-
-- introduce themselves professionally
-- explain the admission process clearly
-- verify patient identity correctly
-- answer patient questions confidently
-- build rapport through warm, respectful communication
-- maintain patient safety and professionalism throughout the admission process
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1242,6 +1153,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -1278,10 +1191,7 @@ Sentence:
 
 The selected words and sentences should naturally reinforce the learner's ability to:
 
-- Use appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Respond naturally in conversation by maintaining smooth conversational flow while adapting to patient questions and comments.
-- Maintain professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourage patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 The learner should repeatedly practise vocabulary that would naturally be spoken while demonstrating these competencies.
 
@@ -1319,6 +1229,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 - Topic: {{topic}}
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 vocabulary questions according to the following rules:
 
@@ -1374,10 +1286,7 @@ Instead:
 
 The correct answer should reinforce one or more of the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow while addressing patient questions or comments.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1385,16 +1294,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during bedside conversations while improving natural communication with patients.
-
-- Every option must be authentic clinical or patient-care vocabulary.
-- The correct answer must be unambiguously correct for the specific situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate word choice, inaccurate clinical meaning, poor conversational fit, or incorrect patient communication.
-- Every sentence should reflect realistic conversations between nurses, patients, and family members in hospitals.
-
-6. Answer Options
+5. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1410,7 +1310,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-7. Medical Terminology
+6. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1425,7 +1325,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-8. Difficulty
+7. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1457,6 +1357,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -1496,26 +1398,13 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow and adapting appropriately to the patient's comments or questions.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and willing to continue the conversation.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
 - Do NOT place all correct answers in the same position.
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
-
-5. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional bedside communication through repeated practice in realistic patient conversations.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific situation.
-- Incorrect answers should be plausible but incorrect because of poor conversational flow, insufficient empathy, inappropriate boundaries, incomplete patient education, or less effective communication—not because they sound unprofessional.
-- Every prompt must contain enough conversational and clinical context that only one response is the best choice.
-- Include situations where the nurse builds rapport through empathy, encouragement, active listening, appropriate humour, or light conversation while maintaining professional boundaries.
 
 Return a JSON array:
 
@@ -1544,6 +1433,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1581,10 +1472,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Uses appropriate social language by speaking naturally and conversationally without sounding overly formal or robotic.
-- Responds naturally in conversation by maintaining smooth conversational flow and adapting to the patient's comments and questions.
-- Maintains professionalism by keeping appropriate boundaries, a respectful tone, and professional bedside behaviour throughout the interaction.
-- Encourages patient comfort and engagement by helping the patient feel relaxed, included, and comfortable continuing the conversation.
+{{competencies}}
 
 5. Realism
 
@@ -1605,20 +1493,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include opportunities for the learner to build rapport through empathy, encouragement, appropriate humour, and friendly conversation while maintaining professional boundaries.
 - Family members may occasionally join the conversation and ask appropriate questions.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, natural, and professional bedside communication while building rapport with patients.
-
-The roleplay should encourage the learner to:
-
-- use natural conversational English
-- respond smoothly to patient comments and questions
-- build trust through empathy and active listening
-- reassure patients without making unrealistic promises
-- maintain professional boundaries
-- create a welcoming and supportive bedside environment
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
