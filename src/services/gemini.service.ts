@@ -385,6 +385,9 @@ export async function generateWithLiveAPIStream(
 				try { controller.close(); } catch { /* ignore */ }
 			};
 
+			let receivedAnyChunk = false;
+			let hasRetried = false;
+
 			timeoutHandle = setTimeout(() => {
 				if (!sessionClosed) {
 					logger.warn('Live API stream session timed out after 45s');
@@ -418,13 +421,26 @@ export async function generateWithLiveAPIStream(
 							const data = message.data;
 							if (data) {
 								sendChunk('audio', data);
+								receivedAnyChunk = true;
 							}
 
 							if (message.serverContent?.outputTranscription?.text) {
 								sendChunk('text', message.serverContent.outputTranscription.text);
+								receivedAnyChunk = true;
 							}
 
 							if (message.serverContent?.turnComplete) {
+								if (!receivedAnyChunk && !hasRetried) {
+									hasRetried = true;
+									logger.warn('Live API turn complete with no chunks received, retrying once (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+									session.sendClientContent({ turns, turnComplete: true });
+									return;
+								}
+
+								if (!receivedAnyChunk && hasRetried) {
+									logger.error('Live API retry also returned an empty turn (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+								}
+
 								logger.info('Live API turn complete (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 								closeStream();
 							}
