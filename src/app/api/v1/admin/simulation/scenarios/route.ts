@@ -74,20 +74,18 @@ async function handler(
 			);
 		}
 
-		// FormData entries are all strings, so allLearners/assignedLearnerIds are
-		// collected into a plain object shape before Zod coerces/validates them.
+		// FormData entries are all strings, so assignedLearnerIds is collected
+		// into a plain object shape before Zod coerces/validates the rest.
 		const rawAssignedLearnerIds = formData.getAll('assignedLearnerIds').map(String);
-		const rawAllLearners = formData.get('allLearners');
 		const fields: Record<string, unknown> = {
 			title: formData.get('title'),
 			workplaceSetting: formData.get('workplaceSetting'),
 			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			weeklyFocus: formData.get('weeklyFocus'),
+			gradingRubric: formData.get('gradingRubric'),
+			maxDurationMinutes: formData.get('maxDurationMinutes'),
 			assignedLearnerIds: rawAssignedLearnerIds,
 		};
-		if (rawAllLearners !== null) {
-			fields.allLearners = rawAllLearners === 'true';
-		}
 
 		const validated = simulationScenarioBodySchema.parse(fields);
 
@@ -122,19 +120,17 @@ async function handler(
 
 		await connectToDatabase();
 
-		const assignedLearnerIds = validated.allLearners ? [] : validated.assignedLearnerIds;
-
 		const scenario = await SimulationScenario.create({
 			title: validated.title,
 			workplaceSetting: validated.workplaceSetting,
 			dramatisationPrompt: validated.dramatisationPrompt,
 			weeklyFocus: validated.weeklyFocus,
-			allLearners: validated.allLearners,
-			assignedLearnerIds,
+			assignedLearnerIds: validated.assignedLearnerIds,
 			displayData,
 			hiddenContext,
 			rawSourceText: rawText,
-			gradingRubric: null, // placeholder, populated from shared constant rubric later
+			gradingRubric: validated.gradingRubric,
+			maxDurationMinutes: validated.maxDurationMinutes,
 			isActive: true,
 			createdBy: ctx.userId,
 		});
