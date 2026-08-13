@@ -1,169 +1,82 @@
 "use client";
 
-import { BottomNav } from "@/components/layout/BottomNav";
-import { Header } from "@/components/layout/Header";
-import { ChevronRight, Lock, Target, Trophy } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SavedDrillsSection } from "@/components/drills/SavedDrillsSection";
+import { PracticeStreakHero } from "@/components/practice/PracticeStreakHero";
+import { PracticeModesList } from "@/components/practice/PracticeModesList";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { useUserStreak } from "@/hooks/useUserStreak";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
-import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
-import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
-import type { ReactNode } from "react";
-
-function PracticeCard({
-  href,
-  iconBg,
-  iconSrc,
-  icon,
-  title,
-  subtitle,
-  meta,
-  locked = false,
-  iconWidth = 24,
-  iconHeight = 24,
-  iconImageClassName = "brightness-0 invert",
-}: {
-  href: string;
-  iconBg: string;
-  iconSrc?: string;
-  icon?: ReactNode;
-  title: string;
-  subtitle: string;
-  meta: string[];
-  locked?: boolean;
-  iconWidth?: number;
-  iconHeight?: number;
-  iconImageClassName?: string;
-}) {
-  const inner = (
-    <div
-      className={`bg-card border border-border rounded-2xl p-4 mb-3 flex items-center gap-4 transition-shadow transition-transform ${
-        locked
-          ? "opacity-60 cursor-not-allowed"
-          : "hover:shadow-md active:scale-[0.98] cursor-pointer"
-      }`}
-    >
-      <div
-        className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden`}
-      >
-        {icon ??
-          (iconSrc ? (
-            <Image
-              src={iconSrc}
-              alt={title}
-              width={iconWidth}
-              height={iconHeight}
-              className={iconImageClassName}
-            />
-          ) : null)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <p className="text-base font-bold font-nunito text-foreground">{title}</p>
-          {locked && (
-            <span className="inline-block bg-orange-100 text-orange-800 text-[10px] font-semibold px-2 py-0.5 rounded-full leading-none">
-              Pro
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-satoshi text-muted-foreground mb-1 leading-snug">{subtitle}</p>
-        <div className="flex items-center gap-3">
-          {meta.map((m, i) => (
-            <span key={i} className="text-xs font-satoshi text-muted-foreground">
-              {m}
-            </span>
-          ))}
-        </div>
-      </div>
-      {locked ? (
-        <ProLockedCtaSwap density="compact">
-          <span
-            className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground pointer-events-none flex-shrink-0"
-            aria-hidden
-          >
-            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-          </span>
-        </ProLockedCtaSwap>
-      ) : (
-        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-      )}
-    </div>
-  );
-
-  if (locked) {
-    return (
-      <ProLockHoverWrap className="block">
-        <div aria-disabled="true">{inner}</div>
-      </ProLockHoverWrap>
-    );
-  }
-
-  return <Link href={href}>{inner}</Link>;
-}
+import { getUserFirstName, getUserInitials } from "@/utils/user";
 
 export default function PracticePage() {
-  const tWeekly = useTranslations("account.weeklyChallenge");
-  const tClinic = useTranslations("account.precisionClinic");
-  const { data: me, isLoading } = useUserCurrent();
+  const t = useTranslations("account.practiceHub");
+  const tAccount = useTranslations("account");
+  const { data: me, isLoading: meLoading } = useUserCurrent();
+  const { data: streak, isLoading: streakLoading } = useUserStreak();
   // Default locked while loading to prevent flash of unlocked state.
-  const isSubscribed = !isLoading && learnerHasProAccess(me?.user);
+  const isSubscribed = !meLoading && learnerHasProAccess(me?.user);
+  const firstName = getUserFirstName(me?.user ?? null);
+  const initial = getUserInitials(me?.user ?? null).charAt(0) || "U";
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
-      <Header title="Practice" />
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
-
-        {/* ── Practice Freely Section ── */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold font-nunito text-foreground mb-4">Choose your mode of practice</h2>
-
-          <PracticeCard
-            href="/account/practice/free-talk"
-            iconBg="bg-[#3B883E]"
-            iconSrc="/icons/logo-yellow.svg"
-            title="Eklan Free Talk"
-            subtitle="Speak about anything"
-            meta={[""]}
-            locked={!isSubscribed}
-          />
-
-          <PracticeCard
-            href="/account/practice/weekly-challenge"
-            iconBg="bg-emerald-700"
-            icon={<Trophy className="w-6 h-6 text-white" aria-hidden />}
-            title={tWeekly("practiceCardTitle")}
-            subtitle={tWeekly("practiceCardSubtitle")}
-            meta={[]}
-            locked={!isSubscribed}
-          />
-
-          <PracticeCard
-            href="/account/practice/precision-clinic"
-            iconBg="bg-teal-700"
-            icon={<Target className="w-6 h-6 text-white" aria-hidden />}
-            title={tClinic("practiceCardTitle")}
-            subtitle={tClinic("practiceCardSubtitle")}
-            meta={[]}
-            locked={!isSubscribed}
-          />
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-md mx-auto px-4 pt-4 pb-3 md:max-w-2xl md:px-8">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold font-nunito text-foreground">
+                {t("title")}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5 font-nunito">
+                {t("subtitle")}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/account/profile"
+                className="flex size-7 items-center justify-center rounded-full bg-[#fbd100] text-[13px] font-extrabold font-nunito text-[#101828] hover:opacity-90 transition-opacity"
+                aria-label={t("profileAria")}
+              >
+                {initial}
+              </Link>
+              <NotificationBell />
+            </div>
+          </div>
         </div>
+      </div>
 
-        {!isSubscribed && !isLoading && (
-          <p className="text-sm text-muted-foreground text-center -mt-4">
+      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-6">
+        <PracticeStreakHero
+          firstName={firstName === "there" ? null : firstName}
+          currentStreak={streak?.currentStreak}
+          todayCompleted={streak?.todayCompleted}
+          weeklyActivity={streak?.weeklyActivity}
+          isLoading={streakLoading}
+        />
+
+        <SavedDrillsSection sectionHeading={tAccount("yourProgress")} />
+
+        <PracticeModesList locked={!isSubscribed} />
+
+        {!isSubscribed && !meLoading && (
+          <p className="text-sm text-muted-foreground text-center -mt-2">
             <Link
               href="/account/settings/subscriptions"
               className="text-green-600 font-semibold hover:underline"
             >
-              Upgrade to Pro
+              {t("upgradeCta")}
             </Link>{" "}
-            to unlock AI practice features.
+            {t("upgradeHint")}
           </p>
         )}
       </div>
+
       <BottomNav />
     </div>
   );

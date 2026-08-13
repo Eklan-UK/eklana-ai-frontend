@@ -27,7 +27,7 @@ import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { weeklyChallengeAPI } from "@/lib/api";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
+import { playPracticeFeedback } from "@/lib/practice-feedback";
 
 interface FillBlankDrillProps {
   drill: any;
@@ -55,6 +55,8 @@ export default function FillBlankDrill({
   const [submittedResults, setSubmittedResults] = useState<{
     score: number;
     passed: boolean;
+    correctBlanks: number;
+    totalBlanks: number;
   } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,6 +139,7 @@ export default function FillBlankDrill({
     submittedResults === null ? null : submittedResults.passed,
     undefined,
     submittedResults?.score,
+    false,
   );
 
   // Parse sentence to extract blank positions
@@ -187,26 +190,26 @@ export default function FillBlankDrill({
             }
 
             return (
-              <span key={partIdx} className="inline-block mx-1">
+              <span key={partIdx} className="inline-block mx-1 align-middle">
                 {showAnswers ? (
-                  <span
-                    className={`px-3 py-1.5 rounded border-2 font-medium ${
-                      isCorrect
-                        ? "bg-emerald-500/15 border-emerald-500 text-gray-900 dark:text-foreground"
-                        : "bg-red-100 border-red-500 text-red-800"
-                    }`}
-                  >
-                    {currentAnswer || "___"}
-                    {showAnswers && (
-                      <span className="ml-2 text-xs">
-                        {isCorrect ? (
-                          <CheckCircle className="w-4 h-4 inline" />
-                        ) : (
-                          `✗ (${blank.correctAnswer || ""})`
-                        )}
+                  isCorrect ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border-2 font-medium bg-emerald-500/15 border-emerald-500 text-gray-900 dark:text-foreground">
+                      {currentAnswer || "___"}
+                      <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                    </span>
+                  ) : (
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      <span className="px-3 py-1.5 rounded border-2 font-medium bg-red-100 border-red-500 text-red-800">
+                        {currentAnswer || "___"}
                       </span>
-                    )}
-                  </span>
+                      <span className="text-xs text-muted-foreground">
+                        Correct:{" "}
+                        <span className="font-semibold text-foreground">
+                          {blank.correctAnswer || ""}
+                        </span>
+                      </span>
+                    </span>
+                  )
                 ) : (
                   <select
                     value={currentAnswer}
@@ -223,7 +226,7 @@ export default function FillBlankDrill({
                       });
                       if (value) {
                         if (value === (blank.correctAnswer || "")) {
-                          playPerfectItemCelebration();
+                          playPracticeFeedback("success");
                         } else {
                           playPracticeFeedback("failure");
                         }
@@ -424,7 +427,7 @@ export default function FillBlankDrill({
         );
       }
 
-      setSubmittedResults({ score, passed });
+      setSubmittedResults({ score, passed, correctBlanks, totalBlanks });
     } catch (error: any) {
       toast.error("Failed to submit drill: " + (error.message || "Unknown error"));
     } finally {
@@ -501,11 +504,21 @@ export default function FillBlankDrill({
             >
               Score: {submittedResults.score}%
             </p>
+            {submittedResults.totalBlanks > 0 && (
+              <p className="text-sm text-foreground mb-1">
+                {submittedResults.correctBlanks === submittedResults.totalBlanks
+                  ? `Great job! You answered all ${submittedResults.totalBlanks} blanks correctly.`
+                  : `You answered ${submittedResults.correctBlanks} out of ${submittedResults.totalBlanks} blanks correctly.`}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground mb-6">
               {submittedResults.passed
                 ? "You passed this drill!"
                 : `You need at least ${PASS_THRESHOLD}% to complete this drill.`}
             </p>
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Answer review
+            </h3>
             <div className="space-y-6 mb-6">
               {items.map((item: any, itemIdx: number) => {
                 const itemAnswers = item.blanks.map(

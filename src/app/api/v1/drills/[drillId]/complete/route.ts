@@ -280,7 +280,11 @@ async function handler(
 	}
 
 	const passed = resolveDrillPassed(validated.score, validated);
-	const effects = buildDrillCompletionEffects(passed, validated.score);
+	const effects = buildDrillCompletionEffects(
+		passed,
+		validated.score,
+		result.attempt.drillType,
+	);
 
 	return apiResponse.success({
 		drillId,
