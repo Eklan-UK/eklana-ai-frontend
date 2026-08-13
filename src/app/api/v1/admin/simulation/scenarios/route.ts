@@ -116,7 +116,8 @@ async function handler(
 			);
 		}
 
-		const { displayData, hiddenContext } = await extractScenarioContext(rawText);
+		const { displayData, studentHint, hiddenContext, scenarioScript } =
+			await extractScenarioContext(rawText);
 
 		await connectToDatabase();
 
@@ -127,7 +128,9 @@ async function handler(
 			weeklyFocus: validated.weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,
 			displayData,
+			studentHint,
 			hiddenContext,
+			scenarioScript,
 			rawSourceText: rawText,
 			gradingRubric: validated.gradingRubric,
 			maxDurationMinutes: validated.maxDurationMinutes,
