@@ -192,7 +192,11 @@ async function postHandler(
 			},
 		];
 
-		const systemInstruction = buildSimulationSystemInstruction(scenario, currentPhase);
+		const systemInstruction = buildSimulationSystemInstruction(
+			scenario,
+			currentPhase,
+			scenario.studentCharacterName,
+		);
 
 		const revealedLabelsForPhase = new Set(
 			session.revealedFindings

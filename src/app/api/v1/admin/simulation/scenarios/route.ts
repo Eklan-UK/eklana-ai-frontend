@@ -81,6 +81,7 @@ async function handler(
 			title: formData.get('title'),
 			workplaceSetting: formData.get('workplaceSetting'),
 			dramatisationPrompt: formData.get('dramatisationPrompt'),
+			studentCharacterName: formData.get('studentCharacterName'),
 			weeklyFocus: formData.get('weeklyFocus'),
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
@@ -117,7 +118,7 @@ async function handler(
 		}
 
 		const { displayData, studentHint, hiddenContext, scenarioScript } =
-			await extractScenarioContext(rawText);
+			await extractScenarioContext(rawText, validated.studentCharacterName);
 
 		await connectToDatabase();
 
@@ -125,6 +126,7 @@ async function handler(
 			title: validated.title,
 			workplaceSetting: validated.workplaceSetting,
 			dramatisationPrompt: validated.dramatisationPrompt,
+			studentCharacterName: validated.studentCharacterName,
 			weeklyFocus: validated.weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,
 			displayData,

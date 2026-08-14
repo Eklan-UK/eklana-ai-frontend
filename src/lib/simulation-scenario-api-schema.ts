@@ -31,6 +31,7 @@ export const simulationScenarioBodySchema = z.object({
 	title: z.string().min(1, 'Title is required').max(200),
 	workplaceSetting: z.string().min(1, 'Workplace setting is required'),
 	dramatisationPrompt: z.string().min(1, 'Dramatisation prompt is required'),
+	studentCharacterName: z.string().min(1, 'Student character name is required'),
 	weeklyFocus: weeklyFocusField,
 	gradingRubric: z.string().min(1, 'Grading rubric is required'),
 	maxDurationMinutes: z.coerce.number().int().positive().default(15),

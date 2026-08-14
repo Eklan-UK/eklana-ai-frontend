@@ -10,6 +10,7 @@ import { useAllLearners } from "@/hooks/useAdmin";
 const emptyForm = () => ({
   title: "",
   workplaceSetting: "",
+  studentCharacterName: "",
   dramatisationPrompt: "",
   gradingRubric: "",
   maxDurationMinutes: "15",
@@ -93,6 +94,7 @@ export default function AdminSimulationScenariosPage() {
   const validate = (): string | null => {
     if (!form.title.trim()) return "Title is required";
     if (!form.workplaceSetting.trim()) return "Workplace setting is required";
+    if (!form.studentCharacterName.trim()) return "Student character name is required";
     if (!form.dramatisationPrompt.trim()) return "Dramatisation prompt is required";
     if (weeklyFocus.length === 0) return "Add at least one weekly focus area";
     if (!form.gradingRubric.trim()) return "Grading rubric is required";
@@ -115,6 +117,7 @@ export default function AdminSimulationScenariosPage() {
       formData.append("file", slideDeck as File);
       formData.append("title", form.title.trim());
       formData.append("workplaceSetting", form.workplaceSetting.trim());
+      formData.append("studentCharacterName", form.studentCharacterName.trim());
       formData.append("dramatisationPrompt", form.dramatisationPrompt.trim());
       formData.append("weeklyFocus", JSON.stringify(weeklyFocus));
       formData.append("gradingRubric", form.gradingRubric.trim());
@@ -182,6 +185,19 @@ export default function AdminSimulationScenariosPage() {
                     value={form.workplaceSetting}
                     onChange={(e) => set("workplaceSetting", e.target.value)}
                     placeholder="e.g. Medical-surgical inpatient ward"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    Student Character Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.studentCharacterName}
+                    onChange={(e) => set("studentCharacterName", e.target.value)}
+                    placeholder="e.g. Nurse Sunju"
                     className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
                   />
                 </div>

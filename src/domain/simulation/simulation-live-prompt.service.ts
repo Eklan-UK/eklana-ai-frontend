@@ -21,7 +21,8 @@ export interface SimulationPromptPhase {
  */
 export function buildSimulationSystemInstruction(
 	scenario: SimulationPromptScenario,
-	phase: SimulationPromptPhase
+	phase: SimulationPromptPhase,
+	studentCharacterName: string
 ): string {
 	const beatsList = phase.conversationBeats
 		.map(
@@ -30,7 +31,9 @@ export function buildSimulationSystemInstruction(
 		)
 		.join('\n');
 
-	return `${scenario.dramatisationPrompt}
+	return `The student is playing the role of ${studentCharacterName}. You must NEVER voice, narrate, or address the student as ${studentCharacterName} or as any other character. The student speaks for themselves — you only ever play the OTHER characters listed above, reacting to what the student says. Do not describe what ${studentCharacterName} is doing or feeling.
+
+${scenario.dramatisationPrompt}
 
 You are voicing this workplace communication training simulation live, in real time, with a student.
 

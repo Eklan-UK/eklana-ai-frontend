@@ -28,8 +28,10 @@ export interface ScenarioExtractionResult {
 	scenarioScript: ScenarioPhase[];
 }
 
-function buildExtractionPrompt(rawSlideText: string): string {
+function buildExtractionPrompt(rawSlideText: string, studentCharacterName: string): string {
 	return `You are extracting structured content from a tutor's uploaded slide deck to build a workplace communication training simulation. The simulation could be set in any workplace context — medical, hospitality, customer service, or otherwise — so do not assume a fixed domain or a fixed number of phases. Derive everything from what is actually present in the deck.
+
+The learner/student plays the role of ${studentCharacterName}. Do NOT include ${studentCharacterName} in any phase's characters array or conversationBeats — the AI never voices or narrates this character, since the student speaks for themselves.
 
 Extract exactly four things:
 
@@ -130,7 +132,29 @@ function validateExtractionShape(parsed: any): asserts parsed is ScenarioExtract
 	}
 }
 
-async function callGeminiForExtraction(rawSlideText: string): Promise<ScenarioExtractionResult> {
+// Deterministic backstop: strip the student's own character from the LLM's
+// output regardless of whether the prompt instruction was followed, since the
+// model has demonstrated unreliability on similar instructions.
+function stripStudentCharacter(
+	scenarioScript: ScenarioPhase[],
+	studentCharacterName: string
+): ScenarioPhase[] {
+	const needle = studentCharacterName.trim().toLowerCase();
+	const matchesStudent = (name: string) => name.trim().toLowerCase().includes(needle);
+
+	return scenarioScript.map((phase) => ({
+		...phase,
+		characters: phase.characters.filter((character) => !matchesStudent(character)),
+		conversationBeats: phase.conversationBeats.filter(
+			(beat) => !matchesStudent(beat.character)
+		),
+	}));
+}
+
+async function callGeminiForExtraction(
+	rawSlideText: string,
+	studentCharacterName: string
+): Promise<ScenarioExtractionResult> {
 	if (!genAI) {
 		throw new Error('Gemini API is not configured');
 	}
@@ -148,7 +172,7 @@ async function callGeminiForExtraction(rawSlideText: string): Promise<ScenarioEx
 		},
 	});
 
-	const prompt = buildExtractionPrompt(rawSlideText);
+	const prompt = buildExtractionPrompt(rawSlideText, studentCharacterName);
 	const result = await model.generateContent(prompt);
 	const responseText = result.response.text();
 
@@ -160,6 +184,8 @@ async function callGeminiForExtraction(rawSlideText: string): Promise<ScenarioEx
 	const parsed = JSON.parse(jsonMatch[0]);
 	validateExtractionShape(parsed);
 
+	parsed.scenarioScript = stripStudentCharacter(parsed.scenarioScript, studentCharacterName);
+
 	return parsed;
 }
 
@@ -170,14 +196,15 @@ async function callGeminiForExtraction(rawSlideText: string): Promise<ScenarioEx
  */
 export async function extractScenarioContext(
 	rawSlideText: string,
+	studentCharacterName: string,
 	retriesRemaining = 1
 ): Promise<ScenarioExtractionResult> {
 	try {
-		return await callGeminiForExtraction(rawSlideText);
+		return await callGeminiForExtraction(rawSlideText, studentCharacterName);
 	} catch (error: any) {
 		if (retriesRemaining > 0) {
 			logger.warn('Scenario extraction failed, retrying once', { error: error.message });
-			return extractScenarioContext(rawSlideText, retriesRemaining - 1);
+			return extractScenarioContext(rawSlideText, studentCharacterName, retriesRemaining - 1);
 		}
 		logger.error('Error extracting simulation scenario context', { error: error.message });
 		throw new Error(`Failed to extract simulation scenario context: ${error.message}`);
