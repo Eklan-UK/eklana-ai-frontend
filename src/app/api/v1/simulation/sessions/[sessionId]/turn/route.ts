@@ -161,23 +161,15 @@ async function postHandler(
 			logger.warn('Simulation turn audio upload failed', { error: msg, sessionId });
 		}
 
-		// Build conversation history for the Live API — mirrors the leading-role
-		// trim logic in generateTopicPracticeResponseStream (gemini.service.ts)
-		// so a stray leading 'model' turn never opens the history.
-		let validHistory: Array<{ role: 'user' | 'model'; text: string }> = session.turns.map(
+		// Build conversation history for the Live API. A leading 'model' turn is
+		// valid by design here — /opening intentionally persists the AI's opening
+		// line as turn 0 — so it must not be trimmed.
+		const validHistory: Array<{ role: 'user' | 'model'; text: string }> = session.turns.map(
 			(turn: ISimulationSession['turns'][number]) => ({
 				role: turn.role === 'student' ? ('user' as const) : ('model' as const),
 				text: turn.text,
 			}),
 		);
-		if (validHistory.length > 0 && validHistory[0].role === 'model') {
-			const firstUserIndex = validHistory.findIndex((msg) => msg.role === 'user');
-			if (firstUserIndex > 0) {
-				validHistory = validHistory.slice(firstUserIndex);
-			} else if (firstUserIndex === -1) {
-				validHistory = [];
-			}
-		}
 
 		const history = validHistory.map((msg) => ({
 			role: msg.role,
