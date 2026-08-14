@@ -74,7 +74,7 @@ export function AssignedDrillsSectionClient() {
                 <PlanFreeTalkRow
                   key={`free-talk-${scenarioId}`}
                   scenarioId={scenarioId}
-                  title={item.drill?.title ?? "Free Talk"}
+                  title={item.drill?.title ?? "Simulation Room"}
                   scenarioType={item.drill?.scenarioType ?? ""}
                   completionDate={item.drill?.completionDate ?? item.dueDate}
                   completedAt={item.completedAt}

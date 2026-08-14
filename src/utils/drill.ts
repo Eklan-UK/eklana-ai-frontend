@@ -164,6 +164,7 @@ export const DRILL_TYPE_LABELS: Record<string, string> = {
   listening: "Listening",
   fill_blank: "Fill-in-the-Blank",
   key_phrases: "Key Phrases",
+  eklan_free_talk: "Simulation Room",
 };
 
 export function getDrillTypeLabel(type: string | undefined | null): string {

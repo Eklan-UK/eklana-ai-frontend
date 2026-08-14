@@ -32,7 +32,7 @@ const MODES: Array<{
     id: "weeklyChallenge",
     href: "/account/practice/weekly-challenge",
     iconBg: "bg-[#fff4ed]",
-    iconSrc: "/icons/practice-hub/challenge-flame.svg",
+    iconSrc: "/icons/practice-hub/trophy.svg",
   },
   {
     id: "simulation",

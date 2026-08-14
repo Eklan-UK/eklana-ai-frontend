@@ -132,7 +132,7 @@ export default function LearningJourneyPartPage() {
                         title={
                           resolveRealDrillTitle(drill?.title) ??
                           topic.title ??
-                          "Free Talk"
+                          "Simulation Room"
                         }
                         scenarioType={drill?.scenarioType ?? ""}
                         completionDate={drill?.completionDate ?? item.dueDate}

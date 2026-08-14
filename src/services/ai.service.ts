@@ -209,10 +209,10 @@ export const aiService = {
       if (response.headers.get("content-type")?.includes("application/json")) {
         const error = await response.json().catch(() => ({}));
         throw new Error(
-          typeof error.message === "string" ? error.message : "Failed to grade Free Talk response"
+          typeof error.message === "string" ? error.message : "Failed to grade Simulation Room response"
         );
       }
-      throw new Error(`Failed to grade Free Talk response: ${response.status}`);
+      throw new Error(`Failed to grade Simulation Room response: ${response.status}`);
     }
 
     await this._processSSEStream(response, onChunk, options.signal);
@@ -270,13 +270,13 @@ export const aiService = {
       }
       const error = await response.json().catch(() => ({}));
       throw new Error(
-        typeof error.message === "string" ? error.message : "Failed to load Free Talk history"
+        typeof error.message === "string" ? error.message : "Failed to load Simulation Room history"
       );
     }
 
     const data = await response.json();
     if (!data.success || !Array.isArray(data.attempts)) {
-      throw new Error(typeof data.message === "string" ? data.message : "Failed to load Free Talk history");
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to load Simulation Room history");
     }
     return {
       attempts: data.attempts as FreeTalkAttemptApiRow[],
@@ -321,13 +321,13 @@ export const aiService = {
       }
       const error = await response.json().catch(() => ({}));
       throw new Error(
-        typeof error.message === "string" ? error.message : "Failed to save Free Talk attempt"
+        typeof error.message === "string" ? error.message : "Failed to save Simulation Room attempt"
       );
     }
 
     const data = await response.json();
     if (!data.success || !data.attempt?.id) {
-      throw new Error(typeof data.message === "string" ? data.message : "Failed to save Free Talk attempt");
+      throw new Error(typeof data.message === "string" ? data.message : "Failed to save Simulation Room attempt");
     }
     return {
       attempt: data.attempt as FreeTalkAttemptApiRow,
