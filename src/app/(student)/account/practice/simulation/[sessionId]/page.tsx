@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/Button";
 
 interface ScenarioPhase {
   phaseName: string;
+  characters: string[];
+}
+
+interface SessionTurn {
+  role: "student" | "ai";
+  text: string;
+  turnNumber: number;
 }
 
 interface SessionDetail {
@@ -19,8 +26,10 @@ interface SessionDetail {
   startedAt: string;
   currentPhaseIndex: number;
   briefingComplete: boolean;
+  turns: SessionTurn[];
   scenario: {
     title: string;
+    workplaceSetting: string;
     maxDurationMinutes: number;
     studentHint: string;
     phases: ScenarioPhase[];
@@ -31,6 +40,10 @@ interface Finding {
   label: string;
   data: string;
 }
+
+type ChatMessage =
+  | { kind: "turn"; role: "student" | "ai"; text: string }
+  | { kind: "findings"; findings: Finding[] };
 
 type UiPhase =
   | "loading"
@@ -50,15 +63,15 @@ interface SseHandlers {
   onAudio?: (data: string) => void;
   onReveal?: (findings: Finding[]) => void;
   onPhaseAdvance?: (newPhaseIndex: number) => void;
+  onTranscript?: (text: string) => void;
 }
 
 async function readSimulationSSE(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   handlers: SseHandlers = {},
-): Promise<{ audioChunks: string[]; textAccum: string }> {
+): Promise<{ textAccum: string }> {
   const decoder = new TextDecoder();
   let buffer = "";
-  const audioChunks: string[] = [];
   let textAccum = "";
 
   while (true) {
@@ -78,13 +91,14 @@ async function readSimulationSSE(
           if (parsed?.type === "reveal" && Array.isArray(parsed.findings)) {
             handlers.onReveal?.(parsed.findings);
           } else if (parsed?.type === "audio" && typeof parsed.data === "string") {
-            audioChunks.push(parsed.data);
             handlers.onAudio?.(parsed.data);
           } else if (parsed?.type === "text" && typeof parsed.data === "string") {
             textAccum += parsed.data;
             handlers.onText?.(parsed.data);
           } else if (parsed?.type === "phaseAdvance" && typeof parsed.newPhaseIndex === "number") {
             handlers.onPhaseAdvance?.(parsed.newPhaseIndex);
+          } else if (parsed?.type === "transcript" && typeof parsed.text === "string") {
+            handlers.onTranscript?.(parsed.text);
           }
         } catch {
           // partial/malformed SSE frame split across reads — ignore
@@ -95,42 +109,135 @@ async function readSimulationSSE(
     }
   }
 
-  return { audioChunks, textAccum };
+  return { textAccum };
 }
 
-async function playPcmAudio(
-  audioChunks: string[],
-  playbackAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
-  onFinished: () => void,
-): Promise<void> {
-  if (audioChunks.length === 0) {
-    onFinished();
-    return;
-  }
+// ─── Progressive, gapless audio playback ───────────────────────────────────
+//
+// Gemini Live streams PCM audio a chunk at a time. Rather than buffer the
+// whole response and convert+play one WAV at the end, we flush ~1.5s worth
+// of PCM to WAV as it arrives and queue each resulting clip for back-to-back
+// playback, so the student hears the AI start speaking well before it
+// finishes generating.
 
+const PCM_SAMPLE_RATE = 24_000;
+const PCM_BYTES_PER_SAMPLE = 2; // 16-bit
+const PCM_CHANNELS = 1;
+const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * PCM_CHANNELS;
+const FLUSH_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND * 1.5; // ~1.5s of audio per flush
+
+/** Estimates decoded byte length of a base64 string without decoding it. */
+function estimateBase64ByteLength(base64: string): number {
+  return (base64.length * 3) / 4;
+}
+
+/** Sequential playback queue: clips play back-to-back via a single <audio> element. */
+function createAudioQueue(
+  playbackAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
+  onDrain?: () => void,
+) {
+  const queue: string[] = [];
+  let playing = false;
+  let streamEnded = false;
+
+  const maybeNotifyDrain = () => {
+    if (streamEnded && !playing && queue.length === 0) onDrain?.();
+  };
+
+  const playNext = () => {
+    const wavBase64 = queue.shift();
+    if (!wavBase64) {
+      playing = false;
+      maybeNotifyDrain();
+      return;
+    }
+    playing = true;
+    const audio = new Audio(`data:audio/wav;base64,${wavBase64}`);
+    playbackAudioRef.current = audio;
+    audio.onended = playNext;
+    audio.onerror = playNext;
+    audio.play().catch(playNext);
+  };
+
+  return {
+    enqueue(wavBase64: string) {
+      queue.push(wavBase64);
+      if (!playing) playNext();
+    },
+    markStreamEnded() {
+      streamEnded = true;
+      maybeNotifyDrain();
+    },
+  };
+}
+
+/** Converts a batch of base64 PCM chunks to WAV and enqueues it for playback. Best-effort. */
+async function flushAudioChunks(
+  chunks: string[],
+  queue: ReturnType<typeof createAudioQueue>,
+): Promise<void> {
+  if (chunks.length === 0) return;
   try {
     const wavRes = await fetch("/api/v1/simulation/audio/wav", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pcmBase64Chunks: audioChunks }),
+      body: JSON.stringify({ pcmBase64Chunks: chunks }),
     });
-
-    if (!wavRes.ok) {
-      onFinished();
-      return;
-    }
-
+    if (!wavRes.ok) return;
     const wavJson = await wavRes.json();
-    const audio = new Audio(`data:audio/wav;base64,${wavJson.data.wavBase64}`);
-    playbackAudioRef.current = audio;
-    audio.onended = onFinished;
-    audio.onerror = onFinished;
-    audio.play().catch(onFinished);
+    queue.enqueue(wavJson.data.wavBase64);
   } catch {
     // Audio playback is best-effort; a failed conversion shouldn't block the turn.
-    onFinished();
   }
+}
+
+/**
+ * Buffers incoming PCM chunks and flushes them to the playback queue in
+ * ~1.5s batches. Flushes are chained sequentially (not fired concurrently)
+ * so clips are guaranteed to enqueue — and therefore play — in arrival
+ * order even if individual WAV-conversion requests race on the network.
+ */
+function createChunkedAudioPlayer(playbackAudioRef: React.MutableRefObject<HTMLAudioElement | null>) {
+  let resolvePlaybackDone: () => void;
+  const playbackDone = new Promise<void>((resolve) => {
+    resolvePlaybackDone = resolve;
+  });
+
+  const queue = createAudioQueue(playbackAudioRef, () => resolvePlaybackDone());
+
+  let buffer: string[] = [];
+  let bufferedBytes = 0;
+  let flushChain: Promise<void> = Promise.resolve();
+
+  const scheduleFlush = (chunks: string[]) => {
+    flushChain = flushChain.then(() => flushAudioChunks(chunks, queue));
+  };
+
+  return {
+    /** Call for every 'audio' SSE event as it arrives. */
+    pushChunk(base64: string) {
+      buffer.push(base64);
+      bufferedBytes += estimateBase64ByteLength(base64);
+      if (bufferedBytes >= FLUSH_THRESHOLD_BYTES) {
+        scheduleFlush(buffer);
+        buffer = [];
+        bufferedBytes = 0;
+      }
+    },
+    /** Call once the SSE stream ends. Flushes any remaining tail chunk. */
+    async finish(): Promise<void> {
+      if (buffer.length > 0) {
+        scheduleFlush(buffer);
+        buffer = [];
+        bufferedBytes = 0;
+      }
+      await flushChain;
+      queue.markStreamEnded();
+    },
+    /** Resolves once every enqueued clip has finished playing (post-finish). */
+    playbackDone,
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -146,15 +253,14 @@ export default function SimulationSessionPage() {
   const [showHint, setShowHint] = useState(false);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState("");
 
-  const [displayMode, setDisplayMode] = useState<"caption" | "findings">("caption");
-  const [captionText, setCaptionText] = useState("");
-  const [findings, setFindings] = useState<Finding[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const briefingAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // ─── Load session detail + play briefing on mount ───────────────────────────
 
@@ -176,6 +282,13 @@ export default function SimulationSessionPage() {
         if (cancelled) return;
 
         setSession(sessionJson.data);
+        setMessages(
+          (sessionJson.data.turns as SessionTurn[]).map((turn) => ({
+            kind: "turn",
+            role: turn.role,
+            text: turn.text,
+          })),
+        );
 
         if (sessionJson.data.briefingComplete) {
           // Returning to an already-started session (e.g. after a refresh).
@@ -232,6 +345,12 @@ export default function SimulationSessionPage() {
     return () => clearInterval(interval);
   }, [session]);
 
+  // ─── Auto-scroll chat to bottom on new message ─────────────────────────────
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   // ─── Start ────────────────────────────────────────────────────────────────
 
   const handleStart = async () => {
@@ -249,12 +368,15 @@ export default function SimulationSessionPage() {
       });
       if (!openingRes.ok || !openingRes.body) throw new Error("Failed to generate opening line");
 
-      const { audioChunks, textAccum } = await readSimulationSSE(openingRes.body.getReader());
+      const player = createChunkedAudioPlayer(playbackAudioRef);
+      const { textAccum } = await readSimulationSSE(openingRes.body.getReader(), {
+        onAudio: (data) => player.pushChunk(data),
+      });
+      await player.finish();
 
-      setCaptionText(textAccum);
-      setDisplayMode("caption");
+      setMessages((prev) => [...prev, { kind: "turn", role: "ai", text: textAccum }]);
 
-      await playPcmAudio(audioChunks, playbackAudioRef, () => setUiPhase("active"));
+      void player.playbackDone.then(() => setUiPhase("active"));
     } catch {
       toast.error("Could not start the session. Please try again.");
       setUiPhase("awaitingStart");
@@ -292,28 +414,26 @@ export default function SimulationSessionPage() {
 
         if (!res.body) throw new Error("Turn response had no body");
 
-        let revealedThisTurn = false;
-        const { audioChunks, textAccum } = await readSimulationSSE(res.body.getReader(), {
+        const player = createChunkedAudioPlayer(playbackAudioRef);
+        const { textAccum } = await readSimulationSSE(res.body.getReader(), {
+          onAudio: (data) => player.pushChunk(data),
+          onTranscript: (text) => {
+            setMessages((prev) => [...prev, { kind: "turn", role: "student", text }]);
+          },
           onReveal: (revealedFindings) => {
-            revealedThisTurn = true;
-            setFindings(revealedFindings);
-            setDisplayMode("findings");
+            setMessages((prev) => [...prev, { kind: "findings", findings: revealedFindings }]);
           },
           onPhaseAdvance: (newPhaseIndex) => {
             setSession((prev) => (prev ? { ...prev, currentPhaseIndex: newPhaseIndex } : prev));
           },
         });
 
-        if (!revealedThisTurn) {
-          setCaptionText(textAccum);
-          setDisplayMode("caption");
+        if (textAccum) {
+          setMessages((prev) => [...prev, { kind: "turn", role: "ai", text: textAccum }]);
         }
 
-        if (audioChunks.length > 0) {
-          void playPcmAudio(audioChunks, playbackAudioRef, () => {
-            /* autoplay may be blocked — non-fatal */
-          });
-        }
+        // Playback is fire-and-forget here — autoplay may be blocked, which is non-fatal.
+        void player.finish();
 
         setUiPhase("active");
       } catch {
@@ -410,6 +530,8 @@ export default function SimulationSessionPage() {
 
   const currentPhaseName =
     session?.scenario.phases[session.currentPhaseIndex]?.phaseName ?? "";
+  const speakerLabel =
+    session?.scenario.phases[session.currentPhaseIndex]?.characters[0] ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -434,17 +556,22 @@ export default function SimulationSessionPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-1">
-          {session?.scenario.phases.map((phase, idx) => (
+        <div className="w-11" />
+      </header>
+
+      {/* Progress bar */}
+      {session && session.scenario.phases.length > 0 && (
+        <div className="flex h-1 w-full gap-1 bg-border">
+          {session.scenario.phases.map((phase, idx) => (
             <span
               key={`${phase.phaseName}-${idx}`}
-              className={`h-1.5 w-1.5 rounded-full ${
-                idx === session.currentPhaseIndex ? "bg-primary" : "bg-border"
+              className={`h-full flex-1 ${
+                idx <= session.currentPhaseIndex ? "bg-primary" : "bg-transparent"
               }`}
             />
           ))}
         </div>
-      </header>
+      )}
 
       {/* Content area */}
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 text-center">
@@ -457,39 +584,66 @@ export default function SimulationSessionPage() {
             <p className="font-nunito text-base text-foreground">
               {session?.scenario.title}
             </p>
+            {session?.scenario.workplaceSetting && (
+              <p className="font-nunito text-sm text-muted-foreground">
+                {session.scenario.workplaceSetting}
+              </p>
+            )}
             <Button onClick={handleStart}>Start</Button>
           </div>
         )}
 
         {uiPhase === "starting" && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
 
-        {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") &&
-          (displayMode === "findings" ? (
-            <div className="w-full max-w-md space-y-3 text-left">
-              <p className="font-nunito text-sm font-medium text-muted-foreground">
-                New information revealed:
-              </p>
-              <ul className="space-y-2">
-                {findings.map((finding) => (
-                  <li
-                    key={finding.label}
-                    className="rounded-xl border border-border bg-card p-3"
+        {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") && (
+          <div className="flex w-full max-w-md flex-1 flex-col gap-3 overflow-y-auto text-left">
+            {messages.map((message, idx) =>
+              message.kind === "findings" ? (
+                <div
+                  key={idx}
+                  className="w-full space-y-2 rounded-xl border border-border bg-card p-3"
+                >
+                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    New information revealed
+                  </p>
+                  <ul className="space-y-2">
+                    {message.findings.map((finding) => (
+                      <li key={finding.label}>
+                        <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {finding.label}
+                        </p>
+                        <p className="font-nunito text-sm text-foreground">{finding.data}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div
+                  key={idx}
+                  className={`flex flex-col gap-1 ${
+                    message.role === "student" ? "items-end" : "items-start"
+                  }`}
+                >
+                  {message.role === "ai" && speakerLabel && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-nunito text-xs font-semibold text-muted-foreground">
+                      {speakerLabel}
+                    </span>
+                  )}
+                  <p
+                    className={`max-w-[85%] rounded-2xl px-4 py-2 font-nunito text-base leading-relaxed ${
+                      message.role === "student"
+                        ? "bg-primary text-white"
+                        : "bg-muted text-foreground"
+                    }`}
                   >
-                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {finding.label}
-                    </p>
-                    <p className="font-nunito text-sm text-foreground">{finding.data}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            captionText && (
-              <p className="font-nunito text-base leading-relaxed text-foreground">
-                {captionText}
-              </p>
-            )
-          ))}
+                    {message.text}
+                  </p>
+                </div>
+              ),
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
 
         {uiPhase === "completed" && (
           <div className="flex flex-col items-center gap-4">
