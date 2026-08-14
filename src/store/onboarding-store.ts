@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { DEFAULT_ENGLISH_ACCENT } from "@/services/tts-accent-voices";
 
 interface OnboardingState {
   // Step 1: Name
@@ -14,6 +15,9 @@ interface OnboardingState {
   // Step 3: Nationality
   nationality: string | null;
   
+  // Step 4: English accent (lesson preference voice key)
+  englishAccent: string;
+  
   // Language (default to English)
   language: string;
   
@@ -22,6 +26,7 @@ interface OnboardingState {
   setUserType: (type: string) => void;
   setLearningGoals: (goals: string[]) => void;
   setNationality: (nationality: string | null) => void;
+  setEnglishAccent: (accent: string) => void;
   setLanguage: (language: string) => void;
   reset: () => void;
   
@@ -41,6 +46,9 @@ interface OnboardingState {
       preferredTimeSlots: string[];
       learningPace: string;
     };
+    lessonPreferences?: {
+      englishAccent: string;
+    };
   };
 }
 
@@ -49,6 +57,7 @@ const initialState = {
   userType: "student", // Default to student for all users
   learningGoals: [], // Now an array for multiple selection
   nationality: null,
+  englishAccent: DEFAULT_ENGLISH_ACCENT,
   language: "English", // Default to English for all users
 };
 
@@ -69,6 +78,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       setUserType: (userType) => set({ userType }),
       setLearningGoals: (learningGoals) => set({ learningGoals }),
       setNationality: (nationality) => set({ nationality }),
+      setEnglishAccent: (englishAccent) => set({ englishAccent }),
       setLanguage: (language) => set({ language }),
 
       reset: () => set(initialState),
@@ -78,7 +88,8 @@ export const useOnboardingStore = create<OnboardingState>()(
         return !!(
           state.name &&
           state.learningGoals.length > 0 &&
-          state.nationality
+          state.nationality &&
+          state.englishAccent
         );
       },
 
@@ -100,6 +111,9 @@ export const useOnboardingStore = create<OnboardingState>()(
             sessionDuration: 60,
             preferredTimeSlots: [],
             learningPace: "moderate",
+          },
+          lessonPreferences: {
+            englishAccent: state.englishAccent,
           },
         };
       },

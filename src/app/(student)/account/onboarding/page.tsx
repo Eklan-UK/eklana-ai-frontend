@@ -22,8 +22,9 @@ import { NationalityLanguageConfirmSheet } from "@/components/account/Nationalit
 import { useTranslations } from "next-intl";
 import { getUserDisplayName } from "@/utils/user";
 import { LearningGoalCards } from "@/components/onboarding/LearningGoalCards";
+import { ONBOARDING_ACCENT_OPTIONS } from "@/services/tts-accent-voices";
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -38,11 +39,13 @@ export default function OnboardingPage() {
     name,
     learningGoals,
     nationality,
+    englishAccent,
     language,
     setName,
     setUserType,
     setLearningGoals,
     setNationality,
+    setEnglishAccent,
     setLanguage,
     getFormattedData,
     reset,
@@ -115,6 +118,8 @@ export default function OnboardingPage() {
         return learningGoals.length > 0;
       case 3:
         return !!nationality;
+      case 4:
+        return !!englishAccent;
       default:
         return false;
     }
@@ -245,6 +250,50 @@ export default function OnboardingPage() {
                         ) : undefined
                       }
                     />
+                  </Card>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              Which English accent do you prefer?
+            </h1>
+            <p className="text-base text-gray-600 mb-8">
+              You can change this anytime in Lesson settings
+            </p>
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+              {ONBOARDING_ACCENT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setEnglishAccent(opt.key)}
+                  className="w-full text-left"
+                >
+                  <Card
+                    className={`transition-all ${
+                      englishAccent === opt.key
+                        ? "bg-green-50 ring-2 ring-green-600"
+                        : "hover:shadow-md"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 p-4">
+                      <span className="text-2xl" aria-hidden>
+                        {opt.flag}
+                      </span>
+                      <span className="flex-1 text-base font-medium text-gray-900">
+                        {opt.label}
+                      </span>
+                      {englishAccent === opt.key ? (
+                        <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      ) : null}
+                    </div>
                   </Card>
                 </button>
               ))}

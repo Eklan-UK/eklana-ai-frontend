@@ -24,6 +24,7 @@ import {
   validateDrillDraft,
 } from "@/components/drills/drill-form-utils";
 import { clearPendingBulkAiDrillApply } from "@/hooks/useAIDrillCreationWorkflow";
+import { invalidatePrecisionClinicStudentWeeks } from "@/hooks/usePrecisionClinic";
 import { invalidateStudentWeeks } from "@/hooks/useStudentWeeks";
 
 export interface BulkDrillWizardProps {
@@ -41,6 +42,8 @@ export interface BulkDrillWizardProps {
   onCancel?: () => void;
   /** Drill-builder week context — places assignedAt in that week when set. */
   weekNumber?: number;
+  /** Tags drills as Precision Clinic — skips journey fields and invalidates PC weeks. */
+  source?: "precision_clinic";
 }
 
 export function BulkDrillWizard({
@@ -51,6 +54,7 @@ export function BulkDrillWizard({
   loadingUsers = false,
   onCancel,
   weekNumber,
+  source,
 }: BulkDrillWizardProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -94,6 +98,8 @@ export function BulkDrillWizard({
     [currentIndex],
   );
 
+  const skipLearningJourney = source === "precision_clinic";
+
   const handleUpload = async () => {
     if (!allHaveCompletionDate) {
       toast.error(
@@ -105,7 +111,12 @@ export function BulkDrillWizard({
     }
 
     for (const draft of drafts) {
-      if (!validateDrillDraft(draft, { requireUsers: true })) {
+      if (
+        !validateDrillDraft(draft, {
+          requireUsers: true,
+          skipLearningJourney,
+        })
+      ) {
         const idx = drafts.indexOf(draft);
         if (idx >= 0) setCurrentIndex(idx);
         return;
@@ -119,7 +130,7 @@ export function BulkDrillWizard({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          drills: buildBulkAssignPayload(drafts, { weekNumber }),
+          drills: buildBulkAssignPayload(drafts, { weekNumber, source }),
         }),
       });
       const json = await res.json();
@@ -132,6 +143,9 @@ export function BulkDrillWizard({
       const created = json.data?.created ?? drafts.length;
       const studentIds = [...new Set(drafts.flatMap((d) => d.selectedUsers))];
       await invalidateStudentWeeks(queryClient, studentIds);
+      if (source === "precision_clinic") {
+        await invalidatePrecisionClinicStudentWeeks(queryClient, studentIds);
+      }
       toast.success(
         created === 1
           ? "Drill created and assigned"
@@ -158,7 +172,7 @@ export function BulkDrillWizard({
   }, []);
 
   const handleSaveCurrentDraft = async () => {
-    if (!validateDrillDraft(currentDraft)) return;
+    if (!validateDrillDraft(currentDraft, { skipLearningJourney })) return;
     setSavingCurrent(true);
     try {
       await drillAPI.create(
@@ -166,10 +180,17 @@ export function BulkDrillWizard({
           assignedTo: currentDraft.selectedUsers,
           isActive: false,
           weekNumber,
+          source,
         }),
       );
       if (currentDraft.selectedUsers.length > 0) {
         await invalidateStudentWeeks(queryClient, currentDraft.selectedUsers);
+        if (source === "precision_clinic") {
+          await invalidatePrecisionClinicStudentWeeks(
+            queryClient,
+            currentDraft.selectedUsers,
+          );
+        }
         toast.success(
           "Drill saved with pending assignment for selected students.",
         );
@@ -186,7 +207,7 @@ export function BulkDrillWizard({
   };
 
   const handleCopyCurrentDraft = () => {
-    if (!validateDrillDraft(currentDraft)) return;
+    if (!validateDrillDraft(currentDraft, { skipLearningJourney })) return;
     const copy: DrillDraft = {
       ...currentDraft,
       selectedUsers: [],
@@ -268,6 +289,7 @@ export function BulkDrillWizard({
         studentSearch={studentSearch}
         onStudentSearchChange={setStudentSearch}
         layout="full"
+        hideLearningJourneyFields={source === "precision_clinic"}
       />
 
       <div className="fixed bottom-0 left-64 right-0 z-10 flex flex-wrap items-center gap-4 border-t border-gray-100 bg-white p-6">

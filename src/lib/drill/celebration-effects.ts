@@ -13,13 +13,36 @@ export type DrillCompletionEffects = {
   confettiVariant: DrillConfettiVariant;
 };
 
-/** `score` drives gold vs green confetti + perfect vs normal MP3: `Math.round(score) >= 100` → `perfect`. */
+/** Speech drills eligible for gold/applause 100% celebration. */
+export const PERFECT_CELEBRATION_DRILL_TYPES = [
+  'vocabulary',
+  'pronunciation',
+  'grammar',
+  'roleplay',
+  'key_phrases',
+] as const;
+
+export function supportsPerfectCelebration(drillType?: string | null): boolean {
+  if (!drillType) return false;
+  return (PERFECT_CELEBRATION_DRILL_TYPES as readonly string[]).includes(drillType);
+}
+
+/**
+ * `score` drives gold vs green confetti + perfect vs normal MP3 when the drill
+ * type supports perfect celebration: `Math.round(score) >= 100` → `perfect`.
+ * Non-speech types (matching, listening, fill_blank, definition, …) stay `pass`
+ * even at 100%.
+ */
 export function buildDrillCompletionEffects(
   passed: boolean,
   score?: number,
+  drillType?: string | null,
 ): DrillCompletionEffects | null {
   if (!passed) return null;
-  const isPerfect = typeof score === 'number' && Math.round(score) >= 100;
+  const isPerfect =
+    supportsPerfectCelebration(drillType) &&
+    typeof score === 'number' &&
+    Math.round(score) >= 100;
   const confettiVariant: DrillConfettiVariant = isPerfect ? 'perfect' : 'pass';
   return {
     soundUrl: isPerfect ? getPerfectCelebrationSoundUrl() : getCelebrationSoundUrl(),

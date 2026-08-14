@@ -28,6 +28,9 @@ export const createUserProfile = async (userId: Types.ObjectId, profileData?: {
 		preferredTimeSlots?: string[];
 		learningPace?: 'slow' | 'moderate' | 'fast';
 	};
+	lessonPreferences?: {
+		englishAccent?: string;
+	};
 }): Promise<void> => {
 	try {
 		// Check if profile already exists
@@ -44,6 +47,8 @@ export const createUserProfile = async (userId: Types.ObjectId, profileData?: {
 		}
 
 		// Create profile
+		// If lessonPreferences.englishAccent is omitted, leave unset so schema
+		// default (british_female) still applies for backwards compatibility.
 		await Profile.create({
 			userId,
 			userType: profileData?.userType,
@@ -61,6 +66,13 @@ export const createUserProfile = async (userId: Types.ObjectId, profileData?: {
 				preferredTimeSlots: [],
 				learningPace: 'moderate',
 			},
+			...(profileData?.lessonPreferences?.englishAccent
+				? {
+						lessonPreferences: {
+							englishAccent: profileData.lessonPreferences.englishAccent,
+						},
+					}
+				: {}),
 			status: 'active',
 		});
 

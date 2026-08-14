@@ -77,6 +77,27 @@ export const VOICE_PREVIEW_SAMPLE_TEXT =
 /** Default student lesson accent when unset / new. */
 export const DEFAULT_ENGLISH_ACCENT: AccentVoiceKey = 'british_female';
 
+/**
+ * Student accent picker for onboarding + lesson settings (not the full voice catalog).
+ * Male + female per country (8 options). Keep in sync with mobile/utils/tts-accent-voices.ts.
+ */
+export interface OnboardingAccentOption {
+  key: AccentVoiceKey;
+  label: string;
+  flag: string;
+}
+
+export const ONBOARDING_ACCENT_OPTIONS: ReadonlyArray<OnboardingAccentOption> = [
+  { key: 'american_male', label: 'American (male)', flag: '🇺🇸' },
+  { key: 'american_female', label: 'American (female)', flag: '🇺🇸' },
+  { key: 'british_male', label: 'British (male)', flag: '🇬🇧' },
+  { key: 'british_female', label: 'British (female)', flag: '🇬🇧' },
+  { key: 'australian_male', label: 'Australian (male)', flag: '🇦🇺' },
+  { key: 'australian_female', label: 'Australian (female)', flag: '🇦🇺' },
+  { key: 'canadian_male', label: 'Canadian (male)', flag: '🇨🇦' },
+  { key: 'canadian_female', label: 'Canadian (female)', flag: '🇨🇦' },
+];
+
 export const ACCENT_VOICE_OPTIONS: AccentVoiceOption[] = [
   // Featured
   { key: 'aanu_afolabi', label: 'Aanu Afolabi', voiceId: 'JXNr0OLVF2ZRyBK6ZXkK', group: 'featured', previewAudioUrl: 'https://res.cloudinary.com/dzr3vlosq/video/upload/v1785969917/eklan/voice-previews/aanu_afolabi.mp3' },
@@ -134,6 +155,37 @@ export function isAccentVoiceKey(key: unknown): key is AccentVoiceKey {
   return typeof key === 'string' && KEY_SET.has(key);
 }
 
+const STUDENT_LESSON_ACCENT_KEYS = new Set<string>(
+  ONBOARDING_ACCENT_OPTIONS.map((o) => o.key),
+);
+
+/** Country male/female accents students may set in lesson prefs / onboarding. */
+export type StudentLessonAccentKey =
+  | 'american_male'
+  | 'american_female'
+  | 'british_male'
+  | 'british_female'
+  | 'australian_male'
+  | 'australian_female'
+  | 'canadian_male'
+  | 'canadian_female';
+
+const STUDENT_COUNTRY_PREFIXES = [
+  'american',
+  'british',
+  'australian',
+  'canadian',
+] as const;
+
+type StudentCountryPrefix = (typeof STUDENT_COUNTRY_PREFIXES)[number];
+
+/** True when key is one of the eight student country accents. */
+export function isStudentLessonAccentKey(
+  key: unknown,
+): key is StudentLessonAccentKey {
+  return typeof key === 'string' && STUDENT_LESSON_ACCENT_KEYS.has(key);
+}
+
 /**
  * Normalize stored englishAccent (including legacy british/american) to a current key.
  * Returns undefined when empty / unknown.
@@ -145,6 +197,40 @@ export function normalizeEnglishAccent(
   const trimmed = key.trim();
   if (isAccentVoiceKey(trimmed)) return trimmed;
   return LEGACY_ACCENT_MAP[trimmed];
+}
+
+function studentCountryPrefix(
+  key: string,
+): StudentCountryPrefix | undefined {
+  for (const prefix of STUDENT_COUNTRY_PREFIXES) {
+    if (key === prefix || key.startsWith(`${prefix}_`)) return prefix;
+  }
+  return undefined;
+}
+
+/** Infer male/female from key suffix or ACCENT_VOICE_OPTIONS label; default female. */
+function genderFromAccentKey(key: AccentVoiceKey): 'male' | 'female' {
+  if (key.endsWith('_male')) return 'male';
+  if (key.endsWith('_female')) return 'female';
+  const option = ACCENT_VOICE_OPTIONS.find((o) => o.key === key);
+  if (option?.label.includes('(male)')) return 'male';
+  if (option?.label.includes('(female)')) return 'female';
+  return 'female';
+}
+
+/**
+ * Map any stored accent/character key → student country male/female key.
+ * Named characters coerce to matching country + gender when possible; else `*_female`.
+ * Featured/unknown → DEFAULT_ENGLISH_ACCENT.
+ */
+export function toStudentLessonAccent(key?: string | null): AccentVoiceKey {
+  const normalized = normalizeEnglishAccent(key);
+  if (!normalized) return DEFAULT_ENGLISH_ACCENT;
+  if (isStudentLessonAccentKey(normalized)) return normalized;
+  const country = studentCountryPrefix(normalized);
+  if (!country) return DEFAULT_ENGLISH_ACCENT;
+  const gender = genderFromAccentKey(normalized);
+  return `${country}_${gender}` as StudentLessonAccentKey;
 }
 
 /**

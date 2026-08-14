@@ -24,7 +24,6 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
 import { drillAPI, pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
@@ -215,16 +214,6 @@ function pickRoleplayRecorderMimeType(): string | undefined {
   }
   return undefined;
 }
-
-// Trigger confetti celebration
-const triggerConfetti = () => {
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 },
-    colors: ['#22c55e', '#16a34a', '#4ade80', '#86efac'],
-  });
-};
 
 export default function RoleplayDrill({
   drill,
@@ -1216,8 +1205,6 @@ export default function RoleplayDrill({
             playPerfectItemCelebration();
           } else {
             playPracticeFeedback("success");
-            // Trigger confetti celebration
-            triggerConfetti();
           }
           toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
         } else {
