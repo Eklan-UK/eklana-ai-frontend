@@ -50,7 +50,7 @@ interface ConversationOptions {
 // Live API returns raw PCM L16 audio (24kHz, 16-bit, mono).
 // Browsers can't play raw PCM, so we wrap it in a WAV header.
 
-function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
+export function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
 	const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 	const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
 	const blockAlign = numChannels * (bitsPerSample / 8);
@@ -84,7 +84,7 @@ function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, 
 // Single model for both text (via outputAudioTranscription) and audio.
 // No separate generateContent call → avoids gemini-2.5-flash rate limits.
 
-function combineBase64Chunks(chunks: string[]): string {
+export function combineBase64Chunks(chunks: string[]): string {
 	if (chunks.length === 0) return '';
 	if (chunks.length === 1) return chunks[0];
 
