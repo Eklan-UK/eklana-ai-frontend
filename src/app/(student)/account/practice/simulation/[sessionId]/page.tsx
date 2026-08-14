@@ -43,6 +43,96 @@ type UiPhase =
   | "completed"
   | "error";
 
+// ─── SSE parsing (shared between /turn and /opening) ───────────────────────
+
+interface SseHandlers {
+  onText?: (text: string) => void;
+  onAudio?: (data: string) => void;
+  onReveal?: (findings: Finding[]) => void;
+  onPhaseAdvance?: (newPhaseIndex: number) => void;
+}
+
+async function readSimulationSSE(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  handlers: SseHandlers = {},
+): Promise<{ audioChunks: string[]; textAccum: string }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const audioChunks: string[] = [];
+  let textAccum = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const rawEvent = buffer.slice(0, boundary).trim();
+      buffer = buffer.slice(boundary + 2);
+
+      if (rawEvent.startsWith("data: ")) {
+        try {
+          const parsed = JSON.parse(rawEvent.slice("data: ".length));
+          if (parsed?.type === "reveal" && Array.isArray(parsed.findings)) {
+            handlers.onReveal?.(parsed.findings);
+          } else if (parsed?.type === "audio" && typeof parsed.data === "string") {
+            audioChunks.push(parsed.data);
+            handlers.onAudio?.(parsed.data);
+          } else if (parsed?.type === "text" && typeof parsed.data === "string") {
+            textAccum += parsed.data;
+            handlers.onText?.(parsed.data);
+          } else if (parsed?.type === "phaseAdvance" && typeof parsed.newPhaseIndex === "number") {
+            handlers.onPhaseAdvance?.(parsed.newPhaseIndex);
+          }
+        } catch {
+          // partial/malformed SSE frame split across reads — ignore
+        }
+      }
+
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+
+  return { audioChunks, textAccum };
+}
+
+async function playPcmAudio(
+  audioChunks: string[],
+  playbackAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
+  onFinished: () => void,
+): Promise<void> {
+  if (audioChunks.length === 0) {
+    onFinished();
+    return;
+  }
+
+  try {
+    const wavRes = await fetch("/api/v1/simulation/audio/wav", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pcmBase64Chunks: audioChunks }),
+    });
+
+    if (!wavRes.ok) {
+      onFinished();
+      return;
+    }
+
+    const wavJson = await wavRes.json();
+    const audio = new Audio(`data:audio/wav;base64,${wavJson.data.wavBase64}`);
+    playbackAudioRef.current = audio;
+    audio.onended = onFinished;
+    audio.onerror = onFinished;
+    audio.play().catch(onFinished);
+  } catch {
+    // Audio playback is best-effort; a failed conversion shouldn't block the turn.
+    onFinished();
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SimulationSessionPage() {
@@ -152,7 +242,19 @@ export default function SimulationSessionPage() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to start session");
-      setUiPhase("active");
+
+      const openingRes = await fetch(`/api/v1/simulation/sessions/${sessionId}/opening`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!openingRes.ok || !openingRes.body) throw new Error("Failed to generate opening line");
+
+      const { audioChunks, textAccum } = await readSimulationSSE(openingRes.body.getReader());
+
+      setCaptionText(textAccum);
+      setDisplayMode("caption");
+
+      await playPcmAudio(audioChunks, playbackAudioRef, () => setUiPhase("active"));
     } catch {
       toast.error("Could not start the session. Please try again.");
       setUiPhase("awaitingStart");
@@ -190,47 +292,17 @@ export default function SimulationSessionPage() {
 
         if (!res.body) throw new Error("Turn response had no body");
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
         let revealedThisTurn = false;
-        const audioChunks: string[] = [];
-        let textAccum = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          let boundary = buffer.indexOf("\n\n");
-          while (boundary !== -1) {
-            const rawEvent = buffer.slice(0, boundary).trim();
-            buffer = buffer.slice(boundary + 2);
-
-            if (rawEvent.startsWith("data: ")) {
-              try {
-                const parsed = JSON.parse(rawEvent.slice("data: ".length));
-                if (parsed?.type === "reveal" && Array.isArray(parsed.findings)) {
-                  revealedThisTurn = true;
-                  setFindings(parsed.findings);
-                  setDisplayMode("findings");
-                } else if (parsed?.type === "audio" && typeof parsed.data === "string") {
-                  audioChunks.push(parsed.data);
-                } else if (parsed?.type === "text" && typeof parsed.data === "string") {
-                  textAccum += parsed.data;
-                } else if (parsed?.type === "phaseAdvance" && typeof parsed.newPhaseIndex === "number") {
-                  setSession((prev) => (prev ? { ...prev, currentPhaseIndex: parsed.newPhaseIndex } : prev));
-                }
-              } catch {
-                // partial/malformed SSE frame split across reads — ignore
-              }
-            }
-
-            boundary = buffer.indexOf("\n\n");
-          }
-        }
+        const { audioChunks, textAccum } = await readSimulationSSE(res.body.getReader(), {
+          onReveal: (revealedFindings) => {
+            revealedThisTurn = true;
+            setFindings(revealedFindings);
+            setDisplayMode("findings");
+          },
+          onPhaseAdvance: (newPhaseIndex) => {
+            setSession((prev) => (prev ? { ...prev, currentPhaseIndex: newPhaseIndex } : prev));
+          },
+        });
 
         if (!revealedThisTurn) {
           setCaptionText(textAccum);
@@ -238,24 +310,9 @@ export default function SimulationSessionPage() {
         }
 
         if (audioChunks.length > 0) {
-          try {
-            const wavRes = await fetch("/api/v1/simulation/audio/wav", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pcmBase64Chunks: audioChunks }),
-            });
-            if (wavRes.ok) {
-              const wavJson = await wavRes.json();
-              const audio = new Audio(`data:audio/wav;base64,${wavJson.data.wavBase64}`);
-              playbackAudioRef.current = audio;
-              audio.play().catch(() => {
-                /* autoplay may be blocked — non-fatal */
-              });
-            }
-          } catch {
-            // Audio playback is best-effort; a failed conversion shouldn't block the turn.
-          }
+          void playPcmAudio(audioChunks, playbackAudioRef, () => {
+            /* autoplay may be blocked — non-fatal */
+          });
         }
 
         setUiPhase("active");
