@@ -116,9 +116,15 @@ export default function SimulationRoomPage() {
                       </p>
                     </div>
                     {status === "completed" ? (
-                      <span className="shrink-0 text-xs font-medium text-muted-foreground px-3 py-2">
-                        Completed
-                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={isStarting}
+                        onClick={() => handleStart(s.scenarioId)}
+                      >
+                        {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Try Again"}
+                      </Button>
                     ) : status === "in_progress" ? (
                       <Button
                         size="sm"

@@ -6,7 +6,6 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession from '@/models/simulation-session';
-import { generateGeminiTTSAudio } from '@/services/gemini.service';
 
 async function getHandler(
 	req: NextRequest,
@@ -50,14 +49,12 @@ async function getHandler(
 			);
 		}
 
-		const audioBuffer = await generateGeminiTTSAudio(scenario.displayData);
-
 		return NextResponse.json(
 			{
 				code: 'Success',
 				data: {
 					displayText: scenario.displayData,
-					audioBase64: audioBuffer.toString('base64'),
+					audioBase64: scenario.briefingAudioBase64,
 				},
 			},
 			{ status: 200 },

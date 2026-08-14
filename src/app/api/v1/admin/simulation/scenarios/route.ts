@@ -1,4 +1,5 @@
 // POST /api/v1/admin/simulation/scenarios — create a scenario from an uploaded slide deck
+// GET  /api/v1/admin/simulation/scenarios — list active scenarios (summary fields only)
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
@@ -8,6 +9,7 @@ import SimulationScenario from '@/models/simulation-scenario';
 import { simulationScenarioBodySchema } from '@/lib/simulation-scenario-api-schema';
 import { extractScenarioContext } from '@/domain/simulation/simulation-scenario-extraction.service';
 import { loadOfficeParser } from '@/services/document-parser.service';
+import { generateGeminiTTSAudio } from '@/services/gemini.service';
 import { Types } from 'mongoose';
 
 async function handler(
@@ -120,6 +122,9 @@ async function handler(
 		const { displayData, studentHint, hiddenContext, scenarioScript } =
 			await extractScenarioContext(rawText, validated.studentCharacterName);
 
+		const briefingAudioBuffer = await generateGeminiTTSAudio(displayData);
+		const briefingAudioBase64 = briefingAudioBuffer.toString('base64');
+
 		await connectToDatabase();
 
 		const scenario = await SimulationScenario.create({
@@ -130,6 +135,7 @@ async function handler(
 			weeklyFocus: validated.weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,
 			displayData,
+			briefingAudioBase64,
 			studentHint,
 			hiddenContext,
 			scenarioScript,
@@ -164,4 +170,48 @@ async function handler(
 	}
 }
 
+// List view: only summary fields, never scenarioScript / hiddenContext /
+// rawSourceText / gradingRubric / displayData / briefingAudioBase64 — those
+// belong to the single-scenario detail view, not this list.
+async function listHandler(
+	req: NextRequest,
+	ctx: { userId: Types.ObjectId; userRole: string }
+): Promise<NextResponse> {
+	try {
+		await connectToDatabase();
+
+		const scenarios = await SimulationScenario.find({ isActive: true })
+			.select('title workplaceSetting studentCharacterName weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
+			.sort({ createdAt: -1 })
+			.lean()
+			.exec();
+
+		const data = scenarios.map((scenario: any) => ({
+			_id: scenario._id,
+			title: scenario.title,
+			workplaceSetting: scenario.workplaceSetting,
+			studentCharacterName: scenario.studentCharacterName,
+			weeklyFocus: scenario.weeklyFocus,
+			maxDurationMinutes: scenario.maxDurationMinutes,
+			assignedLearnerCount: Array.isArray(scenario.assignedLearnerIds)
+				? scenario.assignedLearnerIds.length
+				: 0,
+			createdAt: scenario.createdAt,
+		}));
+
+		return NextResponse.json({ code: 'Success', data }, { status: 200 });
+	} catch (error: any) {
+		logger.error('[SimulationScenarios] GET error', {
+			error: error.message,
+			stack: error.stack,
+			name: error.name,
+		});
+		return NextResponse.json(
+			{ code: 'ServerError', message: 'Failed to fetch scenarios' },
+			{ status: 500 }
+		);
+	}
+}
+
 export const POST = withRole(['tutor', 'admin'], handler);
+export const GET = withRole(['tutor', 'admin'], listHandler);

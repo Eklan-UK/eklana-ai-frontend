@@ -31,6 +31,7 @@ export interface ISimulationScenario extends Document {
 	studentCharacterName: string;
 	weeklyFocus: string[];
 	displayData: string;
+	briefingAudioBase64: string;
 	hiddenContext?: any;
 	rawSourceText?: string;
 	gradingRubric: string;
@@ -110,6 +111,10 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 		displayData: {
 			type: String,
 			required: [true, 'Display data is required'],
+		},
+		briefingAudioBase64: {
+			type: String,
+			required: [true, 'Briefing audio is required'],
 		},
 		hiddenContext: {
 			type: Schema.Types.Mixed,
