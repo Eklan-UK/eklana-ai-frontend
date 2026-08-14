@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import mongoose from 'mongoose';
+import PasswordReset from '@/models/password-reset';
 import {
   applyPasswordUpdate,
   userHasPassword,
@@ -47,21 +47,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     await connectToDatabase();
 
-    // Get or create PasswordReset model
-    let PasswordReset;
-    if (mongoose.models.PasswordReset) {
-      PasswordReset = mongoose.models.PasswordReset;
-    } else {
-      const passwordResetSchema = new mongoose.Schema({
-        userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-        token: { type: String, required: true, unique: true },
-        expiresAt: { type: Date, required: true },
-        createdAt: { type: Date, default: Date.now },
-      }, { collection: 'passwordresets', timestamps: true });
-      
-      PasswordReset = mongoose.model('PasswordReset', passwordResetSchema);
-    }
-
     // Find reset token
     const resetRecord = await PasswordReset.findOne({ token }).lean().exec();
 
@@ -101,12 +86,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const userId = resetRecord.userId.toString();
+
     const isInitialSetup = !(await userHasPassword(
-      resetRecord.userId,
+      userId,
       user.password,
     ));
 
-    await applyPasswordUpdate(resetRecord.userId, newPassword);
+    await applyPasswordUpdate(userId, newPassword);
 
     // Delete the reset token
     await PasswordReset.deleteOne({ token });

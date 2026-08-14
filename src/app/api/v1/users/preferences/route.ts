@@ -133,7 +133,7 @@ async function patchHandler(
 
 		const update: Record<string, unknown> = { ...validated };
 
-		// Coerce student lesson accent to country male/female keys only.
+		// Coerce student lesson accent to country accent keys (`*_female`) only.
 		if (validated.lessonPreferences?.englishAccent !== undefined) {
 			update.lessonPreferences = {
 				...validated.lessonPreferences,

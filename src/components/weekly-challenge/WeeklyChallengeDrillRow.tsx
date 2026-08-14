@@ -12,16 +12,16 @@ import { encodeWeekStartDate } from "@/lib/challenges/weekly-challenge-url";
 
 const DRILL_TYPE_TITLE: Record<string, string> = {
 	pronunciation: "Pronunciation",
-	vocabulary: "Vocabulary/Phrase",
-	roleplay: "Role-play",
-	key_phrases: "Key Phrases",
+	vocabulary: "Vocabulary/Key Phrase",
+	roleplay: "Roleplay",
+	key_phrases: "Pressure Test",
 };
 
 const DRILL_TYPE_BADGE: Record<string, string> = {
 	pronunciation: "Pronunciation",
 	vocabulary: "Fill-in-the-Blank",
-	roleplay: "Role-play",
-	key_phrases: "Key Phrases",
+	roleplay: "Roleplay",
+	key_phrases: "Pressure Test",
 };
 
 const CATEGORY_TEXT: Record<string, string> = {

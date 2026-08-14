@@ -32,7 +32,6 @@ import {
   type PerformanceReviewGroup,
 } from "./shared";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 import {
   loadCheckpoint,
@@ -867,20 +866,9 @@ export default function VocabularyDrill({
                     ? "Pronounce the Word"
                     : "Pronounce the Sentence"}
                 </h2>
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-                    {currentText}
-                  </h1>
-                  {currentScreen === "word" ? (
-                    <BookmarkButton
-                      itemType="word"
-                      content={currentText}
-                      translation={currentSentence.wordTranslation}
-                      context={currentSentence.text}
-                      sourceDrillId={String(drill._id)}
-                    />
-                  ) : null}
-                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+                  {currentText}
+                </h1>
                 {currentScreen === "word" && currentSentence.wordTranslation && (
                   <p className="text-sm text-muted-foreground mt-2">
                     {currentSentence.wordTranslation}

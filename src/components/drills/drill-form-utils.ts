@@ -307,7 +307,7 @@ export function validateDrillDraft(
       draft.keyPhraseItems.length === 0 ||
       !draft.keyPhraseItems.some((item) => item.prompt.trim())
     ) {
-      toast.error("Please add at least one key phrase question");
+      toast.error("Please add at least one Pressure Test question");
       return false;
     }
     for (const item of draft.keyPhraseItems) {

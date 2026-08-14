@@ -31,13 +31,15 @@ export function isValidUserId(id: unknown): id is string {
 
 /**
  * Returns the correct Mongoose query value for a user/learner id field.
+ * - Types.ObjectId instance -> returned as-is
  * - ObjectId-shaped id -> Types.ObjectId (matches stored BSON ObjectId)
  * - UUID-shaped id -> the original string (matches stored string _id)
  *
  * Throws if the id is neither format, to surface bad input early instead of
  * silently matching zero documents.
  */
-export function toUserIdQuery(id: string): Types.ObjectId | string {
+export function toUserIdQuery(id: string | Types.ObjectId): Types.ObjectId | string {
+	if (id instanceof Types.ObjectId) return id;
 	if (isObjectId(id)) {
 		return new Types.ObjectId(id);
 	}

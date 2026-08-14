@@ -1,6 +1,10 @@
 // Use relative paths for Next.js API routes
 import apiClient from './api/axios';
 import { apiCache, createCacheKey } from './api-cache';
+import type {
+  PrecisionClinicLearnerWeekDetailResponse,
+  PrecisionClinicLearnerWeekHistoryResponse,
+} from '@/domain/precision-clinic/types';
 
 // Generic API request function using Axios with caching
 // Better Auth handles authentication via cookies automatically
@@ -2188,17 +2192,7 @@ export const learnerPrecisionClinicAPI = {
   getHistory: () => {
     return apiRequest<{
       code?: string;
-      data?: {
-        weeks: Array<{
-          learnerWeekId: string;
-          personalWeekNumber: number;
-          title: string;
-          status: 'ready';
-          totalItems: number;
-          completedItems: number;
-          assignedAt: string;
-        }>;
-      };
+      data?: PrecisionClinicLearnerWeekHistoryResponse;
     }>('/learner/precision-clinic', {
       method: 'GET',
       cache: false,
@@ -2209,25 +2203,7 @@ export const learnerPrecisionClinicAPI = {
   getWeek: (learnerWeekId: string) => {
     return apiRequest<{
       code?: string;
-      data?: {
-        learnerWeekId: string;
-        personalWeekNumber: number;
-        title: string;
-        status: 'ready';
-        totalItems: number;
-        completedItemIndexes: number[];
-        assignedAt: string;
-        drills: Array<{
-          index: number;
-          itemId: string;
-          sourceDrillId: string;
-          title: string;
-          type: string;
-          difficulty: string;
-          completed: boolean;
-          sortOrder: number;
-        }>;
-      };
+      data?: PrecisionClinicLearnerWeekDetailResponse;
     }>(`/learner/precision-clinic/${encodeURIComponent(learnerWeekId)}`, {
       method: 'GET',
       cache: false,

@@ -28,6 +28,7 @@ import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
 import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
+import { getDrillTypeLabel } from "@/utils/drill";
 
 interface DrillDetailClientProps {
   drill: any;
@@ -161,7 +162,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${getDifficultyColor(drill.difficulty)}`}>
                   {drill.difficulty}
                 </span>
-                <span className="text-sm text-gray-500 capitalize">{drill.type}</span>
+                <span className="text-sm text-gray-500">{getDrillTypeLabel(drill.type)}</span>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${drill.is_active
                     ? "bg-green-100 text-green-700"
                     : "bg-gray-100 text-gray-700"
@@ -246,7 +247,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           drill.key_phrase_items.length > 0 && (
             <Card className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Key Phrase Questions ({drill.key_phrase_items.length})
+                Pressure Test Questions ({drill.key_phrase_items.length})
               </h2>
               <div className="space-y-4">
                 {drill.key_phrase_items.map((item: any, idx: number) => (

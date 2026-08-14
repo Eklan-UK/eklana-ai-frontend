@@ -1,3 +1,5 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { BADGE_DEFINITIONS } from './badge.definitions';
 import { __test__ } from './badge.service';
 import type { BadgeView } from './badge.types';
@@ -23,7 +25,7 @@ describe('badge.service helpers', () => {
         MIN_PRACTICE_SECONDS,
         SEVEN_DAY_TARGET
       );
-      expect(result.met).toBe(true);
+      assert.equal(result.met, true);
     });
 
     it('returns not met when days are below the minutes threshold', () => {
@@ -37,8 +39,8 @@ describe('badge.service helpers', () => {
         MIN_PRACTICE_SECONDS,
         SEVEN_DAY_TARGET
       );
-      expect(result.met).toBe(false);
-      expect(result.currentRun).toBe(0);
+      assert.equal(result.met, false);
+      assert.equal(result.currentRun, 0);
     });
   });
 
@@ -59,7 +61,7 @@ describe('badge.service helpers', () => {
       );
 
       const featured = pickFeaturedBadge(badges);
-      expect(featured.badgeId).toBe('seven-day-stretch');
+      assert.equal(featured.badgeId, 'seven-day-stretch');
     });
 
     it('falls back to first locked badge when none unlocked', () => {
@@ -68,8 +70,8 @@ describe('badge.service helpers', () => {
       );
 
       const featured = pickFeaturedBadge(badges);
-      expect(featured.badgeId).toBe('first-steps');
-      expect(featured.unlocked).toBe(false);
+      assert.equal(featured.badgeId, 'first-steps');
+      assert.equal(featured.unlocked, false);
     });
   });
 });
