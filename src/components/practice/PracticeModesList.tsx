@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
-type ModeId = "freeTalk" | "precisionClinic" | "weeklyChallenge";
+type ModeId = "freeTalk" | "precisionClinic" | "weeklyChallenge" | "simulation";
 
 const MODES: Array<{
   id: ModeId;
@@ -33,6 +33,14 @@ const MODES: Array<{
     href: "/account/practice/weekly-challenge",
     iconBg: "bg-[#fff4ed]",
     iconSrc: "/icons/practice-hub/challenge-flame.svg",
+  },
+  {
+    id: "simulation",
+    href: "/account/practice/simulation",
+    iconBg: "bg-[#fce8f3]",
+    // TODO(design): placeholder icon reused from Free Talk — needs a real
+    // Simulation Room icon asset from design before ship.
+    iconSrc: "/icons/practice-hub/free-talk.svg",
   },
 ];
 
