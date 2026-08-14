@@ -568,7 +568,7 @@ Maps `ChallengeDrillItem` → props expected by the drill runner.
 const DRILL_TYPE_TITLE: Record<string, string> = {
   pronunciation: 'Pronunciation',
   vocabulary: 'Vocabulary',
-  roleplay: 'Role-play',
+  roleplay: 'Roleplay',
   key_phrases: 'Key Phrases',
 };
 
@@ -681,7 +681,7 @@ drillAPI.saveRoleplayProgress(drillId, {
 |-----------|-------|-------------|
 | `pronunciation` | Pronunciation | Pronunciation |
 | `vocabulary` | Vocabulary | Fill-in-the-Blank |
-| `roleplay` | Role-play | Role-play |
+| `roleplay` | Roleplay | Roleplay |
 | `fill_blank` | (use `getDrillTypeLabel`) | Fill-in-the-Blank |
 | `key_phrases` | Key Phrases | Key Phrases |
 

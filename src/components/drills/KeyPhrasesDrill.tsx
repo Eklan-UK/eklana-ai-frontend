@@ -33,7 +33,6 @@ import {
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { preloadTTSAudio } from "@/hooks/useTTS";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
-import { BookmarkButton } from "@/components/common/BookmarkButton";
 import { playPracticeFeedback, playPerfectItemCelebration } from "@/lib/practice-feedback";
 
 interface KeyPhrasesDrillProps {
@@ -632,7 +631,7 @@ export default function KeyPhrasesDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Key Phrases" : "key phrases"}
+        drillType="Pressure Test"
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -661,7 +660,7 @@ export default function KeyPhrasesDrill({
     return (
       <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="p-6 text-center text-muted-foreground">
-          No key phrase items found for this drill.
+          No Pressure Test items found for this drill.
         </Card>
       </DrillLayout>
     );
@@ -698,19 +697,11 @@ export default function KeyPhrasesDrill({
             <p className="min-w-0 flex-1 text-lg font-semibold text-foreground leading-snug break-words pr-1">
               {currentItem.prompt}
             </p>
-            <div className="flex items-center gap-1 shrink-0">
-              <TTSButton
-                text={currentItem.prompt}
-                audioUrl={currentItem.promptAudioUrl}
-                className="shrink-0"
-              />
-              <BookmarkButton
-                itemType="sentence"
-                content={currentItem.prompt}
-                context={currentItem.correctAnswer}
-                sourceDrillId={String(drill._id)}
-              />
-            </div>
+            <TTSButton
+              text={currentItem.prompt}
+              audioUrl={currentItem.promptAudioUrl}
+              className="shrink-0"
+            />
           </div>
         </Card>
 

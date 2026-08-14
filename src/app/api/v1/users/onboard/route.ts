@@ -84,7 +84,7 @@ async function handler(
 						{ status: 400 }
 					);
 				}
-				// Coerce named/character voices to student male/female country keys.
+				// Coerce named/character voices to student country accent keys (`*_female`).
 				lessonPreferences = {
 					englishAccent: toStudentLessonAccent(normalized),
 				};

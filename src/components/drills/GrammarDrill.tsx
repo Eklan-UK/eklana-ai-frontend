@@ -377,7 +377,6 @@ export default function GrammarDrill({
               size="md"
               audioUrl={currentPattern?.patternAudioUrl}
             />
-            <DrillBookmarkToggle drillId={String(drill._id)} />
           </div>
 
           {currentPattern?.hint && (

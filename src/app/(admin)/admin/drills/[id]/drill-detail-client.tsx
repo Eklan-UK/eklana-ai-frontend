@@ -34,6 +34,7 @@ import {
   drillCompletionDateEnd,
   isDrillCompletionOverdue,
 } from "@/lib/drill-completion-date";
+import { getDrillTypeLabel } from "@/utils/drill";
 
 interface DrillDetailClientProps {
   drill: any;
@@ -214,8 +215,8 @@ export function DrillDetailClient({
                 >
                   {drill.difficulty}
                 </span>
-                <span className="text-sm text-gray-500 capitalize">
-                  {drill.type.replace("_", " ")}
+                <span className="text-sm text-gray-500">
+                  {getDrillTypeLabel(drill.type)}
                 </span>
               </div>
             </div>
@@ -524,7 +525,7 @@ export function DrillDetailClient({
           drill.key_phrase_items.length > 0 && (
             <Card className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Key Phrase Questions ({drill.key_phrase_items.length})
+                Pressure Test Questions ({drill.key_phrase_items.length})
               </h2>
               <div className="space-y-4">
                 {drill.key_phrase_items.map((item: any, idx: number) => (

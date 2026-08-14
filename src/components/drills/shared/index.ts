@@ -7,6 +7,10 @@ export { WordAnalytics } from './WordAnalytics';
 export { PronunciationWordBreakdown } from './PronunciationWordBreakdown';
 export { RoleplayPerformanceReview } from './RoleplayPerformanceReview';
 export {
+  RoleplayAnalysisOverlay,
+  type RoleplayAnalysisOverlayState,
+} from './RoleplayAnalysisOverlay';
+export {
   DrillPerformanceReview,
   DrillLineReviewAccordion,
   type PerformanceReviewAnalyticsRow,

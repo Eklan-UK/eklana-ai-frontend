@@ -278,7 +278,7 @@ function renderContentForType(
     case "key_phrases": {
       const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
       return (
-        <PreviewSection title={`Key Phrases — ${items.length} questions`}>
+        <PreviewSection title={`Pressure Test — ${items.length} questions`}>
           {items.map((item, i) => (
             <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
               <p className="font-semibold">{String(item.prompt ?? "")}</p>

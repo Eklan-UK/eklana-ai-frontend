@@ -120,8 +120,9 @@ function deriveTrend(weeklyChange: number): 'improving' | 'stable' | 'declining'
 
 export async function computeProgressScorecard(
 	learnerId: string,
+	options?: { connect?: () => Promise<unknown> },
 ): Promise<ProgressScorecardMetrics> {
-	await connectToDatabase();
+	await (options?.connect ?? connectToDatabase)();
 	// learnerId may be a UUID (Better Auth web sign-up, incl. Google/Apple
 	// OAuth) or an ObjectId hex string (legacy/mobile accounts). DrillAttempt
 	// and FreeTalkAttempt both store `learnerId` as Schema.Types.Mixed, so a

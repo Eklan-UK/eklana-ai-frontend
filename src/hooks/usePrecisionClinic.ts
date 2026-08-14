@@ -57,13 +57,12 @@ export function usePrecisionClinicStats(options?: { enabled?: boolean }) {
 		queryKey: queryKeys.precisionClinic.stats(),
 		queryFn: async (): Promise<PrecisionClinicStats> => {
 			const response = await precisionClinicAPI.getStats();
-			const data = response?.data ?? response ?? {};
+			const stats = response?.data;
 			return {
-				total: typeof data.total === 'number' ? data.total : 0,
-				practiceItems:
-					typeof data.practiceItems === 'number' ? data.practiceItems : 0,
-				published: typeof data.published === 'number' ? data.published : 0,
-				assigned: typeof data.assigned === 'number' ? data.assigned : 0,
+				total: stats?.total ?? 0,
+				practiceItems: stats?.practiceItems ?? 0,
+				published: stats?.published ?? 0,
+				assigned: stats?.assigned ?? 0,
 			};
 		},
 		staleTime: 1000 * 60 * 2,
