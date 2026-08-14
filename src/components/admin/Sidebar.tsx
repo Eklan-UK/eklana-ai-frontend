@@ -28,6 +28,7 @@ import {
   List,
   Target,
   Trophy,
+  Drama,
   type LucideIcon,
 } from "lucide-react";
 
@@ -94,6 +95,7 @@ const Sidebar: React.FC = () => {
         { name: "Eklan Precision Clinic", icon: Target, path: "/admin/precision-clinic" },
         { name: "Bookmark Drills", icon: Bookmark, path: "/admin/drills/bookmarked" },
         { name: "Free Talk Scenarios", icon: MessageSquare, path: "/admin/drill/free-talk" },
+        { name: "Simulation Room", icon: Drama, path: "/admin/simulation/scenarios" },
         { name: "Weekly Challenge", icon: Trophy, path: "/admin/weekly-challenge" },
         { name: "Old Drill Builder", icon: List, path: "/admin/drill" },
         { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
