@@ -11,7 +11,16 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
+import SimulationScenario from '@/models/simulation-scenario';
 import { speechaceService } from '@/lib/api/speechace.service';
+import {
+	analyzeGrammarAndContext,
+	GrammarAnalysisResult,
+} from '@/domain/simulation/simulation-grammar-analysis.service';
+import {
+	scoreCompetencies,
+	CompetencyScoringResult,
+} from '@/domain/simulation/simulation-competency-scoring.service';
 
 async function postHandler(
 	req: NextRequest,
@@ -53,55 +62,105 @@ async function postHandler(
 			);
 		}
 
+		const scenario = await SimulationScenario.findById(session.scenarioId);
+
+		if (!scenario) {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Scenario not found' },
+				{ status: 404 },
+			);
+		}
+
+		const transcript = session.turns.map((turn: ISimulationSession['turns'][number]) => ({
+			turnNumber: turn.turnNumber,
+			role: turn.role,
+			text: turn.text,
+		}));
+
 		const gradableTurns = session.turns.filter(
 			(turn: ISimulationSession['turns'][number]) => turn.role === 'student' && !!turn.audioUrl,
 		);
 
-		const results = await Promise.all(
-			gradableTurns.map(async (turn: ISimulationSession['turns'][number]) => {
-				try {
-					const audioResponse = await fetch(turn.audioUrl);
-					if (!audioResponse.ok) {
-						throw new Error(`Failed to download turn audio: ${audioResponse.status} ${audioResponse.statusText}`);
+		const [pronunciationResults, grammarResult, competencyResult] = await Promise.all([
+			Promise.all(
+				gradableTurns.map(async (turn: ISimulationSession['turns'][number]) => {
+					try {
+						const audioResponse = await fetch(turn.audioUrl);
+						if (!audioResponse.ok) {
+							throw new Error(`Failed to download turn audio: ${audioResponse.status} ${audioResponse.statusText}`);
+						}
+						const audioArrayBuffer = await audioResponse.arrayBuffer();
+						const audioBuffer = Buffer.from(audioArrayBuffer);
+
+						const speechaceResult = await speechaceService.scorePronunciation(
+							turn.text,
+							audioBuffer,
+							ctx.userId.toString(),
+						);
+
+						return { turnNumber: turn.turnNumber, speechaceResult };
+					} catch (error: any) {
+						logger.warn('[SimulationSessionGrade] Failed to score turn', {
+							error: error.message,
+							sessionId,
+							turnNumber: turn.turnNumber,
+						});
+						return { turnNumber: turn.turnNumber, speechaceResult: null };
 					}
-					const audioArrayBuffer = await audioResponse.arrayBuffer();
-					const audioBuffer = Buffer.from(audioArrayBuffer);
-
-					const speechaceResult = await speechaceService.scorePronunciation(
-						turn.text,
-						audioBuffer,
-						ctx.userId.toString(),
-					);
-
-					return { turnNumber: turn.turnNumber, speechaceResult };
+				}),
+			),
+			(async (): Promise<GrammarAnalysisResult> => {
+				try {
+					return await analyzeGrammarAndContext(transcript);
 				} catch (error: any) {
-					logger.warn('[SimulationSessionGrade] Failed to score turn', {
+					logger.warn('[SimulationSessionGrade] Grammar analysis failed', {
 						error: error.message,
 						sessionId,
-						turnNumber: turn.turnNumber,
 					});
-					return { turnNumber: turn.turnNumber, speechaceResult: null };
+					return { errors: [] };
 				}
-			}),
-		);
+			})(),
+			(async (): Promise<CompetencyScoringResult> => {
+				try {
+					return await scoreCompetencies(scenario.gradingRubric, transcript, scenario.weeklyFocus);
+				} catch (error: any) {
+					logger.warn('[SimulationSessionGrade] Competency scoring failed', {
+						error: error.message,
+						sessionId,
+					});
+					return { competencyScores: [], overallSummary: '' };
+				}
+			})(),
+		]);
 
-		const resultsByTurnNumber = new Map(results.map((r) => [r.turnNumber, r.speechaceResult]));
+		const resultsByTurnNumber = new Map(pronunciationResults.map((r) => [r.turnNumber, r.speechaceResult]));
 		for (const turn of session.turns) {
 			if (resultsByTurnNumber.has(turn.turnNumber)) {
 				turn.speechaceResult = resultsByTurnNumber.get(turn.turnNumber);
 			}
 		}
 
-		await session.save();
+		const failedTurnCount = pronunciationResults.filter((r) => r.speechaceResult === null).length;
+		const gradedTurnCount = pronunciationResults.length - failedTurnCount;
 
-		const failedTurnCount = results.filter((r) => r.speechaceResult === null).length;
+		session.overallGradeResult = {
+			pronunciation: { gradedTurnCount, failedTurnCount },
+			grammar: grammarResult,
+			competency: competencyResult,
+			gradedAt: new Date(),
+		};
+
+		await session.save();
 
 		return NextResponse.json(
 			{
 				code: 'Success',
 				data: {
-					gradedTurnCount: results.length - failedTurnCount,
+					gradedTurnCount,
 					failedTurnCount,
+					grammarErrorCount: grammarResult.errors.length,
+					competencyScoreCount: competencyResult.competencyScores.length,
+					overallSummary: competencyResult.overallSummary,
 				},
 			},
 			{ status: 200 },
