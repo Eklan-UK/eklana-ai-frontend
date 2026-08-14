@@ -28,6 +28,7 @@ export interface ISimulationScenario extends Document {
 	title: string;
 	workplaceSetting: string;
 	dramatisationPrompt: string;
+	studentCharacterName: string;
 	weeklyFocus: string[];
 	displayData: string;
 	hiddenContext?: any;
@@ -96,6 +97,10 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 		dramatisationPrompt: {
 			type: String,
 			required: [true, 'Dramatisation prompt is required'],
+		},
+		studentCharacterName: {
+			type: String,
+			required: [true, 'Student character name is required'],
 		},
 		weeklyFocus: {
 			type: [String],
