@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
-type ModeId = "freeTalk" | "precisionClinic" | "weeklyChallenge";
+type ModeId = "simulation" | "precisionClinic" | "weeklyChallenge";
 
 const MODES: Array<{
   id: ModeId;
@@ -17,8 +17,8 @@ const MODES: Array<{
   iconSrc: string;
 }> = [
   {
-    id: "freeTalk",
-    href: "/account/practice/free-talk",
+    id: "simulation",
+    href: "/account/practice/simulation",
     iconBg: "bg-[#eff6ff]",
     iconSrc: "/icons/practice-hub/free-talk.svg",
   },
