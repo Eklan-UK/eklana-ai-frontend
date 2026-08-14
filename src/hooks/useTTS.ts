@@ -11,6 +11,11 @@ interface UseTTSOptions {
   apiPath?: string;
 }
 
+export type PlayAudioOptions = {
+  /** When true, the promise resolves on ended, play error, or stopAudio — not on play() start. */
+  waitUntilEnd?: boolean;
+};
+
 type PreloadedClip = {
   objectUrl: string;
   audio: HTMLAudioElement;
@@ -91,6 +96,8 @@ export function useTTS(options: UseTTSOptions = {}) {
   const fromPreloadCacheRef = useRef(false);
   /** Incremented on stop or new play — stale in-flight playAudio calls bail out. */
   const playGenerationRef = useRef(0);
+  /** Settles a waitUntilEnd waiter when stopAudio / a new play detaches the clip. */
+  const waitUntilEndResolveRef = useRef<(() => void) | null>(null);
 
   const detachActiveAudio = useCallback(() => {
     if (audioRef.current) {
@@ -108,6 +115,10 @@ export function useTTS(options: UseTTSOptions = {}) {
     ownsObjectUrlRef.current = false;
     fromPreloadCacheRef.current = false;
     setIsPlaying(false);
+
+    const finishWait = waitUntilEndResolveRef.current;
+    waitUntilEndResolveRef.current = null;
+    finishWait?.();
   }, []);
 
   const preloadAudio = useCallback(
@@ -122,9 +133,29 @@ export function useTTS(options: UseTTSOptions = {}) {
   );
 
   const playAudio = useCallback(
-    async (text: string, voiceId?: string) => {
+    async (text: string, voiceId?: string, options?: PlayAudioOptions) => {
+      const waitUntilEnd = options?.waitUntilEnd === true;
       const generation = ++playGenerationRef.current;
       const isStale = () => generation !== playGenerationRef.current;
+
+      const waitForPlaybackEnd = (audio: HTMLAudioElement) =>
+        new Promise<void>((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            audio.removeEventListener("ended", finish);
+            audio.removeEventListener("error", finish);
+            if (waitUntilEndResolveRef.current === finish) {
+              waitUntilEndResolveRef.current = null;
+            }
+            resolve();
+          };
+          waitUntilEndResolveRef.current = finish;
+          audio.addEventListener("ended", finish);
+          audio.addEventListener("error", finish);
+          if (isStale() || audio.ended) finish();
+        });
 
       try {
         detachActiveAudio();
@@ -165,20 +196,21 @@ export function useTTS(options: UseTTSOptions = {}) {
             setIsGenerating,
           });
 
-          const playNow = async () => {
+          const playNow = async (): Promise<boolean> => {
             if (isStale()) {
               audio.pause();
               audio.currentTime = 0;
-              return;
+              return false;
             }
             try {
               await audio.play();
+              return !isStale();
             } catch (playErr: unknown) {
-              if (isStale()) return;
+              if (isStale()) return false;
               const err = playErr as { name?: string };
               setIsGenerating(false);
               setIsPlaying(false);
-              if (err.name === "AbortError") return;
+              if (err.name === "AbortError") return false;
               if (err.name === "NotAllowedError") {
                 onError?.(new Error("Audio blocked — tap anywhere first, then try again."));
                 toast.error("Audio blocked by browser. Tap the page and try again.");
@@ -187,12 +219,14 @@ export function useTTS(options: UseTTSOptions = {}) {
                 onError?.(new Error("Failed to play audio"));
                 toast.error("Failed to play audio. Please try again.");
               }
+              return false;
             }
           };
 
+          let started = false;
           if (audio.readyState >= 2) {
-            await playNow();
-          } else {
+            started = await playNow();
+          } else if (!waitUntilEnd) {
             const playWhenReady = () => {
               void playNow();
             };
@@ -202,6 +236,39 @@ export function useTTS(options: UseTTSOptions = {}) {
             setTimeout(() => {
               if (audio.readyState >= 2) void playNow();
             }, 100);
+          } else {
+            started = await new Promise<boolean>((resolve) => {
+              let settled = false;
+              const tryPlay = async () => {
+                if (settled) return;
+                settled = true;
+                const ok = await playNow();
+                resolve(ok);
+              };
+              audio.addEventListener("canplay", () => void tryPlay(), { once: true });
+              audio.addEventListener("canplaythrough", () => void tryPlay(), { once: true });
+              audio.addEventListener("loadeddata", () => void tryPlay(), { once: true });
+              audio.addEventListener(
+                "error",
+                () => {
+                  if (settled) return;
+                  settled = true;
+                  resolve(false);
+                },
+                { once: true },
+              );
+              setTimeout(() => {
+                if (audio.readyState >= 2) void tryPlay();
+              }, 100);
+              if (isStale()) {
+                settled = true;
+                resolve(false);
+              }
+            });
+          }
+
+          if (waitUntilEnd && started && !isStale()) {
+            await waitForPlaybackEnd(audio);
           }
           return;
         }
@@ -254,7 +321,28 @@ export function useTTS(options: UseTTSOptions = {}) {
           audioRef.current = null;
           return;
         }
-        await audio.play();
+        try {
+          await audio.play();
+        } catch (playErr: unknown) {
+          if (isStale()) return;
+          setIsGenerating(false);
+          setIsPlaying(false);
+          const err = playErr as { name?: string };
+          if (err.name === "AbortError") return;
+          if (err.name === "NotAllowedError") {
+            onError?.(new Error("Audio blocked — tap anywhere first, then try again."));
+            toast.error("Audio blocked by browser. Tap the page and try again.");
+          } else {
+            console.error("Error playing audio:", playErr);
+            onError?.(new Error("Failed to play audio"));
+            toast.error("Failed to play audio. Please try again.");
+          }
+          return;
+        }
+
+        if (waitUntilEnd && !isStale()) {
+          await waitForPlaybackEnd(audio);
+        }
       } catch (error: unknown) {
         if (isStale()) return;
         setIsGenerating(false);

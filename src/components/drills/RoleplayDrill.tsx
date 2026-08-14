@@ -290,6 +290,11 @@ export default function RoleplayDrill({
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** Invalidates in-flight AI playback / leftover onended + advance timers. */
+  const aiPlayGenerationRef = useRef(0);
+  const aiAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Stops the student listen button (TTSButton) from outside. */
+  const studentTTSStopRef = useRef<(() => void) | null>(null);
 
   const clearAnalysisOverlayTimer = () => {
     if (analysisOverlayTimerRef.current) {
@@ -310,14 +315,6 @@ export default function RoleplayDrill({
     revokeRecordingPreview();
   };
 
-  useEffect(() => {
-    discardPendingRecording();
-    overlayGenRef.current += 1;
-    clearAnalysisOverlayTimer();
-    setAnalysisOverlay(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
-  }, [currentSceneIndex, currentTurnIndex]);
-
   // TTS for AI characters (fallback if no pre-generated audio)
   const {
     playAudio: playTTSAudio,
@@ -328,16 +325,36 @@ export default function RoleplayDrill({
     autoPlay: false,
   });
 
-  // Cut any leftover TTS / streamed clip from another screen when this drill loads.
-  useEffect(() => {
-    stopTTSAudio();
+  const clearAiAdvanceTimer = useCallback(() => {
+    if (aiAdvanceTimerRef.current) {
+      clearTimeout(aiAdvanceTimerRef.current);
+      aiAdvanceTimerRef.current = null;
+    }
+  }, []);
+
+  const stopAllRoleplaySpeech = useCallback(() => {
+    aiPlayGenerationRef.current += 1;
+    clearAiAdvanceTimer();
     if (preGenAudioRef.current) {
       preGenAudioRef.current.pause();
       preGenAudioRef.current.currentTime = 0;
+      preGenAudioRef.current.onended = null;
+      preGenAudioRef.current.onerror = null;
       preGenAudioRef.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: silence stale audio
-  }, []);
+    stopTTSAudio();
+    studentTTSStopRef.current?.();
+    setIsPlayingAI(false);
+  }, [clearAiAdvanceTimer, stopTTSAudio]);
+
+  useEffect(() => {
+    discardPendingRecording();
+    overlayGenRef.current += 1;
+    clearAnalysisOverlayTimer();
+    setAnalysisOverlay(null);
+    stopAllRoleplaySpeech();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
+  }, [currentSceneIndex, currentTurnIndex]);
 
   // Drill data — memoize so scene-advance effects do not re-fire every render in legacy single-scene path
   const scenes = useMemo(
@@ -819,9 +836,9 @@ export default function RoleplayDrill({
   // Stop prestart intro voice the moment the session begins — runs once on that transition.
   useEffect(() => {
     if (!sessionStarted) return;
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drillIdStr) clearPrestartTtsDebounce(drillIdStr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stopTTSAudio is stable; only needs sessionStarted + drillIdStr
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only needs sessionStarted + drillIdStr
   }, [sessionStarted, drillIdStr]);
 
   // Auto-read intro + roles when the learner lands on the pre-start screen (browser may block until a tap).
@@ -869,6 +886,18 @@ export default function RoleplayDrill({
     setCurrentTurnIndex(prev => prev + 1);
   }, []);
 
+  const scheduleAdvanceAfterBeat = useCallback(
+    (generation: number) => {
+      clearAiAdvanceTimer();
+      aiAdvanceTimerRef.current = setTimeout(() => {
+        aiAdvanceTimerRef.current = null;
+        if (generation !== aiPlayGenerationRef.current) return;
+        moveToNextTurn();
+      }, 300);
+    },
+    [clearAiAdvanceTimer, moveToNextTurn],
+  );
+
   // Play AI turn - only called once per turn
   const playAITurn = useCallback(async (turn: DialogueTurn, turnIndex: number) => {
     const turnKey = makeTurnKey(currentSceneIndex, turnIndex);
@@ -876,7 +905,10 @@ export default function RoleplayDrill({
       return; // Already played, skip
     }
     playedAITurnsRef.current.add(turnKey);
+    const generation = ++aiPlayGenerationRef.current;
     setIsPlayingAI(true);
+
+    const stillCurrent = () => generation === aiPlayGenerationRef.current;
 
     // Silence any pre-start intro TTS still playing via useTTS before scene audio.
     stopTTSAudio();
@@ -891,12 +923,17 @@ export default function RoleplayDrill({
     };
     setCompletedMessages(prev => [...prev, aiMessage]);
 
-    // Play audio
     const audioUrl = turn.audioUrl;
     const voiceId = resolveTurnVoiceId(turn.speaker);
 
+    const playLiveTtsThenAdvance = async () => {
+      if (!stillCurrent()) return;
+      await playTTSAudio(turn.text, voiceId, { waitUntilEnd: true });
+      if (!stillCurrent()) return;
+      scheduleAdvanceAfterBeat(generation);
+    };
+
     if (audioUrl) {
-      // Play from pre-generated URL
       if (preGenAudioRef.current) {
         preGenAudioRef.current.pause();
       }
@@ -904,45 +941,41 @@ export default function RoleplayDrill({
       const audio = new Audio(audioUrl);
       preGenAudioRef.current = audio;
 
-      audio.onended = () => {
-        setTimeout(moveToNextTurn, 300);
-      };
-      audio.onerror = async () => {
+      let fallbackStarted = false;
+      const fallbackToTts = () => {
+        if (!stillCurrent() || fallbackStarted) return;
+        fallbackStarted = true;
         console.warn("Pre-generated audio failed, falling back to TTS");
-        try {
-          await playTTSAudio(turn.text, voiceId);
-          setTimeout(moveToNextTurn, 500);
-        } catch {
-          moveToNextTurn();
-        }
+        void playLiveTtsThenAdvance();
+      };
+
+      audio.onended = () => {
+        if (!stillCurrent()) return;
+        scheduleAdvanceAfterBeat(generation);
+      };
+      audio.onerror = () => {
+        fallbackToTts();
       };
 
       try {
         await audio.play();
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+      } catch (err: unknown) {
+        const name = err && typeof err === "object" && "name" in err ? String(err.name) : "";
+        if (name !== "AbortError") {
           console.error("Error playing pre-generated audio:", err);
         }
-        try {
-          await playTTSAudio(turn.text, voiceId);
-          setTimeout(moveToNextTurn, 500);
-        } catch {
-          moveToNextTurn();
-        }
+        fallbackToTts();
       }
     } else {
-      // Use TTS generation
       try {
-        await playTTSAudio(turn.text, voiceId);
-        // After TTS finishes, move to next turn
-        setTimeout(moveToNextTurn, 500);
+        await playLiveTtsThenAdvance();
       } catch (error) {
         console.error("TTS failed:", error);
         toast.error("Failed to play AI audio");
-        moveToNextTurn();
+        if (stillCurrent()) moveToNextTurn();
       }
     }
-  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio, resolveTurnVoiceId]);
+  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio, resolveTurnVoiceId, scheduleAdvanceAfterBeat]);
 
   // Auto-play AI turns - only after session start and if not already played
   useEffect(() => {
@@ -987,13 +1020,13 @@ export default function RoleplayDrill({
     if (d.length === 0) return;
     if (currentTurnIndex < d.length) return;
     if (currentSceneIndex < scenes.length - 1) {
-      stopTTSAudio();
+      stopAllRoleplaySpeech();
       setSceneBreak({
         completedSceneIndex: currentSceneIndex,
         nextSceneIndex: currentSceneIndex + 1,
       });
     }
-  }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview, sceneBreak, stopTTSAudio]);
+  }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview, sceneBreak, stopAllRoleplaySpeech]);
 
   useEffect(() => {
     if (!sceneBreak || !weeklyChallengeMeta) return;
@@ -1069,7 +1102,7 @@ export default function RoleplayDrill({
   const startRecording = async () => {
     if (!isStudentTurn) return;
 
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1343,12 +1376,8 @@ export default function RoleplayDrill({
     overlayGenRef.current += 1;
     setSessionStartTime(Date.now());
     setIsPlayingAI(false);
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
-    if (preGenAudioRef.current) {
-      preGenAudioRef.current.pause();
-      preGenAudioRef.current = null;
-    }
     setSessionStarted(false);
     setHasRestoredProgress(false);
     void clearCheckpoint();
@@ -1391,7 +1420,7 @@ export default function RoleplayDrill({
     // Clear session analytics for fresh round
     setSessionAnalytics([]);
 
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
     setSessionStarted(false);
     setHasRestoredProgress(false);
@@ -1511,11 +1540,7 @@ export default function RoleplayDrill({
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
-      if (preGenAudioRef.current) {
-        preGenAudioRef.current.pause();
-        preGenAudioRef.current = null;
-      }
-      stopTTSAudio();
+      stopAllRoleplaySpeech();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only cleanup; all captured refs are stable
   }, []);
@@ -1888,6 +1913,8 @@ export default function RoleplayDrill({
                       text={currentTurn.text}
                       size="sm"
                       audioUrl={currentTurn.audioUrl}
+                      voiceId={resolveTurnVoiceId(currentTurn.speaker)}
+                      stopRef={studentTTSStopRef}
                     />
                   </div>
                 </div>
@@ -2091,7 +2118,7 @@ export default function RoleplayDrill({
           <div className="pointer-events-auto w-full max-w-md">
             <button
               type="button"
-              onClick={() => { stopTTSAudio(); setSessionStarted(true); }}
+              onClick={() => { stopAllRoleplaySpeech(); setSessionStarted(true); }}
               className="w-full rounded-full bg-[#388E3C] px-8 py-4 text-center text-base font-bold text-white shadow-md transition-colors hover:bg-[#2f7a33] active:scale-[0.99]"
             >
               Let&apos;s Get Started
