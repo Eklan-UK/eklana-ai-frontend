@@ -145,7 +145,7 @@ describe('notifyLearnerOfAssignment', () => {
     );
 
     assert.equal(result.status, 'sent');
-    const expectedLabel = 'Vocabulary/Phrase · Mission 1 · Follow-up with Patients';
+    const expectedLabel = 'Vocabulary/Key Phrase · Mission 1 · Follow-up with Patients';
 
     const emailArgs = sendEmail.mock.calls[0]?.arguments[0] as {
       drillTitle: string;
@@ -154,7 +154,7 @@ describe('notifyLearnerOfAssignment', () => {
       topicLabel?: string;
     };
     assert.equal(emailArgs.drillTitle, expectedLabel);
-    assert.equal(emailArgs.drillType, 'Vocabulary/Phrase');
+    assert.equal(emailArgs.drillType, 'Vocabulary/Key Phrase');
     assert.equal(emailArgs.missionLabel, 'Mission 1');
     assert.equal(emailArgs.topicLabel, 'Follow-up with Patients');
 
@@ -190,7 +190,7 @@ describe('notifyLearnerOfAssignment', () => {
       }
     );
 
-    const expectedLabel = 'Pronunciation · Mission 2 · Giving an Handover';
+    const expectedLabel = 'Pronunciation · Mission 2 · Giving a Handover';
     const emailArgs = sendEmail.mock.calls[0]?.arguments[0] as {
       drillTitle: string;
     };

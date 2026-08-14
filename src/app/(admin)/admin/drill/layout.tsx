@@ -17,7 +17,7 @@ export default function DrillBuilderLayout({
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground">Drill Builder</h1>
         <p className="text-sm text-gray-500 dark:text-muted-foreground">
-          Manage drills, assignments, and free talk scenarios
+          Manage drills, assignments, and Simulation Room scenarios
         </p>
       </div>
 
@@ -50,7 +50,7 @@ export default function DrillBuilderLayout({
           }`}
         >
           <MessageSquare className="h-4 w-4 shrink-0" />
-          Free Talk Scenarios
+          Simulation Room Scenarios
         </Link>
       </nav>
 

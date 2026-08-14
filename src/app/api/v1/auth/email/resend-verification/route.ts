@@ -6,6 +6,7 @@ import { getAuth } from '@/lib/api/better-auth';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
+import Verification from '@/models/verification';
 import { Types } from 'mongoose';
 import {
 	getPublicBaseUrlFallback,
@@ -63,29 +64,7 @@ async function handler(
 			// Generate a verification token (Better Auth format)
 			const crypto = await import('crypto');
 			const token = crypto.randomBytes(32).toString('hex');
-			
-			// Store the token in Better Auth's verification collection
-			// Better Auth uses 'verifications' collection with specific schema
-			const mongoose = await import('mongoose');
-			
-			// Check if model exists, otherwise create it
-			let Verification;
-			if (mongoose.models.Verification) {
-				Verification = mongoose.models.Verification;
-			} else {
-				const verificationSchema = new mongoose.Schema({
-					userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-					token: { type: String, required: false, sparse: true },
-					expiresAt: { type: Date, required: true },
-					createdAt: { type: Date, default: Date.now },
-				}, { collection: 'verifications', timestamps: true });
-				
-				// Create sparse unique index on token (allows multiple nulls)
-				verificationSchema.index({ token: 1 }, { unique: true, sparse: true });
-				
-				Verification = mongoose.model('Verification', verificationSchema);
-			}
-			
+
 			// Delete old verification tokens for this user
 			await Verification.deleteMany({ userId: context.userId });
 			

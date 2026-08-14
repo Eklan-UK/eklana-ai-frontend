@@ -44,7 +44,7 @@ export function LearnerProfileAnalytics({
       {/* Eklan Free Talk */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" /> Eklan Free Talk
+          <MessageSquare className="w-5 h-5" /> Eklan Simulation Room
         </h2>
         <LearnerFreeTalkAttemptsSection learnerId={learnerId} learnerName={learnerName} />
       </div>

@@ -650,7 +650,7 @@ function FreeTalkSessionInner() {
                   ? scenarioTypeLabel(scenario.scenarioType)
                   : scenarioSummaries?.[scenarioIndex]
                     ? scenarioTypeLabel(scenarioSummaries[scenarioIndex].scenarioType)
-                    : "Eklan Free Talk"}
+                    : "Eklan Simulation Room"}
               </p>
               {headerRightLabel ? (
                 <p className="shrink-0 max-w-[55%] truncate text-right font-sans text-[12px] text-[#6a7282] dark:text-[#9aa39e] sm:text-[13px]">
@@ -1021,7 +1021,7 @@ function FreeTalkSessionInner() {
               Leave this session?
             </h2>
             <p className="text-sm text-gray-600 dark:text-[#9aa39e] mb-6">
-              In-progress work isn&apos;t saved. Completed attempts are kept in History on the Free Talk
+              In-progress work isn&apos;t saved. Completed attempts are kept in History on the Simulation Room
               home screen.
             </p>
             <div className="flex flex-col gap-2">
@@ -1053,7 +1053,7 @@ export default function FreeTalkSessionPage() {
       fallback={
         <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-white dark:bg-[#0c0e0d]">
           <Loader2 className="h-8 w-8 animate-spin text-[#3b883e]" />
-          <p className="mt-4 text-sm text-[#9aa39e]">Loading Free Talk…</p>
+          <p className="mt-4 text-sm text-[#9aa39e]">Loading Simulation Room…</p>
         </div>
       }
     >

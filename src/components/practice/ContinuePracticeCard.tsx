@@ -7,13 +7,13 @@ import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const DRILL_TYPE_LABELS: Record<string, string> = {
   roleplay: "Roleplay",
-  vocabulary: "Vocabulary/Phrase",
+  vocabulary: "Vocabulary/Key Phrase",
   grammar: "Grammar",
   matching: "Matching",
   definition: "Definition",
   sentence_writing: "Sentence Building",
   fill_blank: "Fill-in-the-Blank",
-  key_phrases: "Key Phrases",
+  key_phrases: "Pressure Test",
   summary: "Reading",
   listening: "Listening",
   sentence: "Sentence",

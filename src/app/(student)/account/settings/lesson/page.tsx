@@ -15,7 +15,7 @@ import {
 
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
-/** Same country male/female accents as onboarding (no named characters). */
+/** Same country accents as onboarding (no male/female split or named characters). */
 const ACCENT_OPTIONS = ONBOARDING_ACCENT_OPTIONS.map((opt) => ({
   id: opt.key,
   label: opt.label,

@@ -467,7 +467,7 @@ export default function FillBlankDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Vocabulary/Phrase" : "fill_blank"}
+        drillType={weeklyChallengeMeta ? "Vocabulary/Key Phrase" : "fill_blank"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -591,13 +591,10 @@ export default function FillBlankDrill({
                   <h2 className="text-xl font-bold">
                     Sentence {currentIndex + 1} of {items.length}
                   </h2>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <TTSButton
-                      text={currentItem.sentence}
-                      audioUrl={currentItem.audioUrl}
-                    />
-                    <DrillBookmarkToggle drillId={String(drill._id)} />
-                  </div>
+                  <TTSButton
+                    text={currentItem.sentence}
+                    audioUrl={currentItem.audioUrl}
+                  />
                 </div>
 
                 {currentItem.context?.trim() && (

@@ -1009,12 +1009,9 @@ export default function PronunciationDrill({
                 Sound focus: <span className="font-medium text-foreground">{currentItem.sound}</span>
               </p>
             )}
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground">
-                {currentText}
-              </h1>
-              <DrillBookmarkToggle drillId={String(drill._id)} />
-            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+              {currentText}
+            </h1>
             </div>
 
           {/* Lock message for sentence screen */}
