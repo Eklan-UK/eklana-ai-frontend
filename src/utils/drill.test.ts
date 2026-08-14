@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { normalizeFillBlankItems } from "./drill";
 
 describe("normalizeFillBlankItems", () => {
@@ -16,9 +17,9 @@ describe("normalizeFillBlankItems", () => {
         ],
       },
     ]);
-    expect(result).toHaveLength(1);
-    expect(result[0].context).toBe("You are handing over, so you say:");
-    expect(result[0].sentence).toBe("The patient ___ stable.");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].context, "You are handing over, so you say:");
+    assert.equal(result[0].sentence, "The patient ___ stable.");
   });
 
   it("omits context when empty or whitespace only", () => {
@@ -35,7 +36,7 @@ describe("normalizeFillBlankItems", () => {
         ],
       },
     ]);
-    expect(result).toHaveLength(1);
-    expect(result[0]).not.toHaveProperty("context");
+    assert.equal(result.length, 1);
+    assert.equal("context" in result[0], false);
   });
 });

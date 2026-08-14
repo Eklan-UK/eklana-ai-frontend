@@ -18,7 +18,6 @@ import {
   VolumeX,
   RotateCcw,
   ChevronRight,
-  AlertCircle,
   PartyPopper,
   ArrowLeftRight,
   Clock,
@@ -40,7 +39,9 @@ import {
   DrillLayout,
   DrillProgress,
   RecordingPreviewBar,
+  RoleplayAnalysisOverlay,
   RoleplayPerformanceReview,
+  type RoleplayAnalysisOverlayState,
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
@@ -178,6 +179,8 @@ interface CompletedMessage {
 }
 
 const PASS_THRESHOLD = 65;
+const PASS_OVERLAY_MS = 1400;
+const FAIL_OVERLAY_MS = 1600;
 
 const PRESTART_INTRO_PLACEHOLDER =
   "When you're ready, tap Let's Get Started.";
@@ -262,6 +265,7 @@ export default function RoleplayDrill({
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisOverlay, setAnalysisOverlay] = useState<RoleplayAnalysisOverlayState | null>(null);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [pendingSubmitBlob, setPendingSubmitBlob] = useState<Blob | null>(null);
@@ -269,6 +273,8 @@ export default function RoleplayDrill({
   const MAX_RECORDING_SECONDS = 120;
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const analysisOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlayGenRef = useRef(0);
 
   // AI turn state - use ref for synchronous tracking to prevent double-play
   const playedAITurnsRef = useRef<Set<string>>(new Set());
@@ -285,6 +291,13 @@ export default function RoleplayDrill({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  const clearAnalysisOverlayTimer = () => {
+    if (analysisOverlayTimerRef.current) {
+      clearTimeout(analysisOverlayTimerRef.current);
+      analysisOverlayTimerRef.current = null;
+    }
+  };
+
   const revokeRecordingPreview = () => {
     setRecordingPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -299,6 +312,9 @@ export default function RoleplayDrill({
 
   useEffect(() => {
     discardPendingRecording();
+    overlayGenRef.current += 1;
+    clearAnalysisOverlayTimer();
+    setAnalysisOverlay(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
   }, [currentSceneIndex, currentTurnIndex]);
 
@@ -1147,15 +1163,72 @@ export default function RoleplayDrill({
     });
   };
 
+  const handleContinue = (opts?: {
+    score: number;
+    textScore: TextScore | null;
+    turn?: DialogueTurn;
+  }) => {
+    const turn = opts?.turn ?? currentTurn;
+    if (!turn) return;
+    const score = opts?.score ?? currentProgress.score;
+    const textScore = opts?.textScore !== undefined ? opts.textScore : pronunciationScore;
+    if (score == null || score < PASS_THRESHOLD) return;
+
+    const studentMessage: CompletedMessage = {
+      id: `msg-${Date.now()}`,
+      speaker: "student",
+      text: turn.text,
+      translation: turn.translation,
+      score,
+      timestamp: new Date(),
+      transcript: textScore
+        ? transcriptFromTextScore(textScore)
+        : undefined,
+    };
+    setCompletedMessages(prev => [...prev, studentMessage]);
+    setCurrentTurnIndex(prev => prev + 1);
+    setPronunciationScore(null);
+    setAnalysisOverlay(null);
+  };
+
+  /** Clears scoring UI and restores the mic so the student can redo the line. */
+  const handleRetrySpeaking = () => {
+    discardPendingRecording();
+    setPronunciationScore(null);
+    setAnalysisOverlay(null);
+    setTurnProgress((prev) => ({
+      ...prev,
+      [currentTurnKey]: {
+        passed: false,
+        score: null,
+        attempts: prev[currentTurnKey]?.attempts ?? 0,
+      },
+    }));
+    setSessionAnalytics((prev) =>
+      prev.filter(
+        (a) =>
+          !(a.sceneIndex === currentSceneIndex && a.turnIndex === currentTurnIndex),
+      ),
+    );
+  };
+
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentTurn) return;
 
+    const gen = overlayGenRef.current;
+    const analyzedTurn = currentTurn;
+    const analyzedKey = currentTurnKey;
+    const analyzedSceneIndex = currentSceneIndex;
+    const analyzedTurnIndex = currentTurnIndex;
+
+    clearAnalysisOverlayTimer();
     setIsAnalyzing(true);
     setPronunciationScore(null);
+    setAnalysisOverlay("processing");
 
     try {
       const speechAceResponse = await speechaceService.scorePronunciation(
-        currentTurn.text,
+        analyzedTurn.text,
         audioBlob
       );
 
@@ -1171,28 +1244,30 @@ export default function RoleplayDrill({
       }
 
       if (textScore) {
-        setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
         const passed = score >= PASS_THRESHOLD;
-        const newAttempts = (turnProgress[currentTurnKey]?.attempts || 0) + 1;
+        const newAttempts = (turnProgress[analyzedKey]?.attempts || 0) + 1;
+        const overlayStillCurrent = gen === overlayGenRef.current;
 
-        // Update turn progress
+        if (overlayStillCurrent) {
+          setPronunciationScore(textScore);
+        }
+
         setTurnProgress((prev) => ({
           ...prev,
-          [currentTurnKey]: {
+          [analyzedKey]: {
             passed,
             score,
             attempts: newAttempts,
           },
         }));
 
-        // Silently collect analytics for review screen
         setSessionAnalytics((prev) => [
           ...prev,
           {
-            sceneIndex: currentSceneIndex,
-            turnIndex: currentTurnIndex,
-            text: currentTurn.text,
+            sceneIndex: analyzedSceneIndex,
+            turnIndex: analyzedTurnIndex,
+            text: analyzedTurn.text,
             score,
             textScore,
             attempts: newAttempts,
@@ -1200,87 +1275,51 @@ export default function RoleplayDrill({
           },
         ]);
 
-        if (passed) {
-          if (Math.round(score) >= 100) {
-            playPerfectItemCelebration();
+        if (overlayStillCurrent) {
+          if (passed) {
+            if (Math.round(score) >= 100) {
+              playPerfectItemCelebration();
+            } else {
+              playPracticeFeedback("success");
+            }
+            setAnalysisOverlay("pass");
+            analysisOverlayTimerRef.current = setTimeout(() => {
+              if (gen !== overlayGenRef.current) return;
+              handleContinue({ score, textScore, turn: analyzedTurn });
+            }, PASS_OVERLAY_MS);
           } else {
-            playPracticeFeedback("success");
+            playPracticeFeedback("failure");
+            setAnalysisOverlay("fail");
+            analysisOverlayTimerRef.current = setTimeout(() => {
+              if (gen !== overlayGenRef.current) return;
+              handleRetrySpeaking();
+            }, FAIL_OVERLAY_MS);
           }
-          toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
-        } else {
-          playPracticeFeedback("failure");
-          toast.warning(
-            `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to continue. Try again!`
-          );
         }
 
-        // Record pronunciation attempt
         try {
           const audioBase64 = await blobToBase64(audioBlob);
           await pronunciationAPI.createDrillAttempt({
-            text: currentTurn.text,
+            text: analyzedTurn.text,
             audioBase64,
             drillId: drill._id,
             drillType: 'roleplay',
             passingThreshold: PASS_THRESHOLD,
           });
         } catch (error) {
-          // Log but don't fail the drill if pronunciation recording fails
           console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce");
       }
     } catch (error: any) {
+      if (gen === overlayGenRef.current) {
+        setAnalysisOverlay(null);
+      }
       toast.error(error.message || "Failed to analyze pronunciation");
     } finally {
       setIsAnalyzing(false);
     }
-  };
-
-  const handleContinue = () => {
-    if (!currentProgress.passed) {
-      toast.error(`You need at least ${PASS_THRESHOLD}% to continue`);
-      return;
-    }
-
-    // Add student message to completed messages
-    const studentMessage: CompletedMessage = {
-      id: `msg-${Date.now()}`,
-      speaker: "student",
-      text: currentTurn.text,
-      translation: currentTurn.translation,
-      score: currentProgress.score || 0,
-      timestamp: new Date(),
-      transcript: pronunciationScore
-        ? transcriptFromTextScore(pronunciationScore)
-        : undefined,
-    };
-    setCompletedMessages(prev => [...prev, studentMessage]);
-
-    // Move to next turn
-    setCurrentTurnIndex(prev => prev + 1);
-    setPronunciationScore(null);
-  };
-
-  /** Clears scoring UI and unlocks mic so the student can redo the line (before or after passing). */
-  const handleRetrySpeaking = () => {
-    discardPendingRecording();
-    setPronunciationScore(null);
-    setTurnProgress((prev) => ({
-      ...prev,
-      [currentTurnKey]: {
-        passed: false,
-        score: null,
-        attempts: prev[currentTurnKey]?.attempts ?? 0,
-      },
-    }));
-    setSessionAnalytics((prev) =>
-      prev.filter(
-        (a) =>
-          !(a.sceneIndex === currentSceneIndex && a.turnIndex === currentTurnIndex),
-      ),
-    );
   };
 
   /** Same role: restart entire roleplay from scene 1 / first line (after completion screen). */
@@ -1299,6 +1338,9 @@ export default function RoleplayDrill({
     setHasCompletedRound(false);
     setShowReview(false);
     setSceneBreak(null);
+    setAnalysisOverlay(null);
+    clearAnalysisOverlayTimer();
+    overlayGenRef.current += 1;
     setSessionStartTime(Date.now());
     setIsPlayingAI(false);
     stopTTSAudio();
@@ -1338,6 +1380,9 @@ export default function RoleplayDrill({
     playedAITurnsRef.current = new Set();
     setPronunciationScore(null);
     setShowRoleSwitchOption(false);
+    setAnalysisOverlay(null);
+    clearAnalysisOverlayTimer();
+    overlayGenRef.current += 1;
 
     // Load progress for the new role (if any previous progress exists)
     const savedProgress = newMode === "original" ? originalRoleProgress : swappedRoleProgress;
@@ -1460,6 +1505,8 @@ export default function RoleplayDrill({
   useEffect(() => {
     return () => {
       clearRecordingTimers();
+      clearAnalysisOverlayTimer();
+      overlayGenRef.current += 1;
       setRecordingPreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
@@ -1477,10 +1524,12 @@ export default function RoleplayDrill({
     !!pendingSubmitBlob &&
     !isAnalyzing &&
     !pronunciationScore &&
-    !currentProgress.passed;
+    !currentProgress.passed &&
+    analysisOverlay == null;
 
   const readyToSubmitPreview = awaitingSubmit && Boolean(recordingPreviewUrl);
   const dockMainDisabled =
+    analysisOverlay != null ||
     isAnalyzing ||
     currentProgress.passed ||
     (awaitingSubmit && !recordingPreviewUrl);
@@ -1544,7 +1593,7 @@ export default function RoleplayDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Role-play" : "roleplay"}
+        drillType={weeklyChallengeMeta ? "Roleplay" : "roleplay"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -1731,11 +1780,6 @@ export default function RoleplayDrill({
                       <span className="text-xs font-semibold opacity-90">
                         {displayName}
                       </span>
-                      {isUserMessage && message.score !== undefined && (
-                        <span className="text-xs bg-background/20 px-2 py-0.5 rounded-full">
-                          {message.score}%
-                        </span>
-                      )}
                     </div>
                     <p className="text-sm">{message.text}</p>
                     {message.translation && (
@@ -1845,7 +1889,6 @@ export default function RoleplayDrill({
                       size="sm"
                       audioUrl={currentTurn.audioUrl}
                     />
-                    <DrillBookmarkToggle drillId={String(drill._id)} />
                   </div>
                 </div>
                 <p className="text-xl font-semibold text-foreground text-center">
@@ -1865,15 +1908,9 @@ export default function RoleplayDrill({
                   </div>
                 )}
 
-                {!isRecording && (
+                {!isRecording && analysisOverlay == null && (
                   <p className="text-sm text-muted-foreground text-center px-2">
-                    {currentProgress.passed ? (
-                      <span className="text-green-600 font-medium">Line passed! ✓</span>
-                    ) : isAnalyzing ? (
-                      <span className="text-blue-600">
-                        Analyzing your pronunciation — longer recordings may take a moment...
-                      </span>
-                    ) : awaitingSubmit ? (
+                    {awaitingSubmit ? (
                       <span className="text-foreground">
                         Listen in the player, then tap the green send button to submit, or trash to
                         re-record.
@@ -1883,65 +1920,7 @@ export default function RoleplayDrill({
                     )}
                   </p>
                 )}
-
-                {currentProgress.attempts > 0 && !currentProgress.passed && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Attempt {currentProgress.attempts} • Need {PASS_THRESHOLD}%+ to pass
-                  </p>
-                )}
               </div>
-
-              {/* Simple Score Display - Analytics shown on review screen */}
-              {pronunciationScore && !currentProgress.passed && (
-                <div className={`rounded-xl p-4 mb-4 ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                    ? "bg-emerald-500/15"
-                    : "bg-amber-50/90"
-                  }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-foreground">Your Score</span>
-                    <span className={`text-2xl font-bold ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                        ? "text-green-600"
-                        : "text-amber-600"
-                      }`}>
-                      {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                          ? "bg-green-500"
-                          : "bg-amber-500"
-                        }`}
-                      style={{ width: `${pronunciationScore.speechace_score.pronunciation}%` }}
-                    />
-                  </div>
-                  {(pronunciationScore.speechace_score.pronunciation || 0) < PASS_THRESHOLD && (
-                    <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      You need {PASS_THRESHOLD}% or higher to continue
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-3">
-                    <span className="font-medium text-foreground">Transcript: </span>
-                    {transcriptFromTextScore(pronunciationScore) || "—"}
-                  </p>
-                </div>
-              )}
-
-              {/* Confetti celebration shown when passed - no analytics here */}
-              {currentProgress.passed && pronunciationScore && (
-                <div className="rounded-xl p-4 mb-4 bg-emerald-500/15 border border-emerald-500/25 text-center">
-                  <PartyPopper className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-lg font-bold text-green-700">
-                    {pronunciationScore.speechace_score.pronunciation.toFixed(0)}% - Passed!
-                  </p>
-                  <p className="text-sm text-green-600">Click Continue to proceed</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    <span className="font-medium text-foreground">Transcript: </span>
-                    {transcriptFromTextScore(pronunciationScore) || "—"}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1992,47 +1971,6 @@ export default function RoleplayDrill({
               )}
             </div>
           </div>
-        )}
-
-        {/* Student turn actions */}
-        {isStudentTurn && !isEntireDrillComplete && !sceneBreak && (
-          <>
-            {currentProgress.passed ? (
-              <div className="space-y-3">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={handleContinue}
-                >
-                  <ChevronRight className="w-5 h-5 mr-2" />
-                  Continue
-                </Button>
-                <button
-                  type="button"
-                  className={retrySpeakingButtonClass}
-                  onClick={handleRetrySpeaking}
-                  disabled={isRecording || isAnalyzing || awaitingSubmit}
-                >
-                  <RotateCcw className="w-5 h-5 shrink-0" />
-                  Retry speaking
-                </button>
-                <p className="text-xs text-center text-muted-foreground px-2">
-                  Redo this line if you want a higher score before moving on.
-                </p>
-              </div>
-            ) : pronunciationScore ? (
-              <button
-                type="button"
-                className={retrySpeakingButtonClass}
-                onClick={handleRetrySpeaking}
-                disabled={isRecording || isAnalyzing || awaitingSubmit}
-              >
-                <RotateCcw className="w-5 h-5 shrink-0" />
-                Retry speaking
-              </button>
-            ) : null}
-          </>
         )}
 
         {/* Conversation complete - Show Review and Role Switch options */}
@@ -2160,7 +2098,7 @@ export default function RoleplayDrill({
             </button>
           </div>
         </div>
-      ) : sessionStarted && isStudentTurn && !isEntireDrillComplete && !sceneBreak && currentTurn ? (
+      ) : sessionStarted && isStudentTurn && !isEntireDrillComplete && !sceneBreak && currentTurn && analysisOverlay == null ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-3">
             {awaitingSubmit && recordingPreviewUrl ? (
@@ -2200,13 +2138,9 @@ export default function RoleplayDrill({
                 onClick={handleDockMainClick}
                 disabled={dockMainDisabled}
                 className={`absolute inset-0 flex items-center justify-center rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  currentProgress.passed
-                    ? "bg-emerald-600 cursor-default"
-                    : isRecording
-                      ? "bg-red-500 hover:bg-red-600"
-                      : isAnalyzing
-                        ? "bg-muted cursor-not-allowed"
-                        : "bg-emerald-600 hover:bg-emerald-700"
+                  isRecording
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
                 aria-label={
                   isRecording
@@ -2216,12 +2150,8 @@ export default function RoleplayDrill({
                       : "Start recording"
                 }
               >
-                {currentProgress.passed ? (
-                  <CheckCircle className="h-8 w-8 text-white" />
-                ) : isRecording ? (
+                {isRecording ? (
                   <Square className="h-7 w-7 text-white" />
-                ) : isAnalyzing ? (
-                  <Loader2 className="h-7 w-7 animate-spin text-white" />
                 ) : readyToSubmitPreview ? (
                   <Send className="h-8 w-8 text-white" strokeWidth={2} />
                 ) : (
@@ -2232,6 +2162,7 @@ export default function RoleplayDrill({
           </div>
         </div>
       ) : null}
+      {analysisOverlay ? <RoleplayAnalysisOverlay state={analysisOverlay} /> : null}
     </DrillLayout>
   );
 }

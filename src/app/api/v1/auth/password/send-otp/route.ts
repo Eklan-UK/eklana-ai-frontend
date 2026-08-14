@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import mongoose from 'mongoose';
+import PasswordOTP from '@/models/password-otp';
 import crypto from 'crypto';
 import { sendEmail } from '@/lib/api/email.service';
 
@@ -29,28 +29,6 @@ function isRateLimited(ip: string): boolean {
   record.count++;
   record.lastRequest = now;
   return false;
-}
-
-// Get or create PasswordOTP model
-function getPasswordOTPModel() {
-  if (mongoose.models.PasswordOTP) {
-    return mongoose.models.PasswordOTP;
-  }
-  
-  const passwordOTPSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-    email: { type: String, required: true, index: true },
-    otp: { type: String, required: true },
-    expiresAt: { type: Date, required: true },
-    attempts: { type: Number, default: 0 },
-    verified: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now },
-  }, { collection: 'passwordotps', timestamps: true });
-  
-  // Index for cleanup
-  passwordOTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-  
-  return mongoose.model('PasswordOTP', passwordOTPSchema);
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -100,8 +78,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
-    
-    const PasswordOTP = getPasswordOTPModel();
     
     // Delete old OTPs for this user
     await PasswordOTP.deleteMany({ userId: user._id });

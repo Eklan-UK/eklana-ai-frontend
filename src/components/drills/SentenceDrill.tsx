@@ -395,7 +395,6 @@ export default function SentenceDrill({
                   {currentWord.word}
                 </h1>
                 <TTSButton text={currentWord.word} size="lg" audioUrl={currentWord.audioUrl} />
-                <DrillBookmarkToggle drillId={String(drill._id)} />
               </div>
               {currentWord.hint && (
                 <p className="text-sm text-blue-600 mt-2 bg-blue-50 px-4 py-2 rounded-lg inline-block">

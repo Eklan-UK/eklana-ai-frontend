@@ -3,77 +3,80 @@
  *
  * These tests exercise the computation logic directly, using mock attempt objects
  * that match the shape returned by Mongoose .lean() queries.
+ *
+ * Run: node --import tsx --test src/domain/progress/progress-scorecard.service.test.ts
  */
 
-import {
-	computeProgressScorecard,
-	type ProgressScorecardMetrics,
-} from './progress-scorecard.service';
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import DrillAttempt from '@/models/drill-attempt';
+import FreeTalkAttempt from '@/models/free-talk-attempt';
+import { computeProgressScorecard } from './progress-scorecard.service';
 
-// ── Mocks ──────────────────────────────────────────────────────
+const LEARNER_ID = '507f1f77bcf86cd799439011';
+const noopConnect = async () => undefined;
 
-jest.mock('@/lib/api/db', () => ({
-	connectToDatabase: jest.fn().mockResolvedValue(undefined),
-}));
+const mockDrillAttemptFind = mock.fn(() => mockFind([]));
+const mockFreeTalkAttemptFind = mock.fn(() => mockFind([]));
 
-const mockDrillAttemptFind = jest.fn();
-const mockFreeTalkAttemptFind = jest.fn();
+type FindFn = typeof DrillAttempt.find;
+const originalDrillFind = DrillAttempt.find.bind(DrillAttempt);
+const originalFreeTalkFind = FreeTalkAttempt.find.bind(FreeTalkAttempt);
 
-jest.mock('@/models/drill-attempt', () => ({
-	__esModule: true,
-	default: {
-		find: (...args: unknown[]) => mockDrillAttemptFind(...args),
-	},
-}));
+function thisWeek(): Date {
+	return new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+}
 
-jest.mock('@/models/free-talk-attempt', () => ({
-	__esModule: true,
-	default: {
-		find: (...args: unknown[]) => mockFreeTalkAttemptFind(...args),
-	},
-}));
+function lastWeek(): Date {
+	return new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+}
 
-// ── Helpers ────────────────────────────────────────────────────
-
-const NOW = new Date('2026-06-17T12:00:00.000Z');
-const THIS_WEEK = new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
-const LAST_WEEK = new Date(NOW.getTime() - 10 * 24 * 60 * 60 * 1000); // 10 days ago
-
-beforeEach(() => {
-	jest.useFakeTimers().setSystemTime(NOW);
-	mockDrillAttemptFind.mockReset();
-	mockFreeTalkAttemptFind.mockReset();
-});
-
-afterEach(() => {
-	jest.useRealTimers();
-});
-
-/** Chain-able find mock that returns the given docs. */
 function mockFind(docs: Record<string, unknown>[]) {
 	const chain = {
-		select: jest.fn().mockReturnThis(),
-		sort: jest.fn().mockReturnThis(),
-		limit: jest.fn().mockReturnThis(),
-		lean: jest.fn().mockReturnThis(),
-		exec: jest.fn().mockResolvedValue(docs),
+		select: mock.fn(() => chain),
+		sort: mock.fn(() => chain),
+		limit: mock.fn(() => chain),
+		lean: mock.fn(() => chain),
+		exec: mock.fn(async () => docs),
 	};
 	return chain;
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+function stubFinds(
+	drillDocs: Record<string, unknown>[],
+	freeTalkDocs: Record<string, unknown>[] = [],
+) {
+	mockDrillAttemptFind.mock.mockImplementation(() => mockFind(drillDocs));
+	mockFreeTalkAttemptFind.mock.mockImplementation(() => mockFind(freeTalkDocs));
+}
+
+function runScorecard() {
+	return computeProgressScorecard(LEARNER_ID, { connect: noopConnect });
+}
 
 describe('computeProgressScorecard', () => {
-	const LEARNER_ID = '507f1f77bcf86cd799439011';
+	beforeEach(() => {
+		mockDrillAttemptFind.mock.resetCalls();
+		mockFreeTalkAttemptFind.mock.resetCalls();
+		stubFinds([]);
+		DrillAttempt.find = ((...args: unknown[]) =>
+			mockDrillAttemptFind(...args)) as FindFn;
+		FreeTalkAttempt.find = ((...args: unknown[]) =>
+			mockFreeTalkAttemptFind(...args)) as FindFn;
+	});
+
+	afterEach(() => {
+		DrillAttempt.find = originalDrillFind;
+		FreeTalkAttempt.find = originalFreeTalkFind;
+	});
 
 	describe('Pronunciation', () => {
 		it('returns 0 when no drill attempts exist', async () => {
-			mockDrillAttemptFind.mockReturnValue(mockFind([]));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds([]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.pronunciation).toBe(0);
-			expect(result.sampleCounts.pronunciationDrills).toBe(0);
+			const result = await runScorecard();
+			assert.equal(result.pronunciation, 0);
+			assert.equal(result.sampleCounts.pronunciationDrills, 0);
 		});
 
 		it('averages Speechace pronunciationScores from vocabulary drills', async () => {
@@ -81,7 +84,7 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: {
 						wordScores: [
 							{ word: 'hello', pronunciationScore: 80, score: 70 },
@@ -90,13 +93,12 @@ describe('computeProgressScorecard', () => {
 					},
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
+			const result = await runScorecard();
 			// avg Speechace = (80 + 60) / 2 = 70
-			expect(result.pronunciation).toBe(70);
-			expect(result.sampleCounts.pronunciationDrills).toBe(1);
+			assert.equal(result.pronunciation, 70);
+			assert.equal(result.sampleCounts.pronunciationDrills, 1);
 		});
 
 		it('ignores word scores of 0 from Speechace results', async () => {
@@ -104,7 +106,7 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'pronunciation',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					pronunciationResults: {
 						wordScores: [
 							{ word: 'cat', pronunciationScore: 90, score: 90 },
@@ -113,11 +115,10 @@ describe('computeProgressScorecard', () => {
 					},
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.pronunciation).toBe(90);
+			const result = await runScorecard();
+			assert.equal(result.pronunciation, 90);
 		});
 
 		it('averages across multiple drills (each drill contributes one avg)', async () => {
@@ -125,7 +126,7 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: {
 						wordScores: [{ word: 'a', pronunciationScore: 100, score: 100 }],
 					},
@@ -133,17 +134,16 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-2',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: {
 						wordScores: [{ word: 'b', pronunciationScore: 60, score: 60 }],
 					},
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.pronunciation).toBe(80); // (100 + 60) / 2
+			const result = await runScorecard();
+			assert.equal(result.pronunciation, 80); // (100 + 60) / 2
 		});
 	});
 
@@ -153,89 +153,97 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'key_phrases',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					keyPhrasesResults: { score: 80 },
 				},
 				{
 					drillType: 'fill_blank',
 					drillAssignmentId: 'asgn-2',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					fillBlankResults: { score: 60 },
 				},
 				{
 					// roleplay — should NOT contribute to accuracy
 					drillType: 'roleplay',
 					drillAssignmentId: 'asgn-3',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					score: 90,
 				},
 				{
 					// key_phrases with no assignment (weekly challenge, free practice) — excluded
 					drillType: 'key_phrases',
 					drillAssignmentId: null,
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					keyPhrasesResults: { score: 100 },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.accuracy).toBe(70); // (80 + 60) / 2
-			expect(result.sampleCounts.accuracyDrills).toBe(2);
+			const result = await runScorecard();
+			assert.equal(result.accuracy, 70); // (80 + 60) / 2
+			assert.equal(result.sampleCounts.accuracyDrills, 2);
 		});
 
 		it('returns 0 when no accuracy drills exist', async () => {
 			const attempts = [
-				{ drillType: 'vocabulary', drillAssignmentId: 'asgn-1', completedAt: THIS_WEEK, vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: 90, score: 90 }] } },
+				{
+					drillType: 'vocabulary',
+					drillAssignmentId: 'asgn-1',
+					completedAt: thisWeek(),
+					vocabularyResults: {
+						wordScores: [{ word: 'a', pronunciationScore: 90, score: 90 }],
+					},
+				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.accuracy).toBe(0);
+			const result = await runScorecard();
+			assert.equal(result.accuracy, 0);
 		});
 
 		it('infers key_phrases type from results when drillType is missing (legacy attempts)', async () => {
 			const attempts = [
 				{
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					keyPhrasesResults: { score: 85 },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.accuracy).toBe(85);
-			expect(result.sampleCounts.accuracyDrills).toBe(1);
+			const result = await runScorecard();
+			assert.equal(result.accuracy, 85);
+			assert.equal(result.sampleCounts.accuracyDrills, 1);
 		});
 	});
 
 	describe('Fluency', () => {
 		it('averages gradeResult.overallScore from free talk attempts', async () => {
-			mockDrillAttemptFind.mockReturnValue(mockFind([]));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([
-				{ gradeResult: { overallScore: 70 }, createdAt: THIS_WEEK },
-				{ gradeResult: { overallScore: 90 }, createdAt: LAST_WEEK },
-			]));
+			stubFinds(
+				[],
+				[
+					{ gradeResult: { overallScore: 70 }, createdAt: thisWeek() },
+					{ gradeResult: { overallScore: 90 }, createdAt: lastWeek() },
+				],
+			);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.fluency).toBe(80); // (70 + 90) / 2
-			expect(result.sampleCounts.fluencyScenarios).toBe(2);
+			const result = await runScorecard();
+			assert.equal(result.fluency, 80); // (70 + 90) / 2
+			assert.equal(result.sampleCounts.fluencyScenarios, 2);
 		});
 
 		it('ignores attempts without gradeResult', async () => {
-			mockDrillAttemptFind.mockReturnValue(mockFind([]));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([
-				{ gradeResult: null, createdAt: THIS_WEEK },
-				{ gradeResult: { overallScore: 80 }, createdAt: THIS_WEEK },
-			]));
+			stubFinds(
+				[],
+				[
+					{ gradeResult: null, createdAt: thisWeek() },
+					{ gradeResult: { overallScore: 80 }, createdAt: thisWeek() },
+				],
+			);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.fluency).toBe(80);
-			expect(result.sampleCounts.fluencyScenarios).toBe(1);
+			const result = await runScorecard();
+			assert.equal(result.fluency, 80);
+			assert.equal(result.sampleCounts.fluencyScenarios, 1);
 		});
 	});
 
@@ -245,24 +253,21 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: 80, score: 80 }] },
 				},
 				{
 					drillType: 'key_phrases',
 					drillAssignmentId: 'asgn-2',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					keyPhrasesResults: { score: 60 },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([
-				{ gradeResult: { overallScore: 70 }, createdAt: THIS_WEEK },
-			]));
+			stubFinds(attempts, [{ gradeResult: { overallScore: 70 }, createdAt: thisWeek() }]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
+			const result = await runScorecard();
 			// pronunciation=80, accuracy=60, fluency=70 → confidence=(80+60+70)/3 = 70
-			expect(result.confidence).toBe(70);
+			assert.equal(result.confidence, 70);
 		});
 
 		it('divides only by pillars with data (2-of-3 case)', async () => {
@@ -270,26 +275,22 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: 80, score: 80 }] },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([
-				{ gradeResult: { overallScore: 60 }, createdAt: THIS_WEEK },
-			]));
+			stubFinds(attempts, [{ gradeResult: { overallScore: 60 }, createdAt: thisWeek() }]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
+			const result = await runScorecard();
 			// pronunciation=80, fluency=60, accuracy=0 (no data) → confidence=(80+60)/2 = 70
-			expect(result.confidence).toBe(70);
+			assert.equal(result.confidence, 70);
 		});
 
 		it('returns 0 when no pillars have data', async () => {
-			mockDrillAttemptFind.mockReturnValue(mockFind([]));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds([]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.confidence).toBe(0);
+			const result = await runScorecard();
+			assert.equal(result.confidence, 0);
 		});
 	});
 
@@ -299,21 +300,20 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: 90, score: 90 }] },
 				},
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-2',
-					completedAt: LAST_WEEK,
+					completedAt: lastWeek(),
 					vocabularyResults: { wordScores: [{ word: 'b', pronunciationScore: 60, score: 60 }] },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.pronunciationWeeklyChange).toBe(30); // 90 - 60
+			const result = await runScorecard();
+			assert.equal(result.pronunciationWeeklyChange, 30); // 90 - 60
 		});
 
 		it('returns 0 weekly change when only one window has data', async () => {
@@ -321,34 +321,29 @@ describe('computeProgressScorecard', () => {
 				{
 					drillType: 'vocabulary',
 					drillAssignmentId: 'asgn-1',
-					completedAt: THIS_WEEK,
+					completedAt: thisWeek(),
 					vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: 90, score: 90 }] },
 				},
 			];
-			mockDrillAttemptFind.mockReturnValue(mockFind(attempts));
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds(attempts);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.pronunciationWeeklyChange).toBe(0);
+			const result = await runScorecard();
+			assert.equal(result.pronunciationWeeklyChange, 0);
 		});
 	});
 
 	describe('confidenceTrend', () => {
 		it('is "improving" when confidenceWeeklyChange >= 3', async () => {
-			// Set up data so confidence this week > last week by enough
 			const makeAttempts = (completedAt: Date, score: number) => ({
 				drillType: 'vocabulary',
 				drillAssignmentId: 'asgn-1',
 				completedAt,
 				vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: score, score }] },
 			});
-			mockDrillAttemptFind.mockReturnValue(
-				mockFind([makeAttempts(THIS_WEEK, 90), makeAttempts(LAST_WEEK, 50)]),
-			);
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds([makeAttempts(thisWeek(), 90), makeAttempts(lastWeek(), 50)]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.confidenceTrend).toBe('improving');
+			const result = await runScorecard();
+			assert.equal(result.confidenceTrend, 'improving');
 		});
 
 		it('is "stable" when change is within ±3', async () => {
@@ -358,13 +353,10 @@ describe('computeProgressScorecard', () => {
 				completedAt,
 				vocabularyResults: { wordScores: [{ word: 'a', pronunciationScore: score, score }] },
 			});
-			mockDrillAttemptFind.mockReturnValue(
-				mockFind([makeAttempts(THIS_WEEK, 80), makeAttempts(LAST_WEEK, 79)]),
-			);
-			mockFreeTalkAttemptFind.mockReturnValue(mockFind([]));
+			stubFinds([makeAttempts(thisWeek(), 80), makeAttempts(lastWeek(), 79)]);
 
-			const result = await computeProgressScorecard(LEARNER_ID);
-			expect(result.confidenceTrend).toBe('stable');
+			const result = await runScorecard();
+			assert.equal(result.confidenceTrend, 'stable');
 		});
 	});
 });

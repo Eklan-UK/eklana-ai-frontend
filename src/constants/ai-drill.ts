@@ -7,7 +7,7 @@ export const AI_DRILL_TYPES = [
   { value: "grammar", label: "Grammar" },
   { value: "sentence_writing", label: "Sentence Writing" },
   { value: "fill_blank", label: "Fill in the Blank" },
-  { value: "key_phrases", label: "Key Phrases" },
+  { value: "key_phrases", label: "Pressure Test" },
   { value: "summary", label: "Summary" },
 ] as const;
 
