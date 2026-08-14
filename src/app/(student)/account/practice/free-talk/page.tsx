@@ -233,7 +233,7 @@ export default function FreeTalkHubPage() {
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
-      <Header title="Eklan Free Talk" showBack backHref="/account/practice" />
+      <Header title="Eklan Simulation Room" showBack backHref="/account/practice" />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-6">
         <div>
@@ -277,7 +277,7 @@ export default function FreeTalkHubPage() {
                   <h3 className="text-lg font-semibold text-foreground mb-2">No scenarios available</h3>
                   <p className="text-muted-foreground text-sm">
                     {scenariosError ||
-                      "No free talk scenarios are configured yet. Check back after your instructor adds them."}
+                      "No Simulation Room scenarios are configured yet. Check back after your instructor adds them."}
                   </p>
                 </Card>
               ) : (

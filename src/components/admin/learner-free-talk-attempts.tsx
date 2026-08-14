@@ -40,7 +40,7 @@ export function LearnerFreeTalkAttemptsSection({
   if (error) {
     return (
       <p className="text-sm text-red-600">
-        Could not load Eklan Free Talk attempts for this learner.
+        Could not load Eklan Simulation Room attempts for this learner.
       </p>
     );
   }
@@ -48,7 +48,7 @@ export function LearnerFreeTalkAttemptsSection({
   if (attempts.length === 0) {
     return (
       <p className="text-sm text-gray-500">
-        No Eklan Free Talk sessions recorded for {learnerName} yet.
+        No Eklan Simulation Room sessions recorded for {learnerName} yet.
       </p>
     );
   }

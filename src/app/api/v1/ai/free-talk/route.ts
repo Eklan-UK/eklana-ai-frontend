@@ -95,7 +95,7 @@ async function handler(
 				message:
 					error?.message?.includes('429') || error?.message?.includes('quota')
 						? 'AI service is temporarily busy. Please wait a moment and try again.'
-						: 'Failed to grade Free Talk response. Please try again.',
+						: 'Failed to grade Simulation Room response. Please try again.',
 			},
 			{ status: 500 },
 		);
