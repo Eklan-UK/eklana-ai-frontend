@@ -208,9 +208,22 @@ async function postHandler(
 		);
 
 		let phaseAdvanced = false;
+		const controllerRef: { current: ReadableStreamDefaultController | null } = { current: null };
+		const bufferedPhaseAdvanceChunks: Uint8Array[] = [];
 		const onToolCall = (name: string) => {
 			if (name === 'advancePhase') {
 				phaseAdvanced = true;
+				const phaseAdvanceChunk = new TextEncoder().encode(
+					`data: ${JSON.stringify({
+						type: 'phaseAdvance',
+						newPhaseIndex: session.currentPhaseIndex + 1,
+					})}\n\n`,
+				);
+				if (controllerRef.current) {
+					controllerRef.current.enqueue(phaseAdvanceChunk);
+				} else {
+					bufferedPhaseAdvanceChunks.push(phaseAdvanceChunk);
+				}
 			}
 		};
 
@@ -262,6 +275,11 @@ async function postHandler(
 		// hadn't had a chance to flip yet.
 		const wrappedStream = new ReadableStream({
 			async start(controller) {
+				controllerRef.current = controller;
+				while (bufferedPhaseAdvanceChunks.length > 0) {
+					controller.enqueue(bufferedPhaseAdvanceChunks.shift()!);
+				}
+
 				if (revealFindings.length > 0) {
 					const revealChunk = JSON.stringify({ type: 'reveal', findings: revealFindings });
 					controller.enqueue(new TextEncoder().encode(`data: ${revealChunk}\n\n`));

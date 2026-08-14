@@ -220,6 +220,8 @@ export default function SimulationSessionPage() {
                   audioChunks.push(parsed.data);
                 } else if (parsed?.type === "text" && typeof parsed.data === "string") {
                   textAccum += parsed.data;
+                } else if (parsed?.type === "phaseAdvance" && typeof parsed.newPhaseIndex === "number") {
+                  setSession((prev) => (prev ? { ...prev, currentPhaseIndex: parsed.newPhaseIndex } : prev));
                 }
               } catch {
                 // partial/malformed SSE frame split across reads — ignore
