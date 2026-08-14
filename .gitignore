@@ -66,6 +66,7 @@ scripts/local-class-cron.mjs
 scripts/local-test-notification.mjs
 scripts/verify-schema-facts.mjs
 scripts/verify-schema-facts-2.mjs
+scripts/simulation-tool-reliability-spike.mjs
 
 # Local-only dev test pages & APIs (drill reminder tester, etc.)
 src/app/(student)/account/dev/
