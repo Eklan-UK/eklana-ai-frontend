@@ -36,6 +36,24 @@ const SimulationTurnSchema = new Schema(
 	{ _id: false }
 );
 
+const RevealedFindingSchema = new Schema(
+	{
+		phaseIndex: {
+			type: Number,
+			required: true,
+		},
+		label: {
+			type: String,
+			required: true,
+		},
+		revealedAt: {
+			type: Date,
+			required: true,
+		},
+	},
+	{ _id: false }
+);
+
 export interface ISimulationSession extends Document {
 	_id: Types.ObjectId;
 	scenarioId: Types.ObjectId;
@@ -53,6 +71,13 @@ export interface ISimulationSession extends Document {
 		audioDurationMs?: number;
 		speechaceResult?: any;
 		createdAt: Date;
+	}[];
+	currentPhaseIndex: number;
+	briefingComplete: boolean;
+	revealedFindings: {
+		phaseIndex: number;
+		label: string;
+		revealedAt: Date;
 	}[];
 	createdAt: Date;
 	updatedAt: Date;
@@ -96,6 +121,20 @@ const simulationSessionSchema = new Schema<ISimulationSession>(
 		},
 		turns: {
 			type: [SimulationTurnSchema],
+			default: [],
+		},
+		currentPhaseIndex: {
+			type: Number,
+			required: true,
+			default: 0,
+		},
+		briefingComplete: {
+			type: Boolean,
+			required: true,
+			default: false,
+		},
+		revealedFindings: {
+			type: [RevealedFindingSchema],
 			default: [],
 		},
 	},
