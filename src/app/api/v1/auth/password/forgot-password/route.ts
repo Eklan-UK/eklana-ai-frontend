@@ -9,8 +9,8 @@ import {
   resolvePublicBaseUrlFromHeaders,
 } from '@/lib/public-base-url';
 import { userHasPassword } from '@/lib/api/password-account';
-import mongoose from 'mongoose';
 import crypto from 'crypto';
+import PasswordReset from '@/models/password-reset';
 
 // Rate limiting: track requests by IP
 const rateLimitMap = new Map<string, { count: number; lastRequest: number }>();
@@ -85,21 +85,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Generate reset token
     const token = crypto.randomBytes(32).toString('hex');
-    
-    // Get or create PasswordReset model
-    let PasswordReset;
-    if (mongoose.models.PasswordReset) {
-      PasswordReset = mongoose.models.PasswordReset;
-    } else {
-      const passwordResetSchema = new mongoose.Schema({
-        userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-        token: { type: String, required: true, unique: true },
-        expiresAt: { type: Date, required: true },
-        createdAt: { type: Date, default: Date.now },
-      }, { collection: 'passwordresets', timestamps: true });
-      
-      PasswordReset = mongoose.model('PasswordReset', passwordResetSchema);
-    }
     
     // Delete old reset tokens for this user
     await PasswordReset.deleteMany({ userId: user._id });

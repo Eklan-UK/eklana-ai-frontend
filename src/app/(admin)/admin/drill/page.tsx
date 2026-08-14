@@ -32,6 +32,7 @@ import {
   type DrillAssignmentStatus,
   type DrillListFilters,
 } from "@/lib/drill-list-filters";
+import { getDrillTypeLabel } from "@/utils/drill";
 
 interface Drill {
   _id: string;
@@ -298,7 +299,7 @@ function AdminDrillPageContent() {
             <option value="listening">Listening</option>
             <option value="pronunciation">Pronunciation</option>
             <option value="fill_blank">Fill in the Blank</option>
-            <option value="key_phrases">Key Phrases</option>
+            <option value="key_phrases">Pressure Test</option>
           </select>
 
           <select
@@ -450,8 +451,8 @@ function AdminDrillPageContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 capitalize">
-                        {drill.type.replace("_", " ")}
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        {getDrillTypeLabel(drill.type)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

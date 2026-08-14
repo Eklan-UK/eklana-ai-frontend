@@ -398,10 +398,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                       <p className="text-xs text-muted-foreground mt-1">Define this word</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} />
-                    <DrillBookmarkToggle drillId={String(drill._id)} />
-                  </div>
+                  <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} />
                 </div>
 
                 {currentItem.hint && (

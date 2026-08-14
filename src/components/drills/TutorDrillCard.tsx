@@ -9,7 +9,7 @@ import React, { memo, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Users, Clock, Edit, Trash2, ChevronRight, Loader2 } from "lucide-react";
-import { getDrillIcon } from "@/utils/drill";
+import { getDrillIcon, getDrillTypeLabel } from "@/utils/drill";
 import { Checkbox } from "@/components/ui/Checkbox";
 
 import {
@@ -122,8 +122,8 @@ function TutorDrillCardComponent({
                 >
                   {drill.difficulty}
                 </span>
-                <span className="text-xs text-muted-foreground capitalize">
-                  {drill.type}
+                <span className="text-xs text-muted-foreground">
+                  {getDrillTypeLabel(drill.type)}
                 </span>
               </div>
             </div>

@@ -73,7 +73,7 @@ export function freeTalkScenarioTypeLabel(scenarioType: string): string {
   const label = FREE_TALK_SCENARIO_TYPE_LABELS[scenarioType as keyof typeof FREE_TALK_SCENARIO_TYPE_LABELS];
   if (label) return label;
   const t = scenarioType.replace(/_/g, ' ').trim();
-  if (!t) return 'Eklan Free Talk';
+  if (!t) return 'Eklan Simulation Room';
   return t.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

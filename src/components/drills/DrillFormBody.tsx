@@ -1655,7 +1655,7 @@ export function DrillFormBody({
                       <option value="summary">Summary</option>
                       <option value="listening">Listening</option>
                       <option value="fill_blank">Fill in the Blank</option>
-                      <option value="key_phrases">Key Phrases</option>
+                      <option value="key_phrases">Pressure Test</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { normalizeAiGeneratedToParsedContent } from "./ai-drill-content";
 
 describe("normalizeAiGeneratedToParsedContent", () => {
@@ -6,9 +7,9 @@ describe("normalizeAiGeneratedToParsedContent", () => {
     const result = normalizeAiGeneratedToParsedContent("vocabulary", {
       target_sentences: [{ word: "test", text: "A test.", translation: "테스트" }],
     });
-    expect(result.type).toBe("vocabulary");
-    expect(result.extractedData.items).toHaveLength(1);
-    expect(result.extractedData.items[0].word).toBe("test");
+    assert.equal(result.type, "vocabulary");
+    assert.equal(result.extractedData.items.length, 1);
+    assert.equal(result.extractedData.items[0].word, "test");
   });
 
   it("maps roleplay flat fields to nested items[0]", () => {
@@ -24,10 +25,10 @@ describe("normalizeAiGeneratedToParsedContent", () => {
         },
       ],
     });
-    expect(result.type).toBe("roleplay");
-    expect(result.extractedData.items[0].roleplay_scenes).toHaveLength(1);
-    expect(result.extractedData.items[0].student_character_name).toBe("Nurse");
-    expect(result.extractedData.items[0].context).toBe("ICU");
+    assert.equal(result.type, "roleplay");
+    assert.equal(result.extractedData.items[0].roleplay_scenes.length, 1);
+    assert.equal(result.extractedData.items[0].student_character_name, "Nurse");
+    assert.equal(result.extractedData.items[0].context, "ICU");
   });
 
   it("maps summary article fields to items with title", () => {
@@ -35,8 +36,8 @@ describe("normalizeAiGeneratedToParsedContent", () => {
       article_title: "My Article",
       article_content: "Content here",
     });
-    expect(result.extractedData.title).toBe("My Article");
-    expect(result.extractedData.items[0].content).toBe("Content here");
+    assert.equal(result.extractedData.title, "My Article");
+    assert.equal(result.extractedData.items[0].content, "Content here");
   });
 
   it("maps fill_blank_items directly including context", () => {
@@ -49,10 +50,11 @@ describe("normalizeAiGeneratedToParsedContent", () => {
         },
       ],
     });
-    expect(result.extractedData.items).toHaveLength(1);
-    expect(result.extractedData.items[0].context).toBe(
+    assert.equal(result.extractedData.items.length, 1);
+    assert.equal(
+      result.extractedData.items[0].context,
       "You haven't seen your colleague for several shifts, so you say:",
     );
-    expect(result.extractedData.items[0].sentence).toContain("___");
+    assert.ok(String(result.extractedData.items[0].sentence).includes("___"));
   });
 });

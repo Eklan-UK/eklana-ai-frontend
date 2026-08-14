@@ -50,7 +50,7 @@ interface ConversationOptions {
 // Live API returns raw PCM L16 audio (24kHz, 16-bit, mono).
 // Browsers can't play raw PCM, so we wrap it in a WAV header.
 
-function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
+export function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
 	const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 	const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
 	const blockAlign = numChannels * (bitsPerSample / 8);
@@ -84,7 +84,7 @@ function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, 
 // Single model for both text (via outputAudioTranscription) and audio.
 // No separate generateContent call → avoids gemini-2.5-flash rate limits.
 
-function combineBase64Chunks(chunks: string[]): string {
+export function combineBase64Chunks(chunks: string[]): string {
 	if (chunks.length === 0) return '';
 	if (chunks.length === 1) return chunks[0];
 
@@ -352,6 +352,8 @@ export async function generateWithLiveAPIStream(
 	systemInstruction: string,
 	turns: Array<{ role: string; parts: Array<{ text: string }> }>,
 	voiceName: string = 'Kore',
+	tools?: Array<{ name: string; description: string; parameters?: object }>,
+	onToolCall?: (name: string, args: any) => void | Promise<void>,
 ): Promise<ReadableStream> {
 	if (!genAINew) {
 		throw new Error('Gemini Live API is not configured');
@@ -385,6 +387,9 @@ export async function generateWithLiveAPIStream(
 				try { controller.close(); } catch { /* ignore */ }
 			};
 
+			let receivedAnyChunk = false;
+			let hasRetried = false;
+
 			timeoutHandle = setTimeout(() => {
 				if (!sessionClosed) {
 					logger.warn('Live API stream session timed out after 45s');
@@ -407,24 +412,66 @@ export async function generateWithLiveAPIStream(
 						},
 						outputAudioTranscription: {},
 						thinkingConfig: { thinkingBudget: 0 },
+						...(tools && tools.length > 0 ? { tools: [{ functionDeclarations: tools }] } : {}),
 					},
 					callbacks: {
 						onopen: () => {
 							logger.info('Live API WebSocket connected (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 						},
-						onmessage: (message: LiveServerMessage) => {
+						onmessage: async (message: LiveServerMessage) => {
 							if (sessionClosed) return;
 
 							const data = message.data;
 							if (data) {
 								sendChunk('audio', data);
+								receivedAnyChunk = true;
 							}
 
 							if (message.serverContent?.outputTranscription?.text) {
 								sendChunk('text', message.serverContent.outputTranscription.text);
+								receivedAnyChunk = true;
+							}
+
+							if (message.toolCall?.functionCalls?.length) {
+								for (const call of message.toolCall.functionCalls) {
+									try {
+										if (onToolCall) {
+											await onToolCall(call.name ?? '', call.args);
+										} else {
+											logger.info('Live API tool call received with no onToolCall handler (Stream)', {
+												name: call.name,
+											});
+										}
+									} catch (toolErr: any) {
+										logger.error('Live API onToolCall handler threw (Stream)', {
+											name: call.name,
+											error: toolErr?.message,
+										});
+									}
+									try {
+										session.sendToolResponse({
+											functionResponses: {
+												id: call.id,
+												name: call.name,
+												response: { output: 'ok' },
+											},
+										});
+									} catch { /* ignore */ }
+								}
 							}
 
 							if (message.serverContent?.turnComplete) {
+								if (!receivedAnyChunk && !hasRetried) {
+									hasRetried = true;
+									logger.warn('Live API turn complete with no chunks received, retrying once (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+									session.sendClientContent({ turns, turnComplete: true });
+									return;
+								}
+
+								if (!receivedAnyChunk && hasRetried) {
+									logger.error('Live API retry also returned an empty turn (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+								}
+
 								logger.info('Live API turn complete (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 								closeStream();
 							}
