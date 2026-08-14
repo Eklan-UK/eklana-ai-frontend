@@ -50,6 +50,14 @@ async function getHandler(
 			);
 		}
 
+		const turns = [...session.turns]
+			.sort((a, b) => a.turnNumber - b.turnNumber)
+			.map((turn) => ({
+				role: turn.role,
+				text: turn.text,
+				turnNumber: turn.turnNumber,
+			}));
+
 		return NextResponse.json(
 			{
 				code: 'Success',
@@ -59,13 +67,18 @@ async function getHandler(
 					startedAt: session.startedAt,
 					currentPhaseIndex: session.currentPhaseIndex,
 					briefingComplete: session.briefingComplete,
+					turns,
 					scenario: {
 						title: scenario.title,
+						workplaceSetting: scenario.workplaceSetting,
 						maxDurationMinutes: scenario.maxDurationMinutes,
 						studentHint: scenario.studentHint,
-						phases: scenario.scenarioScript.map((phase: { phaseName: string }) => ({
-							phaseName: phase.phaseName,
-						})),
+						phases: scenario.scenarioScript.map(
+							(phase: { phaseName: string; characters: string[] }) => ({
+								phaseName: phase.phaseName,
+								characters: phase.characters,
+							}),
+						),
 					},
 				},
 			},

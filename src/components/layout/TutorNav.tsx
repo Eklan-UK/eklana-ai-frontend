@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock, List } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, CalendarDays, Clock, List, Drama } from "lucide-react";
 
 export function TutorNav() {
   const pathname = usePathname();
@@ -32,6 +32,11 @@ export function TutorNav() {
       href: "/tutor/drills/all",
       label: "Old Drill Builder",
       icon: List,
+    },
+    {
+      href: "/tutor/simulation/scenarios",
+      label: "Simulation Room",
+      icon: Drama,
     },
     {
       href: "/tutor/students",

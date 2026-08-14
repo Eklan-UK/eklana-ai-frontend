@@ -143,6 +143,12 @@ async function postHandler(
 		const audioBuffer = Buffer.from(arrayBuffer);
 		const transcribedText = await transcribeAudio(audioBuffer, audioMimeType);
 
+		// Emitted early, before the Live stream starts, so the client can render
+		// the student's own turn without waiting on the AI response.
+		const transcriptChunk = new TextEncoder().encode(
+			`data: ${JSON.stringify({ type: 'transcript', text: transcribedText })}\n\n`,
+		);
+
 		// Non-fatal upload — matches the Free Talk attempt convention
 		// (src/app/api/v1/ai/free-talk/attempts/route.ts:168-181): a failed
 		// upload logs a warning and leaves the URL empty rather than failing
@@ -272,6 +278,7 @@ async function postHandler(
 		const wrappedStream = new ReadableStream({
 			async start(controller) {
 				controllerRef.current = controller;
+				controller.enqueue(transcriptChunk);
 				while (bufferedPhaseAdvanceChunks.length > 0) {
 					controller.enqueue(bufferedPhaseAdvanceChunks.shift()!);
 				}

@@ -33,7 +33,11 @@ export function buildSimulationSystemInstruction(
 
 	return `The student is playing the role of ${studentCharacterName}. You must NEVER voice, narrate, or address the student as ${studentCharacterName} or as any other character. The student speaks for themselves — you only ever play the OTHER characters listed above, reacting to what the student says. Do not describe what ${studentCharacterName} is doing or feeling.
 
+BACKGROUND CONTEXT (for your understanding only — never speak, read aloud, or paraphrase this block as dialogue; it may be written in second person addressing the student, but you are not the student and must never voice these lines):
+"""
 ${scenario.dramatisationPrompt}
+"""
+Everything above this line is silent background context. Your actual spoken dialogue must come only from your own in-character reactions to the conversation, guided by the conversation beats below — never recite scenario framing or instructions aloud.
 
 You are voicing this workplace communication training simulation live, in real time, with a student.
 
