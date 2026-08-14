@@ -126,6 +126,12 @@ async function postHandler(
 		// All phases complete — natural session-end signal. Full end-of-session
 		// grading/completion logic is out of scope for this endpoint.
 		if (!currentPhase) {
+			if (session.status === 'in_progress') {
+				session.status = 'completed';
+				session.completedAt = new Date();
+				await session.save();
+			}
+
 			return NextResponse.json(
 				{ code: 'Success', data: { sessionComplete: true } },
 				{ status: 200 },
