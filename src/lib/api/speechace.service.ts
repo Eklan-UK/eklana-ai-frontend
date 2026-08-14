@@ -235,7 +235,7 @@ class SpeechaceService {
 	/**
 	 * Score text pronunciation using Speechace API
 	 * @param text The text that was spoken
-	 * @param audioBase64 Base64 encoded audio data
+	 * @param audio Base64 encoded audio data, or a raw Buffer if the caller already has bytes
 	 * @param userId User identifier
 	 * @param questionInfo Optional question information
 	 * @param mimeType Optional client-reported MIME (e.g. audio/m4a); otherwise sniffed
@@ -243,14 +243,14 @@ class SpeechaceService {
 	 */
 	async scorePronunciation(
 		text: string,
-		audioBase64: string,
+		audio: string | Buffer<ArrayBuffer>,
 		userId: string,
 		questionInfo?: string,
 		mimeType?: string
 	): Promise<SpeechaceScoreResponse & { text_score: number; word_scores: Array<{ word: string; score: number; phonemes?: Array<{ phoneme: string; score: number }> }> }> {
 		try {
-			// Convert base64 to buffer and then to Blob for native FormData
-			const audioBuffer = Buffer.from(audioBase64, 'base64');
+			// Use the buffer directly when the caller already has bytes; otherwise decode base64
+			const audioBuffer = Buffer.isBuffer(audio) ? audio : Buffer.from(audio, 'base64');
 
 			// Guard: reject oversized payloads before hitting Speechace (120 s at 32 kbps ≈ 480 KB)
 			if (audioBuffer.length > 5 * 1024 * 1024) {
