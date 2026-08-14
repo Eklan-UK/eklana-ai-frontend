@@ -18,7 +18,7 @@ const MODES: Array<{
 }> = [
   {
     id: "freeTalk",
-    href: "/account/practice/free-talk",
+    href: "/account/practice/simulation",
     iconBg: "bg-[#eff6ff]",
     iconSrc: "/icons/practice-hub/free-talk.svg",
   },
