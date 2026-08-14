@@ -9,6 +9,7 @@ import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
 import { transcribeAudio, generateWithLiveAPIStream } from '@/services/gemini.service';
+import { uploadToCloudinary } from '@/services/cloudinary.service';
 import { checkFindingReveals } from '@/domain/simulation/simulation-turn-reveal.service';
 import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
 
@@ -141,6 +142,24 @@ async function postHandler(
 		const arrayBuffer = await audioToProcess.arrayBuffer();
 		const audioBuffer = Buffer.from(arrayBuffer);
 		const transcribedText = await transcribeAudio(audioBuffer, audioMimeType);
+
+		// Non-fatal upload — matches the Free Talk attempt convention
+		// (src/app/api/v1/ai/free-talk/attempts/route.ts:168-181): a failed
+		// upload logs a warning and leaves the URL empty rather than failing
+		// the whole request.
+		let studentAudioUrl = '';
+		try {
+			const up = await uploadToCloudinary(audioBuffer, {
+				folder: 'eklan/simulation/turns',
+				publicId: `sim_${sessionId}_${Date.now()}`,
+				resourceType: 'raw',
+				transformation: [],
+			});
+			studentAudioUrl = up.secureUrl;
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : String(e);
+			logger.warn('Simulation turn audio upload failed', { error: msg, sessionId });
+		}
 
 		// Build conversation history for the Live API — mirrors the leading-role
 		// trim logic in generateTopicPracticeResponseStream (gemini.service.ts)
@@ -280,7 +299,11 @@ async function postHandler(
 							turnNumber: nextTurnNumber,
 							role: 'student',
 							text: transcribedText,
-							audioUrl: '',
+							audioUrl: studentAudioUrl,
+							// audioDurationMs intentionally omitted: nothing in this codebase
+							// derives duration from a raw audio buffer/File without decoding
+							// it (the only other place that tracks it, pronunciation.service.ts,
+							// declares the field but never actually sets it either).
 							createdAt: new Date(),
 						});
 						session.turns.push({
