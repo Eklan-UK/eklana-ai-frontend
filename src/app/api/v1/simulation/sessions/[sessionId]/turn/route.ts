@@ -122,6 +122,26 @@ async function postHandler(
 			);
 		}
 
+		const elapsedMs = Date.now() - session.startedAt.getTime();
+		const maxDurationMs = scenario.maxDurationMinutes * 60_000;
+
+		// Time limit reached — end the session before doing any transcription
+		// or Live API work.
+		if (elapsedMs >= maxDurationMs) {
+			if (session.status === 'in_progress') {
+				session.status = 'completed';
+				session.completedAt = new Date();
+				await session.save();
+			}
+
+			return NextResponse.json(
+				{ code: 'Success', data: { sessionComplete: true } },
+				{ status: 200 },
+			);
+		}
+
+		const secondsRemaining = Math.round((maxDurationMs - elapsedMs) / 1000);
+
 		const currentPhase = scenario.scenarioScript[session.currentPhaseIndex];
 
 		// All phases complete — natural session-end signal. Full end-of-session
@@ -210,6 +230,7 @@ async function postHandler(
 			scenario,
 			currentPhase,
 			scenario.studentCharacterName,
+			secondsRemaining,
 		);
 
 		const revealedLabelsForPhase = new Set(

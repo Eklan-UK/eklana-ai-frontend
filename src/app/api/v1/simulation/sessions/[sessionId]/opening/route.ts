@@ -58,6 +58,33 @@ async function postHandler(
 			);
 		}
 
+		const scenario = await SimulationScenario.findById(session.scenarioId);
+
+		if (!scenario) {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Scenario not found' },
+				{ status: 404 },
+			);
+		}
+
+		const elapsedMs = Date.now() - session.startedAt.getTime();
+		const maxDurationMs = scenario.maxDurationMinutes * 60_000;
+
+		// Time limit reached — in case a student stalls long enough before ever
+		// taking their first turn.
+		if (elapsedMs >= maxDurationMs) {
+			if (session.status === 'in_progress') {
+				session.status = 'completed';
+				session.completedAt = new Date();
+				await session.save();
+			}
+
+			return NextResponse.json(
+				{ code: 'Success', data: { sessionComplete: true } },
+				{ status: 200 },
+			);
+		}
+
 		// Idempotent against reloads/retries — if the opening line already exists,
 		// stream back the persisted turn 0 instead of regenerating it.
 		if (session.turns.length > 0) {
@@ -77,15 +104,6 @@ async function postHandler(
 					'Connection': 'keep-alive',
 				},
 			});
-		}
-
-		const scenario = await SimulationScenario.findById(session.scenarioId);
-
-		if (!scenario) {
-			return NextResponse.json(
-				{ code: 'NotFound', message: 'Scenario not found' },
-				{ status: 404 },
-			);
 		}
 
 		const currentPhase = scenario.scenarioScript[session.currentPhaseIndex];
