@@ -1,10 +1,9 @@
 // POST /api/v1/simulation/sessions/[sessionId]/grade — runs SpeechAce scoring
 // for every student turn in a completed session, in parallel. Kept as its own
 // route (rather than inline in turn-taking) so the per-turn Speechace latency
-// doesn't sit on the live-conversation critical path. Grading now also fires
-// automatically in the background the moment a session completes (see the
-// completion points in turn/route.ts and end/route.ts) — this route remains
-// for manual/on-demand re-grading.
+// doesn't sit on the live-conversation critical path. Student-triggered only
+// (the "See my grades" button on the completion screen) — grading does not
+// fire automatically on session completion.
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 120; // generous for N parallel Speechace calls, not 300×N
@@ -56,10 +55,10 @@ async function postHandler(
 			);
 		}
 
-		const summary = await gradeSimulationSession(sessionId);
+		const result = await gradeSimulationSession(sessionId);
 
 		return NextResponse.json(
-			{ code: 'Success', data: summary },
+			{ code: 'Success', data: result },
 			{ status: 200 },
 		);
 	} catch (error: any) {

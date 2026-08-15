@@ -1,11 +1,10 @@
 // POST /api/v1/simulation/sessions/[sessionId]/end — student-initiated early end of a Simulation Room session
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationSession from '@/models/simulation-session';
-import { gradeSimulationSession } from '@/domain/simulation/simulation-grading.service';
 
 async function postHandler(
 	req: NextRequest,
@@ -50,19 +49,6 @@ async function postHandler(
 		session.status = 'completed';
 		session.completedAt = new Date();
 		await session.save();
-
-		// Non-blocking — grading runs in the background and must not delay this
-		// response. Scheduled via after() (not a bare un-awaited promise) so
-		// Vercel keeps the function alive until grading finishes instead of
-		// freezing/killing it right after the response is sent.
-		after(() =>
-			gradeSimulationSession(sessionId).catch((error: any) => {
-				logger.warn('[SimulationSessionEnd] Background grading failed', {
-					error: error.message,
-					sessionId,
-				});
-			}),
-		);
 
 		return NextResponse.json(
 			{ code: 'Success', data: { sessionComplete: true } },

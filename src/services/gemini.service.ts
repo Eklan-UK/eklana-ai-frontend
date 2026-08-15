@@ -379,6 +379,16 @@ export async function generateWithLiveAPIStream(
 				}
 			};
 
+			const sendError = (message: string) => {
+				if (sessionClosed) return;
+				try {
+					const chunk = JSON.stringify({ type: 'error', message });
+					controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+				} catch {
+					/* controller already closed — safe to ignore */
+				}
+			};
+
 			const closeStream = () => {
 				if (sessionClosed) return;
 				sessionClosed = true;
@@ -388,7 +398,8 @@ export async function generateWithLiveAPIStream(
 			};
 
 			let receivedAnyChunk = false;
-			let hasRetried = false;
+			let retryCount = 0;
+			const MAX_RETRIES = 3;
 
 			timeoutHandle = setTimeout(() => {
 				if (!sessionClosed) {
@@ -461,15 +472,23 @@ export async function generateWithLiveAPIStream(
 							}
 
 							if (message.serverContent?.turnComplete) {
-								if (!receivedAnyChunk && !hasRetried) {
-									hasRetried = true;
-									logger.warn('Live API turn complete with no chunks received, retrying once (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+								if (!receivedAnyChunk && retryCount < MAX_RETRIES) {
+									retryCount++;
+									logger.warn('Live API turn complete with no chunks received, retrying (Stream)', {
+										attempt: retryCount,
+										maxRetries: MAX_RETRIES,
+										elapsed: `${Date.now() - startTime}ms`,
+									});
 									session.sendClientContent({ turns, turnComplete: true });
 									return;
 								}
 
-								if (!receivedAnyChunk && hasRetried) {
-									logger.error('Live API retry also returned an empty turn (Stream)', { elapsed: `${Date.now() - startTime}ms` });
+								if (!receivedAnyChunk && retryCount >= MAX_RETRIES) {
+									logger.error('Live API retries exhausted, still no chunks received (Stream)', {
+										retryCount,
+										elapsed: `${Date.now() - startTime}ms`,
+									});
+									sendError('The AI did not respond. Please try again.');
 								}
 
 								logger.info('Live API turn complete (Stream)', { elapsed: `${Date.now() - startTime}ms` });
