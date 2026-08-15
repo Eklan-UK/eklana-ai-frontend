@@ -182,6 +182,7 @@ async function listHandler(
 
 		const scenarios = await SimulationScenario.find({ isActive: true })
 			.select('title workplaceSetting studentCharacterName weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
+			.populate('assignedLearnerIds', 'firstName lastName email')
 			.sort({ createdAt: -1 })
 			.lean()
 			.exec();
@@ -193,9 +194,15 @@ async function listHandler(
 			studentCharacterName: scenario.studentCharacterName,
 			weeklyFocus: scenario.weeklyFocus,
 			maxDurationMinutes: scenario.maxDurationMinutes,
-			assignedLearnerCount: Array.isArray(scenario.assignedLearnerIds)
-				? scenario.assignedLearnerIds.length
-				: 0,
+			assignedLearners: Array.isArray(scenario.assignedLearnerIds)
+				? scenario.assignedLearnerIds.map((learner: any) => ({
+						_id: learner._id,
+						name:
+							`${learner.firstName ?? ''} ${learner.lastName ?? ''}`.trim() ||
+							learner.email ||
+							'Unknown',
+					}))
+				: [],
 			createdAt: scenario.createdAt,
 		}));
 
