@@ -93,7 +93,7 @@ const Sidebar: React.FC = () => {
         { name: "Drill Builder", icon: Hammer, path: "/admin/drills" },
         { name: "Eklan Precision Clinic", icon: Target, path: "/admin/precision-clinic" },
         { name: "Bookmark Drills", icon: Bookmark, path: "/admin/drills/bookmarked" },
-        { name: "Simulation Room Scenarios", icon: MessageSquare, path: "/admin/drill/free-talk" },
+        { name: "Simulation Room Scenarios", icon: MessageSquare, path: "/admin/simulation/scenarios" },
         { name: "Weekly Challenge", icon: Trophy, path: "/admin/weekly-challenge" },
         { name: "Old Drill Builder", icon: List, path: "/admin/drill" },
         { name: "Pronunciations", icon: Mic, path: "/admin/pronunciations" },
