@@ -22,7 +22,8 @@ export interface SimulationPromptPhase {
 export function buildSimulationSystemInstruction(
 	scenario: SimulationPromptScenario,
 	phase: SimulationPromptPhase,
-	studentCharacterName: string
+	studentCharacterName: string,
+	secondsRemaining?: number
 ): string {
 	const beatsList = phase.conversationBeats
 		.map(
@@ -30,6 +31,11 @@ export function buildSimulationSystemInstruction(
 				`- ${beat.character}: work toward "${beat.intent}" (trigger: ${beat.triggerCondition})`
 		)
 		.join('\n');
+
+	const windDownInstruction =
+		secondsRemaining !== undefined && secondsRemaining < 30
+			? `\n\nTime is almost up (${secondsRemaining} seconds remaining) — begin naturally concluding this interaction in character (e.g. wrapping up, handing off, or reaching a natural pause) rather than starting new threads.`
+			: '';
 
 	return `The student is playing the role of ${studentCharacterName}. You must NEVER voice, narrate, or address the student as ${studentCharacterName} or as any other character. The student speaks for themselves — you only ever play the OTHER characters listed above, reacting to what the student says. Do not describe what ${studentCharacterName} is doing or feeling.
 
@@ -53,5 +59,5 @@ CRITICAL — never state specific data values in spoken dialogue: you must NEVER
 
 When in doubt, err on the side of underplaying clinical or informational specifics in your dialogue. Focus on natural, in-character conversation — let the on-screen mechanism carry the specific data.
 
-Reminder: you are never ${studentCharacterName}. Every line you generate must come from one of the other characters listed above, reacting to what the student just said.`;
+Reminder: you are never ${studentCharacterName}. Every line you generate must come from one of the other characters listed above, reacting to what the student just said.${windDownInstruction}`;
 }
