@@ -381,6 +381,8 @@ export default function SimulationSessionPage() {
   const [timeRemainingLabel, setTimeRemainingLabel] = useState("");
   const [gradingState, setGradingState] = useState<GradingState>("idle");
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
+  const [sessionControlsEnabled, setSessionControlsEnabled] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -456,11 +458,14 @@ export default function SimulationSessionPage() {
 
   // ─── Phase time remaining ─────────────────────────────────────────────────
 
+  const SESSION_CONTROLS_ELIGIBLE_MS = 5 * 60_000;
+
   useEffect(() => {
     if (!session) return;
 
-    const endTime =
-      new Date(session.startedAt).getTime() + session.scenario.maxDurationMinutes * 60_000;
+    const startTime = new Date(session.startedAt).getTime();
+    const endTime = startTime + session.scenario.maxDurationMinutes * 60_000;
+    const controlsEligibleAt = startTime + SESSION_CONTROLS_ELIGIBLE_MS;
 
     const tick = () => {
       const remainingMs = Math.max(0, endTime - Date.now());
@@ -468,6 +473,7 @@ export default function SimulationSessionPage() {
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       setTimeRemainingLabel(`${minutes}:${seconds.toString().padStart(2, "0")}`);
+      setSessionControlsEnabled(Date.now() >= controlsEligibleAt);
     };
 
     tick();
@@ -666,15 +672,59 @@ export default function SimulationSessionPage() {
       "Leave this simulation? Your progress will be saved, but the session will end for now.",
     );
     if (!confirmed) return;
-    // Explicitly clear the phase-timer interval before navigating — router.push
-    // doesn't unmount synchronously, so relying solely on the effect's own
-    // cleanup can leave the interval ticking briefly after navigation starts.
+    clearPhaseTimer();
+    releaseMediaStream(mediaStreamRef.current);
+    router.push("/account/practice/simulation");
+  };
+
+  // ─── Session controls (end / leave-and-continue-later) ─────────────────────
+
+  const handleSessionControlsBlocked = () => {
+    toast.error("Available after 5 minutes");
+  };
+
+  // Explicitly clear the phase-timer interval before navigating away —
+  // router.push doesn't unmount synchronously, so relying solely on the
+  // effect's own cleanup can leave the interval ticking briefly after
+  // navigation starts.
+  const clearPhaseTimer = () => {
     if (phaseTimerIntervalRef.current) {
       clearInterval(phaseTimerIntervalRef.current);
       phaseTimerIntervalRef.current = null;
     }
+  };
+
+  const handleLeaveAndContinueLater = () => {
+    if (!sessionControlsEnabled) {
+      handleSessionControlsBlocked();
+      return;
+    }
+    // Session stays in_progress server-side — the Simulation Room list page
+    // already resumes it via its "Continue" button.
+    clearPhaseTimer();
     releaseMediaStream(mediaStreamRef.current);
     router.push("/account/practice/simulation");
+  };
+
+  const handleEndSession = async () => {
+    if (!sessionControlsEnabled) {
+      handleSessionControlsBlocked();
+      return;
+    }
+    setEndingSession(true);
+    try {
+      const res = await fetch(`/api/v1/simulation/sessions/${sessionId}/end`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to end session");
+      clearPhaseTimer();
+      releaseMediaStream(mediaStreamRef.current);
+      router.push("/account/practice/simulation");
+    } catch {
+      toast.error("Could not end the session. Please try again.");
+      setEndingSession(false);
+    }
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -726,6 +776,35 @@ export default function SimulationSessionPage() {
 
         <div className="w-11" />
       </header>
+
+      {/* Session controls */}
+      {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") && (
+        <div className="flex items-center justify-center gap-2 border-b border-border px-4 py-2">
+          <button
+            onClick={handleLeaveAndContinueLater}
+            aria-disabled={!sessionControlsEnabled}
+            className={`rounded-full px-3 py-1.5 font-nunito text-xs font-semibold transition-all ${
+              sessionControlsEnabled
+                ? "bg-primary text-white hover:bg-primary-dark"
+                : "bg-muted text-muted-foreground opacity-50"
+            }`}
+          >
+            Leave &amp; Continue Later
+          </button>
+          <button
+            onClick={handleEndSession}
+            disabled={endingSession}
+            aria-disabled={!sessionControlsEnabled}
+            className={`rounded-full px-3 py-1.5 font-nunito text-xs font-semibold transition-all ${
+              sessionControlsEnabled
+                ? "bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
+                : "bg-muted text-muted-foreground opacity-50"
+            }`}
+          >
+            {endingSession ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "End Session"}
+          </button>
+        </div>
+      )}
 
       {/* Progress bar */}
       {session && session.scenario.phases.length > 0 && (
