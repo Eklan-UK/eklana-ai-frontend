@@ -35,14 +35,14 @@ The learner/student plays the role of ${studentCharacterName}. Do NOT include ${
 
 Extract exactly four things:
 
-1. displayData — ONLY the static background/setup information given to the learner before the scenario begins (e.g. a patient/case snapshot). This will be read aloud by an AI voice at the start of the session, so rewrite it as natural, sayable spoken paragraphs — not bullet fragments and not text copied verbatim from slides.
+1. displayData — ALL baseline information a person in this role would realistically already know or see at the very start of the encounter: the presenting complaint/situation, baseline readings/status, and any chart, handoff, or briefing data given up front. This belongs in displayData EVEN IF the source deck presents it under a separate "findings" or "assessment" heading/slide — where the deck puts it does not matter, only whether it would already be known at scene start. Do not move baseline information into gatedFindings just because the deck labels it as a finding. This will be read aloud by an AI voice at the start of the session, so rewrite it as natural, sayable spoken paragraphs — not bullet fragments and not text copied verbatim from slides.
 
 2. scenarioScript — an array of phase objects covering everything that unfolds DURING the interaction. Derive the number and structure of phases from the deck's actual content. Each phase object has:
    - phaseName: string
    - triggerCondition: string — what starts this phase
    - characters: string[] — which roles/characters are active in this phase (e.g. "patient", "supervisor", "colleague")
    - conversationBeats: array of { character, intent, triggerCondition } — intent describes WHAT the character should communicate or accomplish in natural language (e.g. "reports sudden distress, sounds anxious"), NOT a verbatim scripted line, since a separate live AI will generate the actual wording and respond to the learner in real time
-   - gatedFindings: array of { label, data, revealCondition } — any data/information meant to be displayed on screen only after a trigger condition is met (e.g. after the learner performs an assessment or requests information); this is never spoken aloud
+   - gatedFindings: array of { label, data, revealCondition } — any data/information meant to be displayed on screen only after a trigger condition is met (e.g. after the learner performs an assessment or requests information); this is never spoken aloud. Reserve gatedFindings ONLY for information that requires the learner to actively assess, ask, or act during the encounter to discover — information that would NOT plausibly be known yet at scene start. If it's baseline information already known at the start, it belongs in displayData instead, regardless of which slide/heading the deck put it under. Example: a baseline oxygen saturation reading given in the deck's patient snapshot belongs in displayData, not gatedFindings, even if the deck lists it under an "assessment findings" header — only a CHANGED or newly-measured reading taken during the encounter (e.g. a repeat SpO2 check after an intervention) belongs in gatedFindings.
 
 3. studentHint — optional on-demand reference material the learner could look up if they choose to; it is not shown automatically. Return an empty string if the deck has no such content.
 

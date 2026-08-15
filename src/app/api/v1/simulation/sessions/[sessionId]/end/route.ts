@@ -1,19 +1,10 @@
-// POST /api/v1/simulation/sessions/[sessionId]/grade — runs SpeechAce scoring
-// for every student turn in a completed session, in parallel. Kept as its own
-// route (rather than inline in turn-taking) so the per-turn Speechace latency
-// doesn't sit on the live-conversation critical path. Grading now also fires
-// automatically in the background the moment a session completes (see the
-// completion points in turn/route.ts and end/route.ts) — this route remains
-// for manual/on-demand re-grading.
-import { NextRequest, NextResponse } from 'next/server';
-
-export const maxDuration = 120; // generous for N parallel Speechace calls, not 300×N
-
+// POST /api/v1/simulation/sessions/[sessionId]/end — student-initiated early end of a Simulation Room session
+import { NextRequest, NextResponse, after } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
+import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationSession from '@/models/simulation-session';
-import { connectToDatabase } from '@/lib/api/db';
 import { gradeSimulationSession } from '@/domain/simulation/simulation-grading.service';
 
 async function postHandler(
@@ -49,27 +40,42 @@ async function postHandler(
 			);
 		}
 
-		if (session.status !== 'completed') {
+		if (session.status !== 'in_progress') {
 			return NextResponse.json(
-				{ code: 'ValidationError', message: 'Session must be completed before grading' },
+				{ code: 'ValidationError', message: 'Session is not in progress' },
 				{ status: 400 },
 			);
 		}
 
-		const summary = await gradeSimulationSession(sessionId);
+		session.status = 'completed';
+		session.completedAt = new Date();
+		await session.save();
+
+		// Non-blocking — grading runs in the background and must not delay this
+		// response. Scheduled via after() (not a bare un-awaited promise) so
+		// Vercel keeps the function alive until grading finishes instead of
+		// freezing/killing it right after the response is sent.
+		after(() =>
+			gradeSimulationSession(sessionId).catch((error: any) => {
+				logger.warn('[SimulationSessionEnd] Background grading failed', {
+					error: error.message,
+					sessionId,
+				});
+			}),
+		);
 
 		return NextResponse.json(
-			{ code: 'Success', data: summary },
+			{ code: 'Success', data: { sessionComplete: true } },
 			{ status: 200 },
 		);
 	} catch (error: any) {
-		logger.error('[SimulationSessionGrade] POST error', {
+		logger.error('[SimulationSessionEnd] POST error', {
 			error: error.message,
 			stack: error.stack,
 			name: error.name,
 		});
 		return NextResponse.json(
-			{ code: 'ServerError', message: 'Failed to grade simulation session' },
+			{ code: 'ServerError', message: 'Failed to end simulation session' },
 			{ status: 500 },
 		);
 	}
