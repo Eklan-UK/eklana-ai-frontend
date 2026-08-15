@@ -833,6 +833,14 @@ export class TranscriptionRejectedError extends Error {
  * Uses gemini-2.0-flash (DEFAULT_MODEL) with inline audio data.
  * Fast, cheap, and reliable — no WebSocket overhead.
  */
+// Below this size, a recording is near-silent/near-instant rather than a short
+// real utterance. Gemini has been observed hallucinating a plausible-sounding
+// sentence for such clips (e.g. "I'm not sure if I can do that"), which then
+// gets submitted as real student speech — refusal/repetition detection after
+// the fact can't catch hallucinated-but-coherent output, so this must reject
+// before the model call.
+const MIN_AUDIO_BYTES_FOR_TRANSCRIPTION = 3000;
+
 export async function transcribeAudio(
 	audioBuffer: Buffer,
 	mimeType: string = 'audio/webm'
@@ -840,6 +848,11 @@ export async function transcribeAudio(
 	try {
 		if (!genAI) {
 			throw new Error('Gemini API is not configured');
+		}
+
+		if (audioBuffer.length < MIN_AUDIO_BYTES_FOR_TRANSCRIPTION) {
+			logger.warn('Audio too short or silent, skipping transcription', { size: audioBuffer.length });
+			throw new TranscriptionRejectedError('Audio too short or silent');
 		}
 
 		logger.info('Transcribing audio', { size: audioBuffer.length, mimeType });

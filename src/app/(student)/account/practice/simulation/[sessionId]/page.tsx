@@ -115,16 +115,17 @@ async function readSimulationSSE(
 // ─── Progressive, gapless audio playback ───────────────────────────────────
 //
 // Gemini Live streams PCM audio a chunk at a time. Rather than buffer the
-// whole response and convert+play one WAV at the end, we flush ~1.5s worth
+// whole response and convert+play one WAV at the end, we flush ~1s worth
 // of PCM to WAV as it arrives and queue each resulting clip for back-to-back
 // playback, so the student hears the AI start speaking well before it
-// finishes generating.
+// finishes generating. Playback holds a one-clip cushion before starting
+// (see createAudioQueue) so a lagging conversion round trip doesn't stall it.
 
 const PCM_SAMPLE_RATE = 24_000;
 const PCM_BYTES_PER_SAMPLE = 2; // 16-bit
 const PCM_CHANNELS = 1;
 const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * PCM_CHANNELS;
-const FLUSH_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND * 1.5; // ~1.5s of audio per flush
+const FLUSH_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND * 1.0; // ~1s of audio per flush
 
 /** Estimates decoded byte length of a base64 string without decoding it. */
 function estimateBase64ByteLength(base64: string): number {
@@ -139,6 +140,7 @@ function createAudioQueue(
   const queue: string[] = [];
   let playing = false;
   let streamEnded = false;
+  let hasStartedPlaying = false;
 
   const maybeNotifyDrain = () => {
     if (streamEnded && !playing && queue.length === 0) onDrain?.();
@@ -151,6 +153,7 @@ function createAudioQueue(
       maybeNotifyDrain();
       return;
     }
+    hasStartedPlaying = true;
     playing = true;
     const audio = new Audio(`data:audio/wav;base64,${wavBase64}`);
     playbackAudioRef.current = audio;
@@ -160,12 +163,22 @@ function createAudioQueue(
   };
 
   return {
+    // Keep one clip's cushion before starting playback: wait for 2 clips queued,
+    // or the stream to have ended with at least 1 clip queued, so a lagging
+    // WAV-conversion round trip for a later chunk doesn't produce an audible gap.
+    // Once playback has started, resume immediately as each new clip arrives.
     enqueue(wavBase64: string) {
       queue.push(wavBase64);
-      if (!playing) playNext();
+      if (playing) return;
+      if (!hasStartedPlaying) {
+        if (queue.length >= 2 || (streamEnded && queue.length >= 1)) playNext();
+        return;
+      }
+      playNext();
     },
     markStreamEnded() {
       streamEnded = true;
+      if (!playing && !hasStartedPlaying && queue.length >= 1) playNext();
       maybeNotifyDrain();
     },
   };
@@ -194,7 +207,7 @@ async function flushAudioChunks(
 
 /**
  * Buffers incoming PCM chunks and flushes them to the playback queue in
- * ~1.5s batches. Flushes are chained sequentially (not fired concurrently)
+ * ~1s batches. Flushes are chained sequentially (not fired concurrently)
  * so clips are guaranteed to enqueue — and therefore play — in arrival
  * order even if individual WAV-conversion requests race on the network.
  */
