@@ -100,7 +100,7 @@ function isValidGatedFinding(value: unknown): value is ScenarioGatedFinding {
 	);
 }
 
-function isValidPhase(value: unknown): value is ScenarioPhase {
+export function isValidPhase(value: unknown): value is ScenarioPhase {
 	if (typeof value !== 'object' || value === null) return false;
 	const phase = value as Record<string, unknown>;
 	return (
