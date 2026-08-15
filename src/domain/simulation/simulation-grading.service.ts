@@ -2,9 +2,9 @@
 // scoring for every student turn (in parallel), grammar/context analysis, and
 // competency scoring, then persists the aggregate result onto the session.
 //
-// Used both by the POST /grade route (manual/on-demand grading) and by the
-// completion points in turn/route.ts and end/route.ts, which fire this as a
-// non-blocking background call the moment a session transitions to 'completed'.
+// Used by POST /api/v1/simulation/sessions/[sessionId]/grade — student-triggered,
+// on-demand grading only. Grading no longer fires automatically on session
+// completion (see turn/route.ts and end/route.ts).
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
@@ -19,15 +19,28 @@ import {
 	CompetencyScoringResult,
 } from '@/domain/simulation/simulation-competency-scoring.service';
 
-export interface SimulationGradingSummary {
-	gradedTurnCount: number;
-	failedTurnCount: number;
-	grammarErrorCount: number;
-	competencyScoreCount: number;
-	overallSummary: string;
+export interface MispronouncedWord {
+	word: string;
+	score: number;
+	turnNumber: number;
 }
 
-export async function gradeSimulationSession(sessionId: string): Promise<SimulationGradingSummary> {
+export interface SimulationGradeResult {
+	pronunciation: {
+		gradedTurnCount: number;
+		failedTurnCount: number;
+		mispronouncedWords: MispronouncedWord[];
+	};
+	grammar: GrammarAnalysisResult;
+	competency: CompetencyScoringResult;
+	gradedAt: Date;
+}
+
+// SpeechAce quality_score runs 0-100; below this a word is surfaced to the
+// student as "mispronounced" in the review screen.
+const MISPRONOUNCED_SCORE_THRESHOLD = 70;
+
+export async function gradeSimulationSession(sessionId: string): Promise<SimulationGradeResult> {
 	await connectToDatabase();
 
 	const session = await SimulationSession.findById(sessionId);
@@ -120,20 +133,32 @@ export async function gradeSimulationSession(sessionId: string): Promise<Simulat
 	const failedTurnCount = pronunciationResults.filter((r) => r.speechaceResult === null).length;
 	const gradedTurnCount = pronunciationResults.length - failedTurnCount;
 
-	session.overallGradeResult = {
-		pronunciation: { gradedTurnCount, failedTurnCount },
+	// Word-level pronunciation detail only exists on each turn's speechaceResult
+	// (word_scores) — it isn't aggregated anywhere else, so we flatten it here
+	// into a single list the client can render directly.
+	const mispronouncedWords: MispronouncedWord[] = [];
+	for (const result of pronunciationResults) {
+		const wordScores = result.speechaceResult?.word_scores ?? [];
+		for (const wordScore of wordScores) {
+			if (typeof wordScore.score === 'number' && wordScore.score < MISPRONOUNCED_SCORE_THRESHOLD) {
+				mispronouncedWords.push({
+					word: wordScore.word,
+					score: wordScore.score,
+					turnNumber: result.turnNumber,
+				});
+			}
+		}
+	}
+
+	const gradeResult: SimulationGradeResult = {
+		pronunciation: { gradedTurnCount, failedTurnCount, mispronouncedWords },
 		grammar: grammarResult,
 		competency: competencyResult,
 		gradedAt: new Date(),
 	};
 
+	session.overallGradeResult = gradeResult;
 	await session.save();
 
-	return {
-		gradedTurnCount,
-		failedTurnCount,
-		grammarErrorCount: grammarResult.errors.length,
-		competencyScoreCount: competencyResult.competencyScores.length,
-		overallSummary: competencyResult.overallSummary,
-	};
+	return gradeResult;
 }
