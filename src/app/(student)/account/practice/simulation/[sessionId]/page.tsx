@@ -530,8 +530,6 @@ export default function SimulationSessionPage() {
 
   const currentPhaseName =
     session?.scenario.phases[session.currentPhaseIndex]?.phaseName ?? "";
-  const speakerLabel =
-    session?.scenario.phases[session.currentPhaseIndex]?.characters[0] ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -624,11 +622,6 @@ export default function SimulationSessionPage() {
                     message.role === "student" ? "items-end" : "items-start"
                   }`}
                 >
-                  {message.role === "ai" && speakerLabel && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 font-nunito text-xs font-semibold text-muted-foreground">
-                      {speakerLabel}
-                    </span>
-                  )}
                   <p
                     className={`max-w-[85%] rounded-2xl px-4 py-2 font-nunito text-base leading-relaxed ${
                       message.role === "student"

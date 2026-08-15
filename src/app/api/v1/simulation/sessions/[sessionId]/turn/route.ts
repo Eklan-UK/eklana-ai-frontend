@@ -8,7 +8,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
-import { transcribeAudio, generateWithLiveAPIStream } from '@/services/gemini.service';
+import { transcribeAudio, generateWithLiveAPIStream, TranscriptionRejectedError } from '@/services/gemini.service';
 import { uploadToCloudinary } from '@/services/cloudinary.service';
 import { checkFindingReveals } from '@/domain/simulation/simulation-turn-reveal.service';
 import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
@@ -141,7 +141,23 @@ async function postHandler(
 
 		const arrayBuffer = await audioToProcess.arrayBuffer();
 		const audioBuffer = Buffer.from(arrayBuffer);
-		const transcribedText = await transcribeAudio(audioBuffer, audioMimeType);
+
+		let transcribedText: string;
+		try {
+			transcribedText = await transcribeAudio(audioBuffer, audioMimeType);
+		} catch (error: any) {
+			if (error instanceof TranscriptionRejectedError) {
+				logger.warn('[SimulationSessionTurn] Transcription rejected', {
+					error: error.message,
+					sessionId,
+				});
+				return NextResponse.json(
+					{ code: 'ValidationError', message: "We couldn't understand that clearly — please try again" },
+					{ status: 422 },
+				);
+			}
+			throw error;
+		}
 
 		// Emitted early, before the Live stream starts, so the client can render
 		// the student's own turn without waiting on the AI response.
