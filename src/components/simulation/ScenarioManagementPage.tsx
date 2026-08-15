@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { FileUploadZone } from "@/components/drills/FileUploadZone";
 import { useAllLearners } from "@/hooks/useAdmin";
 import { useTutorStudents } from "@/hooks/useTutor";
+import { COMPETENCY_FRAMEWORK } from "@/config/competency-framework";
 
 interface ScenarioManagementPageProps {
   variant: "tutor" | "admin";
@@ -23,11 +24,42 @@ interface ScenarioSummary {
   title: string;
   workplaceSetting: string;
   studentCharacterName: string;
+  topicId?: string;
   weeklyFocus: string[];
   maxDurationMinutes: number;
   assignedLearners: AssignedLearner[];
   createdAt: string;
 }
+
+interface ConversationBeatFormState {
+  character: string;
+  intent: string;
+  triggerCondition: string;
+}
+
+interface GatedFindingFormState {
+  label: string;
+  data: string;
+  revealCondition: string;
+}
+
+interface PhaseFormState {
+  phaseName: string;
+  triggerCondition: string;
+  characters: string[];
+  characterInput: string;
+  conversationBeats: ConversationBeatFormState[];
+  gatedFindings: GatedFindingFormState[];
+}
+
+const emptyPhase = (): PhaseFormState => ({
+  phaseName: "",
+  triggerCondition: "",
+  characters: [],
+  characterInput: "",
+  conversationBeats: [],
+  gatedFindings: [],
+});
 
 const emptyForm = () => ({
   title: "",
@@ -36,6 +68,7 @@ const emptyForm = () => ({
   dramatisationPrompt: "",
   gradingRubric: "",
   maxDurationMinutes: "15",
+  topicId: "",
 });
 
 function learnerDisplayName(learner: { firstName?: string; lastName?: string; email?: string }) {
@@ -43,11 +76,18 @@ function learnerDisplayName(learner: { firstName?: string; lastName?: string; em
   return name || learner.email || "Unknown";
 }
 
+const fieldClass =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30";
+const smallFieldClass =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30";
+
 export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps) {
   const [form, setForm] = useState(emptyForm());
-  const [weeklyFocus, setWeeklyFocus] = useState<string[]>([]);
-  const [weeklyFocusInput, setWeeklyFocusInput] = useState("");
   const [slideDeck, setSlideDeck] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [displayData, setDisplayData] = useState("");
+  const [studentHint, setStudentHint] = useState("");
+  const [phases, setPhases] = useState<PhaseFormState[]>([]);
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>([]);
   const [learnerSearch, setLearnerSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -142,31 +182,196 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     }
   };
 
-  const addWeeklyFocusTag = () => {
-    const value = weeklyFocusInput.trim();
-    if (!value) return;
-    if (!weeklyFocus.includes(value)) {
-      setWeeklyFocus((prev) => [...prev, value]);
+  // ─── Slide deck extraction (preview / pre-fill) ────────────────────────────
+
+  const canExtract = Boolean(slideDeck) && Boolean(form.studentCharacterName.trim());
+
+  const handleExtract = async () => {
+    if (!slideDeck) return;
+    if (!form.studentCharacterName.trim()) {
+      toast.error("Enter the student character name first");
+      return;
     }
-    setWeeklyFocusInput("");
+
+    setExtracting(true);
+    try {
+      const extractFormData = new FormData();
+      extractFormData.append("file", slideDeck);
+      extractFormData.append("studentCharacterName", form.studentCharacterName.trim());
+
+      const res = await fetch("/api/v1/admin/simulation/scenarios/extract", {
+        method: "POST",
+        credentials: "include",
+        body: extractFormData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Failed to extract from slide deck");
+
+      const result = json.data as {
+        displayData: string;
+        studentHint: string;
+        scenarioScript: Array<{
+          phaseName: string;
+          triggerCondition: string;
+          characters: string[];
+          conversationBeats: ConversationBeatFormState[];
+          gatedFindings: GatedFindingFormState[];
+        }>;
+      };
+
+      setDisplayData(result.displayData ?? "");
+      setStudentHint(result.studentHint ?? "");
+      setPhases(
+        (result.scenarioScript ?? []).map((phase) => ({
+          phaseName: phase.phaseName,
+          triggerCondition: phase.triggerCondition,
+          characters: phase.characters,
+          characterInput: "",
+          conversationBeats: phase.conversationBeats,
+          gatedFindings: phase.gatedFindings,
+        })),
+      );
+      toast.success("Extracted from slide deck — review and edit below");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to extract from slide deck";
+      toast.error(message);
+    } finally {
+      setExtracting(false);
+    }
   };
 
-  const handleWeeklyFocusKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  // ─── Phases editor ──────────────────────────────────────────────────────────
+
+  const addPhase = () => setPhases((prev) => [...prev, emptyPhase()]);
+
+  const removePhase = (phaseIndex: number) =>
+    setPhases((prev) => prev.filter((_, i) => i !== phaseIndex));
+
+  const updatePhaseField = (
+    phaseIndex: number,
+    field: "phaseName" | "triggerCondition",
+    value: string,
+  ) =>
+    setPhases((prev) => prev.map((p, i) => (i === phaseIndex ? { ...p, [field]: value } : p)));
+
+  const setPhaseCharacterInput = (phaseIndex: number, value: string) =>
+    setPhases((prev) => prev.map((p, i) => (i === phaseIndex ? { ...p, characterInput: value } : p)));
+
+  const addPhaseCharacter = (phaseIndex: number) =>
+    setPhases((prev) =>
+      prev.map((p, i) => {
+        if (i !== phaseIndex) return p;
+        const value = p.characterInput.trim();
+        if (!value || p.characters.includes(value)) return { ...p, characterInput: "" };
+        return { ...p, characters: [...p.characters, value], characterInput: "" };
+      }),
+    );
+
+  const removePhaseCharacter = (phaseIndex: number, character: string) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex ? { ...p, characters: p.characters.filter((c) => c !== character) } : p,
+      ),
+    );
+
+  const handlePhaseCharacterKeyDown = (
+    phaseIndex: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addWeeklyFocusTag();
+      addPhaseCharacter(phaseIndex);
     }
   };
 
-  const removeWeeklyFocusTag = (tag: string) => {
-    setWeeklyFocus((prev) => prev.filter((t) => t !== tag));
-  };
+  const addBeat = (phaseIndex: number) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? {
+              ...p,
+              conversationBeats: [
+                ...p.conversationBeats,
+                { character: "", intent: "", triggerCondition: "" },
+              ],
+            }
+          : p,
+      ),
+    );
+
+  const removeBeat = (phaseIndex: number, beatIndex: number) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? { ...p, conversationBeats: p.conversationBeats.filter((_, bi) => bi !== beatIndex) }
+          : p,
+      ),
+    );
+
+  const updateBeatField = (
+    phaseIndex: number,
+    beatIndex: number,
+    field: "character" | "intent" | "triggerCondition",
+    value: string,
+  ) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? {
+              ...p,
+              conversationBeats: p.conversationBeats.map((b, bi) =>
+                bi === beatIndex ? { ...b, [field]: value } : b,
+              ),
+            }
+          : p,
+      ),
+    );
+
+  const addFinding = (phaseIndex: number) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? { ...p, gatedFindings: [...p.gatedFindings, { label: "", data: "", revealCondition: "" }] }
+          : p,
+      ),
+    );
+
+  const removeFinding = (phaseIndex: number, findingIndex: number) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? { ...p, gatedFindings: p.gatedFindings.filter((_, fi) => fi !== findingIndex) }
+          : p,
+      ),
+    );
+
+  const updateFindingField = (
+    phaseIndex: number,
+    findingIndex: number,
+    field: "label" | "data" | "revealCondition",
+    value: string,
+  ) =>
+    setPhases((prev) =>
+      prev.map((p, i) =>
+        i === phaseIndex
+          ? {
+              ...p,
+              gatedFindings: p.gatedFindings.map((f, fi) =>
+                fi === findingIndex ? { ...f, [field]: value } : f,
+              ),
+            }
+          : p,
+      ),
+    );
+
+  // ─── Submit ─────────────────────────────────────────────────────────────────
 
   const resetForm = () => {
     setForm(emptyForm());
-    setWeeklyFocus([]);
-    setWeeklyFocusInput("");
     setSlideDeck(null);
+    setDisplayData("");
+    setStudentHint("");
+    setPhases([]);
     setSelectedLearnerIds([]);
     setLearnerSearch("");
   };
@@ -176,9 +381,12 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     if (!form.workplaceSetting.trim()) return "Workplace setting is required";
     if (!form.studentCharacterName.trim()) return "Student character name is required";
     if (!form.dramatisationPrompt.trim()) return "Dramatisation prompt is required";
-    if (weeklyFocus.length === 0) return "Add at least one weekly focus area";
+    if (!form.topicId) return "Select a topic";
+    if (!displayData.trim()) return "Background / Briefing is required";
     if (!form.gradingRubric.trim()) return "Grading rubric is required";
-    if (!slideDeck) return "Upload a slide deck (.pptx)";
+    if (phases.length === 0) return "Add at least one phase";
+    const hasValidPhase = phases.some((p) => p.phaseName.trim() && p.characters.length > 0);
+    if (!hasValidPhase) return "Add at least one phase with a name and at least one AI-voiced character";
     if (selectedLearnerIds.length === 0) return "Select at least one learner";
     return null;
   };
@@ -194,14 +402,22 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("file", slideDeck as File);
+      if (slideDeck) formData.append("file", slideDeck);
       formData.append("title", form.title.trim());
       formData.append("workplaceSetting", form.workplaceSetting.trim());
       formData.append("studentCharacterName", form.studentCharacterName.trim());
       formData.append("dramatisationPrompt", form.dramatisationPrompt.trim());
-      formData.append("weeklyFocus", JSON.stringify(weeklyFocus));
+      formData.append("topicId", form.topicId);
       formData.append("gradingRubric", form.gradingRubric.trim());
       formData.append("maxDurationMinutes", form.maxDurationMinutes);
+      formData.append("displayData", displayData.trim());
+      formData.append("studentHint", studentHint.trim());
+      formData.append(
+        "scenarioScript",
+        JSON.stringify(
+          phases.map(({ characterInput: _characterInput, ...phase }) => phase),
+        ),
+      );
       for (const learnerId of selectedLearnerIds) {
         formData.append("assignedLearnerIds", learnerId);
       }
@@ -245,7 +461,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   value={form.title}
                   onChange={(e) => set("title", e.target.value)}
                   placeholder="e.g. Handover to Night Shift After a Fall"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  className={fieldClass}
                 />
               </div>
 
@@ -258,7 +474,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   value={form.workplaceSetting}
                   onChange={(e) => set("workplaceSetting", e.target.value)}
                   placeholder="e.g. Medical-surgical inpatient ward"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  className={fieldClass}
                 />
               </div>
 
@@ -271,8 +487,41 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   value={form.studentCharacterName}
                   onChange={(e) => set("studentCharacterName", e.target.value)}
                   placeholder="e.g. Nurse Sunju"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  className={fieldClass}
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Slide Deck (optional)</label>
+                <p className="text-xs text-gray-500">
+                  Optionally upload a slide deck to pre-fill the fields below.
+                </p>
+                <FileUploadZone
+                  acceptedTypes=".pptx"
+                  onFileSelect={(file) => setSlideDeck(file)}
+                  onRemove={() => setSlideDeck(null)}
+                  disabled={submitting || extracting}
+                />
+                <button
+                  type="button"
+                  onClick={handleExtract}
+                  disabled={!canExtract || extracting || submitting}
+                  className="flex items-center gap-2 rounded-xl border border-[#3B883E] px-4 py-2 text-sm font-semibold text-[#3B883E] transition-colors hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {extracting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Extracting…
+                    </>
+                  ) : (
+                    "Extract from slides"
+                  )}
+                </button>
+                {slideDeck && !form.studentCharacterName.trim() && (
+                  <p className="text-xs text-amber-600">
+                    Enter the student character name above first
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -284,42 +533,287 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   onChange={(e) => set("dramatisationPrompt", e.target.value)}
                   rows={4}
                   placeholder="Describe how the AI character(s) should play out this scenario"
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  className={`resize-y ${fieldClass}`}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-gray-700">
-                  Weekly Focus <span className="text-red-500">*</span>
+                  Background / Briefing <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={weeklyFocusInput}
-                  onChange={(e) => setWeeklyFocusInput(e.target.value)}
-                  onKeyDown={handleWeeklyFocusKeyDown}
-                  placeholder="Type a focus area and press Enter"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                <p className="text-xs text-gray-500">
+                  What the learner hears at the start of the session — presenting situation, baseline vitals, handoff info.
+                </p>
+                <textarea
+                  value={displayData}
+                  onChange={(e) => setDisplayData(e.target.value)}
+                  rows={4}
+                  placeholder="Read aloud by an AI voice at the start of the session"
+                  className={`resize-y ${fieldClass}`}
                 />
-                {weeklyFocus.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {weeklyFocus.map((tag) => (
-                      <span
-                        key={tag}
-                        className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-[#3B883E]"
-                      >
-                        {tag}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Vitals / Clinical Info</label>
+                <p className="text-xs text-gray-500">
+                  Optional on-demand hint content shown to the student only if they choose to look it up — not shown automatically.
+                </p>
+                <textarea
+                  value={studentHint}
+                  onChange={(e) => setStudentHint(e.target.value)}
+                  rows={3}
+                  placeholder="Reference material the learner can look up during the session"
+                  className={`resize-y ${fieldClass}`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">
+                    Phases <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addPhase}
+                    className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add phase
+                  </button>
+                </div>
+
+                {phases.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No phases yet. Add one, or extract from a slide deck above.
+                  </p>
+                )}
+
+                <div className="space-y-4">
+                  {phases.map((phase, phaseIndex) => (
+                    <div key={phaseIndex} className="space-y-4 rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Phase {phaseIndex + 1}
+                        </p>
                         <button
                           type="button"
-                          onClick={() => removeWeeklyFocusTag(tag)}
-                          aria-label={`Remove ${tag}`}
-                          className="text-[#3B883E]/70 hover:text-[#3B883E]"
+                          onClick={() => removePhase(phaseIndex)}
+                          aria-label={`Remove phase ${phaseIndex + 1}`}
+                          className="rounded-lg p-1.5 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
                         >
-                          <X className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-gray-700">Phase Name</label>
+                          <input
+                            type="text"
+                            value={phase.phaseName}
+                            onChange={(e) => updatePhaseField(phaseIndex, "phaseName", e.target.value)}
+                            placeholder="e.g. Initial Assessment"
+                            className={smallFieldClass}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-gray-700">
+                            Ends When / Trigger Condition
+                          </label>
+                          <input
+                            type="text"
+                            value={phase.triggerCondition}
+                            onChange={(e) =>
+                              updatePhaseField(phaseIndex, "triggerCondition", e.target.value)
+                            }
+                            placeholder="e.g. Learner escalates to the charge nurse"
+                            className={smallFieldClass}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-gray-700">AI-Voiced Characters</label>
+                        <input
+                          type="text"
+                          value={phase.characterInput}
+                          onChange={(e) => setPhaseCharacterInput(phaseIndex, e.target.value)}
+                          onKeyDown={(e) => handlePhaseCharacterKeyDown(phaseIndex, e)}
+                          placeholder="Type a character name and press Enter"
+                          className={smallFieldClass}
+                        />
+                        {phase.characters.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {phase.characters.map((character) => (
+                              <span
+                                key={character}
+                                className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-[#3B883E]"
+                              >
+                                {character}
+                                <button
+                                  type="button"
+                                  onClick={() => removePhaseCharacter(phaseIndex, character)}
+                                  aria-label={`Remove ${character}`}
+                                  className="text-[#3B883E]/70 hover:text-[#3B883E]"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-gray-700">Conversation Beats</label>
+                          <button
+                            type="button"
+                            onClick={() => addBeat(phaseIndex)}
+                            className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add beat
+                          </button>
+                        </div>
+                        {phase.conversationBeats.length === 0 && (
+                          <p className="text-xs text-gray-500">No conversation beats yet</p>
+                        )}
+                        <div className="space-y-2">
+                          {phase.conversationBeats.map((beat, beatIndex) => (
+                            <div
+                              key={beatIndex}
+                              className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                            >
+                              <input
+                                type="text"
+                                value={beat.character}
+                                onChange={(e) =>
+                                  updateBeatField(phaseIndex, beatIndex, "character", e.target.value)
+                                }
+                                placeholder="Character"
+                                className={smallFieldClass}
+                              />
+                              <input
+                                type="text"
+                                value={beat.intent}
+                                onChange={(e) =>
+                                  updateBeatField(phaseIndex, beatIndex, "intent", e.target.value)
+                                }
+                                placeholder="Intent"
+                                className={smallFieldClass}
+                              />
+                              <input
+                                type="text"
+                                value={beat.triggerCondition}
+                                onChange={(e) =>
+                                  updateBeatField(phaseIndex, beatIndex, "triggerCondition", e.target.value)
+                                }
+                                placeholder="Trigger condition"
+                                className={smallFieldClass}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeBeat(phaseIndex, beatIndex)}
+                                aria-label="Remove conversation beat"
+                                className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-gray-700">Gated Findings</label>
+                          <button
+                            type="button"
+                            onClick={() => addFinding(phaseIndex)}
+                            className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add finding
+                          </button>
+                        </div>
+                        {phase.gatedFindings.length === 0 && (
+                          <p className="text-xs text-gray-500">No gated findings yet</p>
+                        )}
+                        <div className="space-y-2">
+                          {phase.gatedFindings.map((finding, findingIndex) => (
+                            <div
+                              key={findingIndex}
+                              className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                            >
+                              <input
+                                type="text"
+                                value={finding.label}
+                                onChange={(e) =>
+                                  updateFindingField(phaseIndex, findingIndex, "label", e.target.value)
+                                }
+                                placeholder="Label"
+                                className={smallFieldClass}
+                              />
+                              <input
+                                type="text"
+                                value={finding.data}
+                                onChange={(e) =>
+                                  updateFindingField(phaseIndex, findingIndex, "data", e.target.value)
+                                }
+                                placeholder="Data"
+                                className={smallFieldClass}
+                              />
+                              <input
+                                type="text"
+                                value={finding.revealCondition}
+                                onChange={(e) =>
+                                  updateFindingField(
+                                    phaseIndex,
+                                    findingIndex,
+                                    "revealCondition",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Reveal condition"
+                                className={smallFieldClass}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeFinding(phaseIndex, findingIndex)}
+                                aria-label="Remove gated finding"
+                                className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.topicId}
+                  onChange={(e) => set("topicId", e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">Select a topic…</option>
+                  {Object.entries(COMPETENCY_FRAMEWORK).map(([id, { topic }]) => (
+                    <option key={id} value={id}>
+                      {topic}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Determines the competencies this scenario is graded against.
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -331,7 +825,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   onChange={(e) => set("gradingRubric", e.target.value)}
                   rows={8}
                   placeholder="Describe the competencies to grade and what counts as exceeds / meets / fails"
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
+                  className={`resize-y ${fieldClass}`}
                 />
               </div>
 
@@ -344,19 +838,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                   min={1}
                   value={form.maxDurationMinutes}
                   onChange={(e) => set("maxDurationMinutes", e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3B883E] focus:ring-1 focus:ring-[#3B883E]/30"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Slide Deck <span className="text-red-500">*</span>
-                </label>
-                <FileUploadZone
-                  acceptedTypes=".pptx"
-                  onFileSelect={(file) => setSlideDeck(file)}
-                  onRemove={() => setSlideDeck(null)}
-                  disabled={submitting}
+                  className={fieldClass}
                 />
               </div>
 
@@ -497,6 +979,11 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">{scenario.title}</p>
                       <p className="truncate text-xs text-gray-500">{scenario.workplaceSetting}</p>
+                      {scenario.topicId && (
+                        <p className="truncate text-xs font-medium text-[#3B883E]">
+                          {COMPETENCY_FRAMEWORK[scenario.topicId]?.topic ?? scenario.topicId}
+                        </p>
+                      )}
                     </div>
 
                     <div

@@ -29,6 +29,7 @@ export interface ISimulationScenario extends Document {
 	workplaceSetting: string;
 	dramatisationPrompt: string;
 	studentCharacterName: string;
+	topicId: string;
 	weeklyFocus: string[];
 	displayData: string;
 	briefingAudioBase64: string;
@@ -102,6 +103,13 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 		studentCharacterName: {
 			type: String,
 			required: [true, 'Student character name is required'],
+		},
+		// Stored raw (no Mongoose enum) so a change to COMPETENCY_FRAMEWORK's key
+		// set never requires a schema migration — validated against the framework
+		// at the API boundary instead (see simulation-scenario-api-schema.ts).
+		topicId: {
+			type: String,
+			required: [true, 'Topic is required'],
 		},
 		weeklyFocus: {
 			type: [String],
