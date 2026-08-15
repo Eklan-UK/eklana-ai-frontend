@@ -13,6 +13,11 @@ interface ScenarioManagementPageProps {
   variant: "tutor" | "admin";
 }
 
+interface AssignedLearner {
+  _id: string;
+  name: string;
+}
+
 interface ScenarioSummary {
   _id: string;
   title: string;
@@ -20,7 +25,7 @@ interface ScenarioSummary {
   studentCharacterName: string;
   weeklyFocus: string[];
   maxDurationMinutes: number;
-  assignedLearnerCount: number;
+  assignedLearners: AssignedLearner[];
   createdAt: string;
 }
 
@@ -494,9 +499,16 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                       <p className="truncate text-xs text-gray-500">{scenario.workplaceSetting}</p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1.5 text-xs text-gray-500">
-                      <Users className="h-3.5 w-3.5" />
-                      {scenario.assignedLearnerCount}
+                    <div
+                      className="flex w-40 shrink-0 items-center gap-1.5 text-xs text-gray-500"
+                      title={scenario.assignedLearners.map((l) => l.name).join(", ")}
+                    >
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {scenario.assignedLearners.length === 0
+                          ? "No learners assigned"
+                          : scenario.assignedLearners.map((l) => l.name).join(", ")}
+                      </span>
                     </div>
 
                     <p className="w-28 shrink-0 text-right text-xs text-gray-500">
