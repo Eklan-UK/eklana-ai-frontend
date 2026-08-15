@@ -168,3 +168,7 @@ export const COMPETENCY_FRAMEWORK: Record<string, TopicCompetencies> = {
 export function getCompetenciesForTopic(topicId: string): Competency[] | null {
   return COMPETENCY_FRAMEWORK[topicId]?.competencies ?? null;
 }
+
+export function getCompetencyNamesForTopic(topicId: string): string[] {
+  return getCompetenciesForTopic(topicId)?.map((c) => c.name) ?? [];
+}

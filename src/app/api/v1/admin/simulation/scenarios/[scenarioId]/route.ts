@@ -26,7 +26,15 @@ async function deleteHandler(
 
 		await connectToDatabase();
 
-		const scenario = await SimulationScenario.findOne({ _id: scenarioId, isActive: true });
+		// Targeted update instead of load-mutate-save: a full save() re-validates
+		// the entire document, which 500s on older scenarios created before
+		// briefingAudioBase64/studentCharacterName/gradingRubric became required
+		// fields, even though this delete doesn't touch any of them.
+		const scenario = await SimulationScenario.findOneAndUpdate(
+			{ _id: scenarioId, isActive: true },
+			{ isActive: false },
+			{ new: true },
+		);
 
 		if (!scenario) {
 			return NextResponse.json(
@@ -34,9 +42,6 @@ async function deleteHandler(
 				{ status: 404 },
 			);
 		}
-
-		scenario.isActive = false;
-		await scenario.save();
 
 		return NextResponse.json({ code: 'Success', data: null }, { status: 200 });
 	} catch (error: any) {

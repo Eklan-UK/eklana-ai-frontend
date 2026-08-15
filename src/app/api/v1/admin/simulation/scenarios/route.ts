@@ -1,4 +1,10 @@
-// POST /api/v1/admin/simulation/scenarios — create a scenario from an uploaded slide deck
+// POST /api/v1/admin/simulation/scenarios — create a scenario. The slide deck
+// upload is optional: displayData/scenarioScript/studentHint are submitted
+// directly as form fields (whether the tutor edited a slide-deck extraction
+// preview or typed them by hand) and are always the source of truth for what
+// gets saved. If a file IS attached, it's still parsed and re-extracted so
+// rawSourceText/hiddenContext get archived, but that extraction's own
+// displayData/scenarioScript/studentHint are discarded.
 // GET  /api/v1/admin/simulation/scenarios — list active scenarios (summary fields only)
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
@@ -8,6 +14,7 @@ import { z } from 'zod';
 import SimulationScenario from '@/models/simulation-scenario';
 import { simulationScenarioBodySchema } from '@/lib/simulation-scenario-api-schema';
 import { extractScenarioContext } from '@/domain/simulation/simulation-scenario-extraction.service';
+import { getCompetencyNamesForTopic } from '@/config/competency-framework';
 import { loadOfficeParser } from '@/services/document-parser.service';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
 import { Types } from 'mongoose';
@@ -20,60 +27,47 @@ async function handler(
 		const formData = await req.formData();
 		const file = formData.get('file');
 
-		if (!file) {
-			return NextResponse.json(
-				{ code: 'ValidationError', message: 'No file provided' },
-				{ status: 400 }
-			);
-		}
+		// Slide deck is optional — extraction is a pre-fill aid, not a requirement.
+		let fileToProcess: File | Blob | null = null;
+		let fileSize = 0;
 
-		// Convert FormData file to File/Blob
-		// In Next.js, formData.get() returns FormDataEntryValue which is File | string
-		let fileToProcess: File | Blob;
-		let fileName: string;
-		let fileSize: number;
-
-		if (typeof file === 'string') {
-			return NextResponse.json(
-				{ code: 'ValidationError', message: 'Invalid file format. Expected File object.' },
-				{ status: 400 }
-			);
-		}
-
-		if (file instanceof File) {
-			fileToProcess = file;
-			fileName = file.name || 'document';
-			fileSize = file.size;
-		} else {
-			// If it's not a File and not a string, it might be a Blob-like object
-			const blobLike = file as any;
-			if (
-				blobLike &&
-				typeof blobLike.size === 'number' &&
-				typeof blobLike.arrayBuffer === 'function'
-			) {
-				fileToProcess = blobLike as Blob;
-				fileName = blobLike.name || 'document';
-				fileSize = blobLike.size;
-			} else {
+		if (file) {
+			if (typeof file === 'string') {
 				return NextResponse.json(
-					{ code: 'ValidationError', message: 'Invalid file format. Expected File or Blob.' },
+					{ code: 'ValidationError', message: 'Invalid file format. Expected File object.' },
 					{ status: 400 }
 				);
 			}
-		}
 
-		if (!fileName) {
-			fileName = 'document';
-		}
+			if (file instanceof File) {
+				fileToProcess = file;
+				fileSize = file.size;
+			} else {
+				// If it's not a File and not a string, it might be a Blob-like object
+				const blobLike = file as any;
+				if (
+					blobLike &&
+					typeof blobLike.size === 'number' &&
+					typeof blobLike.arrayBuffer === 'function'
+				) {
+					fileToProcess = blobLike as Blob;
+					fileSize = blobLike.size;
+				} else {
+					return NextResponse.json(
+						{ code: 'ValidationError', message: 'Invalid file format. Expected File or Blob.' },
+						{ status: 400 }
+					);
+				}
+			}
 
-		// Check file size (max 10MB)
-		const maxSize = 10 * 1024 * 1024;
-		if (fileSize > maxSize) {
-			return NextResponse.json(
-				{ code: 'ValidationError', message: 'File size exceeds 10MB limit' },
-				{ status: 400 }
-			);
+			// Check file size (max 10MB)
+			const maxSize = 10 * 1024 * 1024;
+			if (fileSize > maxSize) {
+				return NextResponse.json(
+					{ code: 'ValidationError', message: 'File size exceeds 10MB limit' },
+					{ status: 400 }
+				);
+			}
 		}
 
 		// FormData entries are all strings, so assignedLearnerIds is collected
@@ -84,45 +78,58 @@ async function handler(
 			workplaceSetting: formData.get('workplaceSetting'),
 			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			studentCharacterName: formData.get('studentCharacterName'),
-			weeklyFocus: formData.get('weeklyFocus'),
+			topicId: formData.get('topicId'),
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
 			assignedLearnerIds: rawAssignedLearnerIds,
+			displayData: formData.get('displayData'),
+			scenarioScript: formData.get('scenarioScript'),
+			studentHint: formData.get('studentHint') ?? undefined,
 		};
 
 		const validated = simulationScenarioBodySchema.parse(fields);
+		const weeklyFocus = getCompetencyNamesForTopic(validated.topicId);
 
-		let rawText: string;
-		try {
-			const officeParserModule = await loadOfficeParser();
-			const arrayBuffer = await fileToProcess.arrayBuffer();
-			const buffer = Buffer.from(arrayBuffer);
-			const ast = await officeParserModule.parseOffice(buffer);
-			rawText = ast.toText();
-		} catch (error: any) {
-			logger.error('[SimulationScenarios] Failed to parse slide deck', {
-				error: error.message,
-				stack: error.stack,
-				name: error.name,
-			});
+		let rawText: string | undefined;
+		let hiddenContext: string | undefined;
 
-			let errorMessage = 'Failed to parse document';
-			if (error.message?.includes('officeparser')) {
-				errorMessage = 'Document parsing library error. Please ensure all required packages are installed.';
-			} else if (error.message) {
-				errorMessage = error.message;
+		if (fileToProcess) {
+			let parsedText: string;
+			try {
+				const officeParserModule = await loadOfficeParser();
+				const arrayBuffer = await fileToProcess.arrayBuffer();
+				const buffer = Buffer.from(arrayBuffer);
+				const ast = await officeParserModule.parseOffice(buffer);
+				parsedText = ast.toText();
+			} catch (error: any) {
+				logger.error('[SimulationScenarios] Failed to parse slide deck', {
+					error: error.message,
+					stack: error.stack,
+					name: error.name,
+				});
+
+				let errorMessage = 'Failed to parse document';
+				if (error.message?.includes('officeparser')) {
+					errorMessage = 'Document parsing library error. Please ensure all required packages are installed.';
+				} else if (error.message) {
+					errorMessage = error.message;
+				}
+
+				return NextResponse.json(
+					{ code: 'ServerError', message: errorMessage },
+					{ status: 500 }
+				);
 			}
 
-			return NextResponse.json(
-				{ code: 'ServerError', message: errorMessage },
-				{ status: 500 }
-			);
+			rawText = parsedText;
+
+			// Archival only (rawSourceText/hiddenContext) — this extraction's
+			// displayData/scenarioScript/studentHint are intentionally discarded.
+			const extraction = await extractScenarioContext(parsedText, validated.studentCharacterName);
+			hiddenContext = extraction.hiddenContext;
 		}
 
-		const { displayData, studentHint, hiddenContext, scenarioScript } =
-			await extractScenarioContext(rawText, validated.studentCharacterName);
-
-		const briefingAudioBuffer = await generateGeminiTTSAudio(displayData);
+		const briefingAudioBuffer = await generateGeminiTTSAudio(validated.displayData);
 		const briefingAudioBase64 = briefingAudioBuffer.toString('base64');
 
 		await connectToDatabase();
@@ -132,13 +139,14 @@ async function handler(
 			workplaceSetting: validated.workplaceSetting,
 			dramatisationPrompt: validated.dramatisationPrompt,
 			studentCharacterName: validated.studentCharacterName,
-			weeklyFocus: validated.weeklyFocus,
+			topicId: validated.topicId,
+			weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,
-			displayData,
+			displayData: validated.displayData,
 			briefingAudioBase64,
-			studentHint,
+			studentHint: validated.studentHint,
 			hiddenContext,
-			scenarioScript,
+			scenarioScript: validated.scenarioScript,
 			rawSourceText: rawText,
 			gradingRubric: validated.gradingRubric,
 			maxDurationMinutes: validated.maxDurationMinutes,
@@ -181,7 +189,7 @@ async function listHandler(
 		await connectToDatabase();
 
 		const scenarios = await SimulationScenario.find({ isActive: true })
-			.select('title workplaceSetting studentCharacterName weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
+			.select('title workplaceSetting studentCharacterName topicId weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
 			.populate('assignedLearnerIds', 'firstName lastName email')
 			.sort({ createdAt: -1 })
 			.lean()
@@ -192,6 +200,7 @@ async function listHandler(
 			title: scenario.title,
 			workplaceSetting: scenario.workplaceSetting,
 			studentCharacterName: scenario.studentCharacterName,
+			topicId: scenario.topicId,
 			weeklyFocus: scenario.weeklyFocus,
 			maxDurationMinutes: scenario.maxDurationMinutes,
 			assignedLearners: Array.isArray(scenario.assignedLearnerIds)
