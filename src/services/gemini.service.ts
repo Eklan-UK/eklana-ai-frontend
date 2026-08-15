@@ -821,6 +821,13 @@ export async function generateConversationResponseStream(
 
 // ─── Transcription (generateContent — fast + reliable) ──────────────────────
 
+export class TranscriptionRejectedError extends Error {
+	constructor(message: string = 'Transcription refused or failed') {
+		super(message);
+		this.name = 'TranscriptionRejectedError';
+	}
+}
+
 /**
  * Transcribe audio using Gemini generateContent API.
  * Uses gemini-2.0-flash (DEFAULT_MODEL) with inline audio data.
@@ -859,11 +866,66 @@ export async function transcribeAudio(
 
 		const text = result.response.text().trim();
 		logger.info('Audio transcribed', { textLength: text.length, preview: text.substring(0, 80) });
+
+		if (isFailedTranscription(text)) {
+			logger.warn('Transcription refused or failed validation', { preview: text.substring(0, 80) });
+			throw new TranscriptionRejectedError();
+		}
+
 		return text;
 	} catch (error: any) {
+		if (error instanceof TranscriptionRejectedError) {
+			throw error;
+		}
 		logger.error('Error transcribing audio', { error: error.message });
 		throw new Error(`Failed to transcribe audio: ${error.message}`);
 	}
+}
+
+const REFUSAL_PATTERNS = [
+	/^i'?m sorry,? but i (cannot|can'?t)/i,
+	/^i cannot provide/i,
+	/^i'?m unable to/i,
+	/^i can'?t (transcribe|assist|help)/i,
+	/^as an ai/i,
+];
+
+/**
+ * Detects transcription output that is actually a model refusal or a
+ * garbled/pathologically repetitive result rather than real spoken content.
+ */
+function isFailedTranscription(text: string): boolean {
+	if (REFUSAL_PATTERNS.some((pattern) => pattern.test(text.trim()))) {
+		return true;
+	}
+
+	const words = text.trim().split(/\s+/).filter(Boolean);
+	if (words.length === 0) return false;
+
+	// Pathological repetition: same short phrase (3-8 words) repeating >4 times consecutively.
+	for (let phraseLen = 3; phraseLen <= 8; phraseLen++) {
+		let runLength = 1;
+		for (let i = phraseLen; i + phraseLen <= words.length; i += phraseLen) {
+			const prev = words.slice(i - phraseLen, i).join(' ').toLowerCase();
+			const curr = words.slice(i, i + phraseLen).join(' ').toLowerCase();
+			if (prev === curr) {
+				runLength++;
+				if (runLength > 4) return true;
+			} else {
+				runLength = 1;
+			}
+		}
+	}
+
+	// Low unique-word ratio on longer texts suggests a garbled/looping transcription.
+	if (words.length > 100) {
+		const uniqueWords = new Set(words.map((w) => w.toLowerCase()));
+		if (uniqueWords.size / words.length < 0.15) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 export type ListeningAnalyzeQuestion = Record<string, unknown>;
