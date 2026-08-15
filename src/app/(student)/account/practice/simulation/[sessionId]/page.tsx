@@ -56,6 +56,54 @@ type UiPhase =
   | "completed"
   | "error";
 
+// ─── Grading result (POST /grade response shape) ───────────────────────────
+//
+// session.overallGradeResult.pronunciation only ever stored gradedTurnCount/
+// failedTurnCount (counts) — per-word detail lived exclusively on each turn's
+// speechaceResult.word_scores and was never aggregated or returned anywhere.
+// simulation-grading.service.ts now flattens that into mispronouncedWords so
+// the client actually receives word-level detail instead of just counts.
+// Grammar error detail (quotedText/correctedVersion/explanation) was already
+// present in session.overallGradeResult.grammar.errors — the route just
+// wasn't returning it; it returned only summary counts before.
+
+interface MispronouncedWord {
+  word: string;
+  score: number;
+  turnNumber: number;
+}
+
+interface GrammarError {
+  studentTurnNumber: number;
+  quotedText: string;
+  errorType: "context_error" | "phrasing_error";
+  correctedVersion: string;
+  explanation: string;
+}
+
+interface CompetencyScore {
+  competencyName: string;
+  rating: "exceeds" | "meets" | "fails";
+  evidence: string;
+}
+
+interface GradeResult {
+  pronunciation: {
+    gradedTurnCount: number;
+    failedTurnCount: number;
+    mispronouncedWords: MispronouncedWord[];
+  };
+  grammar: {
+    errors: GrammarError[];
+  };
+  competency: {
+    competencyScores: CompetencyScore[];
+    overallSummary: string;
+  };
+}
+
+type GradingState = "idle" | "loading" | "done" | "error";
+
 // ─── SSE parsing (shared between /turn and /opening) ───────────────────────
 
 interface SseHandlers {
@@ -64,6 +112,7 @@ interface SseHandlers {
   onReveal?: (findings: Finding[]) => void;
   onPhaseAdvance?: (newPhaseIndex: number) => void;
   onTranscript?: (text: string) => void;
+  onError?: (message: string) => void;
 }
 
 async function readSimulationSSE(
@@ -99,6 +148,8 @@ async function readSimulationSSE(
             handlers.onPhaseAdvance?.(parsed.newPhaseIndex);
           } else if (parsed?.type === "transcript" && typeof parsed.text === "string") {
             handlers.onTranscript?.(parsed.text);
+          } else if (parsed?.type === "error" && typeof parsed.message === "string") {
+            handlers.onError?.(parsed.message);
           }
         } catch {
           // partial/malformed SSE frame split across reads — ignore
@@ -119,7 +170,7 @@ async function readSimulationSSE(
 // of PCM to WAV as it arrives and queue each resulting clip for back-to-back
 // playback, so the student hears the AI start speaking well before it
 // finishes generating. Playback holds a one-clip cushion before starting
-// (see createAudioQueue) so a lagging conversion round trip doesn't stall it.
+// (see createAudioQueue) so a lagging conversion doesn't stall it.
 
 const PCM_SAMPLE_RATE = 24_000;
 const PCM_BYTES_PER_SAMPLE = 2; // 16-bit
@@ -130,6 +181,86 @@ const FLUSH_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND * 1.0; // ~1s of audio per fl
 /** Estimates decoded byte length of a base64 string without decoding it. */
 function estimateBase64ByteLength(base64: string): number {
   return (base64.length * 3) / 4;
+}
+
+// ─── Client-side PCM → WAV conversion (TEMPORARY / interim fix) ────────────
+//
+// Every audio chunk batch used to round-trip to POST /api/v1/simulation/audio/wav
+// for conversion, which was a likely source of audible playback gaps (a slow
+// round trip for chunk N+1 could outpace chunk N's playback). This ports the
+// same WAV-header-wrapping logic as gemini.service.ts's pcmToWavBase64 to run
+// directly in the browser instead, with no network call.
+//
+// TEMPORARY: this duplicates pcmToWavBase64's logic client-side. Once the
+// live-conversation piece potentially moves to different infrastructure,
+// /api/v1/simulation/audio/wav and this duplicated conversion logic should be
+// reconciled or removed rather than left as two parallel implementations.
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...Array.from(bytes.subarray(i, i + chunkSize)));
+  }
+  return btoa(binary);
+}
+
+function pcmChunksToWavBase64(
+  pcmBase64Chunks: string[],
+  sampleRate = PCM_SAMPLE_RATE,
+  numChannels = PCM_CHANNELS,
+  bitsPerSample = PCM_BYTES_PER_SAMPLE * 8,
+): string {
+  const pcmByteArrays = pcmBase64Chunks.map(base64ToBytes);
+  const pcmLength = pcmByteArrays.reduce((sum, arr) => sum + arr.length, 0);
+
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const wavHeaderSize = 44;
+  const wavBytes = new Uint8Array(wavHeaderSize + pcmLength);
+  const view = new DataView(wavBytes.buffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  // RIFF header
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + pcmLength, true);
+  writeString(8, "WAVE");
+
+  // fmt sub-chunk
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+
+  // data sub-chunk
+  writeString(36, "data");
+  view.setUint32(40, pcmLength, true);
+
+  let offset = wavHeaderSize;
+  for (const arr of pcmByteArrays) {
+    wavBytes.set(arr, offset);
+    offset += arr.length;
+  }
+
+  return bytesToBase64(wavBytes);
 }
 
 /** Sequential playback queue: clips play back-to-back via a single <audio> element. */
@@ -165,8 +296,8 @@ function createAudioQueue(
   return {
     // Keep one clip's cushion before starting playback: wait for 2 clips queued,
     // or the stream to have ended with at least 1 clip queued, so a lagging
-    // WAV-conversion round trip for a later chunk doesn't produce an audible gap.
-    // Once playback has started, resume immediately as each new clip arrives.
+    // conversion for a later chunk doesn't produce an audible gap. Once
+    // playback has started, resume immediately as each new clip arrives.
     enqueue(wavBase64: string) {
       queue.push(wavBase64);
       if (playing) return;
@@ -184,22 +315,12 @@ function createAudioQueue(
   };
 }
 
-/** Converts a batch of base64 PCM chunks to WAV and enqueues it for playback. Best-effort. */
-async function flushAudioChunks(
-  chunks: string[],
-  queue: ReturnType<typeof createAudioQueue>,
-): Promise<void> {
+/** Converts a batch of base64 PCM chunks to WAV (client-side) and enqueues it for playback. */
+function flushAudioChunks(chunks: string[], queue: ReturnType<typeof createAudioQueue>): void {
   if (chunks.length === 0) return;
   try {
-    const wavRes = await fetch("/api/v1/simulation/audio/wav", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pcmBase64Chunks: chunks }),
-    });
-    if (!wavRes.ok) return;
-    const wavJson = await wavRes.json();
-    queue.enqueue(wavJson.data.wavBase64);
+    const wavBase64 = pcmChunksToWavBase64(chunks);
+    queue.enqueue(wavBase64);
   } catch {
     // Audio playback is best-effort; a failed conversion shouldn't block the turn.
   }
@@ -207,9 +328,8 @@ async function flushAudioChunks(
 
 /**
  * Buffers incoming PCM chunks and flushes them to the playback queue in
- * ~1s batches. Flushes are chained sequentially (not fired concurrently)
- * so clips are guaranteed to enqueue — and therefore play — in arrival
- * order even if individual WAV-conversion requests race on the network.
+ * ~1s batches. Conversion is synchronous (client-side) so batches are
+ * naturally enqueued — and therefore played — in arrival order.
  */
 function createChunkedAudioPlayer(playbackAudioRef: React.MutableRefObject<HTMLAudioElement | null>) {
   let resolvePlaybackDone: () => void;
@@ -221,11 +341,6 @@ function createChunkedAudioPlayer(playbackAudioRef: React.MutableRefObject<HTMLA
 
   let buffer: string[] = [];
   let bufferedBytes = 0;
-  let flushChain: Promise<void> = Promise.resolve();
-
-  const scheduleFlush = (chunks: string[]) => {
-    flushChain = flushChain.then(() => flushAudioChunks(chunks, queue));
-  };
 
   return {
     /** Call for every 'audio' SSE event as it arrives. */
@@ -233,7 +348,7 @@ function createChunkedAudioPlayer(playbackAudioRef: React.MutableRefObject<HTMLA
       buffer.push(base64);
       bufferedBytes += estimateBase64ByteLength(base64);
       if (bufferedBytes >= FLUSH_THRESHOLD_BYTES) {
-        scheduleFlush(buffer);
+        flushAudioChunks(buffer, queue);
         buffer = [];
         bufferedBytes = 0;
       }
@@ -241,11 +356,10 @@ function createChunkedAudioPlayer(playbackAudioRef: React.MutableRefObject<HTMLA
     /** Call once the SSE stream ends. Flushes any remaining tail chunk. */
     async finish(): Promise<void> {
       if (buffer.length > 0) {
-        scheduleFlush(buffer);
+        flushAudioChunks(buffer, queue);
         buffer = [];
         bufferedBytes = 0;
       }
-      await flushChain;
       queue.markStreamEnded();
     },
     /** Resolves once every enqueued clip has finished playing (post-finish). */
@@ -265,6 +379,8 @@ export default function SimulationSessionPage() {
   const [briefingText, setBriefingText] = useState("");
   const [showHint, setShowHint] = useState(false);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState("");
+  const [gradingState, setGradingState] = useState<GradingState>("idle");
+  const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -274,6 +390,7 @@ export default function SimulationSessionPage() {
   const briefingAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const phaseTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ─── Load session detail + play briefing on mount ───────────────────────────
 
@@ -305,7 +422,7 @@ export default function SimulationSessionPage() {
 
         if (sessionJson.data.briefingComplete) {
           // Returning to an already-started session (e.g. after a refresh).
-          setUiPhase("active");
+          setUiPhase(sessionJson.data.status === "completed" ? "completed" : "active");
           return;
         }
 
@@ -355,7 +472,11 @@ export default function SimulationSessionPage() {
 
     tick();
     const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
+    phaseTimerIntervalRef.current = interval;
+    return () => {
+      clearInterval(interval);
+      phaseTimerIntervalRef.current = null;
+    };
   }, [session]);
 
   // ─── Auto-scroll chat to bottom on new message ─────────────────────────────
@@ -415,7 +536,8 @@ export default function SimulationSessionPage() {
 
         const contentType = res.headers.get("Content-Type") || "";
         if (contentType.includes("application/json")) {
-          // No phases left — the endpoint short-circuits with a plain JSON body.
+          // No phases left, or time limit reached — the endpoint short-circuits
+          // with a plain JSON body.
           const json = await res.json();
           if (json?.data?.sessionComplete) {
             setUiPhase("completed");
@@ -427,6 +549,7 @@ export default function SimulationSessionPage() {
 
         if (!res.body) throw new Error("Turn response had no body");
 
+        let sseErrorMessage: string | null = null;
         const player = createChunkedAudioPlayer(playbackAudioRef);
         const { textAccum } = await readSimulationSSE(res.body.getReader(), {
           onAudio: (data) => player.pushChunk(data),
@@ -439,14 +562,23 @@ export default function SimulationSessionPage() {
           onPhaseAdvance: (newPhaseIndex) => {
             setSession((prev) => (prev ? { ...prev, currentPhaseIndex: newPhaseIndex } : prev));
           },
+          onError: (message) => {
+            sseErrorMessage = message;
+          },
         });
+
+        // Playback is fire-and-forget here — autoplay may be blocked, which is non-fatal.
+        void player.finish();
+
+        if (sseErrorMessage) {
+          toast.error(sseErrorMessage);
+          setUiPhase("active");
+          return;
+        }
 
         if (textAccum) {
           setMessages((prev) => [...prev, { kind: "turn", role: "ai", text: textAccum }]);
         }
-
-        // Playback is fire-and-forget here — autoplay may be blocked, which is non-fatal.
-        void player.finish();
 
         setUiPhase("active");
       } catch {
@@ -509,6 +641,24 @@ export default function SimulationSessionPage() {
     mediaRecorderRef.current?.stop();
   };
 
+  // ─── Grading (student-triggered, on the completion screen) ─────────────────
+
+  const handleSeeGrades = async () => {
+    setGradingState("loading");
+    try {
+      const res = await fetch(`/api/v1/simulation/sessions/${sessionId}/grade`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Failed to grade session");
+      setGradeResult(json.data);
+      setGradingState("done");
+    } catch {
+      setGradingState("error");
+    }
+  };
+
   // ─── Close / leave ────────────────────────────────────────────────────────
 
   const handleClose = () => {
@@ -516,6 +666,13 @@ export default function SimulationSessionPage() {
       "Leave this simulation? Your progress will be saved, but the session will end for now.",
     );
     if (!confirmed) return;
+    // Explicitly clear the phase-timer interval before navigating — router.push
+    // doesn't unmount synchronously, so relying solely on the effect's own
+    // cleanup can leave the interval ticking briefly after navigation starts.
+    if (phaseTimerIntervalRef.current) {
+      clearInterval(phaseTimerIntervalRef.current);
+      phaseTimerIntervalRef.current = null;
+    }
     releaseMediaStream(mediaStreamRef.current);
     router.push("/account/practice/simulation");
   };
@@ -652,9 +809,96 @@ export default function SimulationSessionPage() {
         )}
 
         {uiPhase === "completed" && (
-          <div className="flex flex-col items-center gap-4">
-            <p className="font-nunito text-base text-foreground">Simulation complete!</p>
-            <Button onClick={() => router.push("/account/practice/simulation")}>
+          <div className="flex w-full max-w-md flex-col items-center gap-4 text-center">
+            <p className="font-nunito text-lg font-semibold text-foreground">
+              Well done — simulation complete!
+            </p>
+            <p className="font-nunito text-sm text-muted-foreground">
+              Great work getting through this scenario. Ready to see how you did?
+            </p>
+
+            {gradingState === "idle" && (
+              <Button onClick={handleSeeGrades}>See my grades</Button>
+            )}
+
+            {gradingState === "loading" && (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <p className="font-nunito text-sm text-muted-foreground">Grading your session…</p>
+              </div>
+            )}
+
+            {gradingState === "error" && (
+              <div className="flex flex-col items-center gap-2">
+                <p className="font-nunito text-sm text-red-500">
+                  Could not grade this session. Please try again.
+                </p>
+                <Button onClick={handleSeeGrades}>Try again</Button>
+              </div>
+            )}
+
+            {gradingState === "done" && gradeResult && (
+              <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-4 text-left">
+                <div>
+                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Summary
+                  </p>
+                  <p className="font-nunito text-sm text-foreground">
+                    {gradeResult.competency.overallSummary || "No summary available."}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mispronounced words
+                  </p>
+                  {gradeResult.pronunciation.mispronouncedWords.length === 0 ? (
+                    <p className="font-nunito text-sm text-muted-foreground">
+                      No mispronounced words detected.
+                    </p>
+                  ) : (
+                    <ul className="mt-1 flex flex-wrap gap-2">
+                      {gradeResult.pronunciation.mispronouncedWords.map((w, idx) => (
+                        <li
+                          key={idx}
+                          className="rounded-full bg-muted px-3 py-1 font-nunito text-sm text-foreground"
+                        >
+                          {w.word}{" "}
+                          <span className="text-xs text-muted-foreground">
+                            ({Math.round(w.score)})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div>
+                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Misused words / grammar
+                  </p>
+                  {gradeResult.grammar.errors.length === 0 ? (
+                    <p className="font-nunito text-sm text-muted-foreground">
+                      No grammar issues detected.
+                    </p>
+                  ) : (
+                    <ul className="mt-1 space-y-2">
+                      {gradeResult.grammar.errors.map((err, idx) => (
+                        <li key={idx} className="font-nunito text-sm text-foreground">
+                          <span className="text-muted-foreground line-through">
+                            {err.quotedText}
+                          </span>{" "}
+                          → <span className="font-medium">{err.correctedVersion}</span>
+                          <p className="text-xs text-muted-foreground">{err.explanation}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <Button variant="outline" onClick={() => router.push("/account/practice/simulation")}>
               Back to Simulation Room
             </Button>
           </div>
