@@ -3,14 +3,40 @@ import DrillAttempt from '@/models/drill-attempt';
 import PronunciationAttemptModel from '@/models/pronunciation-attempt';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import Bookmark from '@/models/bookmark';
-// Side-effect import: registers the Drill model so populate('drillId') can resolve ref: 'Drill'
-import '@/models/drill';
+// Also registers the Drill model so populate('drillId') can resolve ref: 'Drill'
+import DrillModel from '@/models/drill';
 import StudentContext from '@/models/studentContext';
 import UserModel from '@/models/user';
+import SimulationSession from '@/models/simulation-session';
 import type { IDrillAttempt } from '@/models/drill-attempt';
 import type { IPronunciationAttempt } from '@/models/pronunciation-attempt';
 import type { IFreeTalkAttempt } from '@/models/free-talk-attempt';
+import type { ISimulationSession } from '@/models/simulation-session';
 import type { WeaknessSignal, WeaknessProfile } from './types';
+
+// overallGradeResult is stored as Schema.Types.Mixed on ISimulationSession — these
+// describe the shape written by the simulation grade route (grade/route.ts) and the
+// grammar-analysis/speechace services it calls, not a separate persisted schema.
+interface SimulationSpeechaceWordScore {
+	word: string;
+	score: number;
+	phonemes?: Array<{ phoneme: string; score: number; sound_most_like?: string }>;
+}
+
+interface SimulationGrammarError {
+	studentTurnNumber: number;
+	quotedText: string;
+	errorType: 'phrasing_error' | 'context_error';
+	correctedVersion: string;
+	explanation: string;
+}
+
+interface SimulationOverallGradeResult {
+	pronunciation?: { gradedTurnCount: number; failedTurnCount: number };
+	grammar?: { errors: SimulationGrammarError[] };
+	competency?: { competencyScores: unknown[]; overallSummary: string };
+	gradedAt?: Date;
+}
 
 function clamp(value: number): number {
 	return Math.max(0, Math.min(1, value));
@@ -173,12 +199,54 @@ function extractVocabularySignals(
 					: []),
 			],
 			label:
-				drillType === 'key_phrases' ? 'Key phrases accuracy' : 'Vocabulary pronunciation',
+				drillType === 'key_phrases' ? 'Pressure Test accuracy' : 'Vocabulary pronunciation',
 		},
 	];
 }
 
-function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
+const MAX_DRILL_INTRO_EVIDENCE_LENGTH = 300;
+
+function mostRecentTimestamp(attempt: IDrillAttempt): number {
+	const date = attempt.completedAt ?? attempt.createdAt;
+	return date ? new Date(date).getTime() : 0;
+}
+
+// Picks the single most recently completed roleplay attempt and returns
+// evidence built from just that drill's drill_intro/scene names — the
+// "primary scenario" for the week, not every distinct scenario practiced.
+async function fetchRoleplayScenarioEvidence(attempts: IDrillAttempt[]): Promise<string[]> {
+	if (attempts.length === 0) return [];
+
+	const mostRecentAttempt = attempts.reduce((latest, attempt) =>
+		mostRecentTimestamp(attempt) > mostRecentTimestamp(latest) ? attempt : latest
+	);
+
+	const drill = await DrillModel.findById(mostRecentAttempt.drillId)
+		.select('drill_intro roleplay_scenes.scene_name')
+		.lean<{ _id: Types.ObjectId; drill_intro?: string; roleplay_scenes?: Array<{ scene_name: string }> } | null>();
+
+	if (!drill) return [];
+
+	const evidence: string[] = [];
+
+	const intro = drill.drill_intro?.trim();
+	if (intro) {
+		const truncated =
+			intro.length > MAX_DRILL_INTRO_EVIDENCE_LENGTH
+				? `${intro.slice(0, MAX_DRILL_INTRO_EVIDENCE_LENGTH)}…`
+				: intro;
+		evidence.push(`Practised scenario: ${truncated}`);
+	}
+
+	const sceneNames = (drill.roleplay_scenes ?? []).map((s) => s.scene_name).filter(Boolean);
+	if (sceneNames.length > 0) {
+		evidence.push(`Scenes: ${sceneNames.join(', ')}`);
+	}
+
+	return evidence;
+}
+
+async function extractRoleplaySignals(attempts: IDrillAttempt[]): Promise<WeaknessSignal[]> {
 	let fluencyTotal = 0;
 	let pronTotal = 0;
 	let count = 0;
@@ -193,6 +261,8 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 
 	if (count === 0) return [];
 
+	const scenarioEvidence = await fetchRoleplayScenarioEvidence(attempts);
+
 	const avgFluency = fluencyTotal / count;
 	const avgPron = pronTotal / count;
 	const signals: WeaknessSignal[] = [];
@@ -202,7 +272,7 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 			drillType: 'roleplay',
 			category: 'fluency',
 			severity: severityFromScore(avgFluency),
-			evidence: [`Average roleplay fluency: ${avgFluency.toFixed(1)}`],
+			evidence: [`Average roleplay fluency: ${avgFluency.toFixed(1)}`, ...scenarioEvidence],
 			label: 'Roleplay fluency',
 		});
 	}
@@ -212,8 +282,22 @@ function extractRoleplaySignals(attempts: IDrillAttempt[]): WeaknessSignal[] {
 			drillType: 'roleplay',
 			category: 'pronunciation',
 			severity: severityFromScore(avgPron),
-			evidence: [`Average roleplay pronunciation: ${avgPron.toFixed(1)}`],
+			evidence: [`Average roleplay pronunciation: ${avgPron.toFixed(1)}`, ...scenarioEvidence],
 			label: 'Roleplay pronunciation',
+		});
+	}
+
+	// Scores can be fine (no fluency/pronunciation signal above) while the scenario
+	// content is still useful context for the weekly challenge generator. Keep this
+	// signal even when severity is negligible so it survives downstream filtering,
+	// but only add it when neither signal above already carries the scenario evidence.
+	if (signals.length === 0 && scenarioEvidence.length > 0) {
+		signals.push({
+			drillType: 'roleplay',
+			category: 'fluency',
+			severity: Math.max(severityFromScore(Math.min(avgFluency, avgPron)), 0.01),
+			evidence: scenarioEvidence,
+			label: 'Roleplay scenario practice',
 		});
 	}
 
@@ -573,6 +657,7 @@ export async function aggregateWeaknesses(
 		drillAttempts,
 		pronAttempts,
 		freeTalkAttempts,
+		simulationSessions,
 		recentPronAttempts,
 		recentBookmarks,
 		allTimeAnalysis,
@@ -583,6 +668,11 @@ export async function aggregateWeaknesses(
 		DrillAttempt.find({ learnerId, completedAt: dateFilter }).lean() as Promise<IDrillAttempt[]>,
 		PronunciationAttemptModel.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IPronunciationAttempt[]>,
 		FreeTalkAttempt.find({ learnerId, createdAt: dateFilter }).lean() as Promise<IFreeTalkAttempt[]>,
+		SimulationSession.find({
+			studentId: learnerId,
+			status: 'completed',
+			'overallGradeResult.gradedAt': dateFilter,
+		}).lean() as Promise<ISimulationSession[]>,
 		PronunciationAttemptModel.find({ learnerId, createdAt: { $gte: lookbackStart } }).lean() as Promise<IPronunciationAttempt[]>,
 		Bookmark.find({
 			userId: learnerId,
@@ -607,17 +697,20 @@ export async function aggregateWeaknesses(
 
 	const freqSignal = buildPronunciationFrequencySignal(recentPronAttempts);
 	const bmSignal = buildBookmarkSignal(recentBookmarks as Array<{ content: string }>);
+	const roleplaySignals = await extractRoleplaySignals(byType.get('roleplay') ?? []);
+	const simulationSignals = await extractSimulationSignals(simulationSessions);
 
 	const allSignals: WeaknessSignal[] = [
 		...extractPronunciationSignals(pronAttempts),
 		...extractVocabularySignals(byType.get('vocabulary') ?? [], 'vocabulary'),
 		...extractVocabularySignals(byType.get('key_phrases') ?? [], 'key_phrases'),
-		...extractRoleplaySignals(byType.get('roleplay') ?? []),
+		...roleplaySignals,
 		...extractAccuracySignals(byType.get('fill_blank') ?? [], 'fill_blank'),
 		...extractAccuracySignals(byType.get('matching') ?? [], 'matching'),
 		...extractAccuracySignals(byType.get('definition') ?? [], 'definition'),
 		...extractGrammarSignals(byType.get('grammar') ?? []),
 		...extractFreeTalkSignals(freeTalkAttempts),
+		...simulationSignals,
 		// sentence, summary, listening: skipped — no reliable automated weakness signal
 		...(freqSignal ? [freqSignal] : []),
 		...(bmSignal ? [bmSignal] : []),
@@ -642,6 +735,119 @@ export async function aggregateWeaknesses(
 		studentRole: studentIdentity.studentRole,
 		generatedAt: new Date(),
 	};
+}
+
+function extractSimulationPronunciationSignal(
+	sessions: ISimulationSession[]
+): WeaknessSignal | null {
+	let scoreSum = 0;
+	let scoreCount = 0;
+	const weakWords: string[] = [];
+	const phonemeFreq = new Map<string, number>();
+
+	for (const session of sessions) {
+		for (const turn of session.turns) {
+			if (turn.role !== 'student' || !turn.speechaceResult) continue;
+
+			const wordScores: SimulationSpeechaceWordScore[] =
+				(turn.speechaceResult as { word_scores?: SimulationSpeechaceWordScore[] }).word_scores ?? [];
+
+			for (const ws of wordScores) {
+				scoreSum += ws.score;
+				scoreCount++;
+
+				if (ws.score < 90) {
+					if (ws.word) weakWords.push(ws.word);
+					for (const p of ws.phonemes ?? []) {
+						if (p.score < 90 && p.phoneme) {
+							phonemeFreq.set(p.phoneme, (phonemeFreq.get(p.phoneme) ?? 0) + 1);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (scoreCount === 0) return null;
+
+	const avgScore = scoreSum / scoreCount;
+	if (avgScore >= 90 && weakWords.length === 0) return null;
+
+	const topPhonemes = [...phonemeFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([p]) => p);
+	const uniqueWeakWords = [...new Set(weakWords)].slice(0, 5);
+
+	return {
+		drillType: 'simulation_pronunciation',
+		category: 'pronunciation',
+		severity: severityFromScore(avgScore),
+		evidence: [
+			`Average pronunciation score in simulations: ${avgScore.toFixed(1)}`,
+			...(uniqueWeakWords.length > 0 ? [`Struggled with: ${uniqueWeakWords.join(', ')}`] : []),
+			...(topPhonemes.length > 0 ? [`Weak phonemes: ${topPhonemes.join(', ')}`] : []),
+		],
+		label:
+			topPhonemes.length > 0
+				? `Simulation pronunciation — phonemes: ${topPhonemes.join(', ')}`
+				: 'Simulation pronunciation accuracy',
+	};
+}
+
+// Returns up to two signals — phrasing and context errors are kept as distinct
+// signals (rather than merged into one generic "grammar errors" label) so each
+// error type's evidence and label stay legible. Both still share drillType:
+// 'simulation_grammar', so deduplicateByDrillType() will merge them together
+// (evidence lines from each stay intact even after that merge, only the label
+// keeps whichever had the higher severity) — but that drillType is distinct
+// from 'simulation_pronunciation', so pronunciation and grammar signals never
+// get merged into a mismatched category/label pair.
+function extractSimulationGrammarSignals(sessions: ISimulationSession[]): WeaknessSignal[] {
+	const phrasingErrors: string[] = [];
+	const contextErrors: string[] = [];
+
+	for (const session of sessions) {
+		const grammar = (session.overallGradeResult as SimulationOverallGradeResult | undefined)?.grammar;
+		for (const err of grammar?.errors ?? []) {
+			const evidenceLine = `"${err.quotedText}" → "${err.correctedVersion}"`;
+			if (err.errorType === 'phrasing_error') {
+				phrasingErrors.push(evidenceLine);
+			} else if (err.errorType === 'context_error') {
+				contextErrors.push(evidenceLine);
+			}
+		}
+	}
+
+	const signals: WeaknessSignal[] = [];
+
+	if (phrasingErrors.length > 0) {
+		signals.push({
+			drillType: 'simulation_grammar',
+			category: 'grammar',
+			severity: clamp(phrasingErrors.length / 5),
+			evidence: [...new Set(phrasingErrors)].slice(0, 5),
+			label: 'Simulation — phrasing errors',
+		});
+	}
+
+	if (contextErrors.length > 0) {
+		signals.push({
+			drillType: 'simulation_grammar',
+			category: 'grammar',
+			severity: clamp(contextErrors.length / 5),
+			evidence: [...new Set(contextErrors)].slice(0, 5),
+			label: 'Simulation — context errors',
+		});
+	}
+
+	return signals;
+}
+
+export async function extractSimulationSignals(
+	sessions: ISimulationSession[]
+): Promise<WeaknessSignal[]> {
+	const pronunciationSignal = extractSimulationPronunciationSignal(sessions);
+	const grammarSignals = extractSimulationGrammarSignals(sessions);
+
+	return [...(pronunciationSignal ? [pronunciationSignal] : []), ...grammarSignals];
 }
 
 function extractFreeTalkSignals(attempts: IFreeTalkAttempt[]): WeaknessSignal[] {

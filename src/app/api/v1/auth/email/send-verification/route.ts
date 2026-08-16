@@ -9,8 +9,8 @@ import {
   getPublicBaseUrlFallback,
   resolvePublicBaseUrlFromHeaders,
 } from '@/lib/public-base-url';
-import mongoose from 'mongoose';
 import crypto from 'crypto';
+import Verification from '@/models/verification';
 
 // Rate limiting: track requests by IP
 const rateLimitMap = new Map<string, { count: number; lastRequest: number }>();
@@ -93,24 +93,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Generate verification token
     const token = crypto.randomBytes(32).toString('hex');
-    
-    // Get or create Verification model
-    let Verification;
-    if (mongoose.models.Verification) {
-      Verification = mongoose.models.Verification;
-    } else {
-      const verificationSchema = new mongoose.Schema({
-        userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-        token: { type: String, required: false, sparse: true },
-        expiresAt: { type: Date, required: true },
-        createdAt: { type: Date, default: Date.now },
-      }, { collection: 'verifications', timestamps: true });
-      
-      // Create sparse unique index on token (allows multiple nulls)
-      verificationSchema.index({ token: 1 }, { unique: true, sparse: true });
-      
-      Verification = mongoose.model('Verification', verificationSchema);
-    }
     
     // Delete old verification tokens for this user
     await Verification.deleteMany({ userId: user._id });

@@ -7,7 +7,7 @@ import UserModel from '@/models/user';
 const DRILL_LABELS: Record<string, string> = {
   pronunciation: 'Pronunciation',
   vocabulary: 'Vocabulary',
-  key_phrases: 'Key Phrases',
+  key_phrases: 'Pressure Test',
   roleplay: 'Roleplay',
   fill_blank: 'Fill in the Blank',
 };

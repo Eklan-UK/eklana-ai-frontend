@@ -8,6 +8,10 @@ import { createUserProfile, createTutorProfile } from '@/utils/onboarding';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import {
+	normalizeEnglishAccent,
+	toStudentLessonAccent,
+} from '@/services/tts-accent-voices';
 
 const onboardSchema = z.object({
 	role: z.enum(['user', 'tutor']).optional(),
@@ -17,6 +21,11 @@ const onboardSchema = z.object({
 	learningGoals: z.array(z.string()).optional(), // New multiple goals support
 	nationality: z.string().optional(),
 	language: z.string().optional(),
+	lessonPreferences: z
+		.object({
+			englishAccent: z.string().optional(),
+		})
+		.optional(),
 });
 
 async function handler(
@@ -62,12 +71,32 @@ async function handler(
 
 		// Create appropriate profile
 		if (role === 'user') {
+			let lessonPreferences: { englishAccent?: string } | undefined;
+			const rawAccent = validated.lessonPreferences?.englishAccent;
+			if (rawAccent !== undefined && rawAccent !== '') {
+				const normalized = normalizeEnglishAccent(rawAccent);
+				if (!normalized) {
+					return NextResponse.json(
+						{
+							code: 'ValidationError',
+							message: 'Invalid englishAccent',
+						},
+						{ status: 400 }
+					);
+				}
+				// Coerce named/character voices to student country accent keys (`*_female`).
+				lessonPreferences = {
+					englishAccent: toStudentLessonAccent(normalized),
+				};
+			}
+
 			await createUserProfile(context.userId, {
 				userType: validated.userType,
 				learningGoal: validated.learningGoal,
 				nationality: validated.nationality,
 				language: validated.language,
 				...body, // Include any other profile fields
+				lessonPreferences, // Explicit — do not rely on ...body alone
 			});
 			
 			// Update user's hasProfile flag after profile creation

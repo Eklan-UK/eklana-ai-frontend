@@ -28,6 +28,7 @@ import { getStatusBadge } from "@/utils/drill-ui";
 import { usePrefetchDrill } from "@/hooks/useDrills";
 import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
+import { buildDrillWebPath } from "@/lib/drill-open-url";
 
 export interface DrillCardProps {
   drill: any;
@@ -362,7 +363,7 @@ function DrillCardComponent({
                 </ProLockedCtaSwap>
               </ProLockHoverWrap>
             ) : isUpcoming ? (
-              <Link href={`/account/drills/${drill._id}`}>
+              <Link href={buildDrillWebPath(String(drill._id), assignmentId)}>
                 <Button
                   variant="primary"
                   size="sm"

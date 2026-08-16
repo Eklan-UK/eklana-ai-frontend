@@ -10,7 +10,7 @@ import { GRADING_RUBRICS, type GradingBehaviour } from '@/domain/free-talk/free-
 const ffmpegBin: string = require('ffmpeg-static');
 
 // Initialize old SDK (for non-drill functions that still use generateContent)
-let genAI: GoogleGenerativeAI | null = null;
+export let genAI: GoogleGenerativeAI | null = null;
 
 // Initialize new SDK (for Live API — drill practice, transcription)
 let genAINew: GoogleGenAI | null = null;
@@ -24,7 +24,7 @@ if (config.GEMINI_API_KEY) {
 
 // Text model (for non-drill functions — transcription, chat)
 // gemini-2.5-flash-lite: 20 req/day on the free tier; upgrade Gemini billing for higher limits
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+export const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 
 /** Low-latency chat + streaming (see config.GEMINI_CHAT_MODEL). */
 const CHAT_MODEL = config.GEMINI_CHAT_MODEL;
@@ -50,7 +50,7 @@ interface ConversationOptions {
 // Live API returns raw PCM L16 audio (24kHz, 16-bit, mono).
 // Browsers can't play raw PCM, so we wrap it in a WAV header.
 
-function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
+export function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): string {
 	const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 	const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
 	const blockAlign = numChannels * (bitsPerSample / 8);
@@ -84,7 +84,7 @@ function pcmToWavBase64(pcmBase64: string, sampleRate = 24000, numChannels = 1, 
 // Single model for both text (via outputAudioTranscription) and audio.
 // No separate generateContent call → avoids gemini-2.5-flash rate limits.
 
-function combineBase64Chunks(chunks: string[]): string {
+export function combineBase64Chunks(chunks: string[]): string {
 	if (chunks.length === 0) return '';
 	if (chunks.length === 1) return chunks[0];
 
@@ -352,6 +352,8 @@ export async function generateWithLiveAPIStream(
 	systemInstruction: string,
 	turns: Array<{ role: string; parts: Array<{ text: string }> }>,
 	voiceName: string = 'Kore',
+	tools?: Array<{ name: string; description: string; parameters?: object }>,
+	onToolCall?: (name: string, args: any) => void | Promise<void>,
 ): Promise<ReadableStream> {
 	if (!genAINew) {
 		throw new Error('Gemini Live API is not configured');
@@ -377,6 +379,16 @@ export async function generateWithLiveAPIStream(
 				}
 			};
 
+			const sendError = (message: string) => {
+				if (sessionClosed) return;
+				try {
+					const chunk = JSON.stringify({ type: 'error', message });
+					controller.enqueue(new TextEncoder().encode(`data: ${chunk}\n\n`));
+				} catch {
+					/* controller already closed — safe to ignore */
+				}
+			};
+
 			const closeStream = () => {
 				if (sessionClosed) return;
 				sessionClosed = true;
@@ -384,6 +396,10 @@ export async function generateWithLiveAPIStream(
 				try { session?.close(); } catch { /* ignore */ }
 				try { controller.close(); } catch { /* ignore */ }
 			};
+
+			let receivedAnyChunk = false;
+			let retryCount = 0;
+			const MAX_RETRIES = 3;
 
 			timeoutHandle = setTimeout(() => {
 				if (!sessionClosed) {
@@ -407,24 +423,74 @@ export async function generateWithLiveAPIStream(
 						},
 						outputAudioTranscription: {},
 						thinkingConfig: { thinkingBudget: 0 },
+						...(tools && tools.length > 0 ? { tools: [{ functionDeclarations: tools }] } : {}),
 					},
 					callbacks: {
 						onopen: () => {
 							logger.info('Live API WebSocket connected (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 						},
-						onmessage: (message: LiveServerMessage) => {
+						onmessage: async (message: LiveServerMessage) => {
 							if (sessionClosed) return;
 
 							const data = message.data;
 							if (data) {
 								sendChunk('audio', data);
+								receivedAnyChunk = true;
 							}
 
 							if (message.serverContent?.outputTranscription?.text) {
 								sendChunk('text', message.serverContent.outputTranscription.text);
+								receivedAnyChunk = true;
+							}
+
+							if (message.toolCall?.functionCalls?.length) {
+								for (const call of message.toolCall.functionCalls) {
+									try {
+										if (onToolCall) {
+											await onToolCall(call.name ?? '', call.args);
+										} else {
+											logger.info('Live API tool call received with no onToolCall handler (Stream)', {
+												name: call.name,
+											});
+										}
+									} catch (toolErr: any) {
+										logger.error('Live API onToolCall handler threw (Stream)', {
+											name: call.name,
+											error: toolErr?.message,
+										});
+									}
+									try {
+										session.sendToolResponse({
+											functionResponses: {
+												id: call.id,
+												name: call.name,
+												response: { output: 'ok' },
+											},
+										});
+									} catch { /* ignore */ }
+								}
 							}
 
 							if (message.serverContent?.turnComplete) {
+								if (!receivedAnyChunk && retryCount < MAX_RETRIES) {
+									retryCount++;
+									logger.warn('Live API turn complete with no chunks received, retrying (Stream)', {
+										attempt: retryCount,
+										maxRetries: MAX_RETRIES,
+										elapsed: `${Date.now() - startTime}ms`,
+									});
+									session.sendClientContent({ turns, turnComplete: true });
+									return;
+								}
+
+								if (!receivedAnyChunk && retryCount >= MAX_RETRIES) {
+									logger.error('Live API retries exhausted, still no chunks received (Stream)', {
+										retryCount,
+										elapsed: `${Date.now() - startTime}ms`,
+									});
+									sendError('The AI did not respond. Please try again.');
+								}
+
 								logger.info('Live API turn complete (Stream)', { elapsed: `${Date.now() - startTime}ms` });
 								closeStream();
 							}
@@ -774,11 +840,26 @@ export async function generateConversationResponseStream(
 
 // ─── Transcription (generateContent — fast + reliable) ──────────────────────
 
+export class TranscriptionRejectedError extends Error {
+	constructor(message: string = 'Transcription refused or failed') {
+		super(message);
+		this.name = 'TranscriptionRejectedError';
+	}
+}
+
 /**
  * Transcribe audio using Gemini generateContent API.
  * Uses gemini-2.0-flash (DEFAULT_MODEL) with inline audio data.
  * Fast, cheap, and reliable — no WebSocket overhead.
  */
+// Below this size, a recording is near-silent/near-instant rather than a short
+// real utterance. Gemini has been observed hallucinating a plausible-sounding
+// sentence for such clips (e.g. "I'm not sure if I can do that"), which then
+// gets submitted as real student speech — refusal/repetition detection after
+// the fact can't catch hallucinated-but-coherent output, so this must reject
+// before the model call.
+const MIN_AUDIO_BYTES_FOR_TRANSCRIPTION = 3000;
+
 export async function transcribeAudio(
 	audioBuffer: Buffer,
 	mimeType: string = 'audio/webm'
@@ -786,6 +867,11 @@ export async function transcribeAudio(
 	try {
 		if (!genAI) {
 			throw new Error('Gemini API is not configured');
+		}
+
+		if (audioBuffer.length < MIN_AUDIO_BYTES_FOR_TRANSCRIPTION) {
+			logger.warn('Audio too short or silent, skipping transcription', { size: audioBuffer.length });
+			throw new TranscriptionRejectedError('Audio too short or silent');
 		}
 
 		logger.info('Transcribing audio', { size: audioBuffer.length, mimeType });
@@ -812,11 +898,66 @@ export async function transcribeAudio(
 
 		const text = result.response.text().trim();
 		logger.info('Audio transcribed', { textLength: text.length, preview: text.substring(0, 80) });
+
+		if (isFailedTranscription(text)) {
+			logger.warn('Transcription refused or failed validation', { preview: text.substring(0, 80) });
+			throw new TranscriptionRejectedError();
+		}
+
 		return text;
 	} catch (error: any) {
+		if (error instanceof TranscriptionRejectedError) {
+			throw error;
+		}
 		logger.error('Error transcribing audio', { error: error.message });
 		throw new Error(`Failed to transcribe audio: ${error.message}`);
 	}
+}
+
+const REFUSAL_PATTERNS = [
+	/^i'?m sorry,? but i (cannot|can'?t)/i,
+	/^i cannot provide/i,
+	/^i'?m unable to/i,
+	/^i can'?t (transcribe|assist|help)/i,
+	/^as an ai/i,
+];
+
+/**
+ * Detects transcription output that is actually a model refusal or a
+ * garbled/pathologically repetitive result rather than real spoken content.
+ */
+function isFailedTranscription(text: string): boolean {
+	if (REFUSAL_PATTERNS.some((pattern) => pattern.test(text.trim()))) {
+		return true;
+	}
+
+	const words = text.trim().split(/\s+/).filter(Boolean);
+	if (words.length === 0) return false;
+
+	// Pathological repetition: same short phrase (3-8 words) repeating >4 times consecutively.
+	for (let phraseLen = 3; phraseLen <= 8; phraseLen++) {
+		let runLength = 1;
+		for (let i = phraseLen; i + phraseLen <= words.length; i += phraseLen) {
+			const prev = words.slice(i - phraseLen, i).join(' ').toLowerCase();
+			const curr = words.slice(i, i + phraseLen).join(' ').toLowerCase();
+			if (prev === curr) {
+				runLength++;
+				if (runLength > 4) return true;
+			} else {
+				runLength = 1;
+			}
+		}
+	}
+
+	// Low unique-word ratio on longer texts suggests a garbled/looping transcription.
+	if (words.length > 100) {
+		const uniqueWords = new Set(words.map((w) => w.toLowerCase()));
+		if (uniqueWords.size / words.length < 0.15) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 export type ListeningAnalyzeQuestion = Record<string, unknown>;

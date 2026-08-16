@@ -116,7 +116,7 @@ describe('resolveDrillListTitle', () => {
 				title: 'Untitled Drill',
 				type: 'vocabulary',
 			}),
-			'Vocabulary',
+			'Vocabulary/Key Phrase',
 		);
 		assert.equal(resolveDrillListTitle({ title: '' }), 'Practice');
 		assert.equal(resolveDrillListTitle(null), 'Practice');
@@ -132,7 +132,7 @@ describe('formatDrillNotificationLabel', () => {
 				learning_journey_part: 1,
 				learning_journey_topic: 'patient_follow_up',
 			}),
-			'Vocabulary · Mission 1 · Follow-up with Patients',
+			'Vocabulary/Key Phrase · Mission 1 · Follow-up with Patients',
 		);
 	});
 
@@ -144,7 +144,7 @@ describe('formatDrillNotificationLabel', () => {
 				learning_journey_part: 1,
 				learning_journey_topic: 'patient_follow_up',
 			}),
-			'Vocabulary · Mission 1 · Follow-up with Patients · Soft palate practice',
+			'Vocabulary/Key Phrase · Mission 1 · Follow-up with Patients · Soft palate practice',
 		);
 	});
 

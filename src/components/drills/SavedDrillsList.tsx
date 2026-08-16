@@ -57,7 +57,7 @@ export function SavedDrillsList({
             <PlanFreeTalkRow
               key={`free-talk-${key}`}
               scenarioId={key}
-              title={drill?.title ?? "Free Talk"}
+              title={drill?.title ?? "Simulation Room"}
               scenarioType={drill?.scenarioType ?? ""}
               completionDate={drill?.completionDate ?? item.dueDate}
               completedAt={item.completedAt}

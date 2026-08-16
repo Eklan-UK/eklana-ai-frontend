@@ -78,14 +78,21 @@ function normalizeRoleplayScenes(
 // `learning_journey_part`/`learning_journey_topic`, so bulk-created drills can never
 // silently persist with a mismatched or non-canonical mission/topic (e.g. display
 // labels like "Mission 1: ..." instead of the raw numeric id / topic slug).
-const journeyFieldsSchema = z
-  .object({
-    learning_journey_part: learningJourneyPartSchema.optional(),
-    learning_journey_topic: learningJourneyTopicSchema.optional(),
-  })
-  .superRefine((data, ctx) => {
-    refineLearningJourneyFields(data, ctx, { requireAlways: true });
-  });
+// Precision Clinic drills are remediation content, not curriculum-linked — both
+// require flags are false (same as drills/route.ts).
+function makeJourneyFieldsSchema(isPrecisionClinic: boolean) {
+  return z
+    .object({
+      learning_journey_part: learningJourneyPartSchema.optional(),
+      learning_journey_topic: learningJourneyTopicSchema.optional(),
+    })
+    .superRefine((data, ctx) => {
+      refineLearningJourneyFields(data, ctx, {
+        requireAlways: !isPrecisionClinic,
+        requireWhenAssigned: !isPrecisionClinic,
+      });
+    });
+}
 
 // Maps the AI-generated/provided content object onto the type-specific Drill schema fields
 function mapContentFields(
@@ -210,8 +217,9 @@ async function handler(
           }
 
           const parsedPart = parseLearningJourneyPartId(extractedPart);
+          const isPrecisionClinic = source === "precision_clinic";
 
-          const journeyValidation = journeyFieldsSchema.safeParse({
+          const journeyValidation = makeJourneyFieldsSchema(isPrecisionClinic).safeParse({
             learning_journey_part: parsedPart,
             learning_journey_topic: topic,
           });
@@ -291,6 +299,7 @@ async function handler(
             ...(parsedWeek != null ? { builderWeekNumber: parsedWeek } : {}),
             dueDate,
             status: "pending",
+            ...(isPrecisionClinic ? { source } : {}),
           });
 
           notifyLearnersOfAssignment(

@@ -307,7 +307,7 @@ export function validateDrillDraft(
       draft.keyPhraseItems.length === 0 ||
       !draft.keyPhraseItems.some((item) => item.prompt.trim())
     ) {
-      toast.error("Please add at least one key phrase question");
+      toast.error("Please add at least one Pressure Test question");
       return false;
     }
     for (const item of draft.keyPhraseItems) {
@@ -521,7 +521,7 @@ export function getMissingCompletionDateLabels(drafts: DrillDraft[]): string[] {
 // only the first selected student (`selectedUsers[0]`) would ever get assigned.
 export function buildBulkAssignPayload(
   drafts: DrillDraft[],
-  options?: { weekNumber?: number },
+  options?: { weekNumber?: number; source?: "precision_clinic" },
 ) {
   const weekNumber =
     options?.weekNumber != null &&
@@ -543,6 +543,7 @@ export function buildBulkAssignPayload(
       topic: draft.journeyTopic || undefined,
       part: draft.journeyPart ? getPartLabel(draft.journeyPart) : undefined,
       ...(weekNumber != null ? { weekNumber } : {}),
+      ...(options?.source ? { source: options.source } : {}),
     }));
   });
 }

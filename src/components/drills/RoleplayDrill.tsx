@@ -18,13 +18,11 @@ import {
   VolumeX,
   RotateCcw,
   ChevronRight,
-  AlertCircle,
   PartyPopper,
   ArrowLeftRight,
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/react-query";
 import { drillAPI, pronunciationAPI, weeklyChallengeAPI } from "@/lib/api";
@@ -41,7 +39,9 @@ import {
   DrillLayout,
   DrillProgress,
   RecordingPreviewBar,
+  RoleplayAnalysisOverlay,
   RoleplayPerformanceReview,
+  type RoleplayAnalysisOverlayState,
 } from "./shared";
 import { transcriptFromTextScore } from "./shared/speechaceTranscript";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
@@ -179,6 +179,8 @@ interface CompletedMessage {
 }
 
 const PASS_THRESHOLD = 65;
+const PASS_OVERLAY_MS = 1400;
+const FAIL_OVERLAY_MS = 1600;
 
 const PRESTART_INTRO_PLACEHOLDER =
   "When you're ready, tap Let's Get Started.";
@@ -215,16 +217,6 @@ function pickRoleplayRecorderMimeType(): string | undefined {
   }
   return undefined;
 }
-
-// Trigger confetti celebration
-const triggerConfetti = () => {
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 },
-    colors: ['#22c55e', '#16a34a', '#4ade80', '#86efac'],
-  });
-};
 
 export default function RoleplayDrill({
   drill,
@@ -273,6 +265,7 @@ export default function RoleplayDrill({
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisOverlay, setAnalysisOverlay] = useState<RoleplayAnalysisOverlayState | null>(null);
   const [pronunciationScore, setPronunciationScore] = useState<TextScore | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [pendingSubmitBlob, setPendingSubmitBlob] = useState<Blob | null>(null);
@@ -280,6 +273,8 @@ export default function RoleplayDrill({
   const MAX_RECORDING_SECONDS = 120;
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const analysisOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlayGenRef = useRef(0);
 
   // AI turn state - use ref for synchronous tracking to prevent double-play
   const playedAITurnsRef = useRef<Set<string>>(new Set());
@@ -295,6 +290,18 @@ export default function RoleplayDrill({
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** Invalidates in-flight AI playback / leftover onended + advance timers. */
+  const aiPlayGenerationRef = useRef(0);
+  const aiAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Stops the student listen button (TTSButton) from outside. */
+  const studentTTSStopRef = useRef<(() => void) | null>(null);
+
+  const clearAnalysisOverlayTimer = () => {
+    if (analysisOverlayTimerRef.current) {
+      clearTimeout(analysisOverlayTimerRef.current);
+      analysisOverlayTimerRef.current = null;
+    }
+  };
 
   const revokeRecordingPreview = () => {
     setRecordingPreviewUrl((prev) => {
@@ -308,11 +315,6 @@ export default function RoleplayDrill({
     revokeRecordingPreview();
   };
 
-  useEffect(() => {
-    discardPendingRecording();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
-  }, [currentSceneIndex, currentTurnIndex]);
-
   // TTS for AI characters (fallback if no pre-generated audio)
   const {
     playAudio: playTTSAudio,
@@ -323,16 +325,36 @@ export default function RoleplayDrill({
     autoPlay: false,
   });
 
-  // Cut any leftover TTS / streamed clip from another screen when this drill loads.
-  useEffect(() => {
-    stopTTSAudio();
+  const clearAiAdvanceTimer = useCallback(() => {
+    if (aiAdvanceTimerRef.current) {
+      clearTimeout(aiAdvanceTimerRef.current);
+      aiAdvanceTimerRef.current = null;
+    }
+  }, []);
+
+  const stopAllRoleplaySpeech = useCallback(() => {
+    aiPlayGenerationRef.current += 1;
+    clearAiAdvanceTimer();
     if (preGenAudioRef.current) {
       preGenAudioRef.current.pause();
       preGenAudioRef.current.currentTime = 0;
+      preGenAudioRef.current.onended = null;
+      preGenAudioRef.current.onerror = null;
       preGenAudioRef.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: silence stale audio
-  }, []);
+    stopTTSAudio();
+    studentTTSStopRef.current?.();
+    setIsPlayingAI(false);
+  }, [clearAiAdvanceTimer, stopTTSAudio]);
+
+  useEffect(() => {
+    discardPendingRecording();
+    overlayGenRef.current += 1;
+    clearAnalysisOverlayTimer();
+    setAnalysisOverlay(null);
+    stopAllRoleplaySpeech();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the spoken line changes
+  }, [currentSceneIndex, currentTurnIndex]);
 
   // Drill data — memoize so scene-advance effects do not re-fire every render in legacy single-scene path
   const scenes = useMemo(
@@ -814,9 +836,9 @@ export default function RoleplayDrill({
   // Stop prestart intro voice the moment the session begins — runs once on that transition.
   useEffect(() => {
     if (!sessionStarted) return;
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drillIdStr) clearPrestartTtsDebounce(drillIdStr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stopTTSAudio is stable; only needs sessionStarted + drillIdStr
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only needs sessionStarted + drillIdStr
   }, [sessionStarted, drillIdStr]);
 
   // Auto-read intro + roles when the learner lands on the pre-start screen (browser may block until a tap).
@@ -864,6 +886,18 @@ export default function RoleplayDrill({
     setCurrentTurnIndex(prev => prev + 1);
   }, []);
 
+  const scheduleAdvanceAfterBeat = useCallback(
+    (generation: number) => {
+      clearAiAdvanceTimer();
+      aiAdvanceTimerRef.current = setTimeout(() => {
+        aiAdvanceTimerRef.current = null;
+        if (generation !== aiPlayGenerationRef.current) return;
+        moveToNextTurn();
+      }, 300);
+    },
+    [clearAiAdvanceTimer, moveToNextTurn],
+  );
+
   // Play AI turn - only called once per turn
   const playAITurn = useCallback(async (turn: DialogueTurn, turnIndex: number) => {
     const turnKey = makeTurnKey(currentSceneIndex, turnIndex);
@@ -871,7 +905,10 @@ export default function RoleplayDrill({
       return; // Already played, skip
     }
     playedAITurnsRef.current.add(turnKey);
+    const generation = ++aiPlayGenerationRef.current;
     setIsPlayingAI(true);
+
+    const stillCurrent = () => generation === aiPlayGenerationRef.current;
 
     // Silence any pre-start intro TTS still playing via useTTS before scene audio.
     stopTTSAudio();
@@ -886,12 +923,17 @@ export default function RoleplayDrill({
     };
     setCompletedMessages(prev => [...prev, aiMessage]);
 
-    // Play audio
     const audioUrl = turn.audioUrl;
     const voiceId = resolveTurnVoiceId(turn.speaker);
 
+    const playLiveTtsThenAdvance = async () => {
+      if (!stillCurrent()) return;
+      await playTTSAudio(turn.text, voiceId, { waitUntilEnd: true });
+      if (!stillCurrent()) return;
+      scheduleAdvanceAfterBeat(generation);
+    };
+
     if (audioUrl) {
-      // Play from pre-generated URL
       if (preGenAudioRef.current) {
         preGenAudioRef.current.pause();
       }
@@ -899,45 +941,41 @@ export default function RoleplayDrill({
       const audio = new Audio(audioUrl);
       preGenAudioRef.current = audio;
 
-      audio.onended = () => {
-        setTimeout(moveToNextTurn, 300);
-      };
-      audio.onerror = async () => {
+      let fallbackStarted = false;
+      const fallbackToTts = () => {
+        if (!stillCurrent() || fallbackStarted) return;
+        fallbackStarted = true;
         console.warn("Pre-generated audio failed, falling back to TTS");
-        try {
-          await playTTSAudio(turn.text, voiceId);
-          setTimeout(moveToNextTurn, 500);
-        } catch {
-          moveToNextTurn();
-        }
+        void playLiveTtsThenAdvance();
+      };
+
+      audio.onended = () => {
+        if (!stillCurrent()) return;
+        scheduleAdvanceAfterBeat(generation);
+      };
+      audio.onerror = () => {
+        fallbackToTts();
       };
 
       try {
         await audio.play();
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+      } catch (err: unknown) {
+        const name = err && typeof err === "object" && "name" in err ? String(err.name) : "";
+        if (name !== "AbortError") {
           console.error("Error playing pre-generated audio:", err);
         }
-        try {
-          await playTTSAudio(turn.text, voiceId);
-          setTimeout(moveToNextTurn, 500);
-        } catch {
-          moveToNextTurn();
-        }
+        fallbackToTts();
       }
     } else {
-      // Use TTS generation
       try {
-        await playTTSAudio(turn.text, voiceId);
-        // After TTS finishes, move to next turn
-        setTimeout(moveToNextTurn, 500);
+        await playLiveTtsThenAdvance();
       } catch (error) {
         console.error("TTS failed:", error);
         toast.error("Failed to play AI audio");
-        moveToNextTurn();
+        if (stillCurrent()) moveToNextTurn();
       }
     }
-  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio, resolveTurnVoiceId]);
+  }, [playTTSAudio, moveToNextTurn, currentSceneIndex, stopTTSAudio, resolveTurnVoiceId, scheduleAdvanceAfterBeat]);
 
   // Auto-play AI turns - only after session start and if not already played
   useEffect(() => {
@@ -982,13 +1020,13 @@ export default function RoleplayDrill({
     if (d.length === 0) return;
     if (currentTurnIndex < d.length) return;
     if (currentSceneIndex < scenes.length - 1) {
-      stopTTSAudio();
+      stopAllRoleplaySpeech();
       setSceneBreak({
         completedSceneIndex: currentSceneIndex,
         nextSceneIndex: currentSceneIndex + 1,
       });
     }
-  }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview, sceneBreak, stopTTSAudio]);
+  }, [currentSceneIndex, currentTurnIndex, scenes, isCompleted, showReview, sceneBreak, stopAllRoleplaySpeech]);
 
   useEffect(() => {
     if (!sceneBreak || !weeklyChallengeMeta) return;
@@ -1064,7 +1102,7 @@ export default function RoleplayDrill({
   const startRecording = async () => {
     if (!isStudentTurn) return;
 
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1158,15 +1196,72 @@ export default function RoleplayDrill({
     });
   };
 
+  const handleContinue = (opts?: {
+    score: number;
+    textScore: TextScore | null;
+    turn?: DialogueTurn;
+  }) => {
+    const turn = opts?.turn ?? currentTurn;
+    if (!turn) return;
+    const score = opts?.score ?? currentProgress.score;
+    const textScore = opts?.textScore !== undefined ? opts.textScore : pronunciationScore;
+    if (score == null || score < PASS_THRESHOLD) return;
+
+    const studentMessage: CompletedMessage = {
+      id: `msg-${Date.now()}`,
+      speaker: "student",
+      text: turn.text,
+      translation: turn.translation,
+      score,
+      timestamp: new Date(),
+      transcript: textScore
+        ? transcriptFromTextScore(textScore)
+        : undefined,
+    };
+    setCompletedMessages(prev => [...prev, studentMessage]);
+    setCurrentTurnIndex(prev => prev + 1);
+    setPronunciationScore(null);
+    setAnalysisOverlay(null);
+  };
+
+  /** Clears scoring UI and restores the mic so the student can redo the line. */
+  const handleRetrySpeaking = () => {
+    discardPendingRecording();
+    setPronunciationScore(null);
+    setAnalysisOverlay(null);
+    setTurnProgress((prev) => ({
+      ...prev,
+      [currentTurnKey]: {
+        passed: false,
+        score: null,
+        attempts: prev[currentTurnKey]?.attempts ?? 0,
+      },
+    }));
+    setSessionAnalytics((prev) =>
+      prev.filter(
+        (a) =>
+          !(a.sceneIndex === currentSceneIndex && a.turnIndex === currentTurnIndex),
+      ),
+    );
+  };
+
   const analyzePronunciation = async (audioBlob: Blob) => {
     if (!currentTurn) return;
 
+    const gen = overlayGenRef.current;
+    const analyzedTurn = currentTurn;
+    const analyzedKey = currentTurnKey;
+    const analyzedSceneIndex = currentSceneIndex;
+    const analyzedTurnIndex = currentTurnIndex;
+
+    clearAnalysisOverlayTimer();
     setIsAnalyzing(true);
     setPronunciationScore(null);
+    setAnalysisOverlay("processing");
 
     try {
       const speechAceResponse = await speechaceService.scorePronunciation(
-        currentTurn.text,
+        analyzedTurn.text,
         audioBlob
       );
 
@@ -1182,28 +1277,30 @@ export default function RoleplayDrill({
       }
 
       if (textScore) {
-        setPronunciationScore(textScore);
         const score = textScore.speechace_score.pronunciation;
         const passed = score >= PASS_THRESHOLD;
-        const newAttempts = (turnProgress[currentTurnKey]?.attempts || 0) + 1;
+        const newAttempts = (turnProgress[analyzedKey]?.attempts || 0) + 1;
+        const overlayStillCurrent = gen === overlayGenRef.current;
 
-        // Update turn progress
+        if (overlayStillCurrent) {
+          setPronunciationScore(textScore);
+        }
+
         setTurnProgress((prev) => ({
           ...prev,
-          [currentTurnKey]: {
+          [analyzedKey]: {
             passed,
             score,
             attempts: newAttempts,
           },
         }));
 
-        // Silently collect analytics for review screen
         setSessionAnalytics((prev) => [
           ...prev,
           {
-            sceneIndex: currentSceneIndex,
-            turnIndex: currentTurnIndex,
-            text: currentTurn.text,
+            sceneIndex: analyzedSceneIndex,
+            turnIndex: analyzedTurnIndex,
+            text: analyzedTurn.text,
             score,
             textScore,
             attempts: newAttempts,
@@ -1211,89 +1308,51 @@ export default function RoleplayDrill({
           },
         ]);
 
-        if (passed) {
-          if (Math.round(score) >= 100) {
-            playPerfectItemCelebration();
+        if (overlayStillCurrent) {
+          if (passed) {
+            if (Math.round(score) >= 100) {
+              playPerfectItemCelebration();
+            } else {
+              playPracticeFeedback("success");
+            }
+            setAnalysisOverlay("pass");
+            analysisOverlayTimerRef.current = setTimeout(() => {
+              if (gen !== overlayGenRef.current) return;
+              handleContinue({ score, textScore, turn: analyzedTurn });
+            }, PASS_OVERLAY_MS);
           } else {
-            playPracticeFeedback("success");
-            // Trigger confetti celebration
-            triggerConfetti();
+            playPracticeFeedback("failure");
+            setAnalysisOverlay("fail");
+            analysisOverlayTimerRef.current = setTimeout(() => {
+              if (gen !== overlayGenRef.current) return;
+              handleRetrySpeaking();
+            }, FAIL_OVERLAY_MS);
           }
-          toast.success(`Great! You scored ${score.toFixed(0)}% - Line passed!`);
-        } else {
-          playPracticeFeedback("failure");
-          toast.warning(
-            `Score: ${score.toFixed(0)}%. You need at least ${PASS_THRESHOLD}% to continue. Try again!`
-          );
         }
 
-        // Record pronunciation attempt
         try {
           const audioBase64 = await blobToBase64(audioBlob);
           await pronunciationAPI.createDrillAttempt({
-            text: currentTurn.text,
+            text: analyzedTurn.text,
             audioBase64,
             drillId: drill._id,
             drillType: 'roleplay',
             passingThreshold: PASS_THRESHOLD,
           });
         } catch (error) {
-          // Log but don't fail the drill if pronunciation recording fails
           console.error('Failed to record pronunciation attempt:', error);
         }
       } else {
         throw new Error("Invalid response from SpeechAce");
       }
     } catch (error: any) {
+      if (gen === overlayGenRef.current) {
+        setAnalysisOverlay(null);
+      }
       toast.error(error.message || "Failed to analyze pronunciation");
     } finally {
       setIsAnalyzing(false);
     }
-  };
-
-  const handleContinue = () => {
-    if (!currentProgress.passed) {
-      toast.error(`You need at least ${PASS_THRESHOLD}% to continue`);
-      return;
-    }
-
-    // Add student message to completed messages
-    const studentMessage: CompletedMessage = {
-      id: `msg-${Date.now()}`,
-      speaker: "student",
-      text: currentTurn.text,
-      translation: currentTurn.translation,
-      score: currentProgress.score || 0,
-      timestamp: new Date(),
-      transcript: pronunciationScore
-        ? transcriptFromTextScore(pronunciationScore)
-        : undefined,
-    };
-    setCompletedMessages(prev => [...prev, studentMessage]);
-
-    // Move to next turn
-    setCurrentTurnIndex(prev => prev + 1);
-    setPronunciationScore(null);
-  };
-
-  /** Clears scoring UI and unlocks mic so the student can redo the line (before or after passing). */
-  const handleRetrySpeaking = () => {
-    discardPendingRecording();
-    setPronunciationScore(null);
-    setTurnProgress((prev) => ({
-      ...prev,
-      [currentTurnKey]: {
-        passed: false,
-        score: null,
-        attempts: prev[currentTurnKey]?.attempts ?? 0,
-      },
-    }));
-    setSessionAnalytics((prev) =>
-      prev.filter(
-        (a) =>
-          !(a.sceneIndex === currentSceneIndex && a.turnIndex === currentTurnIndex),
-      ),
-    );
   };
 
   /** Same role: restart entire roleplay from scene 1 / first line (after completion screen). */
@@ -1312,14 +1371,13 @@ export default function RoleplayDrill({
     setHasCompletedRound(false);
     setShowReview(false);
     setSceneBreak(null);
+    setAnalysisOverlay(null);
+    clearAnalysisOverlayTimer();
+    overlayGenRef.current += 1;
     setSessionStartTime(Date.now());
     setIsPlayingAI(false);
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
-    if (preGenAudioRef.current) {
-      preGenAudioRef.current.pause();
-      preGenAudioRef.current = null;
-    }
     setSessionStarted(false);
     setHasRestoredProgress(false);
     void clearCheckpoint();
@@ -1351,6 +1409,9 @@ export default function RoleplayDrill({
     playedAITurnsRef.current = new Set();
     setPronunciationScore(null);
     setShowRoleSwitchOption(false);
+    setAnalysisOverlay(null);
+    clearAnalysisOverlayTimer();
+    overlayGenRef.current += 1;
 
     // Load progress for the new role (if any previous progress exists)
     const savedProgress = newMode === "original" ? originalRoleProgress : swappedRoleProgress;
@@ -1359,7 +1420,7 @@ export default function RoleplayDrill({
     // Clear session analytics for fresh round
     setSessionAnalytics([]);
 
-    stopTTSAudio();
+    stopAllRoleplaySpeech();
     if (drill._id != null) clearPrestartTtsDebounce(String(drill._id));
     setSessionStarted(false);
     setHasRestoredProgress(false);
@@ -1473,15 +1534,13 @@ export default function RoleplayDrill({
   useEffect(() => {
     return () => {
       clearRecordingTimers();
+      clearAnalysisOverlayTimer();
+      overlayGenRef.current += 1;
       setRecordingPreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
-      if (preGenAudioRef.current) {
-        preGenAudioRef.current.pause();
-        preGenAudioRef.current = null;
-      }
-      stopTTSAudio();
+      stopAllRoleplaySpeech();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount-only cleanup; all captured refs are stable
   }, []);
@@ -1490,10 +1549,12 @@ export default function RoleplayDrill({
     !!pendingSubmitBlob &&
     !isAnalyzing &&
     !pronunciationScore &&
-    !currentProgress.passed;
+    !currentProgress.passed &&
+    analysisOverlay == null;
 
   const readyToSubmitPreview = awaitingSubmit && Boolean(recordingPreviewUrl);
   const dockMainDisabled =
+    analysisOverlay != null ||
     isAnalyzing ||
     currentProgress.passed ||
     (awaitingSubmit && !recordingPreviewUrl);
@@ -1557,7 +1618,7 @@ export default function RoleplayDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType={weeklyChallengeMeta ? "Role-play" : "roleplay"}
+        drillType={weeklyChallengeMeta ? "Roleplay" : "roleplay"}
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -1744,11 +1805,6 @@ export default function RoleplayDrill({
                       <span className="text-xs font-semibold opacity-90">
                         {displayName}
                       </span>
-                      {isUserMessage && message.score !== undefined && (
-                        <span className="text-xs bg-background/20 px-2 py-0.5 rounded-full">
-                          {message.score}%
-                        </span>
-                      )}
                     </div>
                     <p className="text-sm">{message.text}</p>
                     {message.translation && (
@@ -1857,8 +1913,9 @@ export default function RoleplayDrill({
                       text={currentTurn.text}
                       size="sm"
                       audioUrl={currentTurn.audioUrl}
+                      voiceId={resolveTurnVoiceId(currentTurn.speaker)}
+                      stopRef={studentTTSStopRef}
                     />
-                    <DrillBookmarkToggle drillId={String(drill._id)} />
                   </div>
                 </div>
                 <p className="text-xl font-semibold text-foreground text-center">
@@ -1878,15 +1935,9 @@ export default function RoleplayDrill({
                   </div>
                 )}
 
-                {!isRecording && (
+                {!isRecording && analysisOverlay == null && (
                   <p className="text-sm text-muted-foreground text-center px-2">
-                    {currentProgress.passed ? (
-                      <span className="text-green-600 font-medium">Line passed! ✓</span>
-                    ) : isAnalyzing ? (
-                      <span className="text-blue-600">
-                        Analyzing your pronunciation — longer recordings may take a moment...
-                      </span>
-                    ) : awaitingSubmit ? (
+                    {awaitingSubmit ? (
                       <span className="text-foreground">
                         Listen in the player, then tap the green send button to submit, or trash to
                         re-record.
@@ -1896,65 +1947,7 @@ export default function RoleplayDrill({
                     )}
                   </p>
                 )}
-
-                {currentProgress.attempts > 0 && !currentProgress.passed && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Attempt {currentProgress.attempts} • Need {PASS_THRESHOLD}%+ to pass
-                  </p>
-                )}
               </div>
-
-              {/* Simple Score Display - Analytics shown on review screen */}
-              {pronunciationScore && !currentProgress.passed && (
-                <div className={`rounded-xl p-4 mb-4 ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                    ? "bg-emerald-500/15"
-                    : "bg-amber-50/90"
-                  }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-foreground">Your Score</span>
-                    <span className={`text-2xl font-bold ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                        ? "text-green-600"
-                        : "text-amber-600"
-                      }`}>
-                      {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${(pronunciationScore.speechace_score.pronunciation || 0) >= PASS_THRESHOLD
-                          ? "bg-green-500"
-                          : "bg-amber-500"
-                        }`}
-                      style={{ width: `${pronunciationScore.speechace_score.pronunciation}%` }}
-                    />
-                  </div>
-                  {(pronunciationScore.speechace_score.pronunciation || 0) < PASS_THRESHOLD && (
-                    <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      You need {PASS_THRESHOLD}% or higher to continue
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-3">
-                    <span className="font-medium text-foreground">Transcript: </span>
-                    {transcriptFromTextScore(pronunciationScore) || "—"}
-                  </p>
-                </div>
-              )}
-
-              {/* Confetti celebration shown when passed - no analytics here */}
-              {currentProgress.passed && pronunciationScore && (
-                <div className="rounded-xl p-4 mb-4 bg-emerald-500/15 border border-emerald-500/25 text-center">
-                  <PartyPopper className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-lg font-bold text-green-700">
-                    {pronunciationScore.speechace_score.pronunciation.toFixed(0)}% - Passed!
-                  </p>
-                  <p className="text-sm text-green-600">Click Continue to proceed</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    <span className="font-medium text-foreground">Transcript: </span>
-                    {transcriptFromTextScore(pronunciationScore) || "—"}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -2005,47 +1998,6 @@ export default function RoleplayDrill({
               )}
             </div>
           </div>
-        )}
-
-        {/* Student turn actions */}
-        {isStudentTurn && !isEntireDrillComplete && !sceneBreak && (
-          <>
-            {currentProgress.passed ? (
-              <div className="space-y-3">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onClick={handleContinue}
-                >
-                  <ChevronRight className="w-5 h-5 mr-2" />
-                  Continue
-                </Button>
-                <button
-                  type="button"
-                  className={retrySpeakingButtonClass}
-                  onClick={handleRetrySpeaking}
-                  disabled={isRecording || isAnalyzing || awaitingSubmit}
-                >
-                  <RotateCcw className="w-5 h-5 shrink-0" />
-                  Retry speaking
-                </button>
-                <p className="text-xs text-center text-muted-foreground px-2">
-                  Redo this line if you want a higher score before moving on.
-                </p>
-              </div>
-            ) : pronunciationScore ? (
-              <button
-                type="button"
-                className={retrySpeakingButtonClass}
-                onClick={handleRetrySpeaking}
-                disabled={isRecording || isAnalyzing || awaitingSubmit}
-              >
-                <RotateCcw className="w-5 h-5 shrink-0" />
-                Retry speaking
-              </button>
-            ) : null}
-          </>
         )}
 
         {/* Conversation complete - Show Review and Role Switch options */}
@@ -2166,14 +2118,14 @@ export default function RoleplayDrill({
           <div className="pointer-events-auto w-full max-w-md">
             <button
               type="button"
-              onClick={() => { stopTTSAudio(); setSessionStarted(true); }}
+              onClick={() => { stopAllRoleplaySpeech(); setSessionStarted(true); }}
               className="w-full rounded-full bg-[#388E3C] px-8 py-4 text-center text-base font-bold text-white shadow-md transition-colors hover:bg-[#2f7a33] active:scale-[0.99]"
             >
               Let&apos;s Get Started
             </button>
           </div>
         </div>
-      ) : sessionStarted && isStudentTurn && !isEntireDrillComplete && !sceneBreak && currentTurn ? (
+      ) : sessionStarted && isStudentTurn && !isEntireDrillComplete && !sceneBreak && currentTurn && analysisOverlay == null ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-3">
             {awaitingSubmit && recordingPreviewUrl ? (
@@ -2213,13 +2165,9 @@ export default function RoleplayDrill({
                 onClick={handleDockMainClick}
                 disabled={dockMainDisabled}
                 className={`absolute inset-0 flex items-center justify-center rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  currentProgress.passed
-                    ? "bg-emerald-600 cursor-default"
-                    : isRecording
-                      ? "bg-red-500 hover:bg-red-600"
-                      : isAnalyzing
-                        ? "bg-muted cursor-not-allowed"
-                        : "bg-emerald-600 hover:bg-emerald-700"
+                  isRecording
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
                 aria-label={
                   isRecording
@@ -2229,12 +2177,8 @@ export default function RoleplayDrill({
                       : "Start recording"
                 }
               >
-                {currentProgress.passed ? (
-                  <CheckCircle className="h-8 w-8 text-white" />
-                ) : isRecording ? (
+                {isRecording ? (
                   <Square className="h-7 w-7 text-white" />
-                ) : isAnalyzing ? (
-                  <Loader2 className="h-7 w-7 animate-spin text-white" />
                 ) : readyToSubmitPreview ? (
                   <Send className="h-8 w-8 text-white" strokeWidth={2} />
                 ) : (
@@ -2245,6 +2189,7 @@ export default function RoleplayDrill({
           </div>
         </div>
       ) : null}
+      {analysisOverlay ? <RoleplayAnalysisOverlay state={analysisOverlay} /> : null}
     </DrillLayout>
   );
 }

@@ -27,7 +27,7 @@ async function handler(
 				{
 					success: false,
 					message:
-						'No free talk scenarios are available yet. Please ask an administrator to create scenarios in the admin panel.',
+						'No Simulation Room scenarios are available yet. Please ask an administrator to create scenarios in the admin panel.',
 				},
 				{ status: 404 },
 			);
@@ -52,7 +52,7 @@ async function handler(
 			error: err instanceof Error ? err.message : String(err),
 		});
 		return NextResponse.json(
-			{ success: false, message: 'Unable to load free talk scenarios. Please try again later.' },
+			{ success: false, message: 'Unable to load Simulation Room scenarios. Please try again later.' },
 			{ status: 503 },
 		);
 	}

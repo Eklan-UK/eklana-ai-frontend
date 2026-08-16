@@ -10,9 +10,9 @@
 
 When a learner **passes** a drill, the app plays a **celebration MP3** (hosted on Vercel Blob), triggers **success haptics**, and shows **confetti** once.
 
-When the score is a **perfect 100** (`Math.round(score) >= 100`), confetti is **gold** instead of green — mirroring the badge-unlock celebration — **and** a **distinct "crowd applause" MP3** (`CELEBRATION_SOUND_URL_100`) plays instead of the normal pass MP3. Same haptic either way.
+When the score is a **perfect 100** (`Math.round(score) >= 100`) **and** the drill type is a speech drill (`vocabulary` | `pronunciation` | `grammar` | `roleplay` | `key_phrases`), confetti is **gold** instead of green — mirroring the badge-unlock celebration — **and** a **distinct "crowd applause" MP3** (`CELEBRATION_SOUND_URL_100`) plays instead of the normal pass MP3. Same haptic either way. Matching, listening, fill-blank, and definition keep normal **pass** celebration (green + pass MP3) even at 100% — never gold/applause.
 
-This gold-confetti-plus-perfect-sound combo also fires **mid-item**, while the drill is still in progress, whenever a single item (SpeechAce word/sentence, key-phrase, roleplay turn, matching pair, fill-blank) scores a perfect 100 — see §6.
+This gold-confetti-plus-perfect-sound combo also fires **mid-item**, while the drill is still in progress, whenever a speech-drill item (SpeechAce word/sentence, key-phrase, roleplay turn) scores a perfect 100 — see §6. Matching / fill-blank correct answers use short success feedback only.
 
 | Layer | Responsibility |
 |-------|----------------|
@@ -40,8 +40,8 @@ This gold-confetti-plus-perfect-sound combo also fires **mid-item**, while the d
 | Pass confetti was always green, regardless of score | Confetti is **gold** when `Math.round(score) >= 100`, green otherwise. |
 | Same MP3 (`CELEBRATION_SOUND_URL`) played regardless of score | A perfect score (`Math.round(score) >= 100`) plays a **distinct** MP3 — `CELEBRATION_SOUND_URL_100` (crowd applause) — instead of the normal pass MP3. Same haptic either way. |
 | `effects: { soundUrl, triggerConfetti }` | Adds `effects.confettiVariant: 'pass' \| 'perfect'`. `effects.soundUrl` is already the correct MP3 for that variant (server picks it) — don't re-derive it from score. |
-| N/A | Trigger rule: `passed && Math.round(score) >= 100` → `'perfect'` (gold confetti + perfect MP3), else `'pass'` (green confetti + normal MP3) |
-| Mid-item feedback was short tones only; roleplay per-turn confetti during the drill was always green | **Now in scope**: a perfect mid-item score — `Math.round(itemScore) >= 100` for SpeechAce items (vocab/pronunciation/key-phrases/roleplay), or a correct matching pair / fill-blank answer — fires the same gold confetti + perfect MP3 combo **without leaving the drill screen**. See §6 and §7.1. |
+| N/A | Trigger rule: speech drill + `passed && Math.round(score) >= 100` → `'perfect'` (gold confetti + perfect MP3), else `'pass'` (green confetti + normal MP3). Non-speech types (`matching`, `listening`, `fill_blank`, `definition`, …) stay `'pass'` even at 100%. |
+| Mid-item feedback was short tones only; roleplay per-turn confetti during the drill was always green | **Now in scope**: a perfect mid-item score — `Math.round(itemScore) >= 100` for SpeechAce items (vocab/pronunciation/key-phrases/roleplay) — fires the same gold confetti + perfect MP3 combo **without leaving the drill screen**. Matching / fill-blank correct answers use short success feedback (not perfect). Roleplay non-perfect passes use short success tone only (no green mid-drill confetti). See §6 and §7.1. |
 
 Default assets (when env unset):
 
@@ -90,7 +90,7 @@ Request body unchanged — see [`MOBILE_MY_PLAN.md`](MOBILE_MY_PLAN.md) §5. Alw
 }
 ```
 
-`confettiVariant` is `"perfect"` instead of `"pass"` when `Math.round(attempt.score) >= 100`:
+`confettiVariant` is `"perfect"` instead of `"pass"` when the drill is a speech type (`supportsPerfectCelebration`) and `Math.round(attempt.score) >= 100`:
 
 ```json
 "effects": {
@@ -379,9 +379,10 @@ export function DrillCompletionScreen({
 | Moment | Sound |
 |--------|-------|
 | Each word / match / MCQ graded — non-perfect pass or fail | Short feedback (haptics primary; optional local tone) — [`mobile-practice-feedback.md`](mobile-practice-feedback.md) |
-| Each word / match / MCQ graded — **perfect** (`Math.round(itemScore) >= 100` for SpeechAce items; a correct matching pair; a correct fill-blank answer) | **Gold confetti + perfect MP3** (web: `playPerfectItemCelebration()`) — same combo as end-of-drill, fired without leaving the drill screen (§7.1) |
-| Fill-blank blank option select | Correct answer → perfect celebration (row above); **wrong answer → failure feedback** — never the celebration MP3 either way |
-| **End of drill (pass)** | **Celebration MP3** from `effects.soundUrl` (this doc) — already the perfect MP3 when `confettiVariant === 'perfect'` |
+| Each speech-drill item graded — **perfect** (`Math.round(itemScore) >= 100` for vocab / pronunciation / key-phrases / roleplay) | **Gold confetti + perfect MP3** (web: `playPerfectItemCelebration()`) — same combo as end-of-drill, fired without leaving the drill screen (§7.1) |
+| Matching correct pair / fill-blank correct blank | Short **success** feedback only — not gold/applause |
+| Fill-blank wrong blank | Failure feedback — never the celebration MP3 |
+| **End of drill (pass)** | **Celebration MP3** from `effects.soundUrl` (this doc) — perfect MP3 only when `confettiVariant === 'perfect'` (speech drills at 100%); non-speech completes stay pass even at 100% |
 | End of drill (fail) | Failure haptics / short fail cue — not the celebration MP3 |
 
 ---
@@ -401,9 +402,9 @@ Use `confettiVariant` to pick the color palette. **Gold replaces green on a perf
 
 Web also uses a slightly richer burst for `'perfect'` (`particleCount: 200`, `spread: 120` vs `150`/`100` for `'pass'`) — optional to mirror exactly, but keep the color swap.
 
-**Trigger rule**: `passed && Math.round(score) >= 100` → `'perfect'`; otherwise `'pass'`. Same haptic in both cases — the confetti color **and** the MP3 both switch on `'perfect'` (`CELEBRATION_SOUND_URL_100` instead of `CELEBRATION_SOUND_URL`; see §2.1).
+**Trigger rule**: speech drill (`supportsPerfectCelebration`) + `passed && Math.round(score) >= 100` → `'perfect'`; otherwise `'pass'`. Same haptic in both cases — the confetti color **and** the MP3 both switch on `'perfect'` (`CELEBRATION_SOUND_URL_100` instead of `CELEBRATION_SOUND_URL`; see §2.1).
 
-**Mid-item**: the identical gold-confetti + perfect-MP3 combo fires for a perfect single-item score while the drill is still active (§6) — e.g. web's `playPerfectItemCelebration()` calls `triggerDrillEndConfetti('perfect')` plus the perfect MP3, in place of the normal per-item success tone. Mobile needs a mid-drill confetti host mounted on the drill screen (not just the end/review screen) to support this — see §10.
+**Mid-item**: the identical gold-confetti + perfect-MP3 combo fires for a perfect single-item score on speech drills while the drill is still active (§6) — e.g. web's `playPerfectItemCelebration()` calls `triggerDrillEndConfetti('perfect')` plus the perfect MP3, in place of the normal per-item success tone. Matching / fill-blank correct answers and roleplay non-perfect passes stay on short success feedback (no green mid-drill confetti). Mobile needs a mid-drill confetti host mounted on speech drill screens (not just the end/review screen) to support this — see §10.
 
 ---
 
@@ -426,12 +427,13 @@ Web also uses a slightly richer burst for `'perfect'` (`particleCount: 200`, `sp
 - [ ] **Pattern B**: Matching → MP3 uses `effects.soundUrl` from complete response on completion screen
 - [ ] **Pattern B**: Definition score &lt; 70 → no celebration
 - [ ] Summary / Listening → `passed: true` and effects from API
-- [ ] **Pattern A**: Score review with `Math.round(avgScore) >= 100` → gold confetti + perfect MP3, not green + normal MP3
-- [ ] **Pattern B**: Matching/Listening/Definition complete with score 100 → `effects.confettiVariant === 'perfect'` → gold confetti and `effects.soundUrl` is the perfect MP3
-- [ ] Score 99 (rounds to 99) and 99.5 (rounds to 100) → confirm the `Math.round` boundary matches web
-- [ ] Mid-item: SpeechAce item (vocab / pronunciation / key-phrases / roleplay) at exactly 100 → gold confetti + perfect MP3 fires immediately, without leaving the drill; below 100 but passing → unchanged short success tone (roleplay also keeps green mid-drill confetti on a non-perfect pass, matching web)
-- [ ] Mid-item: matching correct pair → gold confetti + perfect MP3 on every correct match (not just when the whole drill ends at 100%)
-- [ ] Mid-item: fill-blank correct answer → gold confetti + perfect MP3; wrong answer → failure feedback (never the old "always success" tone)
+- [ ] **Pattern A**: Score review with `Math.round(avgScore) >= 100` on speech drills → gold confetti + perfect MP3, not green + normal MP3
+- [ ] **Pattern B**: Matching/Listening/Definition complete with score 100 → `effects.confettiVariant === 'pass'` (green pass celebration, not applause)
+- [ ] **Pattern A**: Fill-blank results at 100% → pass celebration only (`allowPerfectCelebration: false`)
+- [ ] Score 99 (rounds to 99) and 99.5 (rounds to 100) on speech drills → confirm the `Math.round` boundary matches web
+- [ ] Mid-item: SpeechAce item (vocab / pronunciation / key-phrases / roleplay) at exactly 100 → gold confetti + perfect MP3 fires immediately, without leaving the drill; below 100 but passing → short success tone only (no green mid-drill confetti on roleplay non-perfect passes)
+- [ ] Mid-item: matching correct pair → short success feedback only (not gold/applause)
+- [ ] Mid-item: fill-blank correct answer → short success feedback; wrong answer → failure feedback
 - [ ] Physical device: audio with silent switch (iOS) per product rules
 - [ ] Unmount completion screen / drill screen → sound unloaded, mid-drill confetti host unmounted cleanly
 - [ ] Weekly challenge complete → no crash when `effects` missing
@@ -444,11 +446,12 @@ Web also uses a slightly richer burst for `'perfect'` (`particleCount: 200`, `sp
 |------|--------|
 | `types/drills.ts` | `DrillCompletionEffects` (add `confettiVariant`), `CompleteDrillResponse`, `DEFAULT_CELEBRATION_SOUND_URL`, `DEFAULT_PERFECT_CELEBRATION_SOUND_URL` |
 | `lib/drill-celebration.ts` | **New** — `playDrillEndCelebration` (branch to perfect MP3 when `confettiVariant === 'perfect'` and no explicit URL), `playPerfectItemCelebration` (mid-item), `unloadDrillCelebrationSound` |
-| `hooks/useDrillScoreCelebration.ts` | **New** — Pattern A; pick perfect client URL when `Math.round(score) >= 100` and no explicit `celebrationSoundUrl` |
+| `hooks/useDrillScoreCelebration.ts` | **New** — Pattern A; pick perfect client URL when `Math.round(score) >= 100` and `allowPerfectCelebration` (default true); fill-blank passes `false` |
 | `lib/complete-learner-drill.ts` | Return full response; no celebration for Pattern A |
 | Score review components | `useDrillScoreCelebration(passed, celebrationSoundUrl, score)` |
-| Matching / Listening / Definition completion | Pattern B: pass `effects` (incl. `confettiVariant`) to completion screen |
-| Vocabulary / Pronunciation / Key-phrases / Roleplay / Matching / Fill-blank drill screens | Mid-item: call `playPerfectItemCelebration()` on a perfect item score instead of the normal success tone (§6); needs a confetti host mounted on the drill screen itself, not just the review/completion screen |
+| Matching / Listening / Definition completion | Pattern B: pass `effects` (incl. `confettiVariant`) to completion screen — server stays `'pass'` even at 100% for these types |
+| Vocabulary / Pronunciation / Key-phrases / Roleplay drill screens | Mid-item: call `playPerfectItemCelebration()` on a perfect item score instead of the normal success tone (§6); needs a confetti host mounted on the drill screen itself, not just the review/completion screen |
+| Matching / Fill-blank drill screens | Mid-item: `playPracticeFeedback("success")` on correct; fill-blank Pattern A `allowPerfectCelebration: false` |
 | `my-plan/drills/[id]/completed.tsx` | No celebration (web does not celebrate there) |
 
 ---
@@ -462,6 +465,7 @@ Web also uses a slightly richer burst for `'perfect'` (`particleCount: 200`, `sp
 | `src/hooks/useDrillScoreCelebration.ts` | `hooks/useDrillScoreCelebration.ts` |
 | `src/components/drills/shared/DrillPerformanceReview.tsx` | Score review screen |
 | `src/components/drills/shared/DrillCompletionScreen.tsx` | Completion screen (Pattern B) |
-| `src/components/drills/VocabularyDrill.tsx`, `PronunciationDrill.tsx`, `KeyPhrasesDrill.tsx`, `RoleplayDrill.tsx`, `MatchingDrill.tsx`, `FillBlankDrill.tsx` | Same drill screens — mid-item `playPerfectItemCelebration()` calls (§6) |
-| `src/lib/drill/celebration-effects.ts` | Server only — mobile reads `effects` from API |
-| `src/app/api/v1/drills/[drillId]/complete/route.ts` | Same endpoint |
+| `src/components/drills/VocabularyDrill.tsx`, `PronunciationDrill.tsx`, `KeyPhrasesDrill.tsx`, `RoleplayDrill.tsx` | Same drill screens — mid-item `playPerfectItemCelebration()` calls (§6) |
+| `src/components/drills/MatchingDrill.tsx`, `FillBlankDrill.tsx` | Mid-item success feedback; fill-blank `allowPerfectCelebration: false` |
+| `src/lib/drill/celebration-effects.ts` (`supportsPerfectCelebration`) | Server gate + mobile `types/drill.types.ts` mirror — clients read `effects` from API |
+| `src/app/api/v1/drills/[drillId]/complete/route.ts` | Same endpoint; passes `drillType` into `buildDrillCompletionEffects` |

@@ -16,6 +16,8 @@ The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 pronunciation items according to the following rules:
 
 1. Format
@@ -94,6 +96,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 vocabulary questions according to the following rules:
 
 1. Format
@@ -158,16 +162,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during nursing shift handovers while improving professional communication with colleagues.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific handover situation.
-- Incorrect answers should be plausible but incorrect because of inaccurate patient information, incorrect medication, inappropriate assessment, wrong priority, incorrect follow-up action, or incorrect clinical meaning.
-- Every sentence should reflect realistic nurse-to-nurse handover conversations in hospitals.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -185,7 +180,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -201,7 +196,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -216,7 +211,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -248,6 +243,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -298,16 +295,6 @@ The correct answer should demonstrate one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during nursing shift handovers through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific handover situation.
-- Incorrect answers should be plausible but incorrect because of incomplete clarification, poor prioritisation, inaccurate interpretation of patient information, ineffective confirmation of understanding, or inappropriate timing—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the learner must ask clarifying questions, verify medications, confirm pending tasks, identify safety concerns, or summarise the handover before taking responsibility for patient care.
-
 Return a JSON array:
 
 [
@@ -336,6 +323,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -404,20 +393,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include realistic interruptions or follow-up questions where appropriate.
 - Use authentic nursing terminology commonly used during shift handovers.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication during nursing shift handovers.
-
-The roleplay should encourage the learner to:
-
-- actively listen throughout the handover
-- identify important patient information
-- ask relevant clarification questions
-- summarize key priorities accurately
-- confirm next steps before assuming patient care
-- communicate professionally and collaboratively with colleagues
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -459,6 +435,8 @@ Generate a pronunciation drill based on the following:
 The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 pronunciation items according to the following rules:
 
@@ -540,6 +518,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 vocabulary questions according to the following rules:
 
 1. Format
@@ -589,15 +569,6 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used when giving nursing handovers while improving structured professional communication with colleagues.
-
-- Every option must be authentic clinical vocabulary.
-- The correct answer must be unambiguously correct for the specific handover situation.
-- Incorrect answers should be plausible but incorrect because of inaccurate clinical meaning, inappropriate sequencing, incorrect patient information, wrong medication, incorrect assessment, or inappropriate recommendation.
-- Every sentence should reflect realistic nurse-to-nurse handover conversations in hospitals.
-
 Return a JSON array:
 
 [
@@ -624,6 +595,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -691,16 +664,6 @@ The correct answer should demonstrate one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, concise, and structured communication when giving nursing handovers through repeated practice in realistic clinical scenarios.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific handover situation.
-- Incorrect answers should be plausible but incorrect because of poor organisation, omission of important clinical information, incomplete recommendations, inaccurate prioritisation, ineffective communication structure, or inappropriate sequencing—not because they sound unprofessional.
-- Every prompt must contain enough clinical detail that only one response is the best choice.
-- Include situations where the learner must communicate patient status, explain recent changes, report medications, identify safety concerns, discuss pending tasks, respond to clarification questions, or provide recommendations before transferring patient care.
-
 - Replace only the target vocabulary with the blank.
 - Every sentence must describe a realistic clinical situation in a hospital in {{country}}.
 - Include sufficient clinical context such as:
@@ -743,6 +706,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these clinical scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -816,20 +781,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include realistic interruptions or requests for clarification where appropriate.
 - Use authentic nursing terminology commonly heard during ICU and hospital shift handovers.
 
-6. Learning Objective
-
-The learner's objective is to develop automatic, confident, concise, and well-structured communication when giving nursing shift handovers.
-
-The roleplay should encourage the learner to:
-
-- organise patient information logically
-- communicate concise and focused reports
-- include all clinically important details
-- use SBAR or ISBAR naturally
-- respond accurately to clarification questions
-- communicate professionally and collaboratively with colleagues
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -871,6 +823,8 @@ Generate a pronunciation drill based on the following:
 The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 pronunciation items according to the following rules:
 
@@ -952,6 +906,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate 10 - 15 vocabulary questions according to the following rules:
 
 1. Format
@@ -1018,16 +974,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used when discussing workload, scheduling, staffing, and professional disagreements while maintaining respectful workplace communication.
-
-- Every option must be authentic workplace or healthcare vocabulary.
-- The correct answer must be unambiguously correct for the specific workplace situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate meaning, incorrect workplace context, ineffective communication, or inaccurate professional usage.
-- Every sentence should reflect realistic conversations between nurses, managers, supervisors, or charge nurses in hospitals.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -1045,7 +992,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1061,7 +1008,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1076,7 +1023,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1109,6 +1056,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -1165,10 +1114,7 @@ Instead:
 
 The correct answer should demonstrate one or more of the following competencies:
 
-- Maintains a respectful and calm tone by communicating professionally without sounding rude, dismissive, irritated, or emotional.
-- States limitations or refusals clearly by explaining concerns or declining requests directly, confidently, and respectfully without excessive apologising.
-- Avoids confrontation or defensive language by remaining solution-focused and avoiding blame, arguments, or emotional escalation.
-- Provides alternative solutions or assistance by suggesting reasonable compromises, offering different options, or proposing practical next steps whenever appropriate.
+{{competencies}}
 
 4. Balanced Answer Distribution
 
@@ -1176,17 +1122,7 @@ The correct answer should demonstrate one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and professional communication when declining requests, discussing workload, and addressing workplace concerns.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific workplace situation.
-- Incorrect answers should be plausible but incorrect because of poor wording, ineffective boundary setting, unnecessary confrontation, vague communication, excessive apology, failure to explain limitations, or failure to offer an appropriate alternative—not because they sound unprofessional.
-- Every prompt must contain enough workplace context that only one response is the best choice.
-- Include situations involving workload concerns, scheduling conflicts, patient assignments, overtime requests, staffing shortages, vacation requests, policy discussions, and requests from managers or supervisors.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -1204,7 +1140,7 @@ The learner's objective is to develop automatic, confident, and professional com
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1220,7 +1156,7 @@ The learner's objective is to develop automatic, confident, and professional com
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1235,7 +1171,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1268,6 +1204,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these workplace scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1309,10 +1247,7 @@ Examples:
 
 The roleplay should naturally allow the learner to demonstrate the following competencies:
 
-- Maintains a respectful and calm tone by speaking politely and professionally without sounding rude, dismissive, irritated, or emotional.
-- States limitations or refusals clearly by explaining why a request cannot reasonably be accepted without being vague or excessively apologetic.
-- Avoids confrontation or defensive language by remaining composed, respectful, and solution-focused throughout the discussion.
-- Provides alternative solutions or assistance by suggesting compromises, proposing reasonable alternatives, or identifying appropriate next steps whenever possible.
+{{competencies}}
 
 5. Realism
 
@@ -1337,21 +1272,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
   - negotiate alternative solutions
 - The conversation should remain respectful and collaborative even when opinions differ.
 
-6. Learning Objective
-
-The learner's objective is to develop confidence in handling difficult workplace conversations professionally.
-
-The roleplay should encourage the learner to:
-
-- communicate concerns respectfully
-- decline requests professionally when appropriate
-- explain limitations clearly
-- remain calm under pressure
-- avoid defensive language
-- suggest constructive alternatives
-- maintain positive working relationships while advocating for fairness and patient safety
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 
@@ -1392,6 +1313,8 @@ Generate a pronunciation drill based on the following:
 The student struggled with the following phonemes this week: {{weak_phonemes}}
 
 The student struggled with the following words this week: {{weak_words}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 pronunciation items according to the following rules:
 
@@ -1473,6 +1396,8 @@ Generate a fill-in-the-blank vocabulary drill based on the following:
 
 The student struggled with the following words this week: {{fill_blank_evidence}}
 
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
+
 Generate exactly 10 - 15 vocabulary questions according to the following rules:
 
 1. Format
@@ -1539,16 +1464,7 @@ The correct answer should reinforce one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to strengthen recognition and understanding of vocabulary commonly used during professional conversations with colleagues while building confidence in natural workplace communication.
-
-- Every option must be authentic workplace or healthcare vocabulary.
-- The correct answer must be unambiguously correct for the specific workplace situation.
-- Incorrect answers should be plausible but incorrect because of inappropriate meaning, incorrect workplace context, or inaccurate professional usage.
-- Every sentence should reflect realistic conversations between nurses and other healthcare professionals.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -1566,7 +1482,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1582,7 +1498,7 @@ The learner's objective is to strengthen recognition and understanding of vocabu
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1597,7 +1513,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1629,6 +1545,8 @@ Generate a key phrases drill based on the following:
 - Topic: {{topic}}
 
 The student missed the following key phrases this week: {{missed_phrases}}
+
+SCENARIO ANCHOR: If {{practiced_scenarios}} contains a specific clinical scenario (not the generic fallback text), build your sentences and examples inside that same clinical setting — same type of patient situation, same clinical context — using the patient/setting details from that scenario where natural. Do not invent an unrelated scenario. If {{practiced_scenarios}} is empty or only contains generic text, fall back to your own topic-appropriate scenario as usual.
 
 Generate 10 - 15 key phrase questions according to the following rules:
 
@@ -1694,17 +1612,7 @@ The correct answer should demonstrate one or more of the following competencies:
 - Randomly distribute the correct answers across A, B, C, and D.
 - The answer pattern should feel unpredictable.
 
-5. Learning Objective
-
-The learner's objective is to develop automatic, confident, and natural workplace communication while building positive professional relationships with colleagues.
-
-- Every option should sound like something a professional nurse could realistically say.
-- The correct answer must be unambiguously the best response for the specific workplace situation.
-- Incorrect answers should be plausible but incorrect because of awkward conversational flow, poor relationship-building, inappropriate workplace boundaries, unnatural wording, failure to engage the colleague, or missed opportunities to continue the conversation—not because they sound unprofessional.
-- Every prompt must contain enough workplace context that only one response is the best choice.
-- Include situations involving greetings, shift changes, breaks, welcoming colleagues, casual workplace conversations, celebrating achievements, offering encouragement, discussing workload appropriately, and supporting colleagues after challenging shifts.
-
-6. Sentence Design
+5. Sentence Design
 
 - Every question must contain exactly one blank represented by "______".
 - Replace only the target vocabulary with the blank.
@@ -1722,7 +1630,7 @@ The learner's objective is to develop automatic, confident, and natural workplac
 - Avoid dictionary-style definitions or generic example sentences.
 - The sentence should sound like something a nurse would hear, say, document, or read during routine clinical practice.
 
-7. Answer Options
+6. Answer Options
 
 - Provide four answer choices.
 - Exactly one option must be correct.
@@ -1738,7 +1646,7 @@ The learner's objective is to develop automatic, confident, and natural workplac
 - Do not use synonyms of the correct answer.
 - Do not use different grammatical forms of the correct answer.
 
-8. Medical Terminology
+7. Medical Terminology
 
 - Do not use acronyms as the correct answer.
 - Always use the full clinical term.
@@ -1753,7 +1661,7 @@ Incorrect:
 
 - Use terminology commonly used by nurses in {{country}}.
 
-9. Difficulty
+8. Difficulty
 
 - Include a balanced mix of straightforward and moderately challenging questions.
 - Prioritize clinical reasoning over simple vocabulary recall.
@@ -1786,6 +1694,8 @@ Generate a roleplay drill based on the following:
 - Topic: {{topic}}
 
 The student practiced these workplace scenarios this week: {{practiced_scenarios}}
+
+VARIETY: If {{practiced_scenarios}} shows the student recently practiced a specific scenario, create a DIFFERENT scenario this time — related in clinical theme but not the same patient, setting, or situation.
 
 Generate a multi-scene roleplay according to the following rules:
 
@@ -1852,21 +1762,7 @@ The roleplay should naturally allow the learner to demonstrate the following com
 - Include natural humour, encouragement, empathy, or friendly conversation where appropriate.
 - The dialogue should reflect multicultural workplaces commonly found in hospitals in {{country}}.
 
-6. Learning Objective
-
-The learner's objective is to develop confidence in building natural workplace relationships through professional small talk.
-
-The roleplay should encourage the learner to:
-
-- start conversations naturally
-- keep conversations flowing
-- respond appropriately to colleagues
-- ask thoughtful follow-up questions
-- build positive workplace relationships
-- communicate respectfully across cultures
-- balance friendliness with professionalism
-
-7. Output Format
+6. Output Format
 
 Return only valid JSON.
 

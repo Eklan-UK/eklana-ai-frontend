@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
-import mongoose from 'mongoose';
+import Verification from '@/models/verification';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,24 +21,6 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
-    }
-
-    // Find verification token in database
-    let Verification;
-    if (mongoose.models.Verification) {
-      Verification = mongoose.models.Verification;
-    } else {
-      const verificationSchema = new mongoose.Schema({
-        userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-        token: { type: String, required: false, sparse: true },
-        expiresAt: { type: Date, required: true },
-        createdAt: { type: Date, default: Date.now },
-      }, { collection: 'verifications', timestamps: true });
-      
-      // Create sparse unique index on token (allows multiple nulls)
-      verificationSchema.index({ token: 1 }, { unique: true, sparse: true });
-      
-      Verification = mongoose.model('Verification', verificationSchema);
     }
 
     // Find verification record

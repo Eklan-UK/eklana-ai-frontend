@@ -144,7 +144,7 @@ function LineReviewAccordionRow({
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 bg-muted/50">
-        <span className="text-sm font-semibold text-foreground">Performance score</span>
+        <span className="text-sm font-semibold text-foreground">Clarity score</span>
         <div
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
             row.score >= passThreshold ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"

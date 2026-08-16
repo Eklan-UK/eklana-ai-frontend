@@ -5,30 +5,8 @@ import { withAuth } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import User from '@/models/user';
+import EmailVerificationOTP from '@/models/email-verification-otp';
 import { Types } from 'mongoose';
-import mongoose from 'mongoose';
-
-// Get or create EmailVerificationOTP model
-function getEmailVerificationOTPModel() {
-	if (mongoose.models.EmailVerificationOTP) {
-		return mongoose.models.EmailVerificationOTP;
-	}
-
-	const schema = new mongoose.Schema(
-		{
-			userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-			email: { type: String, required: true, index: true },
-			otp: { type: String, required: true },
-			expiresAt: { type: Date, required: true },
-			attempts: { type: Number, default: 0 },
-			verified: { type: Boolean, default: false },
-			createdAt: { type: Date, default: Date.now },
-		},
-		{ collection: 'emailverificationotps', timestamps: true }
-	);
-
-	return mongoose.model('EmailVerificationOTP', schema);
-}
 
 async function handler(
 	req: NextRequest,
@@ -69,8 +47,6 @@ async function handler(
 				{ status: 200 }
 			);
 		}
-
-		const EmailVerificationOTP = getEmailVerificationOTPModel();
 
 		// Look for matching OTP for this user
 		const otpRecord = await EmailVerificationOTP.findOne({

@@ -7,9 +7,10 @@ import { logger } from '@/lib/api/logger';
 import { sendWeeklyDrillDigestEmail } from '@/lib/api/email.service';
 import { formatDrillNotificationLabel } from '@/lib/drill-display-label';
 import { onWeeklyDrillDigest } from '@/services/notification/triggers';
-
-/** Incomplete assignments only — matches daily practice nudge outstanding count. */
-const OUTSTANDING_STATUSES = ['pending', 'in-progress'] as const;
+import {
+  orderTitlesForOutstandingDigest,
+  outstandingAssignmentMongoMatch,
+} from '@/domain/drills/outstanding-drill-assignments';
 
 /** Monday 00:00 UTC through Sunday 23:59:59.999 UTC for the week containing `reference`. */
 function getIsoWeekBounds(reference = new Date()): { start: Date; end: Date } {
@@ -73,7 +74,8 @@ type LearnerAssignmentGroup = {
 export class WeeklyDrillDigestService {
   /**
    * Monday cron: email + in-app/push digest for learners with outstanding
-   * (pending / in-progress) drill assignments — all time, not a 7-day window.
+   * (pending / in-progress / overdue) drill assignments — all time, not a
+   * 7-day window. Precision Clinic assignments are excluded (same as My Plans).
    * Deduped per learner per ISO week.
    */
   async runWeeklyDigest(
@@ -95,20 +97,19 @@ export class WeeklyDrillDigestService {
     const weekKey = getIsoWeekKey(now);
     const weekLabel = formatWeekLabel(now);
 
-    const match: Record<string, unknown> = {
-      status: { $in: [...OUTSTANDING_STATUSES] },
-    };
-    if (options?.learnerId) {
-      match.learnerId = options.learnerId;
-    }
+    const match = outstandingAssignmentMongoMatch(
+      options?.learnerId ? { learnerId: options.learnerId } : {},
+    );
 
+    // Sort then $push so titles come from the same ordered assignment rows as count.
     const groups = (await DrillAssignment.aggregate([
       { $match: match },
+      { $sort: { assignedAt: -1 } },
       {
         $group: {
           _id: '$learnerId',
           count: { $sum: 1 },
-          drillIds: { $addToSet: '$drillId' },
+          drillIds: { $push: '$drillId' },
         },
       },
     ]).exec()) as Array<{ _id: unknown; count: number; drillIds: unknown[] }>;
@@ -161,20 +162,27 @@ export class WeeklyDrillDigestService {
         continue;
       }
 
-      const drills = await Drill.find({ _id: { $in: drillIds } })
+      const uniqueDrillIds = [...new Set(drillIds)];
+      const drills = await Drill.find({ _id: { $in: uniqueDrillIds } })
         .select('title type learning_journey_part learning_journey_topic')
         .lean()
         .exec();
-      const drillTitles = drills
-        .map((d) =>
+      const titleByDrillId = new Map(
+        drills.map((d) => [
+          String(d._id),
           formatDrillNotificationLabel({
             title: d.title,
             type: d.type,
             learning_journey_part: d.learning_journey_part,
             learning_journey_topic: d.learning_journey_topic,
           }),
-        )
-        .slice(0, 20);
+        ]),
+      );
+      const drillTitles = orderTitlesForOutstandingDigest(
+        drillIds,
+        titleByDrillId,
+        20,
+      );
 
       const learner = await User.findById(learnerId)
         .select('email firstName lastName name')

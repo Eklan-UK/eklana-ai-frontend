@@ -2,17 +2,18 @@
 
 import { Play } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { buildDrillWebPath } from "@/lib/drill-open-url";
 import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 
 const DRILL_TYPE_LABELS: Record<string, string> = {
   roleplay: "Roleplay",
-  vocabulary: "Vocabulary",
+  vocabulary: "Vocabulary/Key Phrase",
   grammar: "Grammar",
   matching: "Matching",
   definition: "Definition",
   sentence_writing: "Sentence Building",
   fill_blank: "Fill-in-the-Blank",
-  key_phrases: "Key Phrases",
+  key_phrases: "Pressure Test",
   summary: "Reading",
   listening: "Listening",
   sentence: "Sentence",
@@ -30,6 +31,7 @@ export function ContinuePracticeCard({
   if (!drillData) return null;
 
   const drillId = drillData._id || drill.drillId;
+  const assignmentId = drill.assignmentId;
   const drillType = drillData.type || "practice";
   const topicTitle =
     typeof drillData.topicTitle === "string" ? drillData.topicTitle : null;
@@ -57,7 +59,9 @@ export function ContinuePracticeCard({
         </div>
         <button
           type="button"
-          onClick={() => router.push(`/account/drills/${drillId}`)}
+          onClick={() =>
+            router.push(buildDrillWebPath(String(drillId), assignmentId))
+          }
           className="w-full bg-yellow-400 hover:bg-yellow-300 text-emerald-900 font-semibold text-base py-3.5 rounded-2xl transition-colors"
         >
           {isResume ? "Resume" : "Start"}
