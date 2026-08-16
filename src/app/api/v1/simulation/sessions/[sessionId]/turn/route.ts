@@ -352,40 +352,52 @@ async function postHandler(
 					}
 				} finally {
 					try {
-						const nextTurnNumber = session.turns.length;
-						session.turns.push({
-							turnNumber: nextTurnNumber,
-							role: 'student',
-							text: transcribedText,
-							audioUrl: studentAudioUrl,
-							// audioDurationMs intentionally omitted: nothing in this codebase
-							// derives duration from a raw audio buffer/File without decoding
-							// it (the only other place that tracks it, pronunciation.service.ts,
-							// declares the field but never actually sets it either).
-							createdAt: new Date(),
-						});
-						session.turns.push({
-							turnNumber: nextTurnNumber + 1,
-							role: 'ai',
-							text: aiResponseText,
-							audioUrl: '',
-							createdAt: new Date(),
-						});
+							const nextTurnNumber = session.turns.length;
 
-						const now = new Date();
-						for (const label of newlyRevealedLabels) {
-							session.revealedFindings.push({
-								phaseIndex: session.currentPhaseIndex,
-								label,
-								revealedAt: now,
-							});
-						}
+							if (!aiResponseText.trim()) {
+									logger.error('[SimulationSessionTurn] No AI response text generated, skipping turn persistence', {
+											sessionId: session._id,
+									});
+									// Don't push student or AI turn — nothing was successfully
+									// exchanged. Client already received the SSE error event
+									// (Part 2 retry logic) and can let the student retry.
+							} else {
+									session.turns.push({
+											turnNumber: nextTurnNumber,
+											role: 'student',
+											text: transcribedText,
+											audioUrl: studentAudioUrl,
+											// audioDurationMs intentionally omitted: nothing in this codebase
+											// derives duration from a raw audio buffer/File without decoding
+											// it (the only other place that tracks it, pronunciation.service.ts,
+											// declares the field but neveractually sets it either).
+											createdAt: new Date(),
+									});
+									session.turns.push({
+											turnNumber: nextTurnNumber + 1,
+											role: 'ai',
+											text: aiResponseText,
+											audioUrl: '',
+											createdAt: new Date(),
+									});
 
-						if (phaseAdvanced) {
-							session.currentPhaseIndex += 1;
-						}
+									const now = new Date();
+									for (const label of newlyRevealedLabels) {
+											session.revealedFindings.push({
+													phaseIndex: session.currentPhaseIndex,
+													label,
+													revealedAt: now,
+											});
+									}
 
-						await session.save();
+									if (phaseAdvanced) {
+											session.currentPhaseIndex += 1;
+									}
+
+									await session.save();
+							}
+
+
 					} catch (persistError: any) {
 						logger.error('[SimulationSessionTurn] Failed to persist turn after stream drained', {
 							error: persistError.message,
