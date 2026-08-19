@@ -11,7 +11,7 @@ import SimulationSession, { ISimulationSession } from '@/models/simulation-sessi
 import { transcribeAudio, TranscriptionRejectedError } from '@/services/gemini.service';
 import { uploadToCloudinary } from '@/services/cloudinary.service';
 import { checkFindingReveals } from '@/domain/simulation/simulation-turn-reveal.service';
-import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
+import { buildSimulationSystemInstruction, advancePhaseTool } from '@/domain/simulation/simulation-live-prompt.service';
 import config from '@/lib/api/config';
 
 async function postHandler(
@@ -249,12 +249,6 @@ async function postHandler(
 
 		let phaseAdvanced = false;
 		const sessionKey = `sim_${sessionId}`;
-		const advancePhaseTool = {
-			name: 'advancePhase',
-			description:
-				"Call this when the current phase's trigger condition has been clearly and fully satisfied by the conversation so far.",
-			parameters: { type: 'object', properties: {} },
-		};
 
 		const [relayResponse, revealResult] = await Promise.all([
 			fetch(`${config.RELAY_URL}/relay/turn`, {

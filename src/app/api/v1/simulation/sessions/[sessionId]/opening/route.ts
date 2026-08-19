@@ -8,7 +8,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession from '@/models/simulation-session';
-import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
+import { buildSimulationSystemInstruction, advancePhaseTool } from '@/domain/simulation/simulation-live-prompt.service';
 import config from '@/lib/api/config';
 
 async function postHandler(
@@ -140,6 +140,7 @@ async function postHandler(
 				systemInstruction,
 				turns,
 				voiceName: 'Kore',
+				tools: [advancePhaseTool],
 				sessionKey,
 			}),
 		});
