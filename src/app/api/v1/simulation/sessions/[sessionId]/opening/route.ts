@@ -8,8 +8,8 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession from '@/models/simulation-session';
-import { generateWithLiveAPIStream } from '@/services/gemini.service';
 import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
+import config from '@/lib/api/config';
 
 async function postHandler(
 	req: NextRequest,
@@ -128,34 +128,86 @@ async function postHandler(
 			},
 		];
 
-		const stream = await generateWithLiveAPIStream(systemInstruction, turns, 'Kore');
+		const sessionKey = `sim_${sessionId}`;
+
+		const relayResponse = await fetch(`${config.RELAY_URL}/relay/turn`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Relay-Secret': config.RELAY_AUTH_SECRET || '',
+			},
+			body: JSON.stringify({
+				systemInstruction,
+				turns,
+				voiceName: 'Kore',
+				sessionKey,
+			}),
+		});
+
+		if (!relayResponse.ok || !relayResponse.body) {
+			const errorText = await relayResponse.text().catch(() => '');
+			logger.error('[SimulationSessionOpening] Relay request failed', {
+				status: relayResponse.status,
+				error: errorText,
+				sessionId,
+			});
+			return NextResponse.json(
+				{ code: 'ServerError', message: 'Failed to reach the live conversation service' },
+				{ status: 502 },
+			);
+		}
+
+		const stream = relayResponse.body;
 
 		const wrappedStream = new ReadableStream({
 			async start(controller) {
 				const decoder = new TextDecoder();
+				const encoder = new TextEncoder();
 				let aiResponseText = '';
 				const reader = stream.getReader();
+
+				// SSE frames can be split across multiple read() calls (e.g. large
+				// base64 `audio` payloads) — buffer across the whole loop and only
+				// process pieces that end in a complete '\n\n' frame separator.
+				let sseBuffer = '';
+
+				const processFrame = (line: string): string => {
+					const trimmed = line.trim();
+					if (!trimmed.startsWith('data: ')) {
+						return line;
+					}
+					try {
+						const parsed = JSON.parse(trimmed.slice('data: '.length));
+						if (parsed?.type === 'text' && typeof parsed.data === 'string') {
+							aiResponseText += parsed.data;
+						}
+						return line;
+					} catch {
+						/* partial/malformed SSE frame — ignore */
+						return line;
+					}
+				};
 
 				try {
 					while (true) {
 						const { done, value } = await reader.read();
 						if (done) break;
 
-						const decoded = decoder.decode(value, { stream: true });
-						for (const line of decoded.split('\n\n')) {
-							const trimmed = line.trim();
-							if (!trimmed.startsWith('data: ')) continue;
-							try {
-								const parsed = JSON.parse(trimmed.slice('data: '.length));
-								if (parsed?.type === 'text' && typeof parsed.data === 'string') {
-									aiResponseText += parsed.data;
-								}
-							} catch {
-								/* partial/malformed SSE frame split across chunks — ignore */
-							}
-						}
+						sseBuffer += decoder.decode(value, { stream: true });
 
-						controller.enqueue(value);
+						const pieces = sseBuffer.split('\n\n');
+						// The last piece may be an incomplete frame still waiting on
+						// more data from the next read() call — hold it back.
+						sseBuffer = pieces.pop() ?? '';
+
+						if (pieces.length > 0) {
+							const outputLines = pieces.map(processFrame);
+							controller.enqueue(encoder.encode(outputLines.join('\n\n') + '\n\n'));
+						}
+					}
+
+					if (sseBuffer.length > 0) {
+						controller.enqueue(encoder.encode(processFrame(sseBuffer)));
 					}
 				} finally {
 					try {
