@@ -182,7 +182,7 @@ export const config = {
 	// OpenAI
 	OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 	// eklan-live-relay (Gemini Live API relay service)
-	RELAY_URL: process.env.RELAY_URL,
+	RELAY_URL: process.env.RELAY_URL || 'https://eklan-ai-relay.up.railway.app',
 	RELAY_AUTH_SECRET: process.env.RELAY_AUTH_SECRET,
 	// Speechace Configuration
 	SPEECHACE_API_KEY:
