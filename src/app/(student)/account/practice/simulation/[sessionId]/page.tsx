@@ -700,13 +700,24 @@ export default function SimulationSessionPage() {
     }
   };
 
-  const handleLeaveAndContinueLater = () => {
+  const handleLeaveAndContinueLater = async () => {
     if (!sessionControlsEnabled) {
       handleSessionControlsBlocked();
       return;
     }
     // Session stays in_progress server-side — the Simulation Room list page
     // already resumes it via its "Continue" button.
+    try {
+      const res = await fetch(`/api/v1/simulation/sessions/${sessionId}/pause`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to pause session");
+    } catch {
+      // Non-fatal — losing the pause adjustment shouldn't trap the student
+      // on the page. The timer will simply keep counting in the background.
+      toast.warning("Could not pause the timer. It will keep counting while you're away.");
+    }
     clearPhaseTimer();
     releaseMediaStream(mediaStreamRef.current);
     router.push("/account/practice/simulation");
@@ -773,11 +784,12 @@ export default function SimulationSessionPage() {
           <span className="font-nunito text-sm font-semibold text-foreground">
             {currentPhaseName}
           </span>
-          {timeRemainingLabel && (
-            <span className="font-nunito text-xs text-muted-foreground">
-              {timeRemainingLabel} left
-            </span>
-          )}
+          {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") &&
+            timeRemainingLabel && (
+              <span className="font-nunito text-xs text-muted-foreground">
+                {timeRemainingLabel} left
+              </span>
+            )}
         </div>
 
         <div className="w-11" />

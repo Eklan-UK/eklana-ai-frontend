@@ -62,6 +62,7 @@ export interface ISimulationSession extends Document {
 	status: 'in_progress' | 'completed' | 'abandoned';
 	startedAt: Date;
 	completedAt?: Date;
+	pausedAt: Date | null;
 	overallGradeResult?: any;
 	turns: {
 		turnNumber: number;
@@ -115,6 +116,10 @@ const simulationSessionSchema = new Schema<ISimulationSession>(
 		},
 		completedAt: {
 			type: Date,
+		},
+		pausedAt: {
+			type: Date,
+			default: null,
 		},
 		overallGradeResult: {
 			type: Schema.Types.Mixed,
