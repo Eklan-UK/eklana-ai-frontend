@@ -502,6 +502,12 @@ export default function SimulationSessionPage() {
       });
       if (!res.ok) throw new Error("Failed to start session");
 
+      const startJson = await res.json();
+      const newStartedAt = startJson?.data?.startedAt;
+      if (newStartedAt) {
+        setSession((prev) => (prev ? { ...prev, startedAt: newStartedAt } : prev));
+      }
+
       const openingRes = await fetch(`/api/v1/simulation/sessions/${sessionId}/opening`, {
         method: "POST",
         credentials: "include",
