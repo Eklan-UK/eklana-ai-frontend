@@ -21,6 +21,7 @@ import {
   useStudentWeeks,
 } from "@/hooks/useStudentWeeks";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { assignmentStatusLabel } from "@/lib/drills/assignment-status";
 
 interface StudentWeeksViewProps {
   studentId: string;
@@ -335,8 +336,11 @@ export function StudentWeeksView({
                             {drill.status && (
                               <>
                                 <span className="text-gray-300 shrink-0">·</span>
-                                <span className="capitalize shrink-0">
-                                  {drill.status}
+                                <span className="shrink-0">
+                                  {assignmentStatusLabel({
+                                    status: drill.status,
+                                    dueDate: drill.dueDate,
+                                  })}
                                 </span>
                               </>
                             )}

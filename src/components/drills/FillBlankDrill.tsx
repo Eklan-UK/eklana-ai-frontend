@@ -5,6 +5,7 @@ import { useDrillScoreCelebration } from "@/hooks/useDrillScoreCelebration";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import {
   CheckCircle,
   Loader2,
@@ -49,6 +50,7 @@ export default function FillBlankDrill({
     assignmentId,
     weeklyChallengeMeta,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [submittedCount, setSubmittedCount] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Record<number, string>>>({});
@@ -594,6 +596,7 @@ export default function FillBlankDrill({
                   <TTSButton
                     text={currentItem.sentence}
                     audioUrl={currentItem.audioUrl}
+                    voiceId={drillVoiceId}
                   />
                 </div>
 

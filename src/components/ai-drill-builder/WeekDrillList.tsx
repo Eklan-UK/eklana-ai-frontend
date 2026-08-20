@@ -19,13 +19,7 @@ import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal
 import { AdminDrillBookmarkButton } from "@/components/admin/AdminDrillBookmarkButton";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { WeekDrillItem } from "@/lib/ai-drill-builder/week-utils";
-
-const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-green-50 text-green-700 border-green-200",
-  "in-progress": "bg-blue-50 text-blue-700 border-blue-200",
-  pending: "bg-gray-50 text-gray-600 border-gray-200",
-  overdue: "bg-red-50 text-red-700 border-red-200",
-};
+import { getAssignmentStatusDisplay } from "@/lib/drills/assignment-status";
 
 // Matches the "Saved" badge styling used in TutorDrillCard for drills that
 // still need a tutor/admin to select users and update/assign them.
@@ -54,6 +48,22 @@ interface WeekDrillListProps {
    * general Drill Builder student-weeks invalidator.
    */
   invalidate?: (queryClient: QueryClient, studentId: string) => Promise<void>;
+  /**
+   * Injectable move mutation so Precision Clinic can use its own API.
+   * Defaults to the Drill Builder `useMoveStudentWeekDrills` hook.
+   */
+  moveDrills?: {
+    mutateAsync: (data: {
+      assignmentIds: string[];
+      targetWeekNumber: number;
+    }) => Promise<unknown>;
+    isPending: boolean;
+  };
+  /**
+   * Extra query params on the Edit (`…/create?drillId=`) link so callers like
+   * Precision Clinic can preserve source/student/week context.
+   */
+  createQueryParams?: Record<string, string>;
 }
 
 export function WeekDrillList({
@@ -65,9 +75,12 @@ export function WeekDrillList({
   currentWeek,
   enableMove = true,
   invalidate = invalidateStudentWeeks,
+  moveDrills: moveDrillsProp,
+  createQueryParams,
 }: WeekDrillListProps) {
   const queryClient = useQueryClient();
-  const moveDrills = useMoveStudentWeekDrills(studentId);
+  const defaultMoveDrills = useMoveStudentWeekDrills(studentId);
+  const moveDrills = moveDrillsProp ?? defaultMoveDrills;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showMoveDialog, setShowMoveDialog] = useState(false);
@@ -224,8 +237,11 @@ export function WeekDrillList({
 
       {drills.map((drill) => {
         const drillType = drill.drillType ?? drill.type ?? "drill";
-        const status = drill.status ?? "pending";
-        const statusClass = STATUS_STYLES[status] ?? STATUS_STYLES.pending;
+        const { label: statusLabel, className: statusClass } =
+          getAssignmentStatusDisplay("weekList", {
+            status: drill.status,
+            dueDate: drill.dueDate,
+          });
         // Saved drills (is_active: false) still need a tutor/admin to select
         // users and update/assign them, so surface that alongside the status.
         const isSaved = drill.isActive === false;
@@ -261,9 +277,9 @@ export function WeekDrillList({
                   </span>
                 )}
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border capitalize ${statusClass}`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${statusClass}`}
                 >
-                  {status.replace("-", " ")}
+                  {statusLabel}
                 </span>
                 {isSaved && (
                   <span
@@ -337,7 +353,10 @@ export function WeekDrillList({
                 </button>
                 <Link
                   href={appendReturnTo(
-                    `${drillDetailBasePath}/create?drillId=${drillId}`,
+                    `${drillDetailBasePath}/create?${new URLSearchParams({
+                      drillId,
+                      ...createQueryParams,
+                    }).toString()}`,
                     returnTo,
                   )}
                   className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"

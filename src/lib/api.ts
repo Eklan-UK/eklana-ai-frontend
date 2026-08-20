@@ -473,6 +473,38 @@ export const precisionClinicAPI = {
       method: 'POST',
     });
   },
+
+  /** Move Precision Clinic assignments into another existing week slot. */
+  moveStudentWeekDrills: (
+    studentId: string,
+    data: { assignmentIds: string[]; targetWeekNumber: number },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        movedCount: number;
+        targetWeekNumber: number;
+      };
+    }>(`/precision-clinic/students/${studentId}/weeks/move-drills`, {
+      method: 'POST',
+      data,
+    });
+  },
+
+  /** Delete empty Precision Clinic weeks and compact remaining slots to 1..N. */
+  deleteStudentWeeks: (studentId: string, data: { weekNumbers: number[] }) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        deletedWeekNumbers: number[];
+        weekCount: number;
+        remappedAssignmentCount: number;
+      };
+    }>(`/precision-clinic/students/${studentId}/weeks`, {
+      method: 'DELETE',
+      data,
+    });
+  },
 };
 
 // Pronunciation API - All routes now use Next.js API routes
@@ -1165,6 +1197,7 @@ export const adminAPI = {
         zeroPauseChallengePostTrialUsers: number;
         zeroPauseMaintainerUsers: number;
         newSignupsThisWeek: number;
+        newProSubscribersThisMonth: number;
         discoveryCallsToday: number;
         videosAwaitingReview: number;
       };

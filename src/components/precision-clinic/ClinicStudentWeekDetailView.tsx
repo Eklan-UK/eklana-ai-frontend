@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, Plus } from "lucide-react";
 import {
   invalidatePrecisionClinicStudentWeeks,
+  useMovePrecisionClinicStudentWeekDrills,
   usePrecisionClinicStudentWeeks,
 } from "@/hooks/usePrecisionClinic";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
@@ -64,6 +65,7 @@ export function ClinicStudentWeekDetailView({
 }: ClinicStudentWeekDetailViewProps) {
   const { data: weeksData, isLoading: weeksLoading } =
     usePrecisionClinicStudentWeeks(studentId);
+  const moveDrills = useMovePrecisionClinicStudentWeekDrills(studentId);
   const { data: adminData } = useAiDrillBuilderLearners(true);
 
   const studentInfo = useMemo(() => {
@@ -143,8 +145,14 @@ export function ClinicStudentWeekDetailView({
           studentId={studentId}
           currentWeekNumber={weekNumber}
           currentWeek={weeksData?.currentWeek ?? weekNumber}
-          enableMove={false}
+          enableMove={true}
+          moveDrills={moveDrills}
           invalidate={invalidatePrecisionClinicStudentWeeks}
+          createQueryParams={{
+            student: studentId,
+            week: String(weekNumber),
+            source: "precision_clinic",
+          }}
         />
       </div>
     </div>

@@ -1,5 +1,6 @@
-// GET  /api/v1/precision-clinic/students/[studentId]/weeks — per-student virtual week breakdown
-// POST /api/v1/precision-clinic/students/[studentId]/weeks — add the next week ("+ Week")
+// GET    /api/v1/precision-clinic/students/[studentId]/weeks — per-student virtual week breakdown
+// POST   /api/v1/precision-clinic/students/[studentId]/weeks — add the next week ("+ Week")
+// DELETE /api/v1/precision-clinic/students/[studentId]/weeks — delete empty weeks and compact
 import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { withErrorHandler } from "@/lib/api/error-handler";
@@ -12,6 +13,7 @@ import DrillAssignment from "@/models/drill-assignment";
 import {
   resolvePrecisionClinicWeekCount,
   incrementPrecisionClinicWeekCount,
+  deletePrecisionClinicStudentWeeks,
   weekNumberFromAssignment,
   getWeekDateRange,
 } from "@/lib/precision-clinic/resolve-precision-clinic-weeks";
@@ -167,6 +169,41 @@ async function postHandler(
   );
 }
 
+async function deleteHandler(
+  req: NextRequest,
+  _context: { userId: string; userRole: string },
+  params: { studentId: string },
+) {
+  const { studentId } = params;
+
+  if (!isValidUserId(studentId)) {
+    throw new ValidationError("Invalid student ID");
+  }
+
+  const body = await req.json().catch(() => null);
+  const weekNumbers = body?.weekNumbers;
+
+  if (!Array.isArray(weekNumbers) || weekNumbers.length === 0) {
+    throw new ValidationError("weekNumbers must be a non-empty array");
+  }
+
+  await connectToDatabase();
+
+  const data = await deletePrecisionClinicStudentWeeks({
+    learnerId: studentId,
+    weekNumbers,
+  });
+
+  logger.info("Deleted precision clinic student weeks", {
+    studentId,
+    deletedWeekNumbers: data.deletedWeekNumbers,
+    weekCount: data.weekCount,
+    remappedAssignmentCount: data.remappedAssignmentCount,
+  });
+
+  return apiResponse.success(data);
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ studentId: string }> },
@@ -186,5 +223,16 @@ export async function POST(
   return withRole(
     ["admin"],
     withErrorHandler((r, c) => postHandler(r, c, resolvedParams)),
+  )(req);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const resolvedParams = await params;
+  return withRole(
+    ["admin"],
+    withErrorHandler((r, c) => deleteHandler(r, c, resolvedParams)),
   )(req);
 }

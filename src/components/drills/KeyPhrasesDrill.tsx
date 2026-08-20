@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { CheckCircle, XCircle, Mic, Loader2, Square, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ export default function KeyPhrasesDrill({
     assignmentId,
     weeklyChallengeMeta,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const items = useMemo(() => drill.key_phrase_items || [], [drill.key_phrase_items]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -197,12 +199,12 @@ export default function KeyPhrasesDrill({
         audio.setAttribute("playsinline", "true");
         audio.load();
       } else {
-        void preloadTTSAudio(prompt).catch((error) => {
+        void preloadTTSAudio(prompt, drillVoiceId).catch((error) => {
           console.warn("TTS preload failed:", error);
         });
       }
     }
-  }, [items]);
+  }, [items, drillVoiceId]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) {
@@ -700,6 +702,7 @@ export default function KeyPhrasesDrill({
             <TTSButton
               text={currentItem.prompt}
               audioUrl={currentItem.promptAudioUrl}
+              voiceId={drillVoiceId}
               className="shrink-0"
             />
           </div>

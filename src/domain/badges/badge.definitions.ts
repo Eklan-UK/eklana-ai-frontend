@@ -6,9 +6,10 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     badgeName: 'First Steps',
     icon: '👣',
     sortOrder: 1,
-    beforeDescription: 'You earn this award for completing your first ever drill.',
+    beforeDescription:
+      'You earn this award for completing your first passing drill (score of 70 or more).',
     afterOutcome:
-      "You've earned this award for completing your first drill and officially started your journey toward confident nursing communication.",
+      "You've earned this award for completing your first passing drill (score of 70 or more) and officially started your journey toward confident nursing communication.",
     humorousLine: "Looks like someone's been busy.",
   },
   {
@@ -71,9 +72,9 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     icon: '💊',
     sortOrder: 7,
     beforeDescription:
-      'You earn this award for correctly practicing 50 medication names and explanations.',
+      'You earn this award for correctly practising 50 unique vocabulary words or definitions.',
     afterOutcome:
-      "You've earned this award for correctly practicing 50 medication names and explanations.",
+      "You've earned this award for correctly practising 50 unique vocabulary words or definitions.",
     humorousLine: "Metoprolol is even scared of you now... You're in charge.",
   },
   {
@@ -81,8 +82,10 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     badgeName: 'Handover Hero',
     icon: '📋',
     sortOrder: 8,
-    beforeDescription: 'You earn this award for completing handover drills.',
-    afterOutcome: "You've earned this award for completing handover drills.",
+    beforeDescription:
+      'You earn this award for completing a passing giving- or receiving-handover Free Talk.',
+    afterOutcome:
+      "You've earned this award for completing a passing giving- or receiving-handover Free Talk.",
     humorousLine: 'Clear. Concise. Complete. Look at you!',
   },
   {

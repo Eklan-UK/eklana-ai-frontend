@@ -8,7 +8,12 @@ import { Loader2, Volume2, Pause, Play, CheckCircle, Headphones } from "lucide-r
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
+import {
+  clearCheckpoint,
+  markAssignedDrillInProgress,
+} from "@/lib/drill/drill-checkpoint";
 import { useTTS } from "@/hooks/useTTS";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 import { trackActivity } from "@/utils/activity-cache";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
@@ -39,10 +44,23 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
   const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
   const markListenedRef = useRef<(listened: boolean) => void>(() => {});
+  const markedInProgressRef = useRef(false);
+
+  const markInProgressOnce = () => {
+    if (!assignmentId || markedInProgressRef.current) return;
+    markedInProgressRef.current = true;
+    void markAssignedDrillInProgress(
+      String(drill._id),
+      assignmentId,
+      "listening",
+      new Date(startTime),
+    );
+  };
 
   const contentTitle = drill.listening_drill_title || drill.title;
   const content = drill.listening_drill_content || "";
   const audioUrl = drill.listening_drill_audio_url || "";
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
 
   markListenedRef.current = (listened: boolean) => {
     setHasListened(listened);
@@ -52,6 +70,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       partialResults: { hasListened: listened },
       startedAt: new Date(startTime).toISOString(),
     });
+    if (listened) markInProgressOnce();
   };
 
   // TTS hook for playing content (fallback)
@@ -87,6 +106,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
     const local = localProgress.hydrate();
     if (local?.partialResults?.hasListened === true) {
       setHasListened(true);
+      markInProgressOnce();
     }
     setIsHydrating(false);
   }, [localProgress.isReady]);
@@ -145,7 +165,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       .trim();
 
     if (plainText) {
-      playTTSAudio(plainText);
+      playTTSAudio(plainText, drillVoiceId);
     } else {
       toast.error("No readable content found");
     }
@@ -199,6 +219,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
       setConfettiVariant(result.data?.effects?.confettiVariant);
 
       localProgress.clear();
+      void clearCheckpoint(drillId, assignmentId);
       setIsCompleted(true);
       toast.success("Drill completed! Great job!");
 
@@ -331,7 +352,7 @@ export default function ListeningDrill({ drill, assignmentId }: ListeningDrillPr
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setHasListened(true);
+                  markListenedRef.current(true);
                   toast.success("Marked as listened!");
                 }}
                 className="border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/15"

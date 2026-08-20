@@ -126,7 +126,9 @@
       "historyEmptyDescription": "When your coach assigns a Precision Clinic week, it will show up here.",
       "emptyTitle": "No drills in this week",
       "emptyDescription": "This clinic week does not have any drills yet.",
-      "completed": "Completed"
+      "completed": "Completed",
+      "statusInProgress": "In progress",
+      "statusOverdue": "Overdue"
     },
     "practiceHub": {
       "title": "Practice",

@@ -13,6 +13,7 @@ export interface AdminDashboardStats {
 	zeroPauseChallengePostTrialUsers: number;
 	zeroPauseMaintainerUsers: number;
 	newSignupsThisWeek: number;
+	newProSubscribersThisMonth: number;
 	discoveryCallsToday: number;
 	videosAwaitingReview: number;
 }
@@ -65,9 +66,16 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 	let zeroPauseChallengePostTrialUsers = 0;
 	let zeroPauseMaintainerUsers = 0;
 	let newSignupsThisWeek = 0;
+	let newProSubscribersThisMonth = 0;
+	const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
 	for (const user of learnerSubscriptionRows) {
-		if (isUserSubscribed(user)) subscribedUsers += 1;
+		if (isUserSubscribed(user)) {
+			subscribedUsers += 1;
+			if (user.createdAt && new Date(user.createdAt) >= monthStart) {
+				newProSubscribersThisMonth += 1;
+			}
+		}
 
 		const products = user.zeroPauseProducts;
 		if (Array.isArray(products)) {
@@ -96,6 +104,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 		zeroPauseChallengePostTrialUsers,
 		zeroPauseMaintainerUsers,
 		newSignupsThisWeek,
+		newProSubscribersThisMonth,
 		discoveryCallsToday,
 		videosAwaitingReview: 0,
 	};

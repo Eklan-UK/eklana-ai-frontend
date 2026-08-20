@@ -58,7 +58,7 @@ async function getHandler(
 ) {
 	await connectToDatabase();
 
-	const [drills, assigned, publishedDrillIds] = await Promise.all([
+	const [drills, assigned, publishedAgg] = await Promise.all([
 		Drill.find(PC_SOURCE)
 			.select(
 				'target_sentences pronunciation_items matching_pairs definition_items grammar_items sentence_writing_items fill_blank_items key_phrase_items roleplay_scenes roleplay_dialogue listening_drill_content listening_drill_title article_content article_title sentence_drill_word'
@@ -66,7 +66,11 @@ async function getHandler(
 			.lean()
 			.exec(),
 		DrillAssignment.countDocuments(PC_SOURCE),
-		DrillAssignment.distinct('drillId', PC_SOURCE),
+		DrillAssignment.aggregate([
+			{ $match: PC_SOURCE },
+			{ $group: { _id: '$drillId' } },
+			{ $count: 'count' },
+		]),
 	]);
 
 	let practiceItems = 0;
@@ -74,9 +78,7 @@ async function getHandler(
 		practiceItems += countDrillPracticeItems(drill);
 	}
 
-	const published = Array.isArray(publishedDrillIds)
-		? publishedDrillIds.length
-		: 0;
+	const published = publishedAgg[0]?.count ?? 0;
 
 	return apiResponse.success({
 		total: drills.length,

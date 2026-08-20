@@ -126,6 +126,16 @@ export default function AdminClassesPage() {
   }, [tabFromUrl]);
 
   useEffect(() => {
+    if (searchParams.get("schedule") !== "1") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("schedule");
+    const qs = params.toString();
+    router.replace(qs ? `/admin/classes?${qs}` : "/admin/classes", {
+      scroll: false,
+    });
+  }, [searchParams, router]);
+
+  useEffect(() => {
     if (!filtersOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -199,6 +209,10 @@ export default function AdminClassesPage() {
       : classes;
     return sortTeachingClassesByTab(tab, filtered);
   }, [classes, tab, filterDate]);
+
+  if (searchParams.get("schedule") === "1" && !scheduleTypeChoiceOpen) {
+    setScheduleTypeChoiceOpen(true);
+  }
 
   const headerDate = formatHeaderDate(
     filterDate ? new Date(`${filterDate}T12:00:00`) : undefined,
