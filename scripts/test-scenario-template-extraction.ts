@@ -90,14 +90,17 @@ Facilitator Notes (not shown to learner):
 `.trim();
 
 function printCharacterBreakdown(scenarioScript: Array<{
-  phaseName: string;
+  phaseTitle: string;
+  situation: string;
+  clinicalInformation: string;
   characters: string[];
   conversationBeats: Array<{ character: string; intent: string; triggerCondition: string }>;
-  gatedFindings: Array<{ label: string; data: string; revealCondition: string }>;
 }>) {
   console.log("\n=== scenarioScript — character breakdown per phase ===");
   scenarioScript.forEach((phase, idx) => {
-    console.log(`\n--- Phase ${idx + 1}: "${phase.phaseName}" ---`);
+    console.log(`\n--- Phase ${idx + 1}: "${phase.phaseTitle}" ---`);
+    console.log(`  situation: ${phase.situation}`);
+    console.log(`  clinicalInformation: ${phase.clinicalInformation}`);
     console.log(`  characters (${phase.characters.length}): ${phase.characters.join(", ") || "(none)"}`);
 
     const beatCharacters = Array.from(new Set(phase.conversationBeats.map((b) => b.character)));
@@ -108,11 +111,6 @@ function printCharacterBreakdown(scenarioScript: Array<{
     console.log(`  conversationBeats (${phase.conversationBeats.length}):`);
     for (const beat of phase.conversationBeats) {
       console.log(`    - [${beat.character}] intent: "${beat.intent}" | trigger: "${beat.triggerCondition}"`);
-    }
-
-    console.log(`  gatedFindings (${phase.gatedFindings.length}):`);
-    for (const finding of phase.gatedFindings) {
-      console.log(`    - [${finding.label}] "${finding.data}" | reveal: "${finding.revealCondition}"`);
     }
   });
   console.log("");
@@ -125,12 +123,22 @@ async function main() {
 
   const result = await extractScenarioContext(SAMPLE_SLIDE_TEXT, STUDENT_CHARACTER_NAME);
 
-  console.log("=== displayData (full) ===");
-  console.log(result.displayData);
+  console.log("=== background (full) ===");
+  console.log(result.background);
   console.log("");
 
-  console.log("=== studentHint (full) ===");
-  console.log(result.studentHint || "(empty string — deck had no student-facing reference material)");
+  console.log("=== patientInformation (full) ===");
+  console.log(result.patientInformation);
+  console.log("");
+
+  console.log("=== hints (full) ===");
+  if (result.hints.length === 0) {
+    console.log("(empty array — deck had no student-facing reference material)");
+  } else {
+    for (const hint of result.hints) {
+      console.log(`  - [${hint.phaseTitle}] ${hint.hintText}`);
+    }
+  }
   console.log("");
 
   printCharacterBreakdown(result.scenarioScript);

@@ -75,7 +75,7 @@ async function postHandler(
 			{
 				code: 'Success',
 				data: {
-					phaseName: phase?.phaseName ?? '',
+					phaseTitle: phase?.phaseTitle ?? '',
 					characters: phase?.characters ?? [],
 					startedAt: session.startedAt,
 				},

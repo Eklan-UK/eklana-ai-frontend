@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import SimulationSession from '@/models/simulation-session';
 import SimulationScenario from '@/models/simulation-scenario';
 import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
+import { getTopicName } from '@/config/competency-framework';
 
 async function getHandler(
 	req: NextRequest,
@@ -58,7 +59,9 @@ async function getHandler(
 				code: 'Success',
 				data: {
 					sessionId: session._id,
-					scenarioTitle: scenario.title,
+					// Topic is the sole scenario identifier now that title has been
+					// removed — see the same tradeoff noted on the admin scenario list.
+					scenarioTopic: getTopicName(scenario.topicId),
 					workplaceSetting: scenario.workplaceSetting,
 					studentId: session.studentId,
 					status: session.status,

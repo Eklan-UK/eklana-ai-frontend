@@ -1,10 +1,11 @@
 // POST /api/v1/admin/simulation/scenarios — create a scenario. The slide deck
-// upload is optional: displayData/scenarioScript/studentHint are submitted
-// directly as form fields (whether the tutor edited a slide-deck extraction
-// preview or typed them by hand) and are always the source of truth for what
-// gets saved. If a file IS attached, it's still parsed and re-extracted so
-// rawSourceText/hiddenContext get archived, but that extraction's own
-// displayData/scenarioScript/studentHint are discarded.
+// upload is optional: background/patientInformation/scenarioScript/hints are
+// submitted directly as form fields (whether the tutor edited a slide-deck
+// extraction preview or typed them by hand) and are always the source of
+// truth for what gets saved. If a file IS attached, it's still parsed and
+// re-extracted so rawSourceText/hiddenContext get archived, but that
+// extraction's own background/patientInformation/scenarioScript/hints are
+// discarded.
 // GET  /api/v1/admin/simulation/scenarios — list active scenarios (summary fields only)
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
@@ -75,7 +76,6 @@ async function handler(
 		// into a plain object shape before Zod coerces/validates the rest.
 		const rawAssignedLearnerIds = formData.getAll('assignedLearnerIds').map(String);
 		const fields: Record<string, unknown> = {
-			title: formData.get('title'),
 			workplaceSetting: formData.get('workplaceSetting'),
 			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			studentCharacterName: formData.get('studentCharacterName'),
@@ -83,9 +83,10 @@ async function handler(
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
 			assignedLearnerIds: rawAssignedLearnerIds,
-			displayData: formData.get('displayData'),
+			background: formData.get('background'),
+			patientInformation: formData.get('patientInformation'),
 			scenarioScript: formData.get('scenarioScript'),
-			studentHint: formData.get('studentHint') ?? undefined,
+			hints: formData.get('hints') ?? undefined,
 		};
 
 		const validated = simulationScenarioBodySchema.parse(fields);
@@ -125,29 +126,35 @@ async function handler(
 			rawText = parsedText;
 
 			// Archival only (rawSourceText/hiddenContext) — this extraction's
-			// displayData/scenarioScript/studentHint are intentionally discarded.
+			// background/patientInformation/scenarioScript/hints are intentionally
+			// discarded.
 			const extraction = await extractScenarioContext(parsedText, validated.studentCharacterName);
 			hiddenContext = extraction.hiddenContext;
 		}
 
-		const briefingAudioBuffer = await generateGeminiTTSAudio(validated.displayData);
-		const briefingAudioBase64 = briefingAudioBuffer.toString('base64');
+		const [backgroundAudioBuffer, patientInformationAudioBuffer] = await Promise.all([
+			generateGeminiTTSAudio(validated.background),
+			generateGeminiTTSAudio(validated.patientInformation),
+		]);
+		const backgroundAudioBase64 = backgroundAudioBuffer.toString('base64');
+		const patientInformationAudioBase64 = patientInformationAudioBuffer.toString('base64');
 
 		await connectToDatabase();
 
 		const scenario = await SimulationScenario.create({
-			title: validated.title,
 			workplaceSetting: validated.workplaceSetting,
 			dramatisationPrompt: validated.dramatisationPrompt,
 			studentCharacterName: validated.studentCharacterName,
 			topicId: validated.topicId,
 			weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,
-			displayData: validated.displayData,
-			briefingAudioBase64,
-			studentHint: validated.studentHint,
+			background: validated.background,
+			backgroundAudioBase64,
+			patientInformation: validated.patientInformation,
+			patientInformationAudioBase64,
 			hiddenContext,
 			scenarioScript: validated.scenarioScript,
+			hints: validated.hints,
 			rawSourceText: rawText,
 			gradingRubric: validated.gradingRubric,
 			maxDurationMinutes: validated.maxDurationMinutes,
@@ -180,8 +187,11 @@ async function handler(
 }
 
 // List view: only summary fields, never scenarioScript / hiddenContext /
-// rawSourceText / gradingRubric / displayData / briefingAudioBase64 — those
-// belong to the single-scenario detail view, not this list.
+// rawSourceText / gradingRubric / background / patientInformation / audio —
+// those belong to the single-scenario detail view, not this list.
+// Topic is the sole scenario identifier now that title has been removed —
+// multiple scenarios may share the same topic with nothing else
+// distinguishing them here. Known tradeoff, not addressed by this change.
 async function listHandler(
 	req: NextRequest,
 	ctx: { userId: Types.ObjectId; userRole: string }
@@ -190,7 +200,7 @@ async function listHandler(
 		await connectToDatabase();
 
 		const scenarios = await SimulationScenario.find({ isActive: true })
-			.select('title workplaceSetting studentCharacterName topicId weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
+			.select('workplaceSetting studentCharacterName topicId weeklyFocus maxDurationMinutes assignedLearnerIds createdAt')
 			.populate('assignedLearnerIds', 'firstName lastName email')
 			.sort({ createdAt: -1 })
 			.lean()
@@ -208,7 +218,6 @@ async function listHandler(
 
 		const data = scenarios.map((scenario: any) => ({
 			_id: scenario._id,
-			title: scenario.title,
 			workplaceSetting: scenario.workplaceSetting,
 			studentCharacterName: scenario.studentCharacterName,
 			topicId: scenario.topicId,

@@ -113,7 +113,6 @@ async function patchHandler(
 
 		const rawAssignedLearnerIds = formData.getAll('assignedLearnerIds').map(String);
 		const fields: Record<string, unknown> = {
-			title: formData.get('title'),
 			workplaceSetting: formData.get('workplaceSetting'),
 			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			studentCharacterName: formData.get('studentCharacterName'),
@@ -121,36 +120,42 @@ async function patchHandler(
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
 			assignedLearnerIds: rawAssignedLearnerIds,
-			displayData: formData.get('displayData'),
+			background: formData.get('background'),
+			patientInformation: formData.get('patientInformation'),
 			scenarioScript: formData.get('scenarioScript'),
-			studentHint: formData.get('studentHint') ?? undefined,
+			hints: formData.get('hints') ?? undefined,
 		};
 
 		const validated = simulationScenarioBodySchema.parse(fields);
 		const weeklyFocus = getCompetencyNamesForTopic(validated.topicId);
 
-		// Only re-synthesize the briefing audio when the spoken text actually
+		// Only re-synthesize each audio track when its spoken text actually
 		// changed — TTS generation is the expensive part of this update.
-		const briefingAudioBase64 =
-			validated.displayData !== scenario.displayData
-				? (await generateGeminiTTSAudio(validated.displayData)).toString('base64')
-				: scenario.briefingAudioBase64;
+		const [backgroundAudioBase64, patientInformationAudioBase64] = await Promise.all([
+			validated.background !== scenario.background
+				? generateGeminiTTSAudio(validated.background).then((buf) => buf.toString('base64'))
+				: Promise.resolve(scenario.backgroundAudioBase64),
+			validated.patientInformation !== scenario.patientInformation
+				? generateGeminiTTSAudio(validated.patientInformation).then((buf) => buf.toString('base64'))
+				: Promise.resolve(scenario.patientInformationAudioBase64),
+		]);
 
 		const updated = await SimulationScenario.findOneAndUpdate(
 			{ _id: scenarioId, isActive: true },
 			{
 				$set: {
-					title: validated.title,
 					workplaceSetting: validated.workplaceSetting,
 					dramatisationPrompt: validated.dramatisationPrompt,
 					studentCharacterName: validated.studentCharacterName,
 					topicId: validated.topicId,
 					weeklyFocus,
 					assignedLearnerIds: validated.assignedLearnerIds,
-					displayData: validated.displayData,
-					briefingAudioBase64,
-					studentHint: validated.studentHint,
+					background: validated.background,
+					backgroundAudioBase64,
+					patientInformation: validated.patientInformation,
+					patientInformationAudioBase64,
 					scenarioScript: validated.scenarioScript,
+					hints: validated.hints,
 					gradingRubric: validated.gradingRubric,
 					maxDurationMinutes: validated.maxDurationMinutes,
 				},
@@ -197,9 +202,9 @@ async function deleteHandler(
 		await connectToDatabase();
 
 		// Targeted update instead of load-mutate-save: a full save() re-validates
-		// the entire document, which 500s on older scenarios created before
-		// briefingAudioBase64/studentCharacterName/gradingRubric became required
-		// fields, even though this delete doesn't touch any of them.
+		// the entire document, which 500s on older scenarios created before the
+		// current required fields (background/patientInformation/audio/etc.)
+		// existed, even though this delete doesn't touch any of them.
 		const scenario = await SimulationScenario.findOneAndUpdate(
 			{ _id: scenarioId, isActive: true },
 			{ isActive: false },

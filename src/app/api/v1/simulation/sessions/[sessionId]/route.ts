@@ -79,13 +79,21 @@ async function getHandler(
 					briefingComplete: session.briefingComplete,
 					turns,
 					scenario: {
-						title: scenario.title,
 						workplaceSetting: scenario.workplaceSetting,
 						maxDurationMinutes: scenario.maxDurationMinutes,
-						studentHint: scenario.studentHint,
+						background: scenario.background,
+						patientInformation: scenario.patientInformation,
+						hints: scenario.hints,
 						phases: scenario.scenarioScript.map(
-							(phase: { phaseName: string; characters: string[] }) => ({
-								phaseName: phase.phaseName,
+							(phase: {
+								phaseTitle: string;
+								situation: string;
+								clinicalInformation: string;
+								characters: string[];
+							}) => ({
+								phaseTitle: phase.phaseTitle,
+								situation: phase.situation,
+								clinicalInformation: phase.clinicalInformation,
 								characters: phase.characters,
 							}),
 						),

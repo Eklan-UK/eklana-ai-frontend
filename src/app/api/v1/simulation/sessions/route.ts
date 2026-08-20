@@ -50,7 +50,6 @@ async function handler(
 			startedAt: new Date(),
 			currentPhaseIndex: 0,
 			briefingComplete: false,
-			revealedFindings: [],
 			turns: [],
 		});
 
@@ -59,7 +58,7 @@ async function handler(
 				code: 'Success',
 				data: {
 					sessionId: session._id,
-					displayData: scenario.displayData,
+					background: scenario.background,
 					maxDurationMinutes: scenario.maxDurationMinutes,
 				},
 			},

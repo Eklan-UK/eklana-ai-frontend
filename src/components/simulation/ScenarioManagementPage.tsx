@@ -13,7 +13,6 @@ import {
   buildScenarioFormData,
   validateScenarioForm,
   type ConversationBeatFormState,
-  type GatedFindingFormState,
 } from "@/components/simulation/scenario-form-shared";
 import { ScenarioFormFields } from "@/components/simulation/ScenarioFormFields";
 import { LearnerAssignmentPicker } from "@/components/simulation/LearnerAssignmentPicker";
@@ -30,7 +29,6 @@ interface AssignedLearner {
 
 interface ScenarioSummary {
   _id: string;
-  title: string;
   workplaceSetting: string;
   studentCharacterName: string;
   topicId?: string;
@@ -86,8 +84,8 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     fetchScenarios();
   }, []);
 
-  const handleDeleteScenario = async (scenarioId: string, title: string) => {
-    const confirmed = window.confirm(`Delete "${title}"? This cannot be undone.`);
+  const handleDeleteScenario = async (scenarioId: string, topicLabel: string) => {
+    const confirmed = window.confirm(`Delete "${topicLabel}"? This cannot be undone.`);
     if (!confirmed) return;
 
     setDeletingId(scenarioId);
@@ -135,29 +133,33 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
       if (!res.ok) throw new Error(json.message ?? "Failed to extract from slide deck");
 
       const result = json.data as {
-        displayData: string;
-        studentHint: string;
+        background: string;
+        patientInformation: string;
+        hints: Array<{ phaseTitle: string; hintText: string }>;
         scenarioScript: Array<{
-          phaseName: string;
+          phaseTitle: string;
+          situation: string;
+          clinicalInformation: string;
           triggerCondition: string;
           characters: string[];
           conversationBeats: ConversationBeatFormState[];
-          gatedFindings: GatedFindingFormState[];
         }>;
       };
 
-      formState.setDisplayData(result.displayData ?? "");
-      formState.setStudentHint(result.studentHint ?? "");
+      formState.setBackground(result.background ?? "");
+      formState.setPatientInformation(result.patientInformation ?? "");
       formState.setPhases(
         (result.scenarioScript ?? []).map((phase) => ({
-          phaseName: phase.phaseName,
+          phaseTitle: phase.phaseTitle,
+          situation: phase.situation,
+          clinicalInformation: phase.clinicalInformation,
           triggerCondition: phase.triggerCondition,
           characters: phase.characters,
           characterInput: "",
           conversationBeats: phase.conversationBeats,
-          gatedFindings: phase.gatedFindings,
         })),
       );
+      formState.setHints(result.hints ?? []);
       toast.success("Extracted from slide deck — review and edit below");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to extract from slide deck";
@@ -173,8 +175,10 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     e.preventDefault();
     const validationError = validateScenarioForm(
       formState.form,
-      formState.displayData,
+      formState.background,
+      formState.patientInformation,
       formState.phases,
+      formState.hints,
       formState.selectedLearnerIds,
     );
     if (validationError) {
@@ -186,9 +190,10 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
     try {
       const formData = buildScenarioFormData(
         formState.form,
-        formState.displayData,
-        formState.studentHint,
+        formState.background,
+        formState.patientInformation,
         formState.phases,
+        formState.hints,
         formState.selectedLearnerIds,
       );
       if (slideDeck) formData.append("file", slideDeck);
@@ -318,19 +323,21 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
               <p className="py-8 text-center text-sm text-gray-500">No scenarios yet</p>
             ) : (
               <ul className="space-y-2">
-                {scenarios.map((scenario) => (
+                {scenarios.map((scenario) => {
+                  // Topic is the sole identifier now that title has been removed —
+                  // scenarios sharing a topic are indistinguishable in this list.
+                  // Known tradeoff, not addressed here.
+                  const topicLabel = scenario.topicId
+                    ? COMPETENCY_FRAMEWORK[scenario.topicId]?.topic ?? scenario.topicId
+                    : "Untitled scenario";
+                  return (
                   <li
                     key={scenario._id}
                     className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-3.5"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">{scenario.title}</p>
+                      <p className="truncate text-sm font-medium text-gray-900">{topicLabel}</p>
                       <p className="truncate text-xs text-gray-500">{scenario.workplaceSetting}</p>
-                      {scenario.topicId && (
-                        <p className="truncate text-xs font-medium text-[#3B883E]">
-                          {COMPETENCY_FRAMEWORK[scenario.topicId]?.topic ?? scenario.topicId}
-                        </p>
-                      )}
                     </div>
 
                     <div
@@ -355,8 +362,8 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                       disabled={scenario.hasSessions}
                       aria-label={
                         scenario.hasSessions
-                          ? `${scenario.title} cannot be edited — students have already started sessions`
-                          : `Edit ${scenario.title}`
+                          ? `${topicLabel} cannot be edited — students have already started sessions`
+                          : `Edit ${topicLabel}`
                       }
                       title={
                         scenario.hasSessions
@@ -370,9 +377,9 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteScenario(scenario._id, scenario.title)}
+                      onClick={() => handleDeleteScenario(scenario._id, topicLabel)}
                       disabled={deletingId === scenario._id}
-                      aria-label={`Delete ${scenario.title}`}
+                      aria-label={`Delete ${topicLabel}`}
                       className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                     >
                       {deletingId === scenario._id ? (
@@ -382,7 +389,8 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
                       )}
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

@@ -1,30 +1,33 @@
 import { useState } from "react";
 import {
   emptyForm,
+  emptyHint,
   emptyPhase,
   learnerDisplayName,
   type ConversationBeatFormState,
-  type GatedFindingFormState,
+  type HintFormState,
   type PhaseFormState,
   type ScenarioFormValues,
 } from "@/components/simulation/scenario-form-shared";
 
 export interface ScenarioFormInitialValues {
   form: ScenarioFormValues;
-  displayData: string;
-  studentHint: string;
+  background: string;
+  patientInformation: string;
   phases: PhaseFormState[];
+  hints: HintFormState[];
   selectedLearnerIds: string[];
 }
 
 // Shared state + handlers behind the scenario create/edit forms — both call
-// sites (creation form, edit form) need the identical field/phase/learner
+// sites (creation form, edit form) need the identical field/phase/hint/learner
 // editing behavior, just seeded with different initial values.
 export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
   const [form, setFormState] = useState<ScenarioFormValues>(initial?.form ?? emptyForm());
-  const [displayData, setDisplayData] = useState(initial?.displayData ?? "");
-  const [studentHint, setStudentHint] = useState(initial?.studentHint ?? "");
+  const [background, setBackground] = useState(initial?.background ?? "");
+  const [patientInformation, setPatientInformation] = useState(initial?.patientInformation ?? "");
   const [phases, setPhases] = useState<PhaseFormState[]>(initial?.phases ?? []);
+  const [hints, setHints] = useState<HintFormState[]>(initial?.hints ?? []);
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(
     initial?.selectedLearnerIds ?? [],
   );
@@ -35,9 +38,10 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
 
   const resetForm = (values?: ScenarioFormInitialValues) => {
     setFormState(values?.form ?? emptyForm());
-    setDisplayData(values?.displayData ?? "");
-    setStudentHint(values?.studentHint ?? "");
+    setBackground(values?.background ?? "");
+    setPatientInformation(values?.patientInformation ?? "");
     setPhases(values?.phases ?? []);
+    setHints(values?.hints ?? []);
     setSelectedLearnerIds(values?.selectedLearnerIds ?? []);
     setLearnerSearch("");
   };
@@ -78,7 +82,7 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
 
   const updatePhaseField = (
     phaseIndex: number,
-    field: "phaseName" | "triggerCondition",
+    field: "phaseTitle" | "situation" | "clinicalInformation" | "triggerCondition",
     value: string,
   ) => setPhases((prev) => prev.map((p, i) => (i === phaseIndex ? { ...p, [field]: value } : p)));
 
@@ -155,52 +159,29 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
       ),
     );
 
-  const addFinding = (phaseIndex: number) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? { ...p, gatedFindings: [...p.gatedFindings, { label: "", data: "", revealCondition: "" }] }
-          : p,
-      ),
-    );
+  // ─── Hints editor ────────────────────────────────────────────────────────
+  // A carousel of { phaseTitle, hintText } entries — multiple hints per phase
+  // title are allowed, so this is a flat list, not keyed by phase.
 
-  const removeFinding = (phaseIndex: number, findingIndex: number) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? { ...p, gatedFindings: p.gatedFindings.filter((_, fi) => fi !== findingIndex) }
-          : p,
-      ),
-    );
+  const addHint = () => setHints((prev) => [...prev, emptyHint()]);
 
-  const updateFindingField = (
-    phaseIndex: number,
-    findingIndex: number,
-    field: keyof GatedFindingFormState,
-    value: string,
-  ) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? {
-              ...p,
-              gatedFindings: p.gatedFindings.map((f, fi) =>
-                fi === findingIndex ? { ...f, [field]: value } : f,
-              ),
-            }
-          : p,
-      ),
-    );
+  const removeHint = (hintIndex: number) =>
+    setHints((prev) => prev.filter((_, i) => i !== hintIndex));
+
+  const updateHintField = (hintIndex: number, field: keyof HintFormState, value: string) =>
+    setHints((prev) => prev.map((h, i) => (i === hintIndex ? { ...h, [field]: value } : h)));
 
   return {
     form,
     set,
-    displayData,
-    setDisplayData,
-    studentHint,
-    setStudentHint,
+    background,
+    setBackground,
+    patientInformation,
+    setPatientInformation,
     phases,
     setPhases,
+    hints,
+    setHints,
     selectedLearnerIds,
     setSelectedLearnerIds,
     learnerSearch,
@@ -219,9 +200,9 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
     addBeat,
     removeBeat,
     updateBeatField,
-    addFinding,
-    removeFinding,
-    updateFindingField,
+    addHint,
+    removeHint,
+    updateHintField,
   };
 }
 
