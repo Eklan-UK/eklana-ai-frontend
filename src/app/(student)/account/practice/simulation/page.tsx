@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/Button";
 
 interface ScenarioListItem {
   scenarioId: string;
-  title: string;
   workplaceSetting: string;
   maxDurationMinutes: number;
   topic: string | null;
@@ -35,10 +34,15 @@ interface GrammarError {
   explanation: string;
 }
 
+// Sub-fields are optional, not just their arrays defaulted — a session graded
+// before a given sub-grading pass existed (or whose pass failed in a way that
+// didn't hit the documented { errors: [] }-style fallback) can have the field
+// missing entirely rather than present-but-empty. Every read of these must
+// tolerate that, not just assume at least an empty array/object.
 interface AttemptGradeResult {
-  pronunciation: { gradedTurnCount: number; failedTurnCount: number; mispronouncedWords: MispronouncedWord[] };
-  grammar: { errors: GrammarError[] };
-  competency: { competencyScores: unknown[]; overallSummary: string };
+  pronunciation?: { gradedTurnCount: number; failedTurnCount: number; mispronouncedWords?: MispronouncedWord[] };
+  grammar?: { errors?: GrammarError[] };
+  competency?: { competencyScores?: unknown[]; overallSummary?: string };
   gradedAt: string;
 }
 
@@ -133,6 +137,10 @@ export default function SimulationRoomPage() {
 
   const selectedAttempt =
     selectedAttemptIndex !== null ? attempts[selectedAttemptIndex] ?? null : null;
+  const selectedGrade = selectedAttempt?.overallGradeResult ?? null;
+  const selectedMispronouncedWords = selectedGrade?.pronunciation?.mispronouncedWords ?? [];
+  const selectedGrammarErrors = selectedGrade?.grammar?.errors ?? [];
+  const selectedOverallSummary = selectedGrade?.competency?.overallSummary || "No summary available.";
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
@@ -171,16 +179,11 @@ export default function SimulationRoomPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
-                        {s.title}
+                        {s.topic ?? "Untitled scenario"}
                       </h3>
                       <p className="text-xs mt-0.5 text-muted-foreground line-clamp-1">
                         {s.workplaceSetting}
                       </p>
-                      {s.topic && (
-                        <p className="text-xs mt-0.5 text-muted-foreground line-clamp-1">
-                          {s.topic}
-                        </p>
-                      )}
                       <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
                         {s.maxDurationMinutes} min
                       </p>
@@ -259,7 +262,9 @@ export default function SimulationRoomPage() {
                   <p className="text-sm font-semibold text-foreground">
                     {selectedAttempt ? `Attempt ${selectedAttemptIndex! + 1} Detail` : "Past Attempts"}
                   </p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{attemptsScenario.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {attemptsScenario.topic ?? "Untitled scenario"}
+                  </p>
                 </div>
               </div>
               <button
@@ -273,28 +278,26 @@ export default function SimulationRoomPage() {
             </div>
 
             {selectedAttempt ? (
-              selectedAttempt.overallGradeResult && (
+              selectedGrade && (
                 <div className="mt-4 w-full space-y-4 rounded-2xl border border-border bg-muted/40 p-4 text-left">
                   <div>
                     <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Summary
                     </p>
-                    <p className="font-nunito text-sm text-foreground">
-                      {selectedAttempt.overallGradeResult.competency.overallSummary || "No summary available."}
-                    </p>
+                    <p className="font-nunito text-sm text-foreground">{selectedOverallSummary}</p>
                   </div>
 
                   <div>
                     <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Mispronounced words
                     </p>
-                    {selectedAttempt.overallGradeResult.pronunciation.mispronouncedWords.length === 0 ? (
+                    {selectedMispronouncedWords.length === 0 ? (
                       <p className="font-nunito text-sm text-muted-foreground">
                         No mispronounced words detected.
                       </p>
                     ) : (
                       <ul className="mt-1 flex flex-wrap gap-2">
-                        {selectedAttempt.overallGradeResult.pronunciation.mispronouncedWords.map((w, idx) => (
+                        {selectedMispronouncedWords.map((w, idx) => (
                           <li
                             key={idx}
                             className="rounded-full bg-muted px-3 py-1 font-nunito text-sm text-foreground"
@@ -313,13 +316,13 @@ export default function SimulationRoomPage() {
                     <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Misused words / grammar
                     </p>
-                    {selectedAttempt.overallGradeResult.grammar.errors.length === 0 ? (
+                    {selectedGrammarErrors.length === 0 ? (
                       <p className="font-nunito text-sm text-muted-foreground">
                         No grammar issues detected.
                       </p>
                     ) : (
                       <ul className="mt-1 space-y-2">
-                        {selectedAttempt.overallGradeResult.grammar.errors.map((err, idx) => (
+                        {selectedGrammarErrors.map((err, idx) => (
                           <li key={idx} className="font-nunito text-sm text-foreground">
                             <span className="text-muted-foreground line-through">{err.quotedText}</span>{" "}
                             → <span className="font-medium">{err.correctedVersion}</span>
@@ -384,11 +387,11 @@ export default function SimulationRoomPage() {
                       {attempt.overallGradeResult ? (
                         <div className="mt-2 space-y-1 border-t border-border pt-2">
                           <p className="text-xs text-foreground line-clamp-2">
-                            {attempt.overallGradeResult.competency.overallSummary || "No summary available."}
+                            {attempt.overallGradeResult.competency?.overallSummary || "No summary available."}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {attempt.overallGradeResult.pronunciation.mispronouncedWords.length} mispronounced
-                            words · {attempt.overallGradeResult.grammar.errors.length} grammar issues
+                            {(attempt.overallGradeResult.pronunciation?.mispronouncedWords ?? []).length} mispronounced
+                            words · {(attempt.overallGradeResult.grammar?.errors ?? []).length} grammar issues
                           </p>
                         </div>
                       ) : (

@@ -7,23 +7,24 @@ export interface ScenarioConversationBeat {
 	triggerCondition: string;
 }
 
-export interface ScenarioGatedFinding {
-	label: string;
-	data: string;
-	revealCondition: string;
-}
-
 export interface ScenarioPhase {
-	phaseName: string;
+	phaseTitle: string;
+	situation: string;
+	clinicalInformation: string;
 	triggerCondition: string;
 	characters: string[];
 	conversationBeats: ScenarioConversationBeat[];
-	gatedFindings: ScenarioGatedFinding[];
+}
+
+export interface ScenarioHint {
+	phaseTitle: string;
+	hintText: string;
 }
 
 export interface ScenarioExtractionResult {
-	displayData: string;
-	studentHint: string;
+	background: string;
+	patientInformation: string;
+	hints: ScenarioHint[];
 	hiddenContext: string;
 	scenarioScript: ScenarioPhase[];
 }
@@ -33,41 +34,46 @@ function buildExtractionPrompt(rawSlideText: string, studentCharacterName: strin
 
 The learner/student plays the role of ${studentCharacterName}. Do NOT include ${studentCharacterName} in any phase's characters array or conversationBeats — the AI never voices or narrates this character, since the student speaks for themselves.
 
-Extract exactly four things:
+Extract exactly five things:
 
-1. displayData — ALL baseline information a person in this role would realistically already know or see at the very start of the encounter: the presenting complaint/situation, baseline readings/status, and any chart, handoff, or briefing data given up front. This belongs in displayData EVEN IF the source deck presents it under a separate "findings" or "assessment" heading/slide — where the deck puts it does not matter, only whether it would already be known at scene start. Do not move baseline information into gatedFindings just because the deck labels it as a finding. This will be read aloud by an AI voice at the start of the session, so rewrite it as natural, sayable spoken paragraphs — not bullet fragments and not text copied verbatim from slides.
+1. background — ALL baseline situational information a person in this role would realistically already know or see at the very start of the encounter: the presenting complaint/situation, setting, and any handoff or briefing context given up front. This will be read aloud by an AI voice before the student sees anything else, so rewrite it as natural, sayable spoken paragraphs — not bullet fragments and not text copied verbatim from slides.
 
-2. scenarioScript — an array of phase objects covering everything that unfolds DURING the interaction. Derive the number and structure of phases from the deck's actual content. Each phase object has:
-   - phaseName: string
-   - triggerCondition: string — what starts this phase
+2. patientInformation — baseline readings, status, chart, or subject-specific data known at scene start (e.g. vitals, history, current state). Shown to the student right after background, and also read aloud by an AI voice, so it must also be natural, sayable spoken prose, not bullet fragments.
+
+3. scenarioScript — an array of phase objects covering everything that unfolds DURING the interaction. Derive the number and structure of phases from the deck's actual content. Each phase object has:
+   - phaseTitle: string
+   - situation: string — the scene-setting text shown to the student at the start of this phase, before the conversation for this phase begins (e.g. what has changed, what's now happening). Written as plain descriptive text the student reads on screen, not spoken-audio prose.
+   - clinicalInformation: string — a single plain-text block of information relevant to this phase, shown to the student on screen upfront, before that phase's conversation begins. This is NOT gated or reveal-conditioned — the student sees it immediately when the phase starts. Include here whatever information would newly become relevant or available during this phase (e.g. a repeat reading taken during the encounter, an updated status).
+   - triggerCondition: string — what ends this phase / advances to the next
    - characters: string[] — which roles/characters are active in this phase (e.g. "patient", "supervisor", "colleague")
    - conversationBeats: array of { character, intent, triggerCondition } — intent describes WHAT the character should communicate or accomplish in natural language (e.g. "reports sudden distress, sounds anxious"), NOT a verbatim scripted line, since a separate live AI will generate the actual wording and respond to the learner in real time
-   - gatedFindings: array of { label, data, revealCondition } — any data/information meant to be displayed on screen only after a trigger condition is met (e.g. after the learner performs an assessment or requests information); this is never spoken aloud. Reserve gatedFindings ONLY for information that requires the learner to actively assess, ask, or act during the encounter to discover — information that would NOT plausibly be known yet at scene start. If it's baseline information already known at the start, it belongs in displayData instead, regardless of which slide/heading the deck put it under. Example: a baseline oxygen saturation reading given in the deck's patient snapshot belongs in displayData, not gatedFindings, even if the deck lists it under an "assessment findings" header — only a CHANGED or newly-measured reading taken during the encounter (e.g. a repeat SpO2 check after an intervention) belongs in gatedFindings.
 
-3. studentHint — optional on-demand reference material the learner could look up if they choose to; it is not shown automatically. Return an empty string if the deck has no such content.
+4. hints — optional on-demand reference material the learner could look up during a specific phase if they choose to; not shown automatically. Return an array of { phaseTitle, hintText }, where phaseTitle matches one of the scenarioScript phase titles above exactly. Return an empty array if the deck has no such content. A phase may have zero, one, or multiple hints.
 
-4. hiddenContext — facilitator-only material never shown to the learner: scoring checklists, model/ideal answers, debrief questions, and deck framing/mission-briefing slides not meant for the learner. Return this as a single string, joining/summarizing distinct facilitator sections clearly.
+5. hiddenContext — facilitator-only material never shown to the learner: scoring checklists, model/ideal answers, debrief questions, and deck framing/mission-briefing slides not meant for the learner. Return this as a single string, joining/summarizing distinct facilitator sections clearly.
 
 Raw slide text:
 ${rawSlideText}
 
 Return ONLY valid JSON with this exact shape:
 {
-  "displayData": <string, sayable spoken-prose background/setup info>,
+  "background": <string, sayable spoken-prose situational context>,
+  "patientInformation": <string, sayable spoken-prose baseline data>,
   "scenarioScript": [
     {
-      "phaseName": <string>,
+      "phaseTitle": <string>,
+      "situation": <string>,
+      "clinicalInformation": <string>,
       "triggerCondition": <string>,
       "characters": [<string>, ...],
       "conversationBeats": [
         { "character": <string>, "intent": <string>, "triggerCondition": <string> }
-      ],
-      "gatedFindings": [
-        { "label": <string>, "data": <string>, "revealCondition": <string> }
       ]
     }
   ],
-  "studentHint": <string, empty string if none>,
+  "hints": [
+    { "phaseTitle": <string>, "hintText": <string> }
+  ],
   "hiddenContext": <string, facilitator-only material>
 }`;
 }
@@ -90,36 +96,32 @@ function isValidConversationBeat(value: unknown): value is ScenarioConversationB
 	);
 }
 
-function isValidGatedFinding(value: unknown): value is ScenarioGatedFinding {
+function isValidHint(value: unknown): value is ScenarioHint {
 	if (typeof value !== 'object' || value === null) return false;
-	const finding = value as Record<string, unknown>;
-	return (
-		isNonEmptyString(finding.label) &&
-		isNonEmptyString(finding.data) &&
-		isNonEmptyString(finding.revealCondition)
-	);
+	const hint = value as Record<string, unknown>;
+	return isNonEmptyString(hint.phaseTitle) && isNonEmptyString(hint.hintText);
 }
 
 export function isValidPhase(value: unknown): value is ScenarioPhase {
 	if (typeof value !== 'object' || value === null) return false;
 	const phase = value as Record<string, unknown>;
 	return (
-		isNonEmptyString(phase.phaseName) &&
+		isNonEmptyString(phase.phaseTitle) &&
+		isNonEmptyString(phase.situation) &&
+		isNonEmptyString(phase.clinicalInformation) &&
 		isNonEmptyString(phase.triggerCondition) &&
 		isStringArray(phase.characters) &&
 		Array.isArray(phase.conversationBeats) &&
-		phase.conversationBeats.every(isValidConversationBeat) &&
-		Array.isArray(phase.gatedFindings) &&
-		phase.gatedFindings.every(isValidGatedFinding)
+		phase.conversationBeats.every(isValidConversationBeat)
 	);
 }
 
 function validateExtractionShape(parsed: any): asserts parsed is ScenarioExtractionResult {
-	if (!isNonEmptyString(parsed?.displayData)) {
-		throw new Error('Invalid scenario extraction response shape: displayData must be a non-empty string');
+	if (!isNonEmptyString(parsed?.background)) {
+		throw new Error('Invalid scenario extraction response shape: background must be a non-empty string');
 	}
-	if (typeof parsed?.studentHint !== 'string') {
-		throw new Error('Invalid scenario extraction response shape: studentHint must be a string');
+	if (!isNonEmptyString(parsed?.patientInformation)) {
+		throw new Error('Invalid scenario extraction response shape: patientInformation must be a non-empty string');
 	}
 	if (!isNonEmptyString(parsed?.hiddenContext)) {
 		throw new Error('Invalid scenario extraction response shape: hiddenContext must be a non-empty string');
@@ -129,6 +131,9 @@ function validateExtractionShape(parsed: any): asserts parsed is ScenarioExtract
 	}
 	if (!parsed.scenarioScript.every(isValidPhase)) {
 		throw new Error('Invalid scenario extraction response shape: scenarioScript contains a malformed phase');
+	}
+	if (!Array.isArray(parsed?.hints) || !parsed.hints.every(isValidHint)) {
+		throw new Error('Invalid scenario extraction response shape: hints must be an array of { phaseTitle, hintText }');
 	}
 }
 
@@ -163,11 +168,11 @@ async function callGeminiForExtraction(
 		model: DEFAULT_MODEL,
 		generationConfig: {
 			temperature: 0.2,
-			// scenarioScript now asks for a full multi-phase breakdown (per-phase
-			// characters, conversation beats, and gated findings) on top of the
-			// original displayData/hiddenContext split, so the structured output
-			// is substantially larger than the old 2-field shape. Raised from
-			// 8000 to 16000 to leave headroom for decks with several phases.
+			// scenarioScript asks for a full multi-phase breakdown (per-phase
+			// characters, conversation beats, situation, and clinical info) on top
+			// of background/patientInformation/hints/hiddenContext, so the
+			// structured output is substantial. Kept at 16000 to leave headroom for
+			// decks with several phases.
 			maxOutputTokens: 16000,
 		},
 	});
@@ -190,9 +195,9 @@ async function callGeminiForExtraction(
 }
 
 /**
- * Extract displayData, scenarioScript, studentHint, and hiddenContext from
- * raw parsed slide text using Gemini. Retries once on malformed JSON or
- * failed shape validation before giving up.
+ * Extract background, patientInformation, scenarioScript, hints, and
+ * hiddenContext from raw parsed slide text using Gemini. Retries once on
+ * malformed JSON or failed shape validation before giving up.
  */
 export async function extractScenarioContext(
 	rawSlideText: string,

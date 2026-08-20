@@ -11,6 +11,7 @@ import SimulationSession from '@/models/simulation-session';
 // Registers the SimulationScenario model so populate('scenarioId') can resolve it
 import '@/models/simulation-scenario';
 import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
+import { getTopicName } from '@/config/competency-framework';
 
 interface SimulationGrammarError {
 	studentTurnNumber: number;
@@ -35,7 +36,7 @@ interface SimulationOverallGradeResult {
 
 interface PopulatedSimulationSession {
 	_id: Types.ObjectId;
-	scenarioId: { _id: Types.ObjectId; title: string } | null;
+	scenarioId: { _id: Types.ObjectId; topicId: string } | null;
 	completedAt?: Date;
 	overallGradeResult?: SimulationOverallGradeResult;
 }
@@ -71,12 +72,14 @@ async function getHandler(
 			status: 'completed',
 		})
 			.sort({ completedAt: -1 })
-			.populate('scenarioId', 'title')
+			.populate('scenarioId', 'topicId')
 			.lean()) as unknown as PopulatedSimulationSession[];
 
+		// Topic is the sole scenario identifier now that title has been removed —
+		// see the same tradeoff noted on the admin scenario list.
 		const sessionsSummary = sessions.map((session) => ({
 			sessionId: session._id,
-			scenarioTitle: session.scenarioId?.title ?? '',
+			scenarioTopic: session.scenarioId ? getTopicName(session.scenarioId.topicId) : '',
 			completedAt: session.completedAt,
 			competencyOverallSummary: session.overallGradeResult?.competency?.overallSummary ?? '',
 			grammarErrorCount: session.overallGradeResult?.grammar?.errors?.length ?? 0,

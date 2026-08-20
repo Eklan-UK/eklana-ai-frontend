@@ -4,23 +4,22 @@ export interface ConversationBeatFormState {
   triggerCondition: string;
 }
 
-export interface GatedFindingFormState {
-  label: string;
-  data: string;
-  revealCondition: string;
-}
-
 export interface PhaseFormState {
-  phaseName: string;
+  phaseTitle: string;
+  situation: string;
+  clinicalInformation: string;
   triggerCondition: string;
   characters: string[];
   characterInput: string;
   conversationBeats: ConversationBeatFormState[];
-  gatedFindings: GatedFindingFormState[];
+}
+
+export interface HintFormState {
+  phaseTitle: string;
+  hintText: string;
 }
 
 export interface ScenarioFormValues {
-  title: string;
   workplaceSetting: string;
   studentCharacterName: string;
   dramatisationPrompt: string;
@@ -30,16 +29,21 @@ export interface ScenarioFormValues {
 }
 
 export const emptyPhase = (): PhaseFormState => ({
-  phaseName: "",
+  phaseTitle: "",
+  situation: "",
+  clinicalInformation: "",
   triggerCondition: "",
   characters: [],
   characterInput: "",
   conversationBeats: [],
-  gatedFindings: [],
+});
+
+export const emptyHint = (): HintFormState => ({
+  phaseTitle: "",
+  hintText: "",
 });
 
 export const emptyForm = (): ScenarioFormValues => ({
-  title: "",
   workplaceSetting: "",
   studentCharacterName: "",
   dramatisationPrompt: "",
@@ -60,45 +64,58 @@ export const smallFieldClass =
 
 export function validateScenarioForm(
   form: ScenarioFormValues,
-  displayData: string,
+  background: string,
+  patientInformation: string,
   phases: PhaseFormState[],
+  hints: HintFormState[],
   selectedLearnerIds: string[],
 ): string | null {
-  if (!form.title.trim()) return "Title is required";
   if (!form.workplaceSetting.trim()) return "Workplace setting is required";
   if (!form.studentCharacterName.trim()) return "Student character name is required";
   if (!form.dramatisationPrompt.trim()) return "Dramatisation prompt is required";
   if (!form.topicId) return "Select a topic";
-  if (!displayData.trim()) return "Background / Briefing is required";
+  if (!background.trim()) return "Background is required";
+  if (!patientInformation.trim()) return "Patient information is required";
   if (!form.gradingRubric.trim()) return "Grading rubric is required";
   if (phases.length === 0) return "Add at least one phase";
-  const hasValidPhase = phases.some((p) => p.phaseName.trim() && p.characters.length > 0);
-  if (!hasValidPhase) return "Add at least one phase with a name and at least one AI-voiced character";
+  const hasValidPhase = phases.some(
+    (p) =>
+      p.phaseTitle.trim() &&
+      p.situation.trim() &&
+      p.clinicalInformation.trim() &&
+      p.characters.length > 0,
+  );
+  if (!hasValidPhase) {
+    return "Add at least one phase with a title, situation, clinical information, and at least one AI-voiced character";
+  }
+  const hasIncompleteHint = hints.some((h) => !h.phaseTitle.trim() || !h.hintText.trim());
+  if (hasIncompleteHint) return "Each hint needs a phase and hint text";
   if (selectedLearnerIds.length === 0) return "Select at least one learner";
   return null;
 }
 
 export function buildScenarioFormData(
   form: ScenarioFormValues,
-  displayData: string,
-  studentHint: string,
+  background: string,
+  patientInformation: string,
   phases: PhaseFormState[],
+  hints: HintFormState[],
   selectedLearnerIds: string[],
 ): FormData {
   const formData = new FormData();
-  formData.append("title", form.title.trim());
   formData.append("workplaceSetting", form.workplaceSetting.trim());
   formData.append("studentCharacterName", form.studentCharacterName.trim());
   formData.append("dramatisationPrompt", form.dramatisationPrompt.trim());
   formData.append("topicId", form.topicId);
   formData.append("gradingRubric", form.gradingRubric.trim());
   formData.append("maxDurationMinutes", form.maxDurationMinutes);
-  formData.append("displayData", displayData.trim());
-  formData.append("studentHint", studentHint.trim());
+  formData.append("background", background.trim());
+  formData.append("patientInformation", patientInformation.trim());
   formData.append(
     "scenarioScript",
     JSON.stringify(phases.map(({ characterInput: _characterInput, ...phase }) => phase)),
   );
+  formData.append("hints", JSON.stringify(hints));
   for (const learnerId of selectedLearnerIds) {
     formData.append("assignedLearnerIds", learnerId);
   }

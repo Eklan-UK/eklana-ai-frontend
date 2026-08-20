@@ -1,6 +1,5 @@
 // POST /api/v1/simulation/sessions/[sessionId]/turn — core Simulation Room turn:
-// transcribe the student's audio, run one live-conversation turn, and check for
-// newly-revealed findings, all in a single request.
+// transcribe the student's audio and run one live-conversation turn.
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
@@ -10,7 +9,6 @@ import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
 import { transcribeAudio, TranscriptionRejectedError } from '@/services/gemini.service';
 import { uploadToCloudinary } from '@/services/cloudinary.service';
-import { checkFindingReveals } from '@/domain/simulation/simulation-turn-reveal.service';
 import { buildSimulationSystemInstruction, advancePhaseTool } from '@/domain/simulation/simulation-live-prompt.service';
 import config from '@/lib/api/config';
 
@@ -234,41 +232,23 @@ async function postHandler(
 			secondsRemaining,
 		);
 
-		const revealedLabelsForPhase = new Set(
-			session.revealedFindings
-				.filter(
-					(finding: ISimulationSession['revealedFindings'][number]) =>
-						finding.phaseIndex === session.currentPhaseIndex,
-				)
-				.map((finding: ISimulationSession['revealedFindings'][number]) => finding.label),
-		);
-		const unrevealedFindings = currentPhase.gatedFindings.filter(
-			(finding: { label: string; revealCondition: string }) =>
-				!revealedLabelsForPhase.has(finding.label),
-		);
-
 		let phaseAdvanced = false;
 		const sessionKey = `sim_${sessionId}`;
 
-		const [relayResponse, revealResult] = await Promise.all([
-			fetch(`${config.RELAY_URL}/relay/turn`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Relay-Secret': config.RELAY_AUTH_SECRET || '',
-				},
-				body: JSON.stringify({
-					systemInstruction,
-					turns,
-					voiceName: 'Kore',
-					tools: [advancePhaseTool],
-					sessionKey,
-				}),
+		const relayResponse = await fetch(`${config.RELAY_URL}/relay/turn`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Relay-Secret': config.RELAY_AUTH_SECRET || '',
+			},
+			body: JSON.stringify({
+				systemInstruction,
+				turns,
+				voiceName: 'Kore',
+				tools: [advancePhaseTool],
+				sessionKey,
 			}),
-			unrevealedFindings.length > 0
-				? checkFindingReveals(transcribedText, unrevealedFindings)
-				: Promise.resolve({ revealedLabels: [] as string[] }),
-		]);
+		});
 
 		if (!relayResponse.ok || !relayResponse.body) {
 			const errorText = await relayResponse.text().catch(() => '');
@@ -285,34 +265,17 @@ async function postHandler(
 
 		const stream = relayResponse.body;
 
-		const newlyRevealedLabels = revealResult.revealedLabels.filter(
-			(label) => !revealedLabelsForPhase.has(label),
-		);
-
-		const revealFindings = newlyRevealedLabels.map((label) => ({
-			label,
-			data:
-				currentPhase.gatedFindings.find(
-					(finding: { label: string; data: string }) => finding.label === label,
-				)?.data ?? '',
-		}));
-
-		// Turn persistence (student turn, AI turn, revealedFindings,
-		// currentPhaseIndex) is deliberately deferred until AFTER the Live API
-		// stream is fully drained below — see the two KNOWN LIMITATION notes this
-		// replaced. Draining first lets us (a) accumulate the AI's actual spoken
-		// text from the streamed `outputTranscription` chunks instead of writing
-		// an empty string, and (b) observe whether `advancePhase` was actually
-		// called by the time the session closes, instead of checking a flag that
-		// hadn't had a chance to flip yet.
+		// Turn persistence (student turn, AI turn, currentPhaseIndex) is
+		// deliberately deferred until AFTER the Live API stream is fully drained
+		// below — see the two KNOWN LIMITATION notes this replaced. Draining
+		// first lets us (a) accumulate the AI's actual spoken text from the
+		// streamed `outputTranscription` chunks instead of writing an empty
+		// string, and (b) observe whether `advancePhase` was actually called by
+		// the time the session closes, instead of checking a flag that hadn't
+		// had a chance to flip yet.
 		const wrappedStream = new ReadableStream({
 			async start(controller) {
 				controller.enqueue(transcriptChunk);
-
-				if (revealFindings.length > 0) {
-					const revealChunk = JSON.stringify({ type: 'reveal', findings: revealFindings });
-					controller.enqueue(new TextEncoder().encode(`data: ${revealChunk}\n\n`));
-				}
 
 				const decoder = new TextDecoder();
 				const encoder = new TextEncoder();
@@ -401,15 +364,6 @@ async function postHandler(
 											audioUrl: '',
 											createdAt: new Date(),
 									});
-
-									const now = new Date();
-									for (const label of newlyRevealedLabels) {
-											session.revealedFindings.push({
-													phaseIndex: session.currentPhaseIndex,
-													label,
-													revealedAt: now,
-											});
-									}
 
 									if (phaseAdvanced) {
 											session.currentPhaseIndex += 1;

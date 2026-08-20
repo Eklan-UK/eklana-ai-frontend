@@ -44,7 +44,6 @@ async function handler(
 			const latestSession = latestSessionByScenarioId.get(scenario._id.toString());
 			return {
 				scenarioId: scenario._id,
-				title: scenario.title,
 				workplaceSetting: scenario.workplaceSetting,
 				maxDurationMinutes: scenario.maxDurationMinutes,
 				topic: getTopicName(scenario.topicId),
