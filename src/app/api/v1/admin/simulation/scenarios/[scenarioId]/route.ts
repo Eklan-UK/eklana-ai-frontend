@@ -1,3 +1,6 @@
+// GET    /api/v1/admin/simulation/scenarios/[scenarioId] — fetch a single
+// scenario with its full fields (edit form pre-fill; the list route only
+// returns summary fields).
 // PATCH  /api/v1/admin/simulation/scenarios/[scenarioId] — edit a scenario's
 // fields. Blocked once any student has started a session on it (see the
 // SimulationSession.exists() guard below) — a scenario in flight must stay
@@ -17,6 +20,53 @@ import SimulationSession from '@/models/simulation-session';
 import { simulationScenarioBodySchema } from '@/lib/simulation-scenario-api-schema';
 import { getCompetencyNamesForTopic } from '@/config/competency-framework';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
+
+async function getHandler(
+	req: NextRequest,
+	ctx: { userId: Types.ObjectId; userRole: string },
+	params: { scenarioId: string },
+): Promise<NextResponse> {
+	try {
+		const { scenarioId } = params;
+
+		if (!scenarioId || !Types.ObjectId.isValid(scenarioId)) {
+			return NextResponse.json(
+				{ code: 'ValidationError', message: 'Invalid scenario ID' },
+				{ status: 400 },
+			);
+		}
+
+		await connectToDatabase();
+
+		const scenario = await SimulationScenario.findOne({ _id: scenarioId, isActive: true })
+			.populate('assignedLearnerIds', 'firstName lastName email')
+			.lean();
+
+		if (!scenario) {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Scenario not found' },
+				{ status: 404 },
+			);
+		}
+
+		const hasSessions = await SimulationSession.exists({ scenarioId });
+
+		return NextResponse.json(
+			{ code: 'Success', data: { ...scenario, hasSessions: Boolean(hasSessions) } },
+			{ status: 200 },
+		);
+	} catch (error: any) {
+		logger.error('[SimulationScenarioDetail] GET error', {
+			error: error.message,
+			stack: error.stack,
+			name: error.name,
+		});
+		return NextResponse.json(
+			{ code: 'ServerError', message: 'Failed to fetch scenario' },
+			{ status: 500 },
+		);
+	}
+}
 
 async function patchHandler(
 	req: NextRequest,
@@ -175,6 +225,16 @@ async function deleteHandler(
 			{ status: 500 },
 		);
 	}
+}
+
+export async function GET(
+	req: NextRequest,
+	{ params }: { params: Promise<{ scenarioId: string }> },
+) {
+	const resolvedParams = await params;
+	return withRole(['tutor', 'admin'], (req, context) =>
+		getHandler(req, context, resolvedParams),
+	)(req);
 }
 
 export async function PATCH(
