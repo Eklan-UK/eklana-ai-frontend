@@ -96,11 +96,17 @@ function buildExcelRows(drillType: string, content: Record<string, unknown>): un
     case "key_phrases": {
       const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
       return [
-        ["Prompt", "Correct Answer", "Option 2", "Option 3"],
+        ["Context", "Prompt", "Correct Answer", "Option 2", "Option 3"],
         ...items.map((item) => {
           const opts = (item.options as string[]) ?? [];
           const distractors = opts.filter((o) => o !== item.correctAnswer);
-          return [String(item.prompt ?? ""), String(item.correctAnswer ?? ""), distractors[0] ?? "", distractors[1] ?? ""];
+          return [
+            String(item.context ?? ""),
+            String(item.prompt ?? ""),
+            String(item.correctAnswer ?? ""),
+            distractors[0] ?? "",
+            distractors[1] ?? "",
+          ];
         }),
       ];
     }
@@ -278,9 +284,12 @@ function renderContentForType(
     case "key_phrases": {
       const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
       return (
-        <PreviewSection title={`Pressure Test — ${items.length} questions`}>
+        <PreviewSection title={`Scenario/Pressure Test — ${items.length} questions`}>
           {items.map((item, i) => (
             <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+              {Boolean(String(item.context ?? "").trim()) && (
+                <p className="text-sm text-gray-600 mb-2">{String(item.context)}</p>
+              )}
               <p className="font-semibold">{String(item.prompt ?? "")}</p>
               <p className="text-xs text-gray-500 mt-1">
                 Options: {((item.options as string[]) ?? []).join(" | ")}

@@ -513,7 +513,7 @@ export function DrillDetailClient({
           drill.key_phrase_items.length > 0 && (
             <Card className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Pressure Test Questions ({drill.key_phrase_items.length})
+                Scenario/Pressure Test Questions ({drill.key_phrase_items.length})
               </h2>
               <div className="space-y-4">
                 {drill.key_phrase_items.map((item: any, idx: number) => (
@@ -525,6 +525,9 @@ export function DrillDetailClient({
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Question {idx + 1}
                       </p>
+                      {item.context?.trim() && (
+                        <p className="text-sm text-gray-600 mb-2">{item.context}</p>
+                      )}
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Situation / Scenario
                       </p>
