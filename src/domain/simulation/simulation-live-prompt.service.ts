@@ -1,3 +1,17 @@
+/**
+ * Live API function-declaration for the phase-advance tool call. Shared by
+ * opening/route.ts and turn/route.ts so both relay requests for the same
+ * session send an identical tool definition — the relay's cached-session
+ * reuse only applies tools from whichever request establishes the
+ * connection, so the first request for a session must already include this.
+ */
+export const advancePhaseTool = {
+	name: 'advancePhase',
+	description:
+		"Call this when the current phase's trigger condition has been clearly and fully satisfied by the conversation so far.",
+	parameters: { type: 'object', properties: {} },
+};
+
 export interface SimulationPromptScenario {
 	dramatisationPrompt: string;
 }

@@ -1,10 +1,14 @@
 // POST /api/v1/simulation/sessions/[sessionId]/end — student-initiated early end of a Simulation Room session
 import { NextRequest, NextResponse } from 'next/server';
+
+export const maxDuration = 120; // grading runs inline here now — same budget as /grade
+
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationSession from '@/models/simulation-session';
+import { gradeSimulationSession } from '@/domain/simulation/simulation-grading.service';
 
 async function postHandler(
 	req: NextRequest,
@@ -49,6 +53,20 @@ async function postHandler(
 		session.status = 'completed';
 		session.completedAt = new Date();
 		await session.save();
+
+		// Best-effort — a grading failure (e.g. an LLM call errors out) must not
+		// fail this request. The session is already marked completed above;
+		// overallGradeResult is simply left unset, same as any other partial
+		// sub-result failure inside gradeSimulationSession itself. The student
+		// can still retry via the "See my grades" button (POST .../grade).
+		try {
+			await gradeSimulationSession(sessionId);
+		} catch (gradingError: any) {
+			logger.warn('[SimulationSessionEnd] Auto-grading failed after session end', {
+				error: gradingError.message,
+				sessionId,
+			});
+		}
 
 		return NextResponse.json(
 			{ code: 'Success', data: { sessionComplete: true } },

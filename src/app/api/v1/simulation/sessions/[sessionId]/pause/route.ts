@@ -1,10 +1,9 @@
-// POST /api/v1/simulation/sessions/[sessionId]/start — mark a Simulation Room briefing complete and reveal phase 0
+// POST /api/v1/simulation/sessions/[sessionId]/pause — student-initiated "leave and continue later" pause of a Simulation Room session
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
-import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession from '@/models/simulation-session';
 
 async function postHandler(
@@ -47,49 +46,28 @@ async function postHandler(
 			);
 		}
 
-		if (session.briefingComplete) {
+		if (session.pausedAt) {
 			return NextResponse.json(
-				{ code: 'ValidationError', message: 'Session has already been started' },
+				{ code: 'ValidationError', message: 'Session is already paused' },
 				{ status: 400 },
 			);
 		}
 
-		session.briefingComplete = true;
-		// Timer starts when the student actually begins the conversation, not at
-		// session creation (which happens before the briefing has even played).
-		session.startedAt = new Date();
+		session.pausedAt = new Date();
 		await session.save();
 
-		const scenario = await SimulationScenario.findById(session.scenarioId);
-
-		if (!scenario) {
-			return NextResponse.json(
-				{ code: 'NotFound', message: 'Scenario not found' },
-				{ status: 404 },
-			);
-		}
-
-		const phase = scenario.scenarioScript[0];
-
 		return NextResponse.json(
-			{
-				code: 'Success',
-				data: {
-					phaseName: phase?.phaseName ?? '',
-					characters: phase?.characters ?? [],
-					startedAt: session.startedAt,
-				},
-			},
+			{ code: 'Success', data: { sessionPaused: true } },
 			{ status: 200 },
 		);
 	} catch (error: any) {
-		logger.error('[SimulationSessionStart] POST error', {
+		logger.error('[SimulationSessionPause] POST error', {
 			error: error.message,
 			stack: error.stack,
 			name: error.name,
 		});
 		return NextResponse.json(
-			{ code: 'ServerError', message: 'Failed to start simulation session' },
+			{ code: 'ServerError', message: 'Failed to pause simulation session' },
 			{ status: 500 },
 		);
 	}

@@ -12,6 +12,7 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { z } from 'zod';
 import SimulationScenario from '@/models/simulation-scenario';
+import SimulationSession from '@/models/simulation-session';
 import { simulationScenarioBodySchema } from '@/lib/simulation-scenario-api-schema';
 import { extractScenarioContext } from '@/domain/simulation/simulation-scenario-extraction.service';
 import { getCompetencyNamesForTopic } from '@/config/competency-framework';
@@ -195,6 +196,16 @@ async function listHandler(
 			.lean()
 			.exec();
 
+		// Single aggregate query for all scenario IDs that have at least one
+		// session, instead of an exists() check per scenario in the list.
+		// Uses $group instead of distinct() — distinct isn't supported under
+		// Stable API v1 strict mode.
+		const scenariosWithSessions = await SimulationSession.aggregate([
+			{ $match: { scenarioId: { $in: scenarios.map((scenario: any) => scenario._id) } } },
+			{ $group: { _id: '$scenarioId' } },
+		]);
+		const scenariosWithSessionsSet = new Set(scenariosWithSessions.map((r: any) => String(r._id)));
+
 		const data = scenarios.map((scenario: any) => ({
 			_id: scenario._id,
 			title: scenario.title,
@@ -212,6 +223,7 @@ async function listHandler(
 							'Unknown',
 					}))
 				: [],
+			hasSessions: scenariosWithSessionsSet.has(String(scenario._id)),
 			createdAt: scenario.createdAt,
 		}));
 
