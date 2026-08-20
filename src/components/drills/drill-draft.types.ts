@@ -54,6 +54,7 @@ export interface FillBlankItem {
 }
 
 export interface KeyPhraseItem {
+  context?: string;
   prompt: string;
   respondentName?: string;
   options: string[];
@@ -150,7 +151,13 @@ export function getDefaultDrillDraft(overrides?: Partial<DrillDraft>): DrillDraf
       },
     ],
     keyPhraseItems: [
-      { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
+      {
+        context: "",
+        respondentName: "",
+        prompt: "",
+        options: ["", ""],
+        correctAnswer: "",
+      },
     ],
     drillTitle: "",
     drillType: "vocabulary",

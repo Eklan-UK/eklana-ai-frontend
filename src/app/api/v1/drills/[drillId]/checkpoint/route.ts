@@ -23,6 +23,8 @@ const saveCheckpointSchema = z.object({
     'sentence_writing',
     'fill_blank',
     'key_phrases',
+    'listening',
+    'summary',
   ]),
   resumeFromIndex: z.number().int().min(0),
   completedItemCount: z.number().int().min(0),

@@ -134,6 +134,7 @@ export const adminService = {
     zeroPauseChallengePostTrialUsers: number;
     zeroPauseMaintainerUsers: number;
     newSignupsThisWeek: number;
+    newProSubscribersThisMonth: number;
     discoveryCallsToday: number;
     videosAwaitingReview: number;
   }> => {
@@ -147,6 +148,7 @@ export const adminService = {
       zeroPauseChallengePostTrialUsers: 0,
       zeroPauseMaintainerUsers: 0,
       newSignupsThisWeek: 0,
+      newProSubscribersThisMonth: 0,
       discoveryCallsToday: 0,
       videosAwaitingReview: 0,
     };

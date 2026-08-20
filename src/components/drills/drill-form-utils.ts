@@ -144,6 +144,7 @@ export function applyParsedContentToDraft(
           ? items.map((item) => {
               const row = item as Record<string, unknown>;
               return {
+                context: String(row.context || ""),
                 respondentName: String(row.respondentName || ""),
                 prompt: String(row.prompt || row.word || ""),
                 options:
@@ -307,7 +308,7 @@ export function validateDrillDraft(
       draft.keyPhraseItems.length === 0 ||
       !draft.keyPhraseItems.some((item) => item.prompt.trim())
     ) {
-      toast.error("Please add at least one Pressure Test question");
+      toast.error("Please add at least one Scenario/Pressure Test question");
       return false;
     }
     for (const item of draft.keyPhraseItems) {
@@ -449,11 +450,15 @@ export function buildDrillPayloadFromDraft(
   } else if (drillType === "key_phrases") {
     payload.key_phrase_items = draft.keyPhraseItems
       .filter((item) => item.prompt.trim())
-      .map((item) => ({
-        prompt: item.prompt.trim(),
-        options: item.options.filter((o) => o.trim()),
-        correctAnswer: item.correctAnswer.trim(),
-      }));
+      .map((item) => {
+        const context = item.context?.trim();
+        return {
+          ...(context ? { context } : {}),
+          prompt: item.prompt.trim(),
+          options: item.options.filter((o) => o.trim()),
+          correctAnswer: item.correctAnswer.trim(),
+        };
+      });
   }
 
   return payload;

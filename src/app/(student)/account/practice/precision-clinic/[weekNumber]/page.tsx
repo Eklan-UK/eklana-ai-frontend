@@ -93,6 +93,8 @@ export default function PrecisionClinicWeekDetailPage() {
 									key={item.assignmentId || item.itemId || item.index}
 									item={item}
 									completedLabel={t("completed")}
+									inProgressLabel={t("statusInProgress")}
+									overdueLabel={t("statusOverdue")}
 								/>
 							))}
 						</div>

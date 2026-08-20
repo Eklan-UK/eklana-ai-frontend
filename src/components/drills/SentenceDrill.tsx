@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import {
   Loader2,
   BookOpen,
@@ -88,6 +89,7 @@ export default function SentenceDrill({
     drillType: "sentence_writing",
     assignmentId,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const wordItems = useMemo(() => getWordItems(drill), [drill]);
   const totalWords = wordItems.length;
 
@@ -394,7 +396,7 @@ export default function SentenceDrill({
                 <h1 className="text-3xl md:text-4xl font-bold text-foreground">
                   {currentWord.word}
                 </h1>
-                <TTSButton text={currentWord.word} size="lg" audioUrl={currentWord.audioUrl} />
+                <TTSButton text={currentWord.word} size="lg" audioUrl={currentWord.audioUrl} voiceId={drillVoiceId} />
               </div>
               {currentWord.hint && (
                 <p className="text-sm text-blue-600 mt-2 bg-blue-50 px-4 py-2 rounded-lg inline-block">

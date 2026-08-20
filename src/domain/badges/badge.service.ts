@@ -9,11 +9,7 @@ import Drill from '@/models/drill';
 import FreeTalkAttempt from '@/models/free-talk-attempt';
 import User from '@/models/user';
 import UserStreak from '@/models/user-streak';
-import {
-  isObjectId,
-  toUserIdCandidates,
-  toUserIdQuery,
-} from '@/lib/api/user-id';
+import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 import {
   BADGE_DEFINITIONS,
   BADGE_BY_ID,
@@ -33,6 +29,11 @@ const DEJA_VU_TARGET = 10;
 const MEDICATION_MASTER_TARGET = 50;
 const SEVEN_DAY_TARGET = 7;
 const MONTHLY_CHALLENGE_TARGET = 14;
+
+export const HANDOVER_HERO_SCENARIO_TYPES = [
+  'handover',
+  'handover_receive',
+] as const;
 
 function getDateString(date: Date): string {
   const d = new Date(date);
@@ -170,17 +171,57 @@ function userStreakWriteFilter(userId: string) {
   return { userId: toUserIdQuery(userId) };
 }
 
-/**
- * ObjectId-only collections (DailyFocusCompletion, DrillAssignment) cannot
- * safely query UUID learners — return null instead of throwing.
- */
-function objectIdOnlyUserId(userId: string): Types.ObjectId | null {
-  if (!isObjectId(userId)) return null;
-  return new Types.ObjectId(userId);
-}
+type EvalResult = { earned: boolean; progress: BadgeProgress | null };
 
 function masterCollectorFromBookmarkCount(bookmarkCount: number): EvalResult {
   const earned = bookmarkCount >= 1;
+  return {
+    earned,
+    progress: earned ? null : { current: 0, target: 1 },
+  };
+}
+
+function doneAndDustedFromWeekAssignments(statuses: string[]): EvalResult {
+  if (statuses.length === 0) {
+    return { earned: false, progress: { current: 0, target: 1 } };
+  }
+  const completed = statuses.filter((status) => status === 'completed').length;
+  const total = statuses.length;
+  return {
+    earned: completed === total,
+    progress:
+      completed === total ? null : { current: completed, target: total },
+  };
+}
+
+function skillKeeperFromFirstCompletionCount(n: number): EvalResult {
+  const earned = n >= 1;
+  return {
+    earned,
+    progress: earned ? null : { current: 0, target: 1 },
+  };
+}
+
+function handoverHeroFromPassingCount(n: number): EvalResult {
+  const earned = n >= 1;
+  return {
+    earned,
+    progress: earned ? null : { current: 0, target: 1 },
+  };
+}
+
+function medicationMasterFromUniqueWordCount(n: number): EvalResult {
+  return {
+    earned: n >= MEDICATION_MASTER_TARGET,
+    progress:
+      n >= MEDICATION_MASTER_TARGET
+        ? null
+        : { current: n, target: MEDICATION_MASTER_TARGET },
+  };
+}
+
+function firstStepsFromPassingCounts(drill: number, focus: number): EvalResult {
+  const earned = drill >= 1 || focus >= 1;
   return {
     earned,
     progress: earned ? null : { current: 0, target: 1 },
@@ -192,7 +233,6 @@ async function buildPracticeSecondsByDate(
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   const learnerFilter = { $in: toUserIdCandidates(userId) };
-  const objectIdUid = objectIdOnlyUserId(userId);
 
   const [attempts, focusCompletions] = await Promise.all([
     DrillAttempt.find({
@@ -203,15 +243,13 @@ async function buildPracticeSecondsByDate(
       .select('completedAt timeSpent')
       .lean()
       .exec(),
-    objectIdUid
-      ? DailyFocusCompletion.find({
-          userId: objectIdUid,
-          score: { $gte: PASSING_SCORE },
-        })
-          .select('dateString timeSpent')
-          .lean()
-          .exec()
-      : Promise.resolve([]),
+    DailyFocusCompletion.find({
+      userId: { $in: toUserIdCandidates(userId) },
+      score: { $gte: PASSING_SCORE },
+    })
+      .select('dateString timeSpent')
+      .lean()
+      .exec(),
   ]);
 
   for (const a of attempts) {
@@ -227,29 +265,20 @@ async function buildPracticeSecondsByDate(
   return map;
 }
 
-type EvalResult = { earned: boolean; progress: BadgeProgress | null };
-
 async function evaluateFirstSteps(userId: string): Promise<EvalResult> {
-  const objectIdUid = objectIdOnlyUserId(userId);
   const [drillCount, focusCount] = await Promise.all([
     DrillAttempt.countDocuments({
       learnerId: { $in: toUserIdCandidates(userId) },
       score: { $gte: PASSING_SCORE },
       completedAt: { $exists: true, $ne: null },
     }).exec(),
-    objectIdUid
-      ? DailyFocusCompletion.countDocuments({
-          userId: objectIdUid,
-          isFirstCompletion: true,
-          score: { $gte: PASSING_SCORE },
-        }).exec()
-      : Promise.resolve(0),
+    DailyFocusCompletion.countDocuments({
+      userId: { $in: toUserIdCandidates(userId) },
+      isFirstCompletion: true,
+      score: { $gte: PASSING_SCORE },
+    }).exec(),
   ]);
-  const total = drillCount + focusCount;
-  return {
-    earned: total >= 1,
-    progress: total >= 1 ? null : { current: 0, target: 1 },
-  };
+  return firstStepsFromPassingCounts(drillCount, focusCount);
 }
 
 async function evaluateSevenDayStretch(userId: string): Promise<EvalResult> {
@@ -266,33 +295,19 @@ async function evaluateSevenDayStretch(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateDoneAndDusted(userId: string): Promise<EvalResult> {
-  const uid = objectIdOnlyUserId(userId);
-  if (!uid) {
-    // DrillAssignment.learnerId is ObjectId-only until a future migration.
-    return { earned: false, progress: { current: 0, target: 1 } };
-  }
-
   const { start, end } = getIsoWeekBounds();
 
   const weekAssignments = await DrillAssignment.find({
-    learnerId: uid,
+    learnerId: { $in: toUserIdCandidates(userId) },
     dueDate: { $gte: start, $lte: end },
   })
     .select('status')
     .lean()
     .exec();
 
-  if (weekAssignments.length === 0) {
-    return { earned: false, progress: { current: 0, target: 1 } };
-  }
-
-  const completed = weekAssignments.filter((a) => a.status === 'completed').length;
-  const total = weekAssignments.length;
-  return {
-    earned: completed === total,
-    progress:
-      completed === total ? null : { current: completed, target: total },
-  };
+  return doneAndDustedFromWeekAssignments(
+    weekAssignments.map((a) => a.status)
+  );
 }
 
 async function evaluateDejaVu(userId: string): Promise<EvalResult> {
@@ -396,27 +411,17 @@ async function evaluateMedicationMaster(userId: string): Promise<EvalResult> {
     }
   }
 
-  const count = masteredWords.size;
-  return {
-    earned: count >= MEDICATION_MASTER_TARGET,
-    progress:
-      count >= MEDICATION_MASTER_TARGET
-        ? null
-        : { current: count, target: MEDICATION_MASTER_TARGET },
-  };
+  return medicationMasterFromUniqueWordCount(masteredWords.size);
 }
 
 async function evaluateHandoverHero(userId: string): Promise<EvalResult> {
   const count = await FreeTalkAttempt.countDocuments({
     learnerId: { $in: toUserIdCandidates(userId) },
-    scenarioType: 'handover',
+    scenarioType: { $in: HANDOVER_HERO_SCENARIO_TYPES },
     'gradeResult.overallScore': { $gte: PASSING_SCORE },
   }).exec();
 
-  return {
-    earned: count >= 1,
-    progress: count >= 1 ? null : { current: 0, target: 1 },
-  };
+  return handoverHeroFromPassingCount(count);
 }
 
 async function evaluateNightingaleAward(userId: string): Promise<EvalResult> {
@@ -440,22 +445,13 @@ async function evaluateNightingaleAward(userId: string): Promise<EvalResult> {
 }
 
 async function evaluateSkillKeeper(userId: string): Promise<EvalResult> {
-  const uid = objectIdOnlyUserId(userId);
-  if (!uid) {
-    // DailyFocusCompletion.userId is ObjectId-only until a future migration.
-    return { earned: false, progress: { current: 0, target: 1 } };
-  }
-
   const count = await DailyFocusCompletion.countDocuments({
-    userId: uid,
+    userId: { $in: toUserIdCandidates(userId) },
     isFirstCompletion: true,
     score: { $gte: PASSING_SCORE },
   }).exec();
 
-  return {
-    earned: count >= 1,
-    progress: count >= 1 ? null : { current: 0, target: 1 },
-  };
+  return skillKeeperFromFirstCompletionCount(count);
 }
 
 const EVALUATORS: Record<BadgeId, (userId: string) => Promise<EvalResult>> = {
@@ -636,9 +632,14 @@ export const __test__ = {
   pickFeaturedBadge,
   toBadgeView,
   masterCollectorFromBookmarkCount,
+  doneAndDustedFromWeekAssignments,
+  skillKeeperFromFirstCompletionCount,
+  handoverHeroFromPassingCount,
+  HANDOVER_HERO_SCENARIO_TYPES,
+  medicationMasterFromUniqueWordCount,
+  firstStepsFromPassingCounts,
   userStreakReadFilter,
   userStreakWriteFilter,
-  objectIdOnlyUserId,
   MIN_PRACTICE_SECONDS,
   SEVEN_DAY_TARGET,
 };

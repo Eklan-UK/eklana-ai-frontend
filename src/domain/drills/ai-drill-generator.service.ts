@@ -283,7 +283,7 @@ const tools: Record<DrillType, FunctionTool> = {
     type: 'function',
     function: {
       name: 'generate_key_phrases',
-      description: 'Generate key phrases drill content based off of the roleplay scenario. The key_phrase_items array should contain items that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each item should include a prompt, respondentName, options, and correctAnswer.',
+      description: 'Generate key phrases drill content based off of the roleplay scenario. The key_phrase_items array should contain items that are relevant to the roleplay scenario and context, and should be suitable for a nurse to use in that situation. Each item should include a prompt, options, and correctAnswer. Optionally include a short context setup shown before the Situation / Scenario.',
       parameters: {
         type: 'object',
         properties: {
@@ -292,6 +292,10 @@ const tools: Record<DrillType, FunctionTool> = {
             items: {
               type: 'object',
               properties: {
+                context: {
+                  type: 'string',
+                  description: "Optional short situational setup shown above the Situation / Scenario (e.g. 'You are at the front desk when a guest approaches:')",
+                },
                 prompt: {
                   type: 'string',
                   description: 'Situation / scenario text shown to the learner',

@@ -35,6 +35,7 @@ export interface FillBlankGeneratedContent {
 
 export interface KeyPhrasesGeneratedContent {
 	key_phrase_items: Array<{
+		context?: string;
 		prompt: string;
 		options: string[];
 		correctAnswer: string;

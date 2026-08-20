@@ -1,5 +1,6 @@
 import { toUserIdCandidates } from '@/lib/api/user-id';
 import { NotFoundError, ValidationError } from '@/lib/api/response';
+import { isDrillCompletionOverdue } from '@/lib/drill-completion-date';
 import Drill from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 import type {
@@ -42,9 +43,26 @@ type LeanAssignment = {
 	builderWeekNumber?: number | null;
 	assignedAt?: Date | null;
 	createdAt?: Date;
+	dueDate?: Date | null;
 	status?: string;
 	completedAt?: Date | null;
 };
+
+type LearnerDrillStatus = PrecisionClinicLearnerWeekDrillListItem['status'];
+
+function mapLearnerDrillStatus(assignment: {
+	status?: string;
+	dueDate?: Date | null;
+}): LearnerDrillStatus {
+	const raw = assignment.status;
+	if (raw === 'completed') return 'completed';
+	if (raw === 'skipped') return 'pending';
+	if (raw === 'overdue' || isDrillCompletionOverdue(assignment.dueDate)) {
+		return 'overdue';
+	}
+	if (raw === 'in-progress' || raw === 'in_progress') return 'in-progress';
+	return 'pending';
+}
 
 function isPopulatedDrill(
 	drillId: LeanAssignment['drillId']
@@ -152,7 +170,8 @@ export class PrecisionClinicLearnerService {
 				const drill = assignment.drillId as PopulatedDrill;
 				const drillId = String(drill._id);
 				const assignmentId = String(assignment._id);
-				const completed = assignment.status === 'completed';
+				const status = mapLearnerDrillStatus(assignment);
+				const completed = status === 'completed';
 				if (completed) completedItemIndexes.push(index);
 
 				return {
@@ -164,6 +183,7 @@ export class PrecisionClinicLearnerService {
 					title: drill.title ?? 'Untitled drill',
 					type: drill.type ?? 'vocabulary',
 					difficulty: drill.difficulty ?? 'beginner',
+					status,
 					completed,
 					sortOrder: index,
 				};

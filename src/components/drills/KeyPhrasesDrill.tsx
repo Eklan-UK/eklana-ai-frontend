@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { CheckCircle, XCircle, Mic, Loader2, Square, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ export default function KeyPhrasesDrill({
     assignmentId,
     weeklyChallengeMeta,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const items = useMemo(() => drill.key_phrase_items || [], [drill.key_phrase_items]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -197,12 +199,12 @@ export default function KeyPhrasesDrill({
         audio.setAttribute("playsinline", "true");
         audio.load();
       } else {
-        void preloadTTSAudio(prompt).catch((error) => {
+        void preloadTTSAudio(prompt, drillVoiceId).catch((error) => {
           console.warn("TTS preload failed:", error);
         });
       }
     }
-  }, [items]);
+  }, [items, drillVoiceId]);
 
   const clearRecordingTimers = () => {
     if (recordingTimerRef.current) {
@@ -631,7 +633,7 @@ export default function KeyPhrasesDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType="Pressure Test"
+        drillType="Scenario/Pressure Test"
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -660,7 +662,7 @@ export default function KeyPhrasesDrill({
     return (
       <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="p-6 text-center text-muted-foreground">
-          No Pressure Test items found for this drill.
+          No Scenario/Pressure Test items found for this drill.
         </Card>
       </DrillLayout>
     );
@@ -693,6 +695,11 @@ export default function KeyPhrasesDrill({
           <p className="text-sm font-semibold text-foreground">
             Situation / Scenario
           </p>
+          {currentItem.context?.trim() ? (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {currentItem.context}
+            </p>
+          ) : null}
           <div className="flex items-start justify-between gap-4">
             <p className="min-w-0 flex-1 text-lg font-semibold text-foreground leading-snug break-words pr-1">
               {currentItem.prompt}
@@ -700,6 +707,7 @@ export default function KeyPhrasesDrill({
             <TTSButton
               text={currentItem.prompt}
               audioUrl={currentItem.promptAudioUrl}
+              voiceId={drillVoiceId}
               className="shrink-0"
             />
           </div>
@@ -865,12 +873,12 @@ export default function KeyPhrasesDrill({
                     {currentResult?.isCorrect
                       ? passed
                         ? "Passed!"
-                        : `Pronunciation: ${pronunciationScore.speechace_score.pronunciation.toFixed(0)}% — try again`
+                        : `Clarity score: ${pronunciationScore.speechace_score.pronunciation.toFixed(0)}% — try again`
                       : `Wrong choice — correct: "${currentItem.correctAnswer}"`}
                   </p>
                   {currentResult?.isCorrect && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      Pronunciation score:{" "}
+                      Clarity score:{" "}
                       {pronunciationScore.speechace_score.pronunciation.toFixed(0)}%
                     </p>
                   )}

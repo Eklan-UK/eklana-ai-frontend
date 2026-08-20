@@ -11,7 +11,6 @@ import {
   Clock,
   BookOpen,
   CheckCircle,
-  AlertCircle,
   MessageSquare,
   FileText,
   PenTool,
@@ -26,8 +25,11 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
+import { useDrillAssignments } from "@/hooks/useAdmin";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
+import { DrillAssignedStudentsCard } from "@/components/drills/DrillAssignedStudentsCard";
 import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
+import { summarizeAssignmentCounts } from "@/lib/drills/assignment-status";
 import { getDrillTypeLabel } from "@/utils/drill";
 
 interface DrillDetailClientProps {
@@ -43,6 +45,11 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
   const returnToParam = searchParams.get("returnTo");
   const [deleting, setDeleting] = useState(false);
   const [showAssignedModal, setShowAssignedModal] = useState(false);
+  const { data: assignmentsData } = useDrillAssignments(drillId);
+  const assignments =
+    assignmentsData?.assignments ??
+    assignmentsData?.data?.assignments ??
+    [];
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this drill? This action cannot be undone.")) {
@@ -85,11 +92,16 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
     return colors[difficulty] || "bg-gray-100 text-gray-700";
   };
 
-  const assignedCount = Array.isArray(drill.assigned_to)
-    ? drill.assigned_to.length
-    : drill.assigned_to
-      ? 1
-      : 0;
+  const statusCounts = summarizeAssignmentCounts(assignments);
+  const assignedCount =
+    statusCounts.assigned ||
+    (Array.isArray(drill.assigned_to)
+      ? drill.assigned_to.length
+      : drill.assigned_to
+        ? 1
+        : 0);
+  const completedCount = statusCounts.completed;
+  const inProgressCount = statusCounts.inProgress;
 
   // drill.date is now the completion/due date
   const completionDate = drill.date ? new Date(drill.date) : null;
@@ -173,7 +185,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-gray-400" />
               <div>
@@ -183,28 +195,35 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                 </p>
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-sm text-gray-500">Completed</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {completedCount}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-yellow-500" />
+              <div>
+                <p className="text-sm text-gray-500">In Progress</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {inProgressCount}
+                </p>
+              </div>
+            </div>
             {completionDate && (
               <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-gray-400" />
+                <BookOpen className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-500">Completion Date</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm font-semibold text-gray-900">
                     {completionDate.toLocaleDateString()}
                   </p>
                 </div>
               </div>
             )}
-            <div className="flex items-center gap-3">
-              <BookOpen className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Created</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {drill.created_date
-                    ? new Date(drill.created_date).toLocaleDateString()
-                    : "N/A"}
-                </p>
-              </div>
-            </div>
           </div>
         </Card>
 
@@ -247,7 +266,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           drill.key_phrase_items.length > 0 && (
             <Card className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Pressure Test Questions ({drill.key_phrase_items.length})
+                Scenario/Pressure Test Questions ({drill.key_phrase_items.length})
               </h2>
               <div className="space-y-4">
                 {drill.key_phrase_items.map((item: any, idx: number) => (
@@ -259,6 +278,9 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Question {idx + 1}
                       </p>
+                      {item.context?.trim() && (
+                        <p className="text-sm text-gray-600 mb-2">{item.context}</p>
+                      )}
                       <p className="text-xs font-bold text-gray-500 uppercase mb-1">
                         Situation / Scenario
                       </p>
@@ -368,26 +390,11 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
             </Card>
           )}
 
-        {/* Assigned Students */}
-        {assignedCount > 0 && (
-          <Card>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Assigned Students</h2>
-            <div className="space-y-2">
-              {Array.isArray(drill.assigned_to) ? (
-                drill.assigned_to.map((email: string, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-900">{email}</span>
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-900">{drill.assigned_to}</span>
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-              )}
-            </div>
-          </Card>
+        {assignments.length > 0 && (
+          <DrillAssignedStudentsCard
+            assignments={assignments}
+            getLearnerHref={(userId) => `/tutor/students/${userId}`}
+          />
         )}
       </div>
 

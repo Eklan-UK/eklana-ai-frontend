@@ -296,8 +296,14 @@ export function useDrillAssignments(drillId: string) {
       if (!response.ok) {
         throw new Error('Failed to fetch drill assignments');
       }
-      const data = await response.json();
-      return data;
+      const json = await response.json();
+      // API returns { code, data: { assignments, pagination } }
+      return (
+        json?.data ?? {
+          assignments: json?.assignments ?? [],
+          pagination: json?.pagination,
+        }
+      );
     },
     enabled: !!drillId,
     staleTime: 1000 * 60 * 2, // 2 minutes

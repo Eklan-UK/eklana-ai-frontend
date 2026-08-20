@@ -299,7 +299,7 @@ function AdminDrillPageContent() {
             <option value="listening">Listening</option>
             <option value="pronunciation">Pronunciation</option>
             <option value="fill_blank">Fill in the Blank</option>
-            <option value="key_phrases">Pressure Test</option>
+            <option value="key_phrases">Scenario/Pressure Test</option>
           </select>
 
           <select
