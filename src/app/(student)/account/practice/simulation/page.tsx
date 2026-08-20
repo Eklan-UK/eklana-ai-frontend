@@ -14,6 +14,7 @@ interface ScenarioListItem {
   title: string;
   workplaceSetting: string;
   maxDurationMinutes: number;
+  topic: string | null;
   latestSession: { sessionId: string; status: "in_progress" | "completed" | "abandoned" } | null;
 }
 
@@ -153,6 +154,11 @@ export default function SimulationRoomPage() {
                       <p className="text-xs mt-0.5 text-muted-foreground line-clamp-1">
                         {s.workplaceSetting}
                       </p>
+                      {s.topic && (
+                        <p className="text-xs mt-0.5 text-muted-foreground line-clamp-1">
+                          {s.topic}
+                        </p>
+                      )}
                       <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
                         {s.maxDurationMinutes} min
                       </p>
