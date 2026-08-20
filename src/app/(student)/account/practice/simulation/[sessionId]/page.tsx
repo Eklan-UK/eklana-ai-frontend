@@ -676,7 +676,7 @@ export default function SimulationSessionPage() {
         setUiPhase("active");
       }
     },
-    [sessionId],
+    [sessionId, session],
   );
 
   // ─── Mic recording ────────────────────────────────────────────────────────
