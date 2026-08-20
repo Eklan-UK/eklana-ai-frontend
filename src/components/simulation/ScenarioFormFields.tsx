@@ -19,10 +19,10 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
   const {
     form,
     set,
-    displayData,
-    setDisplayData,
-    studentHint,
-    setStudentHint,
+    background,
+    setBackground,
+    patientInformation,
+    setPatientInformation,
     phases,
     addPhase,
     removePhase,
@@ -34,26 +34,18 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
     addBeat,
     removeBeat,
     updateBeatField,
-    addFinding,
-    removeFinding,
-    updateFindingField,
+    hints,
+    addHint,
+    removeHint,
+    updateHintField,
   } = formState;
+
+  const enteredPhaseTitles = Array.from(
+    new Set(phases.map((p) => p.phaseTitle.trim()).filter(Boolean)),
+  );
 
   return (
     <>
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-700">
-          Title <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => set("title", e.target.value)}
-          placeholder="e.g. Handover to Night Shift After a Fall"
-          className={fieldClass}
-        />
-      </div>
-
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-gray-700">
           Workplace Setting <span className="text-red-500">*</span>
@@ -97,14 +89,14 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
 
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-gray-700">
-          Background / Briefing <span className="text-red-500">*</span>
+          Background <span className="text-red-500">*</span>
         </label>
         <p className="text-xs text-gray-500">
-          What the learner hears at the start of the session — presenting situation, baseline vitals, handoff info.
+          Shown to the learner once, before Phase 1 — the presenting situation, setting, and handoff context.
         </p>
         <textarea
-          value={displayData}
-          onChange={(e) => setDisplayData(e.target.value)}
+          value={background}
+          onChange={(e) => setBackground(e.target.value)}
           rows={4}
           placeholder="Read aloud by an AI voice at the start of the session"
           className={`resize-y ${fieldClass}`}
@@ -112,15 +104,17 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-700">Vitals / Clinical Info</label>
+        <label className="text-sm font-medium text-gray-700">
+          Patient Information <span className="text-red-500">*</span>
+        </label>
         <p className="text-xs text-gray-500">
-          Optional on-demand hint content shown to the student only if they choose to look it up — not shown automatically.
+          Shown to the learner once, right after Background — baseline readings, status, or chart data.
         </p>
         <textarea
-          value={studentHint}
-          onChange={(e) => setStudentHint(e.target.value)}
-          rows={3}
-          placeholder="Reference material the learner can look up during the session"
+          value={patientInformation}
+          onChange={(e) => setPatientInformation(e.target.value)}
+          rows={4}
+          placeholder="Read aloud by an AI voice, right after Background"
           className={`resize-y ${fieldClass}`}
         />
       </div>
@@ -165,11 +159,11 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-gray-700">Phase Name</label>
+                  <label className="text-xs font-medium text-gray-700">Phase Title</label>
                   <input
                     type="text"
-                    value={phase.phaseName}
-                    onChange={(e) => updatePhaseField(phaseIndex, "phaseName", e.target.value)}
+                    value={phase.phaseTitle}
+                    onChange={(e) => updatePhaseField(phaseIndex, "phaseTitle", e.target.value)}
                     placeholder="e.g. Initial Assessment"
                     className={smallFieldClass}
                   />
@@ -186,6 +180,34 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
                     className={smallFieldClass}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-700">Situation</label>
+                <p className="text-xs text-gray-500">
+                  Scene-setting text shown to the student at the start of this phase, before its conversation begins.
+                </p>
+                <textarea
+                  value={phase.situation}
+                  onChange={(e) => updatePhaseField(phaseIndex, "situation", e.target.value)}
+                  rows={3}
+                  placeholder="What's happening / what has changed as this phase begins"
+                  className={`resize-y ${smallFieldClass}`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-700">Clinical Information</label>
+                <p className="text-xs text-gray-500">
+                  Shown to the student upfront for this phase — not gated or reveal-conditioned.
+                </p>
+                <textarea
+                  value={phase.clinicalInformation}
+                  onChange={(e) => updatePhaseField(phaseIndex, "clinicalInformation", e.target.value)}
+                  rows={3}
+                  placeholder="Readings, updates, or other info relevant to this phase"
+                  className={`resize-y ${smallFieldClass}`}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -276,63 +298,62 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
                   ))}
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-gray-700">Gated Findings</label>
-                  <button
-                    type="button"
-                    onClick={() => addFinding(phaseIndex)}
-                    className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add finding
-                  </button>
-                </div>
-                {phase.gatedFindings.length === 0 && (
-                  <p className="text-xs text-gray-500">No gated findings yet</p>
-                )}
-                <div className="space-y-2">
-                  {phase.gatedFindings.map((finding, findingIndex) => (
-                    <div
-                      key={findingIndex}
-                      className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
-                    >
-                      <input
-                        type="text"
-                        value={finding.label}
-                        onChange={(e) => updateFindingField(phaseIndex, findingIndex, "label", e.target.value)}
-                        placeholder="Label"
-                        className={smallFieldClass}
-                      />
-                      <input
-                        type="text"
-                        value={finding.data}
-                        onChange={(e) => updateFindingField(phaseIndex, findingIndex, "data", e.target.value)}
-                        placeholder="Data"
-                        className={smallFieldClass}
-                      />
-                      <input
-                        type="text"
-                        value={finding.revealCondition}
-                        onChange={(e) =>
-                          updateFindingField(phaseIndex, findingIndex, "revealCondition", e.target.value)
-                        }
-                        placeholder="Reveal condition"
-                        className={smallFieldClass}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFinding(phaseIndex, findingIndex)}
-                        aria-label="Remove gated finding"
-                        className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700">Hints</label>
+          <button
+            type="button"
+            onClick={addHint}
+            className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add hint
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          Optional, on-demand reference material the learner can look up during a specific phase. Add as many as you like — including multiple hints for the same phase.
+        </p>
+
+        {hints.length === 0 && <p className="text-sm text-gray-500">No hints yet</p>}
+
+        <div className="space-y-2">
+          {hints.map((hint, hintIndex) => (
+            <div
+              key={hintIndex}
+              className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[200px_1fr_auto]"
+            >
+              <select
+                value={hint.phaseTitle}
+                onChange={(e) => updateHintField(hintIndex, "phaseTitle", e.target.value)}
+                className={smallFieldClass}
+              >
+                <option value="">Select a phase…</option>
+                {enteredPhaseTitles.map((title) => (
+                  <option key={title} value={title}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={hint.hintText}
+                onChange={(e) => updateHintField(hintIndex, "hintText", e.target.value)}
+                placeholder="Hint text shown to the learner"
+                className={smallFieldClass}
+              />
+              <button
+                type="button"
+                onClick={() => removeHint(hintIndex)}
+                aria-label="Remove hint"
+                className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
         </div>
@@ -351,7 +372,7 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
           ))}
         </select>
         <p className="text-xs text-gray-500">
-          Determines the competencies this scenario is graded against.
+          Determines the competencies this scenario is graded against. Topic is also the only identifier shown for this scenario elsewhere in the admin UI — there is no separate title.
         </p>
       </div>
 

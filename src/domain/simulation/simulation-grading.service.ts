@@ -41,6 +41,28 @@ export interface SimulationGradeResult {
 // student as "mispronounced" in the review screen.
 const MISPRONOUNCED_SCORE_THRESHOLD = 70;
 
+// A stored overallGradeResult can predate a sub-grading field that was added
+// later (mispronouncedWords was flattened onto pronunciation after some
+// sessions were already graded), or predate a sub-grading pass's fallback
+// being wired up to store its documented empty shape. Normalize on read so
+// every caller — including the short-circuit below — gets the same complete
+// shape regardless of when the document was written.
+function normalizeGradeResult(raw: any): SimulationGradeResult {
+	return {
+		pronunciation: {
+			gradedTurnCount: raw?.pronunciation?.gradedTurnCount ?? 0,
+			failedTurnCount: raw?.pronunciation?.failedTurnCount ?? 0,
+			mispronouncedWords: raw?.pronunciation?.mispronouncedWords ?? [],
+		},
+		grammar: { errors: raw?.grammar?.errors ?? [] },
+		competency: {
+			competencyScores: raw?.competency?.competencyScores ?? [],
+			overallSummary: raw?.competency?.overallSummary ?? '',
+		},
+		gradedAt: raw?.gradedAt ?? new Date(0),
+	};
+}
+
 export async function gradeSimulationSession(sessionId: string): Promise<SimulationGradeResult> {
 	await connectToDatabase();
 
@@ -54,7 +76,7 @@ export async function gradeSimulationSession(sessionId: string): Promise<Simulat
 	// the stored result rather than re-running the LLM/SpeechAce calls a second
 	// time, which would be wasteful and could disagree with the first result.
 	if (session.overallGradeResult) {
-		return session.overallGradeResult as SimulationGradeResult;
+		return normalizeGradeResult(session.overallGradeResult);
 	}
 
 	if (session.status !== 'completed') {

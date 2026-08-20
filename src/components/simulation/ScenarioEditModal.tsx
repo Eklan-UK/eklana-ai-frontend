@@ -22,15 +22,15 @@ interface ScenarioEditModalProps {
 }
 
 interface ScenarioDetail {
-  title: string;
   workplaceSetting: string;
   studentCharacterName: string;
   dramatisationPrompt: string;
   gradingRubric: string;
   maxDurationMinutes: number;
   topicId: string;
-  displayData: string;
-  studentHint: string;
+  background: string;
+  patientInformation: string;
+  hints: Array<{ phaseTitle: string; hintText: string }>;
   scenarioScript: Omit<PhaseFormState, "characterInput">[];
   assignedLearnerIds: Array<{ _id: string }>;
   hasSessions: boolean;
@@ -70,7 +70,6 @@ export function ScenarioEditModal({ scenarioId, variant, onClose, onSaved }: Sce
         const scenario = json.data as ScenarioDetail;
         formState.resetForm({
           form: {
-            title: scenario.title,
             workplaceSetting: scenario.workplaceSetting,
             studentCharacterName: scenario.studentCharacterName,
             dramatisationPrompt: scenario.dramatisationPrompt,
@@ -78,9 +77,10 @@ export function ScenarioEditModal({ scenarioId, variant, onClose, onSaved }: Sce
             maxDurationMinutes: String(scenario.maxDurationMinutes),
             topicId: scenario.topicId,
           },
-          displayData: scenario.displayData,
-          studentHint: scenario.studentHint,
+          background: scenario.background,
+          patientInformation: scenario.patientInformation,
           phases: (scenario.scenarioScript ?? []).map((phase) => ({ ...phase, characterInput: "" })),
+          hints: scenario.hints ?? [],
           selectedLearnerIds: (scenario.assignedLearnerIds ?? []).map((l) => l._id),
         });
       } catch (e: unknown) {
@@ -102,8 +102,10 @@ export function ScenarioEditModal({ scenarioId, variant, onClose, onSaved }: Sce
     e.preventDefault();
     const validationError = validateScenarioForm(
       formState.form,
-      formState.displayData,
+      formState.background,
+      formState.patientInformation,
       formState.phases,
+      formState.hints,
       formState.selectedLearnerIds,
     );
     if (validationError) {
@@ -115,9 +117,10 @@ export function ScenarioEditModal({ scenarioId, variant, onClose, onSaved }: Sce
     try {
       const formData = buildScenarioFormData(
         formState.form,
-        formState.displayData,
-        formState.studentHint,
+        formState.background,
+        formState.patientInformation,
         formState.phases,
+        formState.hints,
         formState.selectedLearnerIds,
       );
 

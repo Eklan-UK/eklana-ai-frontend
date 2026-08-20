@@ -1,4 +1,6 @@
-// GET /api/v1/simulation/sessions/[sessionId]/briefing — spoken briefing audio for a Simulation Room session
+// GET /api/v1/simulation/sessions/[sessionId]/briefing — spoken background +
+// patient information audio for a Simulation Room session, shown/played as
+// two sequential static screens before Phase 1 begins.
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
@@ -53,8 +55,14 @@ async function getHandler(
 			{
 				code: 'Success',
 				data: {
-					displayText: scenario.displayData,
-					audioBase64: scenario.briefingAudioBase64,
+					background: {
+						displayText: scenario.background,
+						audioBase64: scenario.backgroundAudioBase64,
+					},
+					patientInformation: {
+						displayText: scenario.patientInformation,
+						audioBase64: scenario.patientInformationAudioBase64,
+					},
 				},
 			},
 			{ status: 200 },
