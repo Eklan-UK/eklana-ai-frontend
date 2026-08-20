@@ -70,7 +70,7 @@ export function WordAnalytics({ pronunciationScore }: WordAnalyticsProps) {
           <div className="flex items-center justify-center gap-3 mb-2">
             <ScoreIndicator score={score} size="lg" threshold={{ good: 65, ok: 50 }} />
             <div className="text-left">
-              <p className="text-sm font-medium text-muted-foreground">Pronunciation Score</p>
+              <p className="text-sm font-medium text-muted-foreground">Clarity score</p>
               <p className="text-xs text-muted-foreground">{passed ? "✓ Passed" : "Need 65% to pass"}</p>
             </div>
           </div>

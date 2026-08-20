@@ -131,6 +131,7 @@ const updateDrillSchema = z.object({
 		audioUrl: z.string().optional(),
 	})).optional(),
 	key_phrase_items: z.array(z.object({
+		context: z.string().optional(),
 		prompt: z.string().min(1),
 		respondentName: z.string().optional(),
 		options: z.array(z.string().min(1)).min(2),

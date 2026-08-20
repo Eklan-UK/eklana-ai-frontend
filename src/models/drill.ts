@@ -249,6 +249,11 @@ const SentenceWritingItemSchema = new Schema(
 
 const KeyPhraseItemSchema = new Schema(
   {
+    context: {
+      type: String,
+      default: "",
+      description: "Optional situational setup text shown before the Situation / Scenario",
+    },
     prompt: {
       type: String,
       required: true,
@@ -491,6 +496,7 @@ export interface IDrill extends Document {
 
   // Key Phrases Drill Fields
   key_phrase_items: Array<{
+    context?: string;
     prompt: string;
     respondentName?: string;
     options: string[];

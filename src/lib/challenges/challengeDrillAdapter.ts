@@ -11,7 +11,7 @@ const DRILL_TYPE_TITLE: Record<string, string> = {
 	pronunciation: 'Pronunciation',
 	vocabulary: 'Vocabulary/Key Phrase',
 	roleplay: 'Roleplay',
-	key_phrases: 'Pressure Test',
+	key_phrases: 'Scenario/Pressure Test',
 };
 
 export function toDrillShape(
