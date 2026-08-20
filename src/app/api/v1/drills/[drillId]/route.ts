@@ -141,8 +141,6 @@ const updateDrillSchema = z.object({
 	learning_journey_topic: learningJourneyTopicSchema.optional(),
 	/** Optional discriminator for drills created via a dedicated product surface (e.g. Eklan Precision Clinic). */
 	source: z.enum(["precision_clinic"]).optional(),
-}).superRefine((data, ctx) => {
-	refineLearningJourneyFields(data, ctx);
 });
 
 // GET handler
@@ -184,7 +182,6 @@ async function putHandler(
 
 	const { drillId } = params;
 	const body = await parseRequestBody(req);
-	const validated = validateRequest(updateDrillSchema, body);
 
 	// Initialize services
 	const drillRepo = new DrillRepository();
@@ -196,6 +193,20 @@ async function putHandler(
 	if (!existing) {
 		return apiResponse.notFound("Drill");
 	}
+
+	// Precision Clinic drills are remediation content, not curriculum-linked.
+	// superRefine only sees the request body; omitted `source` leaves the stored
+	// origin untouched, so also bypass when the existing drill is clinic.
+	const isPrecisionClinic =
+		body.source === "precision_clinic" || existing.source === "precision_clinic";
+	const validated = validateRequest(
+		updateDrillSchema.superRefine((data, ctx) => {
+			refineLearningJourneyFields(data, ctx, {
+				requireWhenAssigned: !isPrecisionClinic,
+			});
+		}),
+		body,
+	);
 
 	// Validate assigned_to if provided
 	if (validated.assigned_to !== undefined && validated.assigned_to.length === 0) {

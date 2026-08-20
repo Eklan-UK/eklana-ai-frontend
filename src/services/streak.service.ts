@@ -111,7 +111,7 @@ export class StreakService {
 
       // Check if user already completed this daily focus today
       const existingCompletion = await DailyFocusCompletion.findOne({
-        userId: new Types.ObjectId(userId),
+        userId: { $in: toUserIdCandidates(userId) },
         dailyFocusId: new Types.ObjectId(dailyFocusId),
         dateString: todayString,
         isFirstCompletion: true,
@@ -129,7 +129,7 @@ export class StreakService {
 
       // Create completion record (first completion)
       await DailyFocusCompletion.create({
-        userId: new Types.ObjectId(userId),
+        userId: toUserIdQuery(userId),
         dailyFocusId: new Types.ObjectId(dailyFocusId),
         date: today,
         dateString: todayString,
@@ -182,7 +182,7 @@ export class StreakService {
   ): Promise<void> {
     const todayString = this.getTodayString();
     const today = new Date(`${todayString}T00:00:00.000Z`);
-    const uid = new Types.ObjectId(userId);
+    const uid = toUserIdQuery(userId);
 
     const update: Record<string, unknown> = {
       $set: { date: today },
@@ -192,11 +192,23 @@ export class StreakService {
       update.$max = { score };
     }
 
-    await StreakActivityDay.updateOne(
-      { userId: uid, dateString: todayString },
-      update,
-      { upsert: true }
-    ).exec();
+    const existing = await StreakActivityDay.findOne({
+      userId: { $in: toUserIdCandidates(userId) },
+      dateString: todayString,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+
+    if (existing) {
+      await StreakActivityDay.updateOne({ _id: existing._id }, update).exec();
+    } else {
+      await StreakActivityDay.updateOne(
+        { userId: uid, dateString: todayString },
+        update,
+        { upsert: true }
+      ).exec();
+    }
   }
 
   /**
@@ -313,17 +325,17 @@ export class StreakService {
   private static async getMergedStreakDayRows(
     userId: string
   ): Promise<StreakDayRow[]> {
-    const uid = new Types.ObjectId(userId);
+    const userIdFilter = { $in: toUserIdCandidates(userId) };
     const [dfRows, actRows] = await Promise.all([
       DailyFocusCompletion.find({
-        userId: uid,
+        userId: userIdFilter,
         isFirstCompletion: true,
       })
         .sort({ date: -1 })
         .limit(400)
         .lean()
         .exec(),
-      StreakActivityDay.find({ userId: uid })
+      StreakActivityDay.find({ userId: userIdFilter })
         .sort({ dateString: -1 })
         .limit(400)
         .lean()

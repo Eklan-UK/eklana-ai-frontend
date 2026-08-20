@@ -14,6 +14,7 @@
     "generate:voice-previews": "tsx scripts/generate-voice-previews.ts",
     "test:gates": "node scripts/test-subscription-gates.mjs",
     "test:subscription": "node --import tsx --test src/lib/api/user-subscription.test.ts",
+    "test:badges": "node --import tsx --test src/domain/badges/badge-unlock-criteria.test.ts src/domain/badges/badge.service.test.ts",
     "test:stripe-checkout": "node --import tsx --test src/lib/api/stripe-billing-period.test.ts src/lib/api/stripe-checkout-session.test.ts src/lib/api/user-subscription.test.ts",
     "diagnose:subscription": "tsx scripts/diagnose-subscription.ts",
     "backfill:oauth-verified": "tsx scripts/backfill-oauth-email-verified.ts",

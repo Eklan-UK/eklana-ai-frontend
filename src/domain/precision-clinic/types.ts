@@ -36,6 +36,7 @@ export interface PrecisionClinicLearnerWeekDrillListItem {
 	/** General Drill `type` (Precision Clinic now reuses Drill Builder content). */
 	type: string;
 	difficulty: string;
+	status: 'pending' | 'in-progress' | 'completed' | 'overdue';
 	/** True when assignment `status === 'completed'`. */
 	completed: boolean;
 	sortOrder: number;

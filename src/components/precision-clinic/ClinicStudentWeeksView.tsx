@@ -8,7 +8,9 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   formatWeekDateRange,
   mergeWeeksWithEmptySlots,
@@ -19,12 +21,15 @@ import {
   getLearnerId,
 } from "@/lib/ai-drill-builder/learner-utils";
 import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import {
   useCreatePrecisionClinicStudentWeek,
+  useDeletePrecisionClinicStudentWeeks,
   usePrecisionClinicStudentWeeks,
 } from "@/hooks/usePrecisionClinic";
 import { getDrillTypeLabel } from "@/utils/drill";
+import { assignmentStatusLabel } from "@/lib/drills/assignment-status";
 
 const BASE_PATH = "/admin/precision-clinic/students";
 
@@ -32,7 +37,10 @@ type ClinicWeekDrill = {
   _id?: string;
   title?: string;
   type?: string;
+  drillType?: string;
   difficulty?: string;
+  status?: string;
+  dueDate?: string | Date | null;
 };
 
 interface ClinicStudentWeeksViewProps {
@@ -42,8 +50,12 @@ interface ClinicStudentWeeksViewProps {
 export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProps) {
   const { data, isLoading } = usePrecisionClinicStudentWeeks(studentId);
   const createWeek = useCreatePrecisionClinicStudentWeek(studentId);
+  const deleteWeeks = useDeletePrecisionClinicStudentWeeks(studentId);
   const { data: adminData } = useAiDrillBuilderLearners(true);
   const [expandedPast, setExpandedPast] = useState<Set<number>>(new Set());
+  const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<Set<number>>(
+    new Set(),
+  );
 
   const studentInfo = useMemo(() => {
     const match = (adminData?.learners ?? []).find(
@@ -68,6 +80,12 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
     return mergeWeeksWithEmptySlots(rawWeeks, currentWeek, data?.anchorDate);
   }, [data, currentWeek]);
 
+  const emptyWeekNumbers = useMemo(() => {
+    return weeks
+      .filter((week) => (week.drills?.length ?? week.items?.length ?? 0) === 0)
+      .map((week) => week.weekNumber);
+  }, [weeks]);
+
   const togglePastWeek = (weekNumber: number) => {
     setExpandedPast((prev) => {
       const next = new Set(prev);
@@ -77,6 +95,57 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
     });
   };
 
+  const toggleWeekSelected = (weekNumber: number, checked: boolean) => {
+    setSelectedWeekNumbers((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(weekNumber);
+      else next.delete(weekNumber);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedWeekNumbers(new Set());
+
+  const handleDeleteSelected = async () => {
+    const selected = Array.from(selectedWeekNumbers).sort((a, b) => a - b);
+    if (selected.length === 0) return;
+
+    const nonEmpty = selected.filter((weekNumber) => {
+      const week = weeks.find((w) => w.weekNumber === weekNumber);
+      return (week?.drills?.length ?? week?.items?.length ?? 0) > 0;
+    });
+    if (nonEmpty.length > 0) {
+      toast.error(
+        `Cannot delete week${nonEmpty.length === 1 ? "" : "s"} ${nonEmpty.join(", ")}: move or remove drills first`,
+      );
+      return;
+    }
+
+    if (selected.length >= weeks.length) {
+      toast.error("Cannot delete all weeks; at least one week must remain");
+      return;
+    }
+
+    const label =
+      selected.length === 1
+        ? `Week ${selected[0]}`
+        : `${selected.length} empty weeks (${selected.join(", ")})`;
+    if (
+      !confirm(
+        `Delete ${label}? Remaining weeks will be renumbered to stay consecutive.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteWeeks.mutateAsync({ weekNumbers: selected });
+      clearSelection();
+    } catch {
+      // Toast handled by mutation onError
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -84,6 +153,8 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
       </div>
     );
   }
+
+  const selectedCount = selectedWeekNumbers.size;
 
   return (
     <div className="space-y-6 pb-12">
@@ -115,18 +186,52 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
             {studentInfo.name}
           </span>
         </p>
-        <button
-          type="button"
-          onClick={() => createWeek.mutate()}
-          disabled={createWeek.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {createWeek.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+        <div className="flex items-center gap-2">
+          {selectedCount > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={clearSelection}
+                disabled={deleteWeeks.isPending}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-border dark:bg-card dark:text-muted-foreground"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteSelected()}
+                disabled={deleteWeeks.isPending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleteWeeks.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete {selectedCount} week{selectedCount === 1 ? "" : "s"}
+              </button>
+            </>
           ) : null}
-          + Week
-        </button>
+          <button
+            type="button"
+            onClick={() => createWeek.mutate()}
+            disabled={createWeek.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {createWeek.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            + Week
+          </button>
+        </div>
       </div>
+
+      {emptyWeekNumbers.length > 0 ? (
+        <p className="text-xs text-gray-400">
+          Select empty weeks to delete them. Weeks with drills must be cleared
+          first.
+        </p>
+      ) : null}
 
       {weeks.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-gray-500 dark:border-border dark:bg-card dark:text-muted-foreground">
@@ -144,6 +249,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
               const weekDrills = (week.drills ?? []) as ClinicWeekDrill[];
               const drillCount = weekDrills.length;
               const isEmpty = drillCount === 0;
+              const isSelected = selectedWeekNumbers.has(week.weekNumber);
               const dateRange = formatWeekDateRange(
                 week.weekNumber,
                 data?.anchorDate,
@@ -153,12 +259,34 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
                 <div
                   key={week.weekNumber}
                   className={`overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-card ${
-                    isCurrent
-                      ? "border-emerald-200 ring-1 ring-emerald-100 dark:border-emerald-800"
-                      : "border-gray-100 dark:border-border"
+                    isSelected
+                      ? "border-red-200 ring-1 ring-red-100"
+                      : isCurrent
+                        ? "border-emerald-200 ring-1 ring-emerald-100 dark:border-emerald-800"
+                        : "border-gray-100 dark:border-border"
                   }`}
                 >
                   <div className="flex items-center">
+                    <div className="shrink-0 py-4 pl-4">
+                      <Checkbox
+                        checked={isSelected}
+                        disabled={!isEmpty || deleteWeeks.isPending}
+                        onChange={(e) =>
+                          toggleWeekSelected(week.weekNumber, e.target.checked)
+                        }
+                        aria-label={
+                          isEmpty
+                            ? `Select week ${week.weekNumber} for deletion`
+                            : `Week ${week.weekNumber} has drills and cannot be deleted`
+                        }
+                        title={
+                          isEmpty
+                            ? "Select empty week to delete"
+                            : "Move or remove drills before deleting this week"
+                        }
+                        className="rounded border-gray-300 disabled:opacity-40"
+                      />
+                    </div>
                     {isPast ? (
                       <button
                         type="button"
@@ -231,7 +359,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
                             className="flex min-w-0 items-center gap-2 text-sm text-gray-600 dark:text-muted-foreground"
                           >
                             <span className="shrink-0">
-                              {getDrillTypeLabel(drill.type)}
+                              {getDrillTypeLabel(drill.drillType ?? drill.type)}
                             </span>
                             {drill.title ? (
                               <>
@@ -246,6 +374,17 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
                                 <span className="shrink-0 text-gray-300">·</span>
                                 <span className="shrink-0 capitalize">
                                   {drill.difficulty}
+                                </span>
+                              </>
+                            ) : null}
+                            {drill.status ? (
+                              <>
+                                <span className="shrink-0 text-gray-300">·</span>
+                                <span className="shrink-0">
+                                  {assignmentStatusLabel({
+                                    status: drill.status,
+                                    dueDate: drill.dueDate,
+                                  })}
                                 </span>
                               </>
                             ) : null}

@@ -8,6 +8,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { apiResponse } from '@/lib/api/response';
+import { toUserIdCandidates, toUserIdQuery } from '@/lib/api/user-id';
 
 const saveProgressSchema = z.object({
   currentQuestionIndex: z.number().min(0),
@@ -32,7 +33,7 @@ function getTodayString(): string {
 // GET handler - Get cached progress
 async function getHandler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
   params: { id: string }
 ): Promise<NextResponse> {
   try {
@@ -46,7 +47,7 @@ async function getHandler(
     const todayString = getTodayString();
 
     const progress = await DailyFocusProgress.findOne({
-      userId: context.userId,
+      userId: { $in: toUserIdCandidates(context.userId) },
       dailyFocusId: new Types.ObjectId(id),
       dateString: todayString,
     }).lean().exec();
@@ -65,7 +66,7 @@ async function getHandler(
 // POST handler - Save progress
 async function postHandler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
   params: { id: string }
 ): Promise<NextResponse> {
   try {
@@ -80,34 +81,52 @@ async function postHandler(
     const validated = saveProgressSchema.parse(body);
 
     const todayString = getTodayString();
+    const userIdWrite = toUserIdQuery(context.userId);
+    const dailyFocusId = new Types.ObjectId(id);
 
-    // Upsert progress
-    const progress = await DailyFocusProgress.findOneAndUpdate(
-      {
-        userId: context.userId,
-        dailyFocusId: new Types.ObjectId(id),
-        dateString: todayString,
-      },
-      {
-        $set: {
-          userId: context.userId,
-          dailyFocusId: new Types.ObjectId(id),
-          dateString: todayString,
-          currentQuestionIndex: validated.currentQuestionIndex,
-          answers: validated.answers,
-          lastUpdatedAt: new Date(),
-          isCompleted: validated.isCompleted || false,
-          finalScore: validated.finalScore,
-        },
-        $setOnInsert: {
-          startedAt: new Date(),
-        },
-      },
-      {
-        upsert: true,
-        new: true,
-      }
-    ).exec();
+    const existing = await DailyFocusProgress.findOne({
+      userId: { $in: toUserIdCandidates(context.userId) },
+      dailyFocusId,
+      dateString: todayString,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+
+    const setFields = {
+      userId: userIdWrite,
+      dailyFocusId,
+      dateString: todayString,
+      currentQuestionIndex: validated.currentQuestionIndex,
+      answers: validated.answers,
+      lastUpdatedAt: new Date(),
+      isCompleted: validated.isCompleted || false,
+      finalScore: validated.finalScore,
+    };
+
+    const progress = existing
+      ? await DailyFocusProgress.findByIdAndUpdate(
+          existing._id,
+          { $set: setFields },
+          { new: true }
+        ).exec()
+      : await DailyFocusProgress.findOneAndUpdate(
+          {
+            userId: userIdWrite,
+            dailyFocusId,
+            dateString: todayString,
+          },
+          {
+            $set: setFields,
+            $setOnInsert: {
+              startedAt: new Date(),
+            },
+          },
+          {
+            upsert: true,
+            new: true,
+          }
+        ).exec();
 
     return apiResponse.success({ progress });
   } catch (error: any) {

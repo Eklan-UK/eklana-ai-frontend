@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { TTSButton } from "@/components/ui/TTSButton";
+import { TTSButton, stopAllTTSButtons } from "@/components/ui/TTSButton";
 import {
   CheckCircle,
   Loader2,
@@ -176,6 +176,8 @@ interface CompletedMessage {
   timestamp: Date;
   /** Transcript from pronunciation scoring for this spoken line. */
   transcript?: string;
+  /** Pre-generated Cloudinary clip for this turn, when present. */
+  audioUrl?: string;
 }
 
 const PASS_THRESHOLD = 65;
@@ -344,6 +346,7 @@ export default function RoleplayDrill({
     }
     stopTTSAudio();
     studentTTSStopRef.current?.();
+    stopAllTTSButtons();
     setIsPlayingAI(false);
   }, [clearAiAdvanceTimer, stopTTSAudio]);
 
@@ -385,6 +388,8 @@ export default function RoleplayDrill({
     },
     [drill.ai_character_voice_keys, drill.tts_voice_key],
   );
+
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
 
   const aiCharacterAvatars = Array.isArray(drill.ai_character_avatars)
     ? (drill.ai_character_avatars as string[])
@@ -853,7 +858,7 @@ export default function RoleplayDrill({
 
     if (!consumePrestartTtsDebounceSlot(drillIdStr)) return;
 
-    void playTTSAudio(prestartTtsText);
+    void playTTSAudio(prestartTtsText, drillVoiceId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playTTSAudio is stable from useTTS
   }, [
     sessionStarted,
@@ -866,6 +871,7 @@ export default function RoleplayDrill({
     scenes,
     prestartTtsText,
     drillIdStr,
+    drillVoiceId,
   ]);
 
   // Get speaker display name
@@ -920,6 +926,7 @@ export default function RoleplayDrill({
       text: turn.text,
       translation: turn.translation,
       timestamp: new Date(),
+      audioUrl: turn.audioUrl,
     };
     setCompletedMessages(prev => [...prev, aiMessage]);
 
@@ -1217,6 +1224,7 @@ export default function RoleplayDrill({
       transcript: textScore
         ? transcriptFromTextScore(textScore)
         : undefined,
+      audioUrl: turn.audioUrl,
     };
     setCompletedMessages(prev => [...prev, studentMessage]);
     setCurrentTurnIndex(prev => prev + 1);
@@ -1812,6 +1820,24 @@ export default function RoleplayDrill({
                         {message.translation}
                       </p>
                     )}
+                    <div
+                      className={`mt-2 flex items-center ${
+                        isUserMessage ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <TTSButton
+                        text={message.text}
+                        size="sm"
+                        audioUrl={message.audioUrl}
+                        voiceId={resolveTurnVoiceId(message.speaker)}
+                        onPlayStart={stopAllRoleplaySpeech}
+                        className={
+                          isUserMessage
+                            ? "!bg-white/20 !text-white hover:!bg-white/30"
+                            : undefined
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -2087,7 +2113,7 @@ export default function RoleplayDrill({
                   onClick={() =>
                     isTTSPlaying || isTTSGenerating
                       ? stopTTSAudio()
-                      : void playTTSAudio(prestartTtsText)
+                      : void playTTSAudio(prestartTtsText, drillVoiceId)
                   }
                   disabled={isTTSGenerating}
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${

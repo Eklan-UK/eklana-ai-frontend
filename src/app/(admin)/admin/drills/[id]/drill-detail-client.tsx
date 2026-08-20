@@ -11,7 +11,6 @@ import {
   Clock,
   BookOpen,
   CheckCircle,
-  AlertCircle,
   Link as LinkIcon,
   MessageSquare,
   FileText,
@@ -29,11 +28,9 @@ import { drillAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { useDrillAssignments } from "@/hooks/useAdmin";
 import { AssignedStudentsModal } from "@/components/drills/AssignedStudentsModal";
+import { DrillAssignedStudentsCard } from "@/components/drills/DrillAssignedStudentsCard";
 import { appendReturnTo, sanitizeReturnTo } from "@/lib/drill-list-filters";
-import {
-  drillCompletionDateEnd,
-  isDrillCompletionOverdue,
-} from "@/lib/drill-completion-date";
+import { summarizeAssignmentCounts } from "@/lib/drills/assignment-status";
 import { getDrillTypeLabel } from "@/utils/drill";
 
 interface DrillDetailClientProps {
@@ -68,7 +65,10 @@ export function DrillDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [showAssignedModal, setShowAssignedModal] = useState(false);
   const { data: assignmentsData } = useDrillAssignments(drillId);
-  const assignments = assignmentsData?.assignments || [];
+  const assignments =
+    assignmentsData?.assignments ??
+    assignmentsData?.data?.assignments ??
+    [];
 
   const editHref = returnToParam
     ? appendReturnTo(`${createPath}?drillId=${drillId}`, returnToParam)
@@ -121,28 +121,16 @@ export function DrillDetailClient({
     return colors[difficulty] || "bg-gray-100 text-gray-700";
   };
 
+  const statusCounts = summarizeAssignmentCounts(assignments);
   const assignedCount =
-    assignments.length ||
+    statusCounts.assigned ||
     (Array.isArray(drill.assigned_to)
       ? drill.assigned_to.length
       : drill.assigned_to
         ? 1
         : 0);
-
-  const completedAssignments = assignments.filter(
-    (a: any) => a.status === "completed"
-  );
-  const incompleteAssignments = assignments.filter(
-    (a: any) => a.status !== "completed"
-  );
-  const completedCount = completedAssignments.length;
-  const incompleteCount = incompleteAssignments.length;
-  const inProgressCount = assignments.filter(
-    (a: any) => a.status === "in-progress" || a.status === "in_progress"
-  ).length;
-  const pendingCount = assignments.filter(
-    (a: any) => a.status === "pending"
-  ).length;
+  const completedCount = statusCounts.completed;
+  const inProgressCount = statusCounts.inProgress;
 
   // drill.date is now the completion/due date
   const completionDate = drill.date ? new Date(drill.date) : null;
@@ -664,195 +652,12 @@ export function DrillDetailClient({
             </Card>
           )}
 
-        {/* Assigned Students List */}
         {assignments.length > 0 && (
-          <Card>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">
-                  Assigned Students
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {completedCount} completed • {incompleteCount} incomplete •{" "}
-                  {assignedCount} total
-                </p>
-              </div>
-              <Link href={assignmentHref}>
-                <Button variant="outline" size="sm">
-                  <Users className="w-4 h-4 mr-2" />
-                  Manage Assignments
-                </Button>
-              </Link>
-            </div>
-
-            {/* Completed Students */}
-            {completedAssignments.length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Completed ({completedCount})
-                  </h3>
-                </div>
-                <div className="space-y-2">
-                  {completedAssignments.map((assignment: any) => {
-                    const user =
-                      assignment.userId ||
-                      assignment.user ||
-                      assignment.learnerId;
-                    const userName = user
-                      ? `${user.firstName || ""} ${user.lastName || ""
-                        }`.trim() || user.email
-                      : "Unknown User";
-                    const userEmail = user?.email || "N/A";
-                    const userId =
-                      user?._id ||
-                      assignment.learnerId?._id ||
-                      assignment.learnerId;
-
-                    return (
-                      <Link
-                        key={assignment._id}
-                        href={`/admin/learners/${userId}/drills`}
-                        className="block"
-                      >
-                        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">
-                              {userName}
-                            </p>
-                            <p className="text-sm text-gray-500">{userEmail}</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            {assignment.score !== undefined &&
-                              assignment.score !== null && (
-                                <span className="text-sm font-semibold text-green-700">
-                                  {assignment.score}%
-                                </span>
-                              )}
-                            {assignment.completedAt && (
-                              <span className="text-xs text-gray-500">
-                                {new Date(
-                                  assignment.completedAt
-                                ).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Incomplete Students */}
-            {incompleteAssignments.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Not Completed ({incompleteCount})
-                  </h3>
-                </div>
-                <div className="space-y-2">
-                  {incompleteAssignments.map((assignment: any) => {
-                    const user =
-                      assignment.userId ||
-                      assignment.user ||
-                      assignment.learnerId;
-                    const userName = user
-                      ? `${user.firstName || ""} ${user.lastName || ""
-                        }`.trim() || user.email
-                      : "Unknown User";
-                    const userEmail = user?.email || "N/A";
-                    const userId =
-                      user?._id ||
-                      assignment.learnerId?._id ||
-                      assignment.learnerId;
-                    const status = assignment.status || "pending";
-                    const isOverdue =
-                      status !== "completed" &&
-                      status !== "skipped" &&
-                      isDrillCompletionOverdue(assignment.dueDate);
-
-                    return (
-                      <Link
-                        key={assignment._id}
-                        href={`/admin/learners/${userId}/drills`}
-                        className="block"
-                      >
-                        <div
-                          className={`flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors ${isOverdue
-                              ? "bg-red-50 border border-red-200"
-                              : "bg-gray-50 border border-gray-200"
-                            }`}
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">
-                              {userName}
-                            </p>
-                            <p className="text-sm text-gray-500">{userEmail}</p>
-                            {assignment.dueDate && (
-                              <p
-                                className={`text-xs mt-1 ${isOverdue
-                                    ? "text-red-600 font-medium"
-                                    : "text-gray-500"
-                                  }`}
-                              >
-                                Due:{" "}
-                                {drillCompletionDateEnd(
-                                  assignment.dueDate
-                                ).toLocaleDateString()}
-                                {isOverdue && " (Overdue)"}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${assignment.status === "in-progress" ||
-                                  assignment.status === "in_progress"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : isOverdue
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-gray-100 text-gray-700"
-                                }`}
-                            >
-                              {isOverdue
-                                ? "Overdue"
-                                : assignment.status || "Pending"}
-                            </span>
-                            {!isOverdue && (
-                              <Clock className="w-5 h-5 text-yellow-600" />
-                            )}
-                            {isOverdue && (
-                              <AlertCircle className="w-5 h-5 text-red-600" />
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* No assignments message */}
-            {assignments.length === 0 && (
-              <div className="text-center py-8">
-                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">
-                  No students assigned to this drill yet
-                </p>
-                <Link href={assignmentHref}>
-                  <Button variant="primary" size="sm" className="mt-4">
-                    Assign Students
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </Card>
+          <DrillAssignedStudentsCard
+            assignments={assignments}
+            getLearnerHref={(userId) => `/admin/learners/${userId}/drills`}
+            manageAssignmentsHref={assignmentHref}
+          />
         )}
       </div>
 

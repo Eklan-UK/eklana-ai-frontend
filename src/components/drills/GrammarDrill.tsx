@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import {
   Loader2,
   BookOpen,
@@ -56,6 +57,7 @@ export default function GrammarDrill({
     drillType: "grammar",
     assignmentId,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const patternItems: PatternItem[] = useMemo(() => {
     return (drill.grammar_items || []).map((item: any) => ({
       pattern: item.pattern || "",
@@ -376,6 +378,7 @@ export default function GrammarDrill({
               text={currentPattern?.pattern || ""}
               size="md"
               audioUrl={currentPattern?.patternAudioUrl}
+              voiceId={drillVoiceId}
             />
           </div>
 
@@ -406,6 +409,7 @@ export default function GrammarDrill({
                 text={currentPattern?.example || ""}
                 size="sm"
                 audioUrl={currentPattern?.exampleAudioUrl}
+                voiceId={drillVoiceId}
               />
             </div>
           </div>
