@@ -852,6 +852,7 @@ export const userAPI = {
   updatePreferences: (data: {
     nationality?: string;
     language?: string;
+    nativeLanguage?: string;
     learningGoal?: string;
     learningGoals?: string[];
     theme?: 'system' | 'light' | 'dark';
@@ -874,6 +875,7 @@ export const userAPI = {
       data: {
         nationality?: string;
         language?: string;
+        nativeLanguage?: string;
         learningGoal?: string;
         learningGoals?: string[];
         theme?: 'system' | 'light' | 'dark';

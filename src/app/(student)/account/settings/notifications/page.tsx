@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Header } from "@/components/layout/Header";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
@@ -76,6 +77,7 @@ function ToggleRow({ label, value, onChange, saving, id, last }: ToggleRowProps)
 }
 
 export default function SettingsNotificationsPage() {
+  const t = useTranslations("settings");
   const queryClient = useQueryClient();
   const { data: me, isLoading } = useUserCurrent();
 
@@ -124,26 +126,26 @@ export default function SettingsNotificationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="h-6" />
-      <Header showBack title="Notifications" />
+      <Header showBack title={t("notifications")} />
 
       <div className="max-w-md mx-auto px-5 md:max-w-2xl md:px-8 mt-4">
         <ToggleRow
           id="pref-learning-reminders"
-          label="Learning reminders"
+          label={t("learningReminders")}
           value={prefs.learningReminders}
           onChange={update("learningReminders")}
           saving={saving || !hydrated}
         />
         <ToggleRow
           id="pref-special-offers"
-          label="Special offers"
+          label={t("specialOffers")}
           value={prefs.specialOffers}
           onChange={update("specialOffers")}
           saving={saving || !hydrated}
         />
         <ToggleRow
           id="pref-subscription-expires"
-          label="Subscription expires update"
+          label={t("subscriptionExpires")}
           value={prefs.subscriptionExpires}
           onChange={update("subscriptionExpires")}
           saving={saving || !hydrated}

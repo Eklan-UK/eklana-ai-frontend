@@ -5,13 +5,25 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Lock, Eye, EyeOff, Loader2, AlertCircle, Mail, Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authService } from "@/services/auth.service";
 import { toast } from "sonner";
+import { useAuthStore } from "@/store/auth-store";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { useTranslations } from "next-intl";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const t = useTranslations("settings");
+  const tProfile = useTranslations("profile");
+  const { user } = useAuthStore();
+  const { data: me } = useUserCurrent();
+  const email = me?.user?.email || user?.email || "";
+  const phone =
+    (typeof me?.user?.phone === "string" && me.user.phone) ||
+    (typeof user?.phone === "string" && user.phone) ||
+    "";
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -64,9 +76,16 @@ export default function ChangePasswordPage() {
       await authService.changePassword(currentPassword, newPassword);
       toast.success("Password changed successfully");
       router.back();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to change password");
-      if (error.message?.includes("current password") || error.message?.includes("incorrect")) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to change password";
+      toast.error(message);
+      if (
+        message.includes("current password") ||
+        message.includes("incorrect")
+      ) {
         setErrors({ currentPassword: "Current password is incorrect" });
       }
     } finally {
@@ -79,11 +98,32 @@ export default function ChangePasswordPage() {
       {/* Status Bar Space */}
       <div className="h-6"></div>
 
-      <Header showBack title="Change Password" />
+      <Header showBack title={t("changePassword")} />
 
       <div className="max-w-md mx-auto px-4 py-8 md:max-w-2xl md:px-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card className="bg-yellow-50 border-yellow-200">
+          <Card className="py-2">
+            <div className="flex items-center gap-3 py-3 border-b border-border">
+              <Mail className="w-5 h-5 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{tProfile("email")}</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {email || "—"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 py-3">
+              <Phone className="w-5 h-5 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{tProfile("phone")}</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {phone || "—"}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-500/10 dark:border-yellow-500/30">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 text-yellow-600 mt-0.5" />
               <div>

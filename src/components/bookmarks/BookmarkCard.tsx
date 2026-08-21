@@ -10,6 +10,7 @@ import {
   FileText,
   Calendar,
   BookOpen,
+  Loader2,
 } from "lucide-react";
 
 interface BookmarkCardProps {
@@ -25,7 +26,8 @@ interface BookmarkCardProps {
   onDelete: (id: string, e: React.MouseEvent) => void;
   onPlay: (content: string, e: React.MouseEvent) => void;
   /** Navigate to the source drill (Practice and card click). */
-  onGoToDrill: (drillId: string, e: React.MouseEvent) => void;
+  onGoToDrill: (drillId: string, e: React.MouseEvent) => void | Promise<void>;
+  opening?: boolean;
 }
 
 export function BookmarkCard({
@@ -33,14 +35,24 @@ export function BookmarkCard({
   onDelete,
   onPlay,
   onGoToDrill,
+  opening = false,
 }: BookmarkCardProps) {
   const isWord = bookmark.type === "word";
   const typeLabel = isWord ? "Word" : "Expression";
 
   return (
     <Card
-      className="group relative overflow-hidden transition-all duration-300 hover:shadow-md border border-gray-100 hover:border-green-200 bg-white cursor-pointer"
-      onClick={(e: React.MouseEvent) => onGoToDrill(bookmark.drillId, e)}
+      className={`group relative overflow-hidden transition-all duration-300 hover:shadow-md border border-gray-100 hover:border-green-200 bg-white ${
+        opening ? "cursor-wait opacity-80" : "cursor-pointer"
+      }`}
+      aria-busy={opening}
+      onClick={(e: React.MouseEvent) => {
+        if (opening) {
+          e.stopPropagation();
+          return;
+        }
+        void onGoToDrill(bookmark.drillId, e);
+      }}
     >
       <div className="p-3">
         <div className="flex justify-between items-start mb-2">
@@ -121,19 +133,32 @@ export function BookmarkCard({
               variant="ghost"
               size="sm"
               className="p-1.5 h-auto flex gap-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-              onClick={(e) => onGoToDrill(bookmark.drillId, e)}
+              onClick={(e) => void onGoToDrill(bookmark.drillId, e)}
+              disabled={opening}
               title="Go to Drill"
+              aria-label="Go to Drill"
             >
-              <BookOpen className="w-4 h-4" />
+              {opening ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <BookOpen className="w-4 h-4" />
+              )}
             </Button>
           </div>
 
           <Button
             size="sm"
             className="gap-1.5 text-xs font-semibold px-3 h-8 rounded-full bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm group-hover:shadow-md transform group-hover:translate-x-1 duration-200"
-            onClick={(e) => onGoToDrill(bookmark.drillId, e)}
+            onClick={(e) => void onGoToDrill(bookmark.drillId, e)}
+            disabled={opening}
           >
-            Practice <ArrowRight className="w-3.5 h-3.5" />
+            {opening ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <>
+                Practice <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
           </Button>
         </div>
       </div>

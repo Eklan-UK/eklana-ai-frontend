@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Header } from "@/components/layout/Header";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useQueryClient } from "@tanstack/react-query";
 import { userAPI } from "@/lib/api";
 import { toast } from "sonner";
 import { APP_INTERFACE_LANGUAGE_NAMES } from "@/lib/nationality-language";
 import { SUPPORTED_LOCALES } from "@/i18n/locales";
+import { ProfileRadioRow } from "@/components/account/ProfileRadioRow";
 
 export default function LanguagePage() {
   const t = useTranslations("settingsLanguage");
@@ -61,7 +61,7 @@ export default function LanguagePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="h-6"></div>
+      <div className="h-6" />
 
       <Header showBack title={t("pageTitle")} />
 
@@ -70,44 +70,15 @@ export default function LanguagePage() {
 
         <div className="space-y-2 mb-6">
           {languages.map((language) => (
-            <button
+            <ProfileRadioRow
               key={language.code}
-              onClick={() => setSelected(language.name)}
-              className="w-full text-left"
+              selected={selected === language.name}
+              onSelect={() => setSelected(language.name)}
             >
-              <Card
-                className={`transition-all ${
-                  selected === language.name
-                    ? "bg-green-50 ring-2 ring-green-600"
-                    : ""
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-foreground">
-                    {language.name}
-                  </span>
-                  {selected === language.name && (
-                    <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M13 4L6 11L3 8"
-                          stroke="white"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </button>
+              <span className="text-base font-medium text-foreground">
+                {language.name}
+              </span>
+            </ProfileRadioRow>
           ))}
         </div>
 
