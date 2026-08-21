@@ -10,6 +10,7 @@ import Drill from "@/models/drill";
 import DrillAssignment from "@/models/drill-assignment";
 import User from "@/models/user";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
+import { assertLearnersEnrolledForClinic } from "@/domain/precision-clinic/clinic-enrollment.service";
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 import { getAssignedAtForWeek } from "@/lib/ai-drill-builder/week-utils";
@@ -63,7 +64,7 @@ async function handler(
 
   // Verify drill exists
   const drill = await Drill.findById(drillObjectId)
-    .select("_id title type assigned_to learning_journey_part learning_journey_topic")
+    .select("_id title type assigned_to learning_journey_part learning_journey_topic source")
     .lean()
     .exec();
   if (!drill) {
@@ -98,12 +99,18 @@ async function handler(
     );
   }
 
-  const journeyPart = drill.learning_journey_part as LearningJourneyPartId | undefined;
-  if (journeyPart != null) {
-    await assertLearnersEnrolledForDrill({
+  if (drill.source === "precision_clinic") {
+    await assertLearnersEnrolledForClinic({
       learnerIds: userIds as string[],
-      part: journeyPart,
     });
+  } else {
+    const journeyPart = drill.learning_journey_part as LearningJourneyPartId | undefined;
+    if (journeyPart != null) {
+      await assertLearnersEnrolledForDrill({
+        learnerIds: userIds as string[],
+        part: journeyPart,
+      });
+    }
   }
 
   const dueDateObj =

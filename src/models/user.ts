@@ -123,6 +123,17 @@ export interface IUser extends Document<Types.ObjectId | string> {
    */
   drillBuilderWeekCount?: number | null;
   /**
+   * Optional per-week display date overrides for Drill Builder week cards.
+   * Sparse: only weeks the tutor/admin has edited. Unedited weeks keep
+   * formula dates from the learner anchor. Does not affect assignment
+   * dueDate / assignedAt / builderWeekNumber.
+   */
+  drillBuilderWeekDates?: Array<{
+    weekNumber: number;
+    weekStartDate: Date;
+    weekEndDate: Date;
+  }>;
+  /**
    * Admin/tutor Precision Clinic week cap for this learner. Mirrors
    * `drillBuilderWeekCount` but tracked separately so the two builders
    * don't interfere with each other's week counts.
@@ -370,6 +381,16 @@ const userSchema = new Schema<IUser>(
       type: Number,
       default: null,
       min: 1,
+    },
+    drillBuilderWeekDates: {
+      type: [
+        {
+          weekNumber: { type: Number, required: true, min: 1 },
+          weekStartDate: { type: Date, required: true },
+          weekEndDate: { type: Date, required: true },
+        },
+      ],
+      default: undefined,
     },
     precisionClinicWeekCount: {
       type: Number,

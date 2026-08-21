@@ -5,7 +5,7 @@ import { StudentListPage } from "@/components/ai-drill-builder/StudentListPage";
 export default function AdminDrillsPage() {
   return (
     <div className="p-6 md:p-8">
-      <div className="max-w-4xl">
+      <div className="max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-2">
           Drill Builder
         </h1>

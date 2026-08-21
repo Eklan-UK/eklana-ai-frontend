@@ -9,6 +9,7 @@ import { PracticeStreakHero } from "@/components/practice/PracticeStreakHero";
 import { PracticeModesList } from "@/components/practice/PracticeModesList";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useUserStreak } from "@/hooks/useUserStreak";
+import { useMyClinicEnrollment } from "@/hooks/usePrecisionClinicEnrollments";
 import { learnerHasProAccess } from "@/utils/learner-subscription";
 import { getUserFirstName, getUserInitials } from "@/utils/user";
 
@@ -19,6 +20,11 @@ export default function PracticePage() {
   const { data: streak, isLoading: streakLoading } = useUserStreak();
   // Default locked while loading to prevent flash of unlocked state.
   const isSubscribed = !meLoading && learnerHasProAccess(me?.user);
+  const { data: clinicEnrolled } = useMyClinicEnrollment({
+    enabled: isSubscribed,
+  });
+  // Default clinic locked while enrollment is loading (no flash of unlocked).
+  const clinicEnrollmentLocked = clinicEnrolled !== true;
   const firstName = getUserFirstName(me?.user ?? null);
   const initial = getUserInitials(me?.user ?? null).charAt(0) || "U";
 
@@ -62,7 +68,10 @@ export default function PracticePage() {
 
         <SavedDrillsSection sectionHeading={tAccount("yourProgress")} />
 
-        <PracticeModesList locked={!isSubscribed} />
+        <PracticeModesList
+          locked={!isSubscribed}
+          clinicEnrollmentLocked={clinicEnrollmentLocked}
+        />
 
         {!isSubscribed && !meLoading && (
           <p className="text-sm text-muted-foreground text-center -mt-2">

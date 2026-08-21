@@ -6,13 +6,14 @@
 
 ## 1. Overview
 
-The Profile section gives the student a view of their identity and learning analytics, plus tools to edit their name, email, and avatar.
+Profile is a **menu hub**, not an analytics dashboard. Analytics live on **My Progress**.
 
-The Profile tab contains:
-- **Profile screen** — read-only overview: avatar, name, email, plan badge, metrics (pronunciation score, time studied, streak), confidence and pronunciation analytics, subscription plan
-- **Edit Profile screen** — editable name and email
-- **Change Photo screen** — preset avatars or device camera/gallery upload
-- **Delete Account** — accessible from edit screen
+The Profile flow contains:
+- **Profile hub** — avatar, name, email, plan pill; stats triple (Saved / Day streak / Time practiced); menus (My Progress, My Plan, Account Information, Subscription, FAQ, Contact, Feedback sheet, Log Out); gear → Settings
+- **My Progress** — streak card, skill levels (scorecard → skill-bands), recent badges, Continue practice
+- **Account Information** — photo, full name, email, phone, DOB, nationality, native language
+- **Change Photo** — preset avatars or device camera/gallery upload
+- **Close Account** — confirmation → `DELETE /users/current` (from Settings, not edit)
 
 ---
 
@@ -20,11 +21,15 @@ The Profile tab contains:
 
 | Web Route | Mobile Screen | Description |
 |-----------|---------------|-------------|
-| `/account/profile` | `profile/index.tsx` | Read-only profile view with metrics |
-| `/account/profile/edit` | `profile/edit.tsx` | Edit name + email; delete account |
+| `/account/profile` | `app/(tabs)/profile.tsx` | Menu hub + stats triple + gear → Settings |
+| `/account/progress` | `app/my-progress.tsx` | Streak, skill bands, recent badges, CTA |
+| `/account/profile/edit` | `app/edit-profile.tsx` | Account Information (name, email, phone, DOB, nationality, nativeLanguage) |
 | `/account/profile/photo` | `profile/photo.tsx` | Choose avatar: preset or upload |
+| `/account/settings` | `app/settings.tsx` | Settings hub (see `MOBILE_SETTINGS.md`) |
 
 > Note: `/profile/photo/capture` and `/profile/photo/record-video` do not exist in the web app — all photo selection is handled on the single `photo` page.
+
+Shared skill-band util: web `src/domain/progress/skill-bands.ts` ↔ mobile `utils/skill-bands.ts` (same thresholds).
 
 ---
 
@@ -39,14 +44,17 @@ All endpoints require `Authorization: Bearer <token>`. See `MOBILE_README.md`.
 | Method | Path | Auth | Body | Response | Notes |
 |--------|------|------|------|----------|-------|
 | GET | `/users/current` | Yes | — | `{ user: User, profile?: Profile }` | No `code/data` wrapper |
-| PATCH | `/users/profile` | Yes | `UpdateProfileBody` (Zod) | `{ code: 'Success', data: { user: User } }` | Edit name / email |
+| PATCH | `/users/profile` | Yes | `UpdateProfileBody` (Zod) | `{ code: 'Success', data: { user: User } }` | Name, email, phone, DOB |
+| PATCH | `/users/preferences` | Yes | preferences incl. `nationality`, `nativeLanguage` | profile prefs | Account Info nationality / native language |
 | POST | `/users/avatar` | Yes | `multipart/form-data`, field `avatar` | `{ code: 'Success', data: { avatarUrl, publicId } }` | Upload image from device |
 | PATCH | `/users/avatar` | Yes | `{ avatarUrl: string }` | `{ code: 'Success', data: { avatarUrl } }` | Set preset avatar URL |
-| DELETE | `/users/current` | Yes | — | `{ code: 'Success', message }` | Soft-deletes account |
-| GET | `/pronunciation` | Yes | — | `{ code: 'Success', data: { pronunciation: PronunciationMetrics } }` | Profile pronunciation tile |
-| GET | `/drills/learner/my-drills` | Yes | `limit=200` | `{ code: 'Success', data: { drills } }` | Sum `timeSpent` for "time studied" |
-| GET | `/drills/learner/saved-drills` | Yes | — | `{ code: 'Success', data: { drills } }` | Whole-drill bookmarks (`type: 'drill'`) for Profile Saved Drills |
+| DELETE | `/users/current` | Yes | — | `{ code: 'Success', message }` | Soft-deletes account (Close Account) |
+| GET | `/progress/scorecard` | Yes | — | scorecard metrics 0–100 | Clarity = `pronunciation` |
+| GET | `/badges` | Yes | — | badge gallery state | Recent achievements |
+| GET | `/bookmarks` | Yes | optional `type` | bookmarks list | Profile **Saved** count |
+| GET | `/drills/learner/my-drills` | Yes | `limit=200` | `{ code: 'Success', data: { drills } }` | Sum `timeSpent` for time practiced |
 | GET | `/users/streak` | Yes | — | `{ code: 'Success', data: StreakData }` | Streak summary |
+| POST | `/feedback` | Yes | `{ name, rating, message }` | success | Feedback sheet from Profile + Settings |
 
 ---
 
@@ -80,6 +88,8 @@ export interface Profile {
   learningGoals?: string[];
   nationality?: string;
   language?: string;
+  /** Spoken native language (display name). Distinct from app interface `language`. */
+  nativeLanguage?: string;
   theme?: 'system' | 'light' | 'dark';
   lessonPreferences?: LessonPreferences;
   notificationPreferences?: NotificationPreferences;
@@ -96,15 +106,13 @@ export interface UpdateProfileBody {
   dateOfBirth?: string | null;
 }
 
-// Server validation (Zod) for PATCH /users/profile
-// firstName: optional, 1–50 chars
-// lastName: optional, 1–50 chars
-// username: optional, 3–50 chars, nullable
-// email: optional, valid email format
-// phone: optional, nullable
-// dateOfBirth: optional, nullable
+// Skill bands (shared util) — score 0–100
+// <40 Emerging → Learner@40; <60 Developing → Skilled@60;
+// <75 Effective → Advanced@75; <90 Confident → Mastery@90; else Authoritative
+// Overall badge from 4-metric average: <40 Learner, <75 Skilled, <90 Advanced, else Mastery
+// 10-tick bar: round(score / 10)
 
-// PronunciationMetrics (from /pronunciation)
+// PronunciationMetrics (legacy /pronunciation — prefer scorecard for My Progress)
 export interface PronunciationMetrics {
   learnerId: string;
   overallScore: number;         // 0–100
@@ -116,7 +124,7 @@ export interface StreakData {
   currentStreak: number;
   longestStreak: number;
   lastActivityDate?: string;
-  weeklyActivity?: boolean[];   // 7 booleans Mon–Sun
+  weeklyActivity?: Array<{ date: string; completed: boolean }>;
 }
 
 // Avatar upload response
@@ -134,278 +142,71 @@ export interface AvatarResponse {
 
 ## 6. Plan Label Logic
 
-The web app determines the plan badge label like this:
+Use `planTitleFromUser` / subscription fields from `GET /users/current`:
 
 ```ts
-// Hardcoded override — "Pro" for all students with subscriptionPlan
-export function getPlanLabel(user: User): string {
-  if (user.subscriptionPlan) return 'Pro';       // STUDENT_PLAN_LABEL_OVERRIDE
-  if (user.isSubscribed) return 'Subscribed';
+export function planTitleFromUser(user: User | null | undefined): string {
+  if (!user) return '—';
+  const plan = (user.subscriptionPlan || 'free').toLowerCase();
+  if (plan === 'premium' || user.isSubscribed === true) return 'Pro';
   return 'Free';
 }
 ```
 
-Subscription detail lives in `/account/settings/subscriptions` — the profile screen just shows the badge.
+Subscription detail lives in `/account/settings/subscriptions` — the profile hub shows the Pro/Free pill and a Subscription menu row.
 
 ---
 
 ## 7. Screen Breakdown
 
-### 7.1 Profile Screen (`profile/index.tsx`)
+### 7.1 Profile hub (`profile` tab)
 
-**Data hooks:**
-
-```ts
-const { data: me } = useQuery(['user-current'], fetchUserCurrent);
-const { data: pronunciation } = useQuery(['pronunciation'], fetchPronunciation);
-const { data: streak } = useQuery(['user-streak'], fetchUserStreak);
-const { data: drillsData } = useQuery(
-  ['learner-drills', { limit: 200 }],
-  () => apiClient.get('/drills/learner/my-drills?limit=200').then(r => r.data.data)
-);
-
-// Compute time studied
-const totalMinutes = drillsData?.drills.reduce(
-  (sum, d) => sum + (d.latestAttempt?.timeSpent ?? 0), 0
-) ?? 0;
-const timeStudiedMins = Math.round(totalMinutes / 60);
-```
+**Data hooks:** bookmarks (all types), streak, learner time studied, `users/current`.
 
 **UI Layout:**
 
 ```
-SafeAreaView
-└── ScrollView
-    ├── Header (title "Profile", settings icon → settings screen)
-    ├── AvatarSection
-    │   ├── Avatar (circular image, fallback: initials)
-    │   ├── Display name
-    │   ├── Email
-    │   └── Plan badge ("Pro" / "Free")
-    ├── StatsTiles (horizontal row)
-    │   ├── Bookmarks tile → bookmarks screen
-    │   ├── Pronunciation score tile
-    │   └── Time studied tile (in minutes)
-    ├── ConfidenceCard (ring chart)
-    ├── PronunciationCard (ring chart)
-    ├── CurrentPlanCard → settings/subscriptions
-    └── StreakSection
-        ├── Streak count + weekly dot grid
-        └── CTA → Practice tab
+Header (Profile + gear → Settings)
+Avatar + camera badge → photo
+Name / email / Pro|Free pill
+Stats triple: Saved → bookmarks | Day streak → streak | Time practiced
+Menus:
+  My Progress → /account/progress
+  My Plan → Plan tab
+  Account Information → edit
+  Subscription → settings/subscriptions
+  FAQ / Contact / Feedback sheet
+  Log Out
 ```
 
-**Avatar fallback logic:**
-```ts
-function getInitials(user: User): string {
-  const first = user.firstName?.[0] ?? '';
-  const last = user.lastName?.[0] ?? '';
-  return (first + last).toUpperCase() || user.email[0].toUpperCase();
-}
+### 7.2 My Progress (`/account/progress`)
 
-// Render:
-{user.avatar || user.image
-  ? <Image source={{ uri: user.avatar ?? user.image }} style={styles.avatar} />
-  : <Text style={styles.initials}>{getInitials(user)}</Text>
-}
-```
+Stats triple (same sources), streak card (weekly dots + link to streak screen), skill-level card (`useProgressScorecard` + `getSkillBand` / `SkillLevelRow`), recent unlocked badges (`useBadges`), Continue practice → Practice tab.
 
-**Navigation from profile:**
-- Settings icon → `settings/index`
-- Edit avatar → `profile/photo`
-- Edit name/email → `profile/edit`
-- Bookmarks tile → `bookmarks/index` (word/sentence practice bookmarks **and** a Saved Drills section — see below)
-- Plan card → `settings/subscriptions`
-- Streak CTA → `practice/index`
+### 7.3 Account Information (`profile/edit`)
 
-### 7.1.1 Profile Bookmarks screen (`bookmarks/index.tsx`)
+Editable: photo shortcut, full name, email, phone, date of birth, nationality (full country list), native language (`LANGUAGE_OPTIONS`). Save calls `PATCH /users/profile` then `PATCH /users/preferences` for nationality / nativeLanguage. Close Account is on Settings, not this screen.
 
-The Profile **Bookmarks** tile opens a screen with **two distinct bookmark types**:
+### 7.4 Bookmarks (Saved count)
 
-| Section | API | Content |
-|---------|-----|---------|
-| **Word / sentence practice** | `GET /api/v1/bookmarks?type=word` and `?type=sentence` | In-drill vocabulary bookmarks for spaced-repetition practice |
-| **Saved Drills** | `GET /api/v1/drills/learner/saved-drills` | Whole-drill bookmarks (`Bookmark.type === 'drill'`) from Learning Journey / My Plan |
+Profile **Saved** uses `GET /api/v1/bookmarks` (all types) for the count and links to `/account/bookmarks`.
 
-**Do not** use `GET /api/v1/bookmarks` alone for Saved Drills — that list mixes all bookmark types and the word/sentence card UI cannot render drill-level rows.
+Word/sentence practice bookmarks and Saved Drills remain on the bookmarks screen — see existing bookmarks handoff. Do not use bookmarks alone for Saved Drills list UI.
 
-**Saved Drills response:** `{ code: 'Success', data: { drills: LearnerMyDrillRow[] } }` — same row shape as `my-drills` (including `itemType: 'free_talk_scenario'` rows). Every returned row has `hasBookmarks: true`. Sort client-side with `sortAssignedPlanItems` if needed (server already returns sorted rows).
+### 7.5 Change Photo Screen (`profile/photo`)
 
-**After bookmark toggle** (journey, My Plan, or Saved Drills list): invalidate/refetch both `my-drills` and `saved-drills` caches so bookmark icon state and lists stay in sync.
-
-See `docs/eklan-mobile-learning-journey-spec.md` §4.1 and §7.2.1 for Saved Drills UI wiring on Home / My Plan.
-
-### 7.2 Edit Profile Screen (`profile/edit.tsx`)
-
-**Display fields:**
-- Full name (first + last combined into one text input, split on first space when saving)
-- Email input
-
-**Form state:**
-
-```ts
-const [displayName, setDisplayName] = useState(
-  [user.firstName, user.lastName].filter(Boolean).join(' ')
-);
-const [email, setEmail] = useState(user.email);
-```
-
-**Validation (client-side before sending):**
-```ts
-function validate() {
-  if (!displayName.trim()) return 'Name is required';
-  if (!email.includes('@')) return 'Valid email required';
-  return null;
-}
-```
-
-**Save mutation:**
-```ts
-const updateMutation = useMutation({
-  mutationFn: async () => {
-    const parts = displayName.trim().split(' ');
-    const firstName = parts[0];
-    const lastName = parts.slice(1).join(' ') || '';
-    return apiClient.patch('/users/profile', { firstName, lastName, email });
-  },
-  onSuccess: (res) => {
-    queryClient.invalidateQueries(['user-current']);
-    // Also update local auth store with new user data
-    authStore.setUser(res.data.data.user);
-    router.back();
-  },
-  onError: (err) => Alert.alert('Update failed', extractErrorMessage(err)),
-});
-```
-
-**Delete account:**
-```ts
-const deleteMutation = useMutation({
-  mutationFn: () => apiClient.delete('/users/current'),
-  onSuccess: async () => {
-    await authStore.logout();          // clears token, resets store
-    router.replace('/auth/login');
-  },
-});
-
-// Show confirmation alert first
-Alert.alert(
-  'Delete Account',
-  'This cannot be undone. All your data will be deleted.',
-  [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
-  ]
-);
-```
-
-**Navigate to photo:** button/avatar tap → `profile/photo`
-
-### 7.3 Change Photo Screen (`profile/photo.tsx`)
-
-**Three options:**
-
-#### Option A: Preset avatars
-
-```ts
-const PRESET_AVATARS: string[] = [
-  // 30 DiceBear PNG URLs — copy from web src/app/(student)/account/profile/photo/page.tsx
-];
-
-// Save preset
-const presetMutation = useMutation({
-  mutationFn: (avatarUrl: string) => apiClient.patch('/users/avatar', { avatarUrl }),
-  onSuccess: (res) => {
-    queryClient.invalidateQueries(['user-current']);
-    authStore.setUserAvatar(res.data.data.avatarUrl);
-    router.back();
-  },
-});
-```
-
-#### Option B: Camera capture
-
-```ts
-import * as ImagePicker from 'expo-image-picker';
-
-async function pickFromCamera() {
-  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== 'granted') {
-    Alert.alert('Camera Permission', 'Please allow camera access in settings.');
-    return;
-  }
-  const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.8,
-  });
-  if (!result.canceled) await uploadImage(result.assets[0].uri);
-}
-```
-
-#### Option C: Gallery picker
-
-```ts
-async function pickFromGallery() {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== 'granted') {
-    Alert.alert('Gallery Permission', 'Please allow photo library access in settings.');
-    return;
-  }
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.8,
-  });
-  if (!result.canceled) await uploadImage(result.assets[0].uri);
-}
-```
-
-#### Upload flow
-
-```ts
-async function uploadImage(uri: string) {
-  // Validate size (5MB max)
-  const info = await FileSystem.getInfoAsync(uri, { size: true });
-  if ((info as any).size > 5 * 1024 * 1024) {
-    Alert.alert('File too large', 'Please choose an image under 5MB.');
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('avatar', {
-    uri,
-    name: 'avatar.jpg',
-    type: 'image/jpeg',
-  } as unknown as Blob);
-
-  const res = await apiClient.post('/users/avatar', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-
-  // Update auth store and query cache
-  queryClient.invalidateQueries(['user-current']);
-  authStore.setUserAvatar(res.data.data.avatarUrl);
-  router.back();
-}
-```
-
-**Important**: The backend handles Cloudinary upload server-side using secret credentials. The mobile app **never** uploads directly to Cloudinary — it always goes through `POST /users/avatar`. The backend:
-1. Reads the multipart buffer
-2. Uploads to Cloudinary folder `eklan/users/avatars` with face crop (400×400)
-3. Deletes the old Cloudinary asset if one exists
-4. Saves `secure_url` to `user.avatar` and `user.image`
+Unchanged: preset avatars, camera, gallery → `POST /users/avatar` or `PATCH /users/avatar`. Backend handles Cloudinary; mobile never uploads directly to Cloudinary.
 
 ---
 
-## 8. Expo Router File Structure
+## 8. Expo Router File Structure (target IA)
 
 ```
-app/(student)/profile/
-├── index.tsx         ← Profile overview
-├── edit.tsx          ← Edit name + email + delete account
-└── photo.tsx         ← Choose preset or upload image
+app/(tabs)/profile.tsx     ← Profile menu hub
+app/my-progress.tsx        ← My Progress
+app/edit-profile.tsx       ← Account Information
+app/settings.tsx           ← Settings hub
+profile/photo.tsx          ← Avatar picker
 ```
 
 ---
@@ -413,16 +214,8 @@ app/(student)/profile/
 ## 9. State Management
 
 ```ts
-// React Query keys
-queryKeys.userCurrent           → invalidate after edit / avatar change
-queryKeys.pronunciation         → stale: 5 minutes
-queryKeys.userStreak            → stale: 60 seconds
-['learner-drills', { limit: 200 }] → shared with My Plan; stale: 60s
-
-// Auth store (Zustand + MMKV)
-// After profile update, patch the cached user object to avoid full refetch
-authStore.setUser(updatedUser)
-authStore.setUserAvatar(avatarUrl)
+queryKeys: user-current, user-streak, bookmarks, progress-scorecard, badges
+Invalidate user-current after profile / preferences / avatar changes
 ```
 
 ---
@@ -431,10 +224,10 @@ authStore.setUserAvatar(avatarUrl)
 
 | Permission | Trigger | Expo API |
 |------------|---------|----------|
-| Camera | "Take photo" button | `ImagePicker.requestCameraPermissionsAsync()` |
-| Media Library | "Choose from gallery" button | `ImagePicker.requestMediaLibraryPermissionsAsync()` |
+| Camera | "Take photo" | `ImagePicker.requestCameraPermissionsAsync()` |
+| Media Library | "Choose from gallery" | `ImagePicker.requestMediaLibraryPermissionsAsync()` |
 
-Request permissions at the moment the button is pressed, not on screen mount.
+Request at button press, not on mount.
 
 ---
 
@@ -442,33 +235,20 @@ Request permissions at the moment the button is pressed, not on screen mount.
 
 | Scenario | Handling |
 |----------|---------|
-| `avatar` and `image` both null | Show initials circle |
-| Edit: server Zod validation fails (400) | Display field-level error messages |
-| Upload: file > 5MB | Client-side check before upload |
-| Upload: network failure | Show retry alert |
-| Delete account: auth call fails | Show error toast; do not log out (user still authenticated) |
-| Camera unavailable (simulator) | `ImagePicker.launchCameraAsync` returns `canceled: true` |
-| `pronunciation.overallScore` is 0 | Show "—" or "No data yet" |
-| `timeStudied` computes to 0 | Show "0 min" — not an error |
-| Subscription fields missing | Hide plan badge or show "Free" |
+| No avatar | Initials circle |
+| Scorecard empty / zero | Show 0% bands / Emerging |
+| No unlocked badges | Empty copy on My Progress |
+| Close account fails | Toast; stay signed in |
+| Time practiced 0 | Show `0m` |
 
 ---
 
 ## 12. Acceptance Checklist
 
-- [ ] Profile screen loads avatar, name, email, plan badge correctly
-- [ ] Initials fallback renders when no avatar URL
-- [ ] Pronunciation score, time studied, and streak all load from their respective APIs
-- [ ] Confidence and pronunciation ring cards animate correctly
-- [ ] Tapping settings icon navigates to Settings tab
-- [ ] Edit screen pre-populates name and email
-- [ ] Name edit splits correctly into firstName / lastName on save
-- [ ] Email change calls `PATCH /users/profile` and updates cache
-- [ ] Delete account shows confirmation alert before calling API
-- [ ] After delete, user is logged out and redirected to login
-- [ ] Photo screen shows 30 preset avatars in a grid
-- [ ] Camera capture requests permission, crops 1:1, and uploads via `POST /users/avatar`
-- [ ] Gallery pick requests permission, crops 1:1, and uploads
-- [ ] Files over 5MB are rejected before upload
-- [ ] After avatar change, profile screen reflects the new avatar immediately
-- [ ] No Cloudinary credentials on mobile client
+- [ ] Profile hub shows stats triple + menu rows; gear opens Settings
+- [ ] My Progress shows streak, skill bands from scorecard, recent badges, Continue practice
+- [ ] Account Information saves phone, DOB, nationality, nativeLanguage
+- [ ] Feedback sheet opens from Profile
+- [ ] Log Out works from Profile
+- [ ] Close Account lives on Settings (not edit)
+- [ ] Photo flow unchanged
