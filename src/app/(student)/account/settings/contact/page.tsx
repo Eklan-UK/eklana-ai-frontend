@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { User, Mail } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Header } from "@/components/layout/Header";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
+
+const MAX_MESSAGE_LENGTH = 500;
 
 function InputField({
   label,
@@ -15,13 +18,14 @@ function InputField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm text-foreground">{label}</label>
+      <label className="text-sm text-muted-foreground">{label}</label>
       {children}
     </div>
   );
 }
 
 export default function ContactUsPage() {
+  const t = useTranslations("settings");
   const { data: me } = useUserCurrent();
 
   const [name, setName] = useState("");
@@ -50,7 +54,12 @@ export default function ContactUsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
-  const canSubmit = subject.trim().length > 0 && message.trim().length > 0;
+  const canSubmit =
+    name.trim().length > 0 &&
+    email.trim().length > 0 &&
+    subject.trim().length > 0 &&
+    message.trim().length > 0 &&
+    message.length <= MAX_MESSAGE_LENGTH;
 
   const handleSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -74,89 +83,83 @@ export default function ContactUsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <div className="h-6" />
-      <Header showBack title="Contact Us" />
+      <Header showBack title={t("contact")} />
 
-      <div className="max-w-md mx-auto px-5 py-6 md:max-w-2xl md:px-8 flex flex-col gap-8">
-        {/* Form fields */}
-        <div className="flex flex-col gap-4">
-          {/* Name + Email row */}
-          <div className="flex flex-col gap-4">
-            <InputField label="Name">
-              <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
-                <User className="w-6 h-6 text-muted-foreground shrink-0" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="flex-1 bg-transparent text-base text-foreground outline-none"
-                />
-              </div>
-            </InputField>
-
-            <InputField label="Email">
-              <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
-                <Mail className="w-6 h-6 text-muted-foreground shrink-0" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="flex-1 bg-transparent text-base text-foreground outline-none"
-                />
-              </div>
-            </InputField>
+      <div className="max-w-md mx-auto w-full px-5 py-4 md:max-w-2xl md:px-8 flex flex-col gap-5 flex-1">
+        <InputField label="Name">
+          <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
+            <User className="w-5 h-5 text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+            />
           </div>
+        </InputField>
 
-          {/* Subject + Message */}
-          <div className="flex flex-col gap-4">
-            <InputField label="Subject">
-              <div className="bg-muted border border-border rounded-xl p-3 h-12 flex items-center">
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="What's this about?"
-                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                />
-              </div>
-            </InputField>
-
-            <InputField label="Your message">
-              <div className="bg-muted border border-border rounded-xl p-3 h-[193px]">
-                <textarea
-                  value={message}
-                  onChange={(e) => {
-                    if (e.target.value.length <= 500) setMessage(e.target.value);
-                  }}
-                  placeholder="Message (max 500 characters)"
-                  className="w-full h-full bg-transparent text-sm text-foreground outline-none resize-none placeholder:text-muted-foreground"
-                />
-              </div>
-              {message.length > 0 && (
-                <p className="text-xs text-muted-foreground text-right mt-1">
-                  {message.length}/500
-                </p>
-              )}
-            </InputField>
+        <InputField label="Email">
+          <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
+            <Mail className="w-5 h-5 text-muted-foreground shrink-0" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+            />
           </div>
+        </InputField>
+
+        <InputField label="Subject">
+          <div className="bg-muted border border-border rounded-xl p-3 flex items-center">
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="What's this about?"
+              className="w-full bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </InputField>
+
+        <InputField label="Your message">
+          <div className="bg-muted border border-border rounded-xl p-3 min-h-[180px]">
+            <textarea
+              value={message}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
+                  setMessage(e.target.value);
+                }
+              }}
+              placeholder="Tell us how we can help…"
+              className="w-full h-[160px] bg-transparent text-base text-foreground outline-none resize-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <p
+            className={`text-xs text-right mt-1 ${
+              message.length > MAX_MESSAGE_LENGTH
+                ? "text-destructive"
+                : "text-muted-foreground"
+            }`}
+          >
+            {message.length}/{MAX_MESSAGE_LENGTH}
+          </p>
+        </InputField>
+
+        <div className="pt-2 pb-8 mt-auto">
+          <button
+            type="button"
+            disabled={!canSubmit || submitting}
+            onClick={handleSubmit}
+            className="w-full bg-primary text-white py-4 rounded-full text-base font-medium disabled:opacity-50 transition-opacity"
+          >
+            {submitting ? "Sending…" : "Submit"}
+          </button>
         </div>
-
-        {/* Submit button */}
-        <button
-          type="button"
-          disabled={!canSubmit || submitting}
-          onClick={handleSubmit}
-          className={`w-full py-4 rounded-[50px] text-base font-medium text-center transition-colors ${
-            canSubmit
-              ? "bg-[#3b883e] text-[#fafafa]"
-              : "bg-[#e8e8e8] text-[#fafafa] cursor-not-allowed"
-          }`}
-        >
-          {submitting ? "Sending…" : "Submit"}
-        </button>
       </div>
     </div>
   );

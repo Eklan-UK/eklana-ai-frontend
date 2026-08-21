@@ -8,7 +8,7 @@ export default function TutorDrillsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="h-6" />
       <Header title="Drill Builder" />
-      <div className="max-w-4xl mx-auto px-4 py-6 md:px-8">
+      <div className="max-w-5xl mx-auto px-4 py-6 md:px-8">
         <p className="text-sm text-gray-500 mb-6">
           Select a student to view their weekly plan and create personalized
           drills with AI.

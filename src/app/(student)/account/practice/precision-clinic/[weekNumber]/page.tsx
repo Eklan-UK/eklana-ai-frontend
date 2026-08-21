@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/Card";
 import { LearnerPrecisionClinicDrillRow } from "@/components/precision-clinic";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useLearnerPrecisionClinicWeek } from "@/hooks/useLearnerPrecisionClinic";
+import { useMyClinicEnrollment } from "@/hooks/usePrecisionClinicEnrollments";
+import { toast } from "sonner";
 
 export default function PrecisionClinicWeekDetailPage() {
 	const router = useRouter();
@@ -18,10 +20,15 @@ export default function PrecisionClinicWeekDetailPage() {
 	const t = useTranslations("account.precisionClinic");
 	const { data: me, isLoading: meLoading } = useUserCurrent();
 	const {
+		data: clinicEnrolled,
+		isLoading: enrollmentLoading,
+	} = useMyClinicEnrollment();
+	const enrolled = clinicEnrolled === true;
+	const {
 		data: week,
 		isLoading,
 		isError,
-	} = useLearnerPrecisionClinicWeek(learnerWeekId);
+	} = useLearnerPrecisionClinicWeek(learnerWeekId, { enabled: enrolled });
 
 	useEffect(() => {
 		if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
@@ -30,13 +37,22 @@ export default function PrecisionClinicWeekDetailPage() {
 	}, [meLoading, me, router]);
 
 	useEffect(() => {
-		if (meLoading || isLoading || !learnerWeekId) return;
+		if (meLoading || enrollmentLoading) return;
+		if (me?.user != null && me.user.isSubscribed !== true) return;
+		if (!enrolled) {
+			toast.error(t("notEnrolledToast"));
+			router.replace("/account/practice");
+		}
+	}, [meLoading, enrollmentLoading, enrolled, me, router, t]);
+
+	useEffect(() => {
+		if (meLoading || enrollmentLoading || isLoading || !learnerWeekId || !enrolled) return;
 		if (isError || week === null) {
 			router.replace("/account/practice/precision-clinic");
 		}
-	}, [meLoading, isLoading, isError, week, learnerWeekId, router]);
+	}, [meLoading, enrollmentLoading, isLoading, isError, week, learnerWeekId, enrolled, router]);
 
-	if (meLoading || isLoading || !week) {
+	if (meLoading || enrollmentLoading || isLoading || !week) {
 		return (
 			<div className="min-h-screen bg-background pb-24">
 				<Header

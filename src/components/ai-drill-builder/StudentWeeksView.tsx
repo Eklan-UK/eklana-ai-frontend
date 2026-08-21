@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
   ChevronRight,
   Loader2,
   Calendar,
+  Pencil,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  formatDateForInput,
+  formatStoredWeekDateRange,
   formatWeekDateRange,
   mergeWeeksWithEmptySlots,
   type StudentWeek,
@@ -19,6 +23,7 @@ import {
   useCreateStudentWeek,
   useDeleteStudentWeeks,
   useStudentWeeks,
+  useUpdateStudentWeekDates,
 } from "@/hooks/useStudentWeeks";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { assignmentStatusLabel } from "@/lib/drills/assignment-status";
@@ -39,10 +44,14 @@ export function StudentWeeksView({
   const { data, isLoading } = useStudentWeeks(studentId);
   const createWeek = useCreateStudentWeek(studentId);
   const deleteWeeks = useDeleteStudentWeeks(studentId);
+  const updateWeekDates = useUpdateStudentWeekDates(studentId);
   const [expandedPast, setExpandedPast] = useState<Set<number>>(new Set());
   const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<Set<number>>(
     new Set(),
   );
+  const [editingWeek, setEditingWeek] = useState<StudentWeek | null>(null);
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
 
   // Trust the API week count after seed — do not expand from client clock.
   const currentWeek = data?.currentWeek ?? 0;
@@ -121,6 +130,47 @@ export function StudentWeeksView({
     try {
       await deleteWeeks.mutateAsync({ weekNumbers: selected });
       clearSelection();
+    } catch {
+      // Toast handled by mutation onError
+    }
+  };
+
+  const openEditDates = (week: StudentWeek, event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const start = week.weekStartDate
+      ? formatDateForInput(new Date(week.weekStartDate))
+      : "";
+    const end = week.weekEndDate
+      ? formatDateForInput(new Date(week.weekEndDate))
+      : "";
+    setEditStartDate(start);
+    setEditEndDate(end);
+    setEditingWeek(week);
+  };
+
+  const closeEditDates = () => {
+    if (updateWeekDates.isPending) return;
+    setEditingWeek(null);
+  };
+
+  const handleSaveDates = async () => {
+    if (!editingWeek) return;
+    if (!editStartDate || !editEndDate) {
+      toast.error("Start and end dates are required");
+      return;
+    }
+    if (editEndDate < editStartDate) {
+      toast.error("End date must be on or after start date");
+      return;
+    }
+    try {
+      await updateWeekDates.mutateAsync({
+        weekNumber: editingWeek.weekNumber,
+        weekStartDate: editStartDate,
+        weekEndDate: editEndDate,
+      });
+      setEditingWeek(null);
     } catch {
       // Toast handled by mutation onError
     }
@@ -205,10 +255,12 @@ export function StudentWeeksView({
             const drillCount = week.drills?.length ?? week.items?.length ?? 0;
             const isEmpty = drillCount === 0;
             const isSelected = selectedWeekNumbers.has(week.weekNumber);
-            const dateRange = formatWeekDateRange(
-              week.weekNumber,
-              data?.anchorDate ?? anchorDate,
-            );
+            const dateRange =
+              formatStoredWeekDateRange(week.weekStartDate, week.weekEndDate) ??
+              formatWeekDateRange(
+                week.weekNumber,
+                data?.anchorDate ?? anchorDate,
+              );
 
             return (
               <div
@@ -290,10 +342,16 @@ export function StudentWeeksView({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-0.5">
+                        <button
+                          type="button"
+                          onClick={(event) => openEditDates(week, event)}
+                          className="relative z-10 flex items-center gap-1.5 text-sm text-gray-500 mt-0.5 hover:text-emerald-700 transition-colors"
+                          aria-label={`Edit dates for week ${week.weekNumber}`}
+                        >
                           <Calendar className="w-3.5 h-3.5" />
-                          {dateRange}
-                        </div>
+                          <span>{dateRange}</span>
+                          <Pencil className="w-3 h-3 opacity-70" />
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -358,6 +416,91 @@ export function StudentWeeksView({
               </div>
             );
           })
+      )}
+
+      {editingWeek && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !updateWeekDates.isPending) {
+              closeEditDates();
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md mx-4 shadow-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  Edit week dates
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Display dates for Week {editingWeek.weekNumber}. Other weeks
+                  and drill due dates stay the same.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditDates}
+                disabled={updateWeekDates.isPending}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-gray-700">
+                  Start date
+                </span>
+                <input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  disabled={updateWeekDates.isPending}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 disabled:opacity-50"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-gray-700">
+                  End date
+                </span>
+                <input
+                  type="date"
+                  value={editEndDate}
+                  min={editStartDate || undefined}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                  disabled={updateWeekDates.isPending}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 disabled:opacity-50"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={closeEditDates}
+                disabled={updateWeekDates.isPending}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveDates()}
+                disabled={
+                  updateWeekDates.isPending || !editStartDate || !editEndDate
+                }
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updateWeekDates.isPending && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -152,6 +152,21 @@ export const queryKeys = {
     stats: () => [...queryKeys.precisionClinic.all, "stats"] as const,
     studentWeeks: (studentId: string) =>
       [...queryKeys.precisionClinic.all, "student-weeks", studentId] as const,
+    myEnrollment: () =>
+      [...queryKeys.precisionClinic.all, "enrollments", "me"] as const,
+    enrollmentsList: () =>
+      [...queryKeys.precisionClinic.all, "enrollments", "list"] as const,
+    learnerEnrollment: (learnerId: string) =>
+      [
+        ...queryKeys.precisionClinic.all,
+        "enrollments",
+        "learner",
+        learnerId,
+      ] as const,
+  },
+  drillBuilder: {
+    all: ["drill-builder"] as const,
+    stats: () => [...queryKeys.drillBuilder.all, "stats"] as const,
   },
   learnerPrecisionClinic: {
     all: ["learner-precision-clinic"] as const,

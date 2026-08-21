@@ -6,16 +6,15 @@
 
 ## 1. Overview
 
-The Settings section lets students manage their account, preferences, and app behaviour. It is structured as a hub screen with links to individual sub-screens.
+Settings is a **sectioned hub** aligned with the Profile + Settings Figma IA. Profile is the entry menu; Settings is reached via the gear.
 
-The Settings screen contains:
-- Profile header (avatar, name) → shortcut to edit profile
-- **Account**: email verification status, change password
-- **Preferences**: nationality, interface language, learning goals, notification toggles, lesson settings, theme
-- **Support**: help, FAQ, contact, feedback
-- **Legal**: terms, privacy policy
-- **Subscription** info
-- **Logout** button
+The Settings hub contains:
+- Identity header (avatar, name, email) — My Profile is an explicit row (not header-only)
+- **Account**: My Profile, Nationality, Subscription
+- **Preferences**: App Language, Learning Goals, Notifications, **Lesson** (kept; omitted in Figma), Appearance (theme sheet)
+- **Security & Privacy**: Email verification, Password & Login, Privacy
+- **Support & Feedback**: FAQ, Contact, Feedback sheet
+- **Other**: About (real app version), Terms, Close Account (`DELETE /users/current`), Sign Out
 
 ---
 
@@ -23,22 +22,23 @@ The Settings screen contains:
 
 | Web Route | Mobile Screen | Description |
 |-----------|---------------|-------------|
-| `/account/settings` | `settings/index.tsx` | Hub with profile header + links |
-| `/account/settings/password` | `settings/password.tsx` | Change password |
-| `/account/settings/nationality` | `settings/nationality.tsx` | Pick nationality |
-| `/account/settings/language` | `settings/language.tsx` | Pick interface language |
-| `/account/settings/goals` | `settings/goals.tsx` | Select learning goal |
-| `/account/settings/notifications` | `settings/notifications.tsx` | Toggle notification preferences |
-| `/account/settings/lesson` | `settings/lesson.tsx` | Lesson preferences (accent, voice, speed) |
-| `/account/settings/theme` | Inline bottom sheet on hub | Light / Dark / System toggle |
-| `/account/settings/subscriptions` | `settings/subscriptions.tsx` | Current plan display |
-| `/account/settings/contact` | `settings/contact.tsx` | Contact form |
-| `/account/settings/help` | `settings/help.tsx` | Help + feedback |
+| `/account/settings` | `app/settings.tsx` | Sectioned hub + theme / feedback / close-account sheets |
+| `/account/profile/edit` | `app/edit-profile.tsx` | Account Information (also from Profile) |
+| `/account/settings/password` | `settings/password.tsx` | Password & login (+ read-only email/phone on web) |
+| `/account/settings/nationality` | `settings/nationality.tsx` | Full nationality list + radio rows |
+| `/account/settings/language` | `settings/language.tsx` | App interface language |
+| `/account/settings/goals` | `settings/goals.tsx` | Learning goals |
+| `/account/settings/notifications` | `settings/notifications.tsx` | Notification toggles |
+| `/account/settings/lesson` | `settings/lesson.tsx` | Lesson preferences (keep) |
+| `/account/settings/theme` | Inline bottom sheet on hub | System / Light / Dark |
+| `/account/settings/subscriptions` | `settings/subscriptions.tsx` / `premium` | Plan + billing portal / IAP |
+| `/account/settings/contact` | `settings/contact.tsx` | Contact form (`POST /contact`) |
+| `/account/settings/help` | optional | Legacy help; feedback also on hub |
 | `/account/settings/faq` | `settings/faq.tsx` | FAQ accordion |
 | `/account/settings/privacy` | `settings/privacy.tsx` | Privacy policy |
 | `/account/settings/terms` | `settings/terms.tsx` | Terms of service |
 
-> **Theme** on the web is a bottom sheet opened from the hub. On mobile, implement it inline as a selection list within the hub or its own `settings/theme.tsx` screen.
+> **Theme** on the web is `ThemeSettingSheet` from the hub. **Feedback** is `FeedbackSheet` from Profile and Settings. **Close Account** uses confirmation → `DELETE /users/current`. **About** shows the real package / Expo version (not a mock). **Biometric Login** is mobile-only.
 
 ---
 

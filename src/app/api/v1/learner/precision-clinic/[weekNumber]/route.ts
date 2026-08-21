@@ -6,6 +6,8 @@ import { connectToDatabase } from '@/lib/api/db';
 import { apiResponse } from '@/lib/api/response';
 import { ValidationError } from '@/lib/api/response';
 import { PrecisionClinicLearnerService } from '@/domain/precision-clinic';
+import { isLearnerEnrolled } from '@/domain/precision-clinic/clinic-enrollment.service';
+import '@/models/learner-precision-clinic-enrollment';
 
 async function getHandler(
 	_req: NextRequest,
@@ -13,6 +15,10 @@ async function getHandler(
 	params: { weekNumber: string }
 ) {
 	await connectToDatabase();
+	const enrolled = await isLearnerEnrolled(context.userId.toString());
+	if (!enrolled) {
+		return apiResponse.forbidden('You are not enrolled in Precision Clinic');
+	}
 
 	const weekNumber = Number(params.weekNumber);
 	if (!Number.isInteger(weekNumber) || weekNumber < 1) {

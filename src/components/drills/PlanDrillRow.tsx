@@ -13,6 +13,7 @@ import {
   formatDate,
 } from "@/utils/drill";
 import { resolveDrillListTitle } from "@/lib/drill-display-label";
+import { buildLearnerDrillHref } from "@/lib/drill-open-url";
 
 const CATEGORY_TEXT: Record<string, string> = {
   green: "text-violet-600",
@@ -106,12 +107,9 @@ export function PlanDrillRow({
   const isCompleted = drillStatus === "completed";
   const isInProgress =
     status === "in-progress" || status === "in_progress";
-  const href =
-    isCompleted && assignmentId
-      ? `/account/drills/${drill._id}/completed?assignmentId=${assignmentId}`
-      : assignmentId
-        ? `/account/drills/${drill._id}?assignmentId=${assignmentId}`
-        : `/account/drills/${drill._id}`;
+  const href = buildLearnerDrillHref(drill._id, assignmentId, {
+    completed: isCompleted,
+  });
 
   const catClass =
     CATEGORY_TEXT[typeInfo.color] ?? CATEGORY_TEXT.gray!;

@@ -10,12 +10,21 @@ import { Card } from "@/components/ui/Card";
 import { LearnerPrecisionClinicWeekCard } from "@/components/precision-clinic";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useLearnerPrecisionClinicHistory } from "@/hooks/useLearnerPrecisionClinic";
+import { useMyClinicEnrollment } from "@/hooks/usePrecisionClinicEnrollments";
+import { toast } from "sonner";
 
 export default function PrecisionClinicHistoryPage() {
 	const router = useRouter();
 	const t = useTranslations("account.precisionClinic");
 	const { data: me, isLoading: meLoading } = useUserCurrent();
-	const { data: weeks = [], isLoading } = useLearnerPrecisionClinicHistory();
+	const {
+		data: clinicEnrolled,
+		isLoading: enrollmentLoading,
+	} = useMyClinicEnrollment();
+	const enrolled = clinicEnrolled === true;
+	const { data: weeks = [], isLoading } = useLearnerPrecisionClinicHistory({
+		enabled: enrolled,
+	});
 
 	useEffect(() => {
 		if (!meLoading && me?.user != null && me.user.isSubscribed !== true) {
@@ -23,7 +32,16 @@ export default function PrecisionClinicHistoryPage() {
 		}
 	}, [meLoading, me, router]);
 
-	if (meLoading || isLoading) {
+	useEffect(() => {
+		if (meLoading || enrollmentLoading) return;
+		if (me?.user != null && me.user.isSubscribed !== true) return;
+		if (!enrolled) {
+			toast.error(t("notEnrolledToast"));
+			router.replace("/account/practice");
+		}
+	}, [meLoading, enrollmentLoading, enrolled, me, router, t]);
+
+	if (meLoading || enrollmentLoading || isLoading || !enrolled) {
 		return (
 			<div className="min-h-screen bg-background pb-24">
 				<Header title={t("pageTitle")} showBack backHref="/account/practice" />

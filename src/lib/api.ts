@@ -505,6 +505,83 @@ export const precisionClinicAPI = {
       data,
     });
   },
+
+  getMyEnrollment: () => {
+    return apiRequest<{
+      code?: string;
+      data?: { enrolled: boolean };
+      enrolled?: boolean;
+    }>('/precision-clinic/enrollments/me', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  listEnrollments: (params?: { learnerId?: string }) => {
+    return apiRequest<{
+      code?: string;
+      data?: {
+        enrollments: Array<{
+          learnerId: string;
+          enrolledAt: string;
+          status: 'active';
+        }>;
+      };
+      enrollments?: Array<{
+        learnerId: string;
+        enrolledAt: string;
+        status: 'active';
+      }>;
+    }>('/precision-clinic/enrollments', {
+      method: 'GET',
+      params,
+      cache: false,
+    });
+  },
+
+  getLearnerEnrollment: (learnerId: string) => {
+    return apiRequest<{
+      code?: string;
+      data?: {
+        learnerId: string;
+        enrolled: boolean;
+        enrolledAt?: string | null;
+        status?: 'active' | 'withdrawn' | null;
+      };
+      enrolled?: boolean;
+    }>(`/precision-clinic/enrollments/learner/${learnerId}`, {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
+  setLearnerEnrollment: (learnerId: string, enrolled: boolean) => {
+    return apiRequest<{
+      code?: string;
+      data?: { learnerId: string; enrolled: boolean };
+      enrolled?: boolean;
+    }>(`/precision-clinic/enrollments/learner/${learnerId}`, {
+      method: 'PUT',
+      data: { enrolled },
+    });
+  },
+};
+
+// Drill Builder API — admin/tutor shell (stats). Week CRUD stays on studentAPI.
+export const drillBuilderAPI = {
+  /** Dashboard card counts from Drill / DrillAssignment (source != precision_clinic). */
+  getStats: () => {
+    return apiRequest<{
+      code?: string;
+      message?: string;
+      data?: {
+        total: number;
+        practiceItems: number;
+        published: number;
+        assigned: number;
+      };
+    }>('/ai-drill-builder/stats', { cache: false });
+  },
 };
 
 // Pronunciation API - All routes now use Next.js API routes
@@ -852,6 +929,7 @@ export const userAPI = {
   updatePreferences: (data: {
     nationality?: string;
     language?: string;
+    nativeLanguage?: string;
     learningGoal?: string;
     learningGoals?: string[];
     theme?: 'system' | 'light' | 'dark';
@@ -874,6 +952,7 @@ export const userAPI = {
       data: {
         nationality?: string;
         language?: string;
+        nativeLanguage?: string;
         learningGoal?: string;
         learningGoals?: string[];
         theme?: 'system' | 'light' | 'dark';
@@ -2222,6 +2301,17 @@ export const weeklyChallengeAPI = {
 };
 
 export const learnerPrecisionClinicAPI = {
+  getMyEnrollment: () => {
+    return apiRequest<{
+      code?: string;
+      data?: { enrolled: boolean };
+      enrolled?: boolean;
+    }>('/precision-clinic/enrollments/me', {
+      method: 'GET',
+      cache: false,
+    });
+  },
+
   getHistory: () => {
     return apiRequest<{
       code?: string;
@@ -2358,6 +2448,23 @@ export const studentAPI = {
       };
     }>(`/students/${studentId}/weeks`, {
       method: 'DELETE',
+      data,
+    });
+  },
+
+  updateStudentWeekDates: (
+    studentId: string,
+    data: { weekNumber: number; weekStartDate: string; weekEndDate: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        weekNumber: number;
+        weekStartDate: string;
+        weekEndDate: string;
+      };
+    }>(`/students/${studentId}/weeks`, {
+      method: 'PATCH',
       data,
     });
   },
