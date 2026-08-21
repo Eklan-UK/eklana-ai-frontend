@@ -84,14 +84,15 @@ export function FeedbackSheet({ isOpen, onClose }: FeedbackSheetProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+    <div className="fixed inset-0 z-[60]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal
-        aria-label={t("title")}
-        className="relative bg-card rounded-t-[32px] w-full max-w-md mx-auto overflow-hidden shadow-xl px-5 pt-5 pb-8 flex flex-col gap-6"
-      >
+      <div className="absolute inset-x-0 bottom-0 flex justify-center pb-[max(5.5rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))]">
+        <div
+          role="dialog"
+          aria-modal
+          aria-label={t("title")}
+          className="relative bg-card rounded-[32px] w-full max-w-md overflow-hidden shadow-xl px-5 pt-5 pb-8 flex flex-col gap-6 mx-4 mb-2"
+        >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <button
@@ -157,6 +158,7 @@ export function FeedbackSheet({ isOpen, onClose }: FeedbackSheetProps) {
         >
           {submitting ? t("submitting") : t("submit")}
         </button>
+        </div>
       </div>
     </div>
   );

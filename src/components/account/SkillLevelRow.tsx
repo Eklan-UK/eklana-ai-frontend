@@ -2,64 +2,91 @@ import type { SkillBandId } from "@/domain/progress/skill-bands";
 import { getSkillBand, skillBarTicks } from "@/domain/progress/skill-bands";
 
 const BAND_TICK: Record<SkillBandId, string> = {
-  emerging: "bg-red-500",
-  developing: "bg-orange-500",
-  effective: "bg-blue-500",
-  confident: "bg-primary",
-  authoritative: "bg-emerald-600",
+  emerging: "bg-[#ef4444]",
+  developing: "bg-[#f97316]",
+  effective: "bg-[#3b82f6]",
+  confident: "bg-[#22c55e]",
+  authoritative: "bg-[#059669]",
+};
+
+const BAND_TEXT: Record<SkillBandId, string> = {
+  emerging: "text-[#ef4444]",
+  developing: "text-[#f97316]",
+  effective: "text-[#3b82f6]",
+  confident: "text-[#22c55e]",
+  authoritative: "text-[#059669]",
 };
 
 const BAND_PILL: Record<SkillBandId, string> = {
-  emerging: "bg-red-500/10 text-red-700 dark:text-red-300",
-  developing: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  effective: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  confident: "bg-primary/10 text-primary",
-  authoritative: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  emerging: "bg-[#fef2f2] text-[#ef4444]",
+  developing: "bg-[#fff7ed] text-[#f97316]",
+  effective: "bg-[#eff6ff] text-[#3b82f6]",
+  confident: "bg-[#f0fdf4] text-[#22c55e]",
+  authoritative: "bg-emerald-50 text-[#059669] dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
 export function SkillLevelRow({
   emoji,
   title,
   score,
-  nextHint,
 }: {
   emoji: string;
   title: string;
   score: number;
-  nextHint: string;
 }) {
   const band = getSkillBand(score);
   const filled = skillBarTicks(score);
-  const pct = Math.round(Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0);
+  const pct = Math.round(
+    Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0,
+  );
+  const nextHint =
+    band.nextLabel && band.pointsToNext > 0
+      ? `+${band.pointsToNext}% → ${band.nextLabel}`
+      : null;
 
   return (
-    <div className="py-3">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg leading-none" aria-hidden>
+    <div className="rounded-xl bg-[#f7faf9] p-3 dark:bg-muted/40">
+      <div className="flex items-center gap-2.5">
+        <span className="shrink-0 text-lg leading-none" aria-hidden>
           {emoji}
         </span>
-        <p className="text-sm font-semibold text-foreground flex-1 min-w-0">
+        <p className="min-w-0 shrink font-nunito text-[13px] font-extrabold leading-[19.5px] text-[#101828] dark:text-foreground">
           {title}
         </p>
         <span
-          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${BAND_PILL[band.id]}`}
+          className={`shrink-0 rounded-full px-2 py-0.5 font-nunito text-[10px] font-extrabold leading-[15px] ${BAND_PILL[band.id]}`}
         >
           {band.label}
         </span>
+        <span
+          className={`ml-auto shrink-0 font-nunito text-xs font-extrabold leading-[18px] ${BAND_TEXT[band.id]}`}
+        >
+          {pct}%
+        </span>
       </div>
-      <div className="flex gap-1 mb-1.5" aria-hidden>
+
+      <div className="mt-2 flex gap-[3px]" aria-hidden>
         {Array.from({ length: 10 }, (_, i) => (
           <span
             key={i}
-            className={`h-2 flex-1 rounded-sm ${
-              i < filled ? BAND_TICK[band.id] : "bg-muted"
+            className={`h-[5px] flex-1 rounded-full ${
+              i < filled ? BAND_TICK[band.id] : "bg-[#e2e8f0] dark:bg-border"
             }`}
           />
         ))}
       </div>
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{pct}%</span>
-        <span>{nextHint}</span>
+
+      <div className="mt-1.5 flex items-center justify-between">
+        <span className="font-nunito text-[10px] font-bold leading-[15px] text-[#99a1af]">
+          {pct}%
+        </span>
+        <span
+          className={`font-nunito text-[10px] font-bold leading-[15px] ${
+            nextHint ? BAND_TEXT[band.id] : "text-[#99a1af]"
+          }`}
+        >
+          {nextHint ?? "Mastery reached"}
+        </span>
       </div>
     </div>
   );

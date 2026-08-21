@@ -1,17 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import {
-  Bookmark,
-  Flame,
-  Clock,
-  Calendar,
-  ChevronRight,
-} from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { Card } from "@/components/ui/Card";
-import { ProfileStatTriple } from "@/components/account/ProfileStatTriple";
 import { SkillLevelRow } from "@/components/account/SkillLevelRow";
 import { useLearnerTimeStudied } from "@/hooks/useLearnerTimeStudied";
 import { useUserStreak } from "@/hooks/useUserStreak";
@@ -22,8 +14,8 @@ import {
   averageSkillScore,
   formatTimePracticed,
   getOverallSkillBadge,
-  getSkillBand,
   overallSkillBadgeLabel,
+  type OverallSkillBadge,
 } from "@/domain/progress/skill-bands";
 
 function weekdayLetter(isoDate: string) {
@@ -32,30 +24,27 @@ function weekdayLetter(isoDate: string) {
   return ["S", "M", "T", "W", "T", "F", "S"][d.getUTCDay()] ?? "";
 }
 
-function nextHint(
-  score: number,
-  ptsToNext: (points: number, next: string) => string,
-  masteryReached: string
-): string {
-  const band = getSkillBand(score);
-  if (!band.nextLabel || band.pointsToNext <= 0) return masteryReached;
-  return ptsToNext(band.pointsToNext, band.nextLabel);
-}
+const OVERALL_BADGE_STYLE: Record<
+  OverallSkillBadge,
+  { wrap: string; emoji: string }
+> = {
+  learner: { wrap: "bg-[#fff7ed] text-[#f97316]", emoji: "🌱" },
+  skilled: { wrap: "bg-[#eff6ff] text-[#3b82f6]", emoji: "⚔️" },
+  advanced: { wrap: "bg-[#ecffed] text-[#3b883e]", emoji: "🏆" },
+  mastery: { wrap: "bg-[#ecfdf5] text-[#059669]", emoji: "👑" },
+};
 
 export default function MyProgressPage() {
   const t = useTranslations("profile");
+  const router = useRouter();
   const { data: timeSeconds, isLoading: timeLoading } = useLearnerTimeStudied();
   const { data: streak, isLoading: streakLoading } = useUserStreak();
   const { data: bookmarks, isLoading: bookmarksLoading } = useBookmarks();
   const { data: scorecard, isLoading: scoreLoading } = useProgressScorecard();
   const { data: badgesData, isLoading: badgesLoading } = useBadges();
 
-  const savedCount = bookmarksLoading
-    ? "…"
-    : String(bookmarks?.length ?? 0);
-  const streakValue = streakLoading
-    ? "…"
-    : String(streak?.currentStreak ?? 0);
+  const savedCount = bookmarksLoading ? "…" : String(bookmarks?.length ?? 0);
+  const streakValue = streakLoading ? "…" : String(streak?.currentStreak ?? 0);
   const timeValue = timeLoading
     ? "…"
     : formatTimePracticed(timeSeconds ?? 0);
@@ -71,87 +60,166 @@ export default function MyProgressPage() {
     fluency,
     confidence,
   });
-  const overallBadge = overallSkillBadgeLabel(getOverallSkillBadge(overallAvg));
+  const overallBadgeId = getOverallSkillBadge(overallAvg);
+  const overallBadge = overallSkillBadgeLabel(overallBadgeId);
+  const overallStyle = OVERALL_BADGE_STYLE[overallBadgeId];
 
   const recentBadges = (badgesData?.badges ?? [])
     .filter((b) => b.unlocked && b.unlockedAt)
     .sort(
       (a, b) =>
-        new Date(b.unlockedAt!).getTime() - new Date(a.unlockedAt!).getTime()
+        new Date(b.unlockedAt!).getTime() - new Date(a.unlockedAt!).getTime(),
     )
     .slice(0, 3);
+
+  const hasStreak = Boolean(streak && !streakLoading && streak.currentStreak > 0);
 
   return (
     <div className="min-h-screen bg-background pb-10">
       <div className="h-6" />
-      <Header showBack title={t("progressTitle")} />
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8 space-y-4">
-        <Card className="py-3">
-          <ProfileStatTriple
-            items={[
-              {
-                icon: Bookmark,
-                value: savedCount,
-                label: t("saved"),
-                href: "/account/bookmarks",
-              },
-              {
-                icon: Flame,
-                value: streakValue,
-                label: t("dayStreak"),
-                href: "/account/streak",
-              },
-              {
-                icon: Clock,
-                value: timeValue,
-                label: t("timePracticed"),
-              },
-            ]}
-          />
-        </Card>
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-md items-center gap-3 px-4 py-3 md:max-w-2xl md:px-8">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-[0px_1px_2px_rgba(0,0,0,0.09)] dark:border dark:border-border"
+          >
+            <span className="relative block size-[18px] overflow-hidden">
+              <Image
+                src="/icons/profile/back.svg"
+                alt=""
+                width={18}
+                height={18}
+                className="size-full"
+                unoptimized
+              />
+            </span>
+          </button>
+          <h1 className="font-nunito text-xl font-extrabold leading-[30px] tracking-[-0.3px] text-[#101828] dark:text-foreground">
+            {t("progressTitle")}
+          </h1>
+        </div>
+      </div>
 
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-foreground">
+      <div className="mx-auto max-w-md space-y-4 px-4 py-2 md:max-w-2xl md:px-8">
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            {
+              href: "/account/bookmarks",
+              iconSrc: "/icons/profile/progress-bookmark.svg",
+              value: savedCount,
+              label: t("saved"),
+            },
+            {
+              href: "/account/streak",
+              iconSrc: "/icons/profile/progress-fire.svg",
+              value: streakValue,
+              label: t("dayStreak"),
+            },
+            {
+              href: undefined as string | undefined,
+              iconSrc: "/icons/profile/progress-clock.svg",
+              value: timeValue,
+              label: t("timePracticed"),
+            },
+          ].map((stat) => {
+            const inner = (
+              <div className="flex h-[101px] flex-col items-center justify-center rounded-2xl bg-card px-2 py-4 shadow-[0px_1px_3px_rgba(0,0,0,0.06)] dark:border dark:border-border">
+                <span className="relative block size-6 overflow-hidden">
+                  <Image
+                    src={stat.iconSrc}
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="size-full"
+                    unoptimized
+                  />
+                </span>
+                <p className="mt-1 font-nunito text-lg font-extrabold leading-[18px] text-[#101828] dark:text-foreground">
+                  {stat.value}
+                </p>
+                <p className="mt-0.5 text-center font-nunito text-[10px] font-semibold leading-[15px] text-[#99a1af]">
+                  {stat.label}
+                </p>
+              </div>
+            );
+            return stat.href ? (
+              <Link
+                key={stat.label}
+                href={stat.href}
+                className="no-underline hover:no-underline"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div key={stat.label}>{inner}</div>
+            );
+          })}
+        </div>
+
+        <section className="rounded-[18px] bg-card p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.06)] dark:border dark:border-border">
+          <div className="flex items-center justify-between">
+            <h2 className="font-nunito text-sm font-extrabold leading-[21px] text-[#101828] dark:text-foreground">
               {t("streakCardTitle")}
-            </h3>
+            </h2>
             <Link
               href="/account/streak"
-              className="text-primary flex items-center gap-1 text-sm"
+              className="inline-flex items-center gap-1 no-underline hover:no-underline"
             >
-              <Calendar className="w-4 h-4" />
-              <span>{t("viewStreak")}</span>
-              <ChevronRight className="w-4 h-4" />
+              <span className="relative block size-[13px] overflow-hidden">
+                <Image
+                  src="/icons/profile/view-streak.svg"
+                  alt=""
+                  width={13}
+                  height={13}
+                  className="size-full"
+                  unoptimized
+                />
+              </span>
+              <span className="font-nunito text-xs font-bold leading-[18px] text-[#3b883e]">
+                {t("viewStreak")}
+              </span>
+              <span className="relative block size-3 overflow-hidden">
+                <Image
+                  src="/icons/profile/chevron.svg"
+                  alt=""
+                  width={12}
+                  height={12}
+                  className="size-full"
+                  unoptimized
+                />
+              </span>
             </Link>
           </div>
 
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-base font-semibold text-foreground">
+          <div className="mt-1 flex items-center justify-between">
+            <p className="font-nunito text-[13px] font-bold leading-[19.5px] text-[#4a5565] dark:text-muted-foreground">
               {streakLoading
                 ? "…"
-                : streak && streak.currentStreak > 0
-                  ? t("dayStreakCount", { count: streak.currentStreak })
+                : hasStreak
+                  ? t("dayStreakCount", { count: streak!.currentStreak })
                   : t("buildStreak")}
-            </h4>
-            {streak && !streakLoading && streak.currentStreak > 0 ? (
-              <span className="text-sm text-muted-foreground">
-                {t("bestStreak", { count: streak.longestStreak })}
-              </span>
+            </p>
+            {hasStreak ? (
+              <p className="font-nunito text-xs font-bold leading-[18px] text-[#99a1af]">
+                {t("bestStreak", { count: streak!.longestStreak })}
+              </p>
             ) : null}
           </div>
 
           {streak && streak.weeklyActivity.length > 0 ? (
-            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-4">
+            <div className="mt-3 flex items-center justify-center gap-2">
               {streak.weeklyActivity.map((day) => (
                 <div
                   key={day.date}
-                  className={`flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full font-black text-[10px] sm:text-xs ${
-                    day.completed
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
                   title={day.date}
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full font-nunito text-[13px] font-extrabold leading-[19.5px] ${
+                    day.completed
+                      ? "bg-[#3b883e] text-white"
+                      : "bg-[#f3f4f6] text-[#99a1af] dark:bg-muted dark:text-muted-foreground"
+                  }`}
                 >
                   {weekdayLetter(day.date)}
                 </div>
@@ -159,127 +227,116 @@ export default function MyProgressPage() {
             </div>
           ) : null}
 
-          <div className="bg-yellow-500/10 border border-border rounded-lg p-4">
-            <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-              <Flame className="w-4 h-4 text-yellow-600" />
-              {streak && streak.currentStreak > 0
-                ? t("keepGoing")
-                : t("startStreak")}
-            </p>
-            <p className="text-xs md:text-sm text-muted-foreground">
+          <div className="mt-4 rounded-xl bg-[#fffbeb] px-4 py-3 dark:bg-amber-500/10">
+            <div className="flex items-center gap-1.5">
+              <span aria-hidden className="text-[15px] leading-[22.5px]">
+                🔥
+              </span>
+              <p className="font-nunito text-[12.5px] font-extrabold leading-[18.75px] text-[#973c00] dark:text-amber-200">
+                {hasStreak ? t("keepGoing") : t("startStreak")}
+              </p>
+            </div>
+            <p className="mt-1 font-nunito text-xs font-semibold leading-[19.5px] text-[#bb4d00] dark:text-amber-100/90">
               {t("streakHint")}
             </p>
           </div>
-        </Card>
 
-        <Card>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-bold text-foreground">
-              {t("skillLevels")}
-            </h3>
+          <Link
+            href="/account/practice"
+            className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-[#3b883e] font-nunito text-[13.5px] font-extrabold leading-[20.25px] text-white no-underline hover:opacity-90 hover:no-underline active:scale-[0.99]"
+          >
+            {t("continuePractice")}
+          </Link>
+        </section>
+
+        <section className="rounded-[18px] bg-card p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.06)] dark:border dark:border-border">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-nunito text-[13.5px] font-extrabold leading-[20.25px] text-[#101828] dark:text-foreground">
+                {t("skillLevels")}
+              </h2>
+              {!scoreLoading ? (
+                <p className="font-nunito text-[11px] font-bold leading-[16.5px] text-[#99a1af]">
+                  {t("skillAvgSubtitle", { avg: Math.round(overallAvg) })}
+                </p>
+              ) : null}
+            </div>
             {!scoreLoading ? (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
-                {t("overallBadge", { badge: overallBadge })}
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ${overallStyle.wrap}`}
+              >
+                <span className="text-[13px] leading-[19.5px]" aria-hidden>
+                  {overallStyle.emoji}
+                </span>
+                <span className="font-nunito text-[11px] font-extrabold leading-[16.5px]">
+                  {overallBadge}
+                </span>
               </span>
             ) : null}
           </div>
 
           {scoreLoading ? (
-            <p className="text-sm text-muted-foreground py-4">…</p>
+            <p className="py-4 text-sm text-muted-foreground">…</p>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="mt-4 space-y-3">
               <SkillLevelRow
-                emoji="🗣️"
+                emoji="💪"
+                title={t("confidence")}
+                score={confidence}
+              />
+              <SkillLevelRow
+                emoji="🔍"
                 title={t("clarity")}
                 score={pronunciation}
-                nextHint={nextHint(
-                  pronunciation,
-                  (points, next) => t("ptsToNext", { points, next }),
-                  t("masteryReached")
-                )}
               />
               <SkillLevelRow
                 emoji="🎯"
                 title={t("accuracy")}
                 score={accuracy}
-                nextHint={nextHint(
-                  accuracy,
-                  (points, next) => t("ptsToNext", { points, next }),
-                  t("masteryReached")
-                )}
               />
-              <SkillLevelRow
-                emoji="💨"
-                title={t("fluency")}
-                score={fluency}
-                nextHint={nextHint(
-                  fluency,
-                  (points, next) => t("ptsToNext", { points, next }),
-                  t("masteryReached")
-                )}
-              />
-              <SkillLevelRow
-                emoji="💪"
-                title={t("confidence")}
-                score={confidence}
-                nextHint={nextHint(
-                  confidence,
-                  (points, next) => t("ptsToNext", { points, next }),
-                  t("masteryReached")
-                )}
-              />
+              <SkillLevelRow emoji="💬" title={t("fluency")} score={fluency} />
             </div>
           )}
-        </Card>
+        </section>
 
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-foreground">
-              {t("recentAchievements")}
-            </h3>
-            <Link
-              href="/account/badges"
-              className="text-sm text-primary font-medium"
-            >
-              {t("seeAllBadges")}
-            </Link>
-          </div>
+        <section className="rounded-[18px] bg-card p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.06)] dark:border dark:border-border">
+          <h2 className="font-nunito text-[13.5px] font-extrabold leading-[20.25px] text-[#101828] dark:text-foreground">
+            {t("recentAchievements")}
+          </h2>
 
           {badgesLoading ? (
-            <p className="text-sm text-muted-foreground py-2">…</p>
+            <p className="py-2 text-sm text-muted-foreground">…</p>
           ) : recentBadges.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">
+            <p className="py-2 text-sm text-muted-foreground">
               {t("noBadgesYet")}
             </p>
           ) : (
-            <ul className="space-y-3">
-              {recentBadges.map((badge) => (
-                <li key={badge.badgeId} className="flex items-center gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-400 text-xl shrink-0">
-                    {badge.icon}
+            <ul className="mt-3">
+              {recentBadges.map((badge, i) => (
+                <li
+                  key={badge.badgeId}
+                  className={`flex items-center gap-3 py-2.5 ${
+                    i < recentBadges.length - 1
+                      ? "border-b border-[#f9fafb] dark:border-border"
+                      : ""
+                  }`}
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#fffbeb] text-xl dark:bg-amber-500/15">
+                    {badge.icon || "🏅"}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
+                    <p className="truncate font-nunito text-[13px] font-extrabold leading-[19.5px] text-[#101828] dark:text-foreground">
                       {badge.badgeName}
                     </p>
-                    {badge.unlockedAt ? (
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(badge.unlockedAt).toLocaleDateString()}
-                      </p>
-                    ) : null}
+                    <p className="truncate font-nunito text-[11px] font-semibold leading-[16.5px] text-[#99a1af]">
+                      {badge.afterOutcome}
+                    </p>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-
-        <Link
-          href="/account/practice"
-          className="inline-flex w-full items-center justify-center rounded-xl font-semibold transition-all duration-200 active:scale-95 bg-primary text-primary-foreground hover:opacity-90 px-8 py-4 text-lg"
-        >
-          {t("continuePractice")}
-        </Link>
+        </section>
       </div>
     </div>
   );
