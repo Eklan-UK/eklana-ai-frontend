@@ -21,6 +21,7 @@ import {
 	refineLearningJourneyFields,
 } from '@/domain/learning-journey/learning-journey.validation';
 import { assertLearnersEnrolledForDrill } from '@/domain/learning-journey/mission-enrollment.service';
+import { assertLearnersEnrolledForClinic } from '@/domain/precision-clinic/clinic-enrollment.service';
 
 // Validation schemas
 const targetSentenceSchema = z.object({
@@ -258,7 +259,13 @@ async function postHandler(
 	const body = await parseRequestBody(req);
 	const validated = validateRequest(createDrillSchema, body);
 
-	if (validated.learning_journey_part && validated.assigned_to.length > 0) {
+	if (validated.source === 'precision_clinic') {
+		if (validated.assigned_to.length > 0) {
+			await assertLearnersEnrolledForClinic({
+				learnerIds: validated.assigned_to,
+			});
+		}
+	} else if (validated.learning_journey_part && validated.assigned_to.length > 0) {
 		await assertLearnersEnrolledForDrill({
 			learnerIds: validated.assigned_to,
 			part: validated.learning_journey_part,

@@ -204,6 +204,7 @@
       "upgradeCta": "Mejorar a Pro",
       "upgradeHint": "para desbloquear las funciones de práctica con IA.",
       "profileAria": "Abrir perfil",
+      "notEnrolledYet": "Aún no estás inscrito",
       "weekdayMon": "Lun",
       "weekdayTue": "Mar",
       "weekdayWed": "Mié",
@@ -260,7 +261,8 @@
       "emptyDescription": "This clinic week does not have any drills yet.",
       "completed": "Completed",
       "statusInProgress": "In progress",
-      "statusOverdue": "Overdue"
+      "statusOverdue": "Overdue",
+      "notEnrolledToast": "Aún no estás inscrito en Precision Clinic."
     }
   },
   "nav": {

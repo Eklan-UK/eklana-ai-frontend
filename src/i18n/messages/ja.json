@@ -204,6 +204,7 @@
       "upgradeCta": "Proにアップグレード",
       "upgradeHint": "してAI練習機能を解除しましょう。",
       "profileAria": "プロフィールを開く",
+      "notEnrolledYet": "まだ登録されていません",
       "weekdayMon": "月",
       "weekdayTue": "火",
       "weekdayWed": "水",
@@ -260,7 +261,8 @@
       "emptyDescription": "This clinic week does not have any drills yet.",
       "completed": "Completed",
       "statusInProgress": "In progress",
-      "statusOverdue": "Overdue"
+      "statusOverdue": "Overdue",
+      "notEnrolledToast": "Precision Clinic にはまだ登録されていません。"
     }
   },
   "nav": {

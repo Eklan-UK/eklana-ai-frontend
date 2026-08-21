@@ -30,6 +30,8 @@ import {
 } from "@/hooks/usePrecisionClinic";
 import { getDrillTypeLabel } from "@/utils/drill";
 import { assignmentStatusLabel } from "@/lib/drills/assignment-status";
+import { useLearnerClinicEnrollment } from "@/hooks/usePrecisionClinicEnrollments";
+import { ClinicEnrollmentModal } from "./ClinicEnrollmentModal";
 
 const BASE_PATH = "/admin/precision-clinic/students";
 
@@ -56,6 +58,8 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
   const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<Set<number>>(
     new Set(),
   );
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const { data: enrolled = false } = useLearnerClinicEnrollment(studentId);
 
   const studentInfo = useMemo(() => {
     const match = (adminData?.learners ?? []).find(
@@ -158,25 +162,38 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex items-start gap-4">
-        <LearnerAvatar learner={studentInfo} size="lg" />
-        <div>
-          <Link
-            href="/admin/precision-clinic"
-            className="mb-2 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to students
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground">
-            {studentInfo.name}
-          </h1>
-          {studentInfo.email ? (
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-muted-foreground">
-              {studentInfo.email}
-            </p>
-          ) : null}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <LearnerAvatar learner={studentInfo} size="lg" />
+          <div>
+            <Link
+              href="/admin/precision-clinic"
+              className="mb-2 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to students
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-foreground">
+              {studentInfo.name}
+            </h1>
+            {studentInfo.email ? (
+              <p className="mt-0.5 text-sm text-gray-500 dark:text-muted-foreground">
+                {studentInfo.email}
+              </p>
+            ) : null}
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setEnrollmentModalOpen(true)}
+          className={`inline-flex items-center gap-2 self-start rounded-xl border px-4 py-2 text-sm font-medium transition-colors sm:self-auto ${
+            enrolled
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-foreground"
+          }`}
+        >
+          {enrolled ? "Enrolled" : "Locked"}
+        </button>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -402,6 +419,13 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
               );
             })}
         </div>
+      )}
+
+      {enrollmentModalOpen && (
+        <ClinicEnrollmentModal
+          initialStudentId={studentId}
+          onClose={() => setEnrollmentModalOpen(false)}
+        />
       )}
     </div>
   );

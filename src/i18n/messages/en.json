@@ -230,7 +230,8 @@
       "emptyDescription": "This clinic week does not have any drills yet.",
       "completed": "Completed",
       "statusInProgress": "In progress",
-      "statusOverdue": "Overdue"
+      "statusOverdue": "Overdue",
+      "notEnrolledToast": "You are not enrolled in Precision Clinic yet."
     },
     "practiceHub": {
       "title": "Practice",
@@ -254,6 +255,7 @@
       "upgradeCta": "Upgrade to Pro",
       "upgradeHint": "to unlock AI practice features.",
       "profileAria": "Open profile",
+      "notEnrolledYet": "Not enrolled yet",
       "weekdayMon": "Mon",
       "weekdayTue": "Tue",
       "weekdayWed": "Wed",

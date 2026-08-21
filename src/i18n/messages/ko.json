@@ -204,6 +204,7 @@
       "upgradeCta": "Pro로 업그레이드",
       "upgradeHint": "하여 AI 연습 기능을 잠금 해제하세요.",
       "profileAria": "프로필 열기",
+      "notEnrolledYet": "아직 등록되지 않았습니다",
       "weekdayMon": "월",
       "weekdayTue": "화",
       "weekdayWed": "수",
@@ -260,7 +261,8 @@
       "emptyDescription": "This clinic week does not have any drills yet.",
       "completed": "Completed",
       "statusInProgress": "In progress",
-      "statusOverdue": "Overdue"
+      "statusOverdue": "Overdue",
+      "notEnrolledToast": "아직 Precision Clinic에 등록되지 않았습니다."
     }
   },
   "nav": {

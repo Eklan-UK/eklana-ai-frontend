@@ -204,6 +204,7 @@
       "upgradeCta": "升级到 Pro",
       "upgradeHint": "以解锁 AI 练习功能。",
       "profileAria": "打开个人资料",
+      "notEnrolledYet": "尚未注册",
       "weekdayMon": "一",
       "weekdayTue": "二",
       "weekdayWed": "三",
@@ -260,7 +261,8 @@
       "emptyDescription": "This clinic week does not have any drills yet.",
       "completed": "Completed",
       "statusInProgress": "In progress",
-      "statusOverdue": "Overdue"
+      "statusOverdue": "Overdue",
+      "notEnrolledToast": "你尚未加入 Precision Clinic。"
     }
   },
   "nav": {
