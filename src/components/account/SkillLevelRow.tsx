@@ -1,5 +1,12 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import type { SkillBandId } from "@/domain/progress/skill-bands";
-import { getSkillBand, skillBarTicks } from "@/domain/progress/skill-bands";
+import {
+  getSkillBand,
+  getSkillTransition,
+  skillBarTicks,
+} from "@/domain/progress/skill-bands";
 
 const BAND_TICK: Record<SkillBandId, string> = {
   emerging: "bg-[#ef4444]",
@@ -29,20 +36,26 @@ export function SkillLevelRow({
   emoji,
   title,
   score,
+  weeklyChange,
 }: {
   emoji: string;
   title: string;
   score: number;
+  weeklyChange: number;
 }) {
+  const t = useTranslations("profile");
   const band = getSkillBand(score);
   const filled = skillBarTicks(score);
   const pct = Math.round(
     Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0,
   );
-  const nextHint =
-    band.nextLabel && band.pointsToNext > 0
-      ? `+${band.pointsToNext}% → ${band.nextLabel}`
-      : null;
+  const transition = getSkillTransition(score, weeklyChange);
+  const hint =
+    transition.kind === "up" && transition.label
+      ? t("ptsToNext", { points: transition.points, next: transition.label })
+      : transition.kind === "down" && transition.label
+        ? t("ptsToPrev", { points: transition.points, prev: transition.label })
+        : t("highestLevelReached");
 
   return (
     <div className="rounded-xl bg-[#f7faf9] p-3 dark:bg-muted/40">
@@ -82,10 +95,10 @@ export function SkillLevelRow({
         </span>
         <span
           className={`font-nunito text-[10px] font-bold leading-[15px] ${
-            nextHint ? BAND_TEXT[band.id] : "text-[#99a1af]"
+            transition.kind === "max" ? "text-[#99a1af]" : BAND_TEXT[band.id]
           }`}
         >
-          {nextHint ?? "Mastery reached"}
+          {hint}
         </span>
       </div>
     </div>

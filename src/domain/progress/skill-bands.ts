@@ -17,12 +17,27 @@ export interface SkillBand {
   id: SkillBandId;
   /** e.g. "Emerging Communicator" */
   label: string;
-  /** Next overall badge name, or null at Mastery. */
+  /** Next communicator band name, or null at Authoritative. */
   nextLabel: string | null;
   nextThreshold: number | null;
-  /** Points needed to reach the next threshold (0 at Mastery). */
+  /** Points needed to reach the next threshold (0 at Authoritative). */
   pointsToNext: number;
+  /** Previous communicator band name, or null at Emerging. */
+  prevLabel: string | null;
+  /** Points to the previous band boundary (0 at Emerging). */
+  pointsToPrev: number;
 }
+
+export type SkillTransitionKind = "up" | "down" | "max";
+
+export interface SkillTransition {
+  kind: SkillTransitionKind;
+  points: number;
+  label: string | null;
+}
+
+/** Same threshold as `deriveTrend` in progress-scorecard.service.ts. */
+const DECLINE_WEEKLY_CHANGE = -3;
 
 const BANDS: ReadonlyArray<{
   max: number;
@@ -30,52 +45,61 @@ const BANDS: ReadonlyArray<{
   label: string;
   nextLabel: string | null;
   nextThreshold: number | null;
+  prevLabel: string | null;
+  prevMax: number | null;
 }> = [
   {
     max: 40,
     id: "emerging",
     label: "Emerging Communicator",
-    nextLabel: "Learner",
+    nextLabel: "Developing Communicator",
     nextThreshold: 40,
+    prevLabel: null,
+    prevMax: null,
   },
   {
     max: 60,
     id: "developing",
     label: "Developing Communicator",
-    nextLabel: "Skilled",
+    nextLabel: "Effective Communicator",
     nextThreshold: 60,
+    prevLabel: "Emerging Communicator",
+    prevMax: 40,
   },
   {
     max: 75,
     id: "effective",
     label: "Effective Communicator",
-    nextLabel: "Advanced",
+    nextLabel: "Confident Communicator",
     nextThreshold: 75,
+    prevLabel: "Developing Communicator",
+    prevMax: 60,
   },
   {
     max: 90,
     id: "confident",
     label: "Confident Communicator",
-    nextLabel: "Mastery",
+    nextLabel: "Authoritative Communicator",
     nextThreshold: 90,
+    prevLabel: "Effective Communicator",
+    prevMax: 75,
   },
 ];
-
-const AUTHORITATIVE: SkillBand = {
-  id: "authoritative",
-  label: "Authoritative Communicator",
-  nextLabel: null,
-  nextThreshold: null,
-  pointsToNext: 0,
-};
 
 function clampScore(score: number): number {
   if (!Number.isFinite(score)) return 0;
   return Math.max(0, Math.min(100, score));
 }
 
+/** Distance down to the previous band’s last inclusive score (`prevMax - 1`). */
+function pointsToPrevBand(rounded: number, prevMax: number | null): number {
+  if (prevMax == null) return 0;
+  return Math.max(0, rounded - (prevMax - 1));
+}
+
 export function getSkillBand(score: number): SkillBand {
   const n = clampScore(score);
+  const rounded = Math.round(n);
   for (const band of BANDS) {
     if (n < band.max) {
       return {
@@ -83,11 +107,43 @@ export function getSkillBand(score: number): SkillBand {
         label: band.label,
         nextLabel: band.nextLabel,
         nextThreshold: band.nextThreshold,
-        pointsToNext: Math.max(0, band.max - Math.round(n)),
+        pointsToNext: Math.max(0, band.max - rounded),
+        prevLabel: band.prevLabel,
+        pointsToPrev: pointsToPrevBand(rounded, band.prevMax),
       };
     }
   }
-  return AUTHORITATIVE;
+  return {
+    id: "authoritative",
+    label: "Authoritative Communicator",
+    nextLabel: null,
+    nextThreshold: null,
+    pointsToNext: 0,
+    prevLabel: "Confident Communicator",
+    pointsToPrev: pointsToPrevBand(rounded, 90),
+  };
+}
+
+/**
+ * Footer arrow for a skill row: next communicator on increase, previous on
+ * decline (weeklyChange ≤ −3). Emerging has no lower band, so decline still
+ * points up. Authoritative with no decline is the max level.
+ */
+export function getSkillTransition(
+  score: number,
+  weeklyChange: number,
+): SkillTransition {
+  const band = getSkillBand(score);
+  const declining =
+    Number.isFinite(weeklyChange) && weeklyChange <= DECLINE_WEEKLY_CHANGE;
+
+  if (declining && band.prevLabel && band.pointsToPrev > 0) {
+    return { kind: "down", points: band.pointsToPrev, label: band.prevLabel };
+  }
+  if (band.nextLabel && band.pointsToNext > 0) {
+    return { kind: "up", points: band.pointsToNext, label: band.nextLabel };
+  }
+  return { kind: "max", points: 0, label: null };
 }
 
 export function getOverallSkillBadge(average: number): OverallSkillBadge {

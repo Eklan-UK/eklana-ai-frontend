@@ -23,8 +23,10 @@ import { ClipboardPaste } from "@/components/drills/ClipboardPaste";
 import { AIDrillCreationShell } from "@/components/drills/AIDrillCreationShell";
 import { DrillFormBody } from "@/components/drills/DrillFormBody";
 import { BulkDrillWizard } from "@/components/drills/BulkDrillWizard";
+import { DrillUploadPreviewModal } from "@/components/drills/DrillUploadPreviewModal";
 import {
   applyParsedContentToDraft,
+  buildBulkContentFromDraft,
   buildDrillPayloadFromDraft,
   draftFromBulkPendingItem,
   validateDrillDraft,
@@ -166,6 +168,7 @@ export function DrillCreatePageContent({
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState("");
   const [showReassignConfirm, setShowReassignConfirm] = useState(false);
+  const [showUploadPreview, setShowUploadPreview] = useState(false);
 
   const [bulkDrafts, setBulkDrafts] = useState<DrillDraft[] | null>(null);
   const [bulkReturnTo, setBulkReturnTo] = useState("");
@@ -551,6 +554,16 @@ export function DrillCreatePageContent({
     await executeSubmit();
   };
 
+  const handlePreview = () => {
+    if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
+      return;
+    if (draft.selectedUsers.length === 0) {
+      toast.error("Please select at least one user");
+      return;
+    }
+    setShowUploadPreview(true);
+  };
+
   const handleCopyDrill = async () => {
     if (!validateDrillDraft(draft, { skipLearningJourney: source === "precision_clinic" }))
       return;
@@ -732,7 +745,7 @@ export function DrillCreatePageContent({
         </button>
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={isEditMode ? handleSubmit : handlePreview}
           disabled={loading || saving || copying}
           className="px-8 py-3.5 bg-[#418b43] text-white font-bold rounded-full hover:bg-[#3a7c3b] transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
@@ -746,7 +759,7 @@ export function DrillCreatePageContent({
           ) : isEditMode ? (
             `Update Drill for ${draft.selectedUsers.length} user${draft.selectedUsers.length !== 1 ? "s" : ""}`
           ) : (
-            `Create Drill for ${draft.selectedUsers.length} user${draft.selectedUsers.length !== 1 ? "s" : ""}`
+            "Preview"
           )}
         </button>
         <button
@@ -824,6 +837,20 @@ export function DrillCreatePageContent({
             />
           </div>
         </div>
+      )}
+
+      {showUploadPreview && !isEditMode && (
+        <DrillUploadPreviewModal
+          results={[
+            {
+              drillType: draft.drillType,
+              content: buildBulkContentFromDraft(draft),
+            },
+          ]}
+          onUpload={executeSubmit}
+          onCancel={() => setShowUploadPreview(false)}
+          uploading={loading || isGeneratingAudio}
+        />
       )}
 
       {!isEditMode && (

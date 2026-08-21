@@ -283,18 +283,26 @@ export default function MyProgressPage() {
                 emoji="💪"
                 title={t("confidence")}
                 score={confidence}
+                weeklyChange={scorecard?.confidenceWeeklyChange ?? 0}
               />
               <SkillLevelRow
                 emoji="🔍"
                 title={t("clarity")}
                 score={pronunciation}
+                weeklyChange={scorecard?.pronunciationWeeklyChange ?? 0}
               />
               <SkillLevelRow
                 emoji="🎯"
                 title={t("accuracy")}
                 score={accuracy}
+                weeklyChange={scorecard?.accuracyWeeklyChange ?? 0}
               />
-              <SkillLevelRow emoji="💬" title={t("fluency")} score={fluency} />
+              <SkillLevelRow
+                emoji="💬"
+                title={t("fluency")}
+                score={fluency}
+                weeklyChange={scorecard?.fluencyWeeklyChange ?? 0}
+              />
             </div>
           )}
         </section>
