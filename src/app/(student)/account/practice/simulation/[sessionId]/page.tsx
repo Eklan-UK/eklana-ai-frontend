@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { X, Mic, Loader2, Lightbulb } from "lucide-react";
+import { X, Mic, Loader2, Lightbulb, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { releaseMediaStream } from "@/lib/ios-audio-utils";
 import { Button } from "@/components/ui/Button";
@@ -10,8 +10,15 @@ import { Button } from "@/components/ui/Button";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ScenarioPhase {
-  phaseName: string;
+  phaseTitle: string;
+  situation: string;
+  clinicalInformation: string;
   characters: string[];
+}
+
+interface ScenarioHint {
+  phaseTitle: string;
+  hintText: string;
 }
 
 interface SessionTurn {
@@ -28,28 +35,40 @@ interface SessionDetail {
   briefingComplete: boolean;
   turns: SessionTurn[];
   scenario: {
-    title: string;
     workplaceSetting: string;
     maxDurationMinutes: number;
-    studentHint: string;
+    background: string;
+    patientInformation: string;
+    hints: ScenarioHint[];
     phases: ScenarioPhase[];
   };
 }
 
-interface Finding {
-  label: string;
-  data: string;
+type ChatMessage = { kind: "turn"; role: "student" | "ai"; text: string };
+
+interface BriefingScreen {
+  displayText: string;
+  audioBase64: string;
 }
 
-type ChatMessage =
-  | { kind: "turn"; role: "student" | "ai"; text: string }
-  | { kind: "findings"; findings: Finding[] };
+interface BriefingData {
+  background: BriefingScreen;
+  patientInformation: BriefingScreen;
+}
 
+// New flow, in order: awaitingStart (Start button, timer starts on click) ->
+// background (static text + audio, Continue) -> patientInformation (static
+// text + audio, Continue) -> phaseIntro (current phase's title/situation/
+// clinical info, "Begin conversation" the first time / "Continue
+// conversation" after a phase advance) -> active/recording/processing (live
+// conversation) -> phaseIntro again on each advancePhase -> ... -> completed.
 type UiPhase =
   | "loading"
-  | "briefing"
   | "awaitingStart"
   | "starting"
+  | "background"
+  | "patientInformation"
+  | "phaseIntro"
   | "active"
   | "recording"
   | "processing"
@@ -87,18 +106,24 @@ interface CompetencyScore {
   evidence: string;
 }
 
+// Sub-fields are optional, not just their arrays defaulted — a session graded
+// before a given sub-grading pass existed (or whose pass failed outside the
+// documented { errors: [] }-style fallback) can have the field missing
+// entirely. gradeSimulationSession's overallGradeResult short-circuit returns
+// whatever was previously persisted as-is, so this can reach the client even
+// on a fresh "See my grades" call for an old session.
 interface GradeResult {
-  pronunciation: {
+  pronunciation?: {
     gradedTurnCount: number;
     failedTurnCount: number;
-    mispronouncedWords: MispronouncedWord[];
+    mispronouncedWords?: MispronouncedWord[];
   };
-  grammar: {
-    errors: GrammarError[];
+  grammar?: {
+    errors?: GrammarError[];
   };
-  competency: {
-    competencyScores: CompetencyScore[];
-    overallSummary: string;
+  competency?: {
+    competencyScores?: CompetencyScore[];
+    overallSummary?: string;
   };
 }
 
@@ -109,7 +134,6 @@ type GradingState = "idle" | "loading" | "done" | "error";
 interface SseHandlers {
   onText?: (text: string) => void;
   onAudio?: (data: string) => void;
-  onReveal?: (findings: Finding[]) => void;
   onPhaseAdvance?: (newPhaseIndex: number) => void;
   onTranscript?: (text: string) => void;
   onError?: (message: string) => void;
@@ -137,9 +161,7 @@ async function readSimulationSSE(
       if (rawEvent.startsWith("data: ")) {
         try {
           const parsed = JSON.parse(rawEvent.slice("data: ".length));
-          if (parsed?.type === "reveal" && Array.isArray(parsed.findings)) {
-            handlers.onReveal?.(parsed.findings);
-          } else if (parsed?.type === "audio" && typeof parsed.data === "string") {
+          if (parsed?.type === "audio" && typeof parsed.data === "string") {
             handlers.onAudio?.(parsed.data);
           } else if (parsed?.type === "text" && typeof parsed.data === "string") {
             textAccum += parsed.data;
@@ -376,8 +398,9 @@ export default function SimulationSessionPage() {
 
   const [uiPhase, setUiPhase] = useState<UiPhase>("loading");
   const [session, setSession] = useState<SessionDetail | null>(null);
-  const [briefingText, setBriefingText] = useState("");
+  const [briefingData, setBriefingData] = useState<BriefingData | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [hintCarouselIndex, setHintCarouselIndex] = useState(0);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState("");
   const [gradingState, setGradingState] = useState<GradingState>("idle");
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
@@ -414,6 +437,7 @@ export default function SimulationSessionPage() {
         if (cancelled) return;
 
         setSession(sessionJson.data);
+        setBriefingData(briefingJson.data);
         setMessages(
           (sessionJson.data.turns as SessionTurn[]).map((turn) => ({
             kind: "turn",
@@ -422,25 +446,35 @@ export default function SimulationSessionPage() {
           })),
         );
 
-        if (sessionJson.data.briefingComplete) {
-          // Returning to an already-started session (e.g. after a refresh).
-          setUiPhase(sessionJson.data.status === "completed" ? "completed" : "active");
+        if (sessionJson.data.status === "completed") {
+          setUiPhase("completed");
           return;
         }
 
-        setBriefingText(briefingJson.data.displayText || "");
-        setUiPhase("briefing");
+        if (sessionJson.data.briefingComplete) {
+          const turns = sessionJson.data.turns as SessionTurn[];
+          if (turns.length > 0) {
+            // Genuinely mid-conversation (the AI has spoken at least once) —
+            // background/patient-info/phase-intro screens were already shown
+            // earlier in this session, so skip straight back into it.
+            setUiPhase("active");
+          } else {
+            // Start was clicked (briefingComplete is set) but the student left
+            // before reaching "Begin conversation" — no AI opening line has
+            // fired yet. Resuming into "active" here would be a dead-end mic
+            // screen with an empty message list, so resume into the current
+            // phase's intro screen instead; it already renders "Begin
+            // conversation" whenever messages.length === 0. Background/Patient
+            // Information aren't replayed — the student already saw them once
+            // this session.
+            setUiPhase("phaseIntro");
+          }
+          return;
+        }
 
-        const audio = new Audio(`data:audio/wav;base64,${briefingJson.data.audioBase64}`);
-        briefingAudioRef.current = audio;
-        const finishBriefing = () => {
-          if (cancelled) return;
-          setBriefingText("");
-          setUiPhase("awaitingStart");
-        };
-        audio.onended = finishBriefing;
-        audio.onerror = finishBriefing;
-        audio.play().catch(finishBriefing);
+        // Start button click is still the very first action shown — no
+        // pre-Start audio plays automatically any more.
+        setUiPhase("awaitingStart");
       } catch {
         if (cancelled) return;
         toast.error("Could not load this session. Please try again.");
@@ -491,7 +525,7 @@ export default function SimulationSessionPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ─── Start ────────────────────────────────────────────────────────────────
+  // ─── Start → Background → Patient Information → Phase intro ───────────────
 
   const handleStart = async () => {
     setUiPhase("starting");
@@ -508,6 +542,44 @@ export default function SimulationSessionPage() {
         setSession((prev) => (prev ? { ...prev, startedAt: newStartedAt } : prev));
       }
 
+      playBriefingScreenAudio("background");
+      setUiPhase("background");
+    } catch {
+      toast.error("Could not start the session. Please try again.");
+      setUiPhase("awaitingStart");
+    }
+  };
+
+  /** Autoplays a briefing screen's narration — best-effort, the Continue button never waits on it. */
+  const playBriefingScreenAudio = (screen: keyof BriefingData) => {
+    const audioBase64 = briefingData?.[screen]?.audioBase64;
+    if (!audioBase64) return;
+    briefingAudioRef.current?.pause();
+    const audio = new Audio(`data:audio/wav;base64,${audioBase64}`);
+    briefingAudioRef.current = audio;
+    audio.play().catch(() => {
+      // Autoplay can be blocked — non-fatal, the text is already on screen.
+    });
+  };
+
+  const handleBackgroundContinue = () => {
+    briefingAudioRef.current?.pause();
+    playBriefingScreenAudio("patientInformation");
+    setUiPhase("patientInformation");
+  };
+
+  const handlePatientInformationContinue = () => {
+    briefingAudioRef.current?.pause();
+    setUiPhase("phaseIntro");
+  };
+
+  // Phase-intro "Begin conversation" (first entry, no turns yet) triggers the
+  // opening line the same way handleStart used to. "Continue conversation"
+  // (after an advancePhase) just resumes — the live Gemini session is still
+  // cached server-side under the same sessionKey, so no API call is needed.
+  const handleBeginConversation = async () => {
+    setUiPhase("starting");
+    try {
       const openingRes = await fetch(`/api/v1/simulation/sessions/${sessionId}/opening`, {
         method: "POST",
         credentials: "include",
@@ -524,10 +596,12 @@ export default function SimulationSessionPage() {
 
       void player.playbackDone.then(() => setUiPhase("active"));
     } catch {
-      toast.error("Could not start the session. Please try again.");
-      setUiPhase("awaitingStart");
+      toast.error("Could not start the conversation. Please try again.");
+      setUiPhase("phaseIntro");
     }
   };
+
+  const handleContinueConversation = () => setUiPhase("active");
 
   // ─── Turn submission (SSE) ────────────────────────────────────────────────
 
@@ -562,17 +636,21 @@ export default function SimulationSessionPage() {
         if (!res.body) throw new Error("Turn response had no body");
 
         let sseErrorMessage: string | null = null;
+        // Set only when advancePhase fires AND there's a next phase to show an
+        // intro screen for (the last phase advancing past the end is left to
+        // the existing sessionComplete detection on the next /turn call).
+        let advancedToPhaseIndex: number | null = null;
         const player = createChunkedAudioPlayer(playbackAudioRef);
         const { textAccum } = await readSimulationSSE(res.body.getReader(), {
           onAudio: (data) => player.pushChunk(data),
           onTranscript: (text) => {
             setMessages((prev) => [...prev, { kind: "turn", role: "student", text }]);
           },
-          onReveal: (revealedFindings) => {
-            setMessages((prev) => [...prev, { kind: "findings", findings: revealedFindings }]);
-          },
           onPhaseAdvance: (newPhaseIndex) => {
             setSession((prev) => (prev ? { ...prev, currentPhaseIndex: newPhaseIndex } : prev));
+            if (newPhaseIndex < (session?.scenario.phases.length ?? 0)) {
+              advancedToPhaseIndex = newPhaseIndex;
+            }
           },
           onError: (message) => {
             sseErrorMessage = message;
@@ -592,13 +670,13 @@ export default function SimulationSessionPage() {
           setMessages((prev) => [...prev, { kind: "turn", role: "ai", text: textAccum }]);
         }
 
-        setUiPhase("active");
+        setUiPhase(advancedToPhaseIndex !== null ? "phaseIntro" : "active");
       } catch {
         toast.error("Something went wrong processing your turn. Please try again.");
         setUiPhase("active");
       }
     },
-    [sessionId],
+    [sessionId, session],
   );
 
   // ─── Mic recording ────────────────────────────────────────────────────────
@@ -765,8 +843,10 @@ export default function SimulationSessionPage() {
     );
   }
 
-  const currentPhaseName =
-    session?.scenario.phases[session.currentPhaseIndex]?.phaseName ?? "";
+  const currentPhase = session?.scenario.phases[session.currentPhaseIndex];
+  const currentPhaseName = currentPhase?.phaseTitle ?? "";
+  const currentPhaseHints =
+    session?.scenario.hints.filter((hint) => hint.phaseTitle === currentPhaseName) ?? [];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -784,7 +864,9 @@ export default function SimulationSessionPage() {
           <span className="font-nunito text-sm font-semibold text-foreground">
             {currentPhaseName}
           </span>
-          {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") &&
+          {uiPhase !== "awaitingStart" &&
+            uiPhase !== "starting" &&
+            uiPhase !== "completed" &&
             timeRemainingLabel && (
               <span className="font-nunito text-xs text-muted-foreground">
                 {timeRemainingLabel} left
@@ -829,7 +911,7 @@ export default function SimulationSessionPage() {
         <div className="flex h-1 w-full gap-1 bg-border">
           {session.scenario.phases.map((phase, idx) => (
             <span
-              key={`${phase.phaseName}-${idx}`}
+              key={`${phase.phaseTitle}-${idx}`}
               className={`h-full flex-1 ${
                 idx <= session.currentPhaseIndex ? "bg-primary" : "bg-transparent"
               }`}
@@ -840,17 +922,10 @@ export default function SimulationSessionPage() {
 
       {/* Content area */}
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 text-center">
-        {uiPhase === "briefing" && briefingText && (
-          <p className="font-nunito text-base leading-relaxed text-foreground">{briefingText}</p>
-        )}
-
         {uiPhase === "awaitingStart" && (
           <div className="flex flex-col items-center gap-4">
-            <p className="font-nunito text-base text-foreground">
-              {session?.scenario.title}
-            </p>
             {session?.scenario.workplaceSetting && (
-              <p className="font-nunito text-sm text-muted-foreground">
+              <p className="font-nunito text-base text-foreground">
                 {session.scenario.workplaceSetting}
               </p>
             )}
@@ -860,47 +935,67 @@ export default function SimulationSessionPage() {
 
         {uiPhase === "starting" && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
 
+        {uiPhase === "background" && (
+          <div className="flex w-full max-w-md flex-col items-center gap-6">
+            <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Background
+            </p>
+            <p className="font-nunito text-base leading-relaxed text-foreground">
+              {session?.scenario.background}
+            </p>
+            <Button onClick={handleBackgroundContinue}>Continue</Button>
+          </div>
+        )}
+
+        {uiPhase === "patientInformation" && (
+          <div className="flex w-full max-w-md flex-col items-center gap-6">
+            <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Patient Information
+            </p>
+            <p className="font-nunito text-base leading-relaxed text-foreground">
+              {session?.scenario.patientInformation}
+            </p>
+            <Button onClick={handlePatientInformationContinue}>Continue</Button>
+          </div>
+        )}
+
+        {uiPhase === "phaseIntro" && currentPhase && (
+          <div className="flex w-full max-w-md flex-col items-center gap-6">
+            <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {currentPhase.phaseTitle}
+            </p>
+            <p className="font-nunito text-base leading-relaxed text-foreground">
+              {currentPhase.situation}
+            </p>
+            <p className="font-nunito text-sm leading-relaxed text-muted-foreground">
+              {currentPhase.clinicalInformation}
+            </p>
+            <Button onClick={messages.length === 0 ? handleBeginConversation : handleContinueConversation}>
+              {messages.length === 0 ? "Begin conversation" : "Continue conversation"}
+            </Button>
+          </div>
+        )}
+
         {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") && (
           <div className="flex w-full max-w-md flex-1 flex-col gap-3 overflow-y-auto text-left">
-            {messages.map((message, idx) =>
-              message.kind === "findings" ? (
-                <div
-                  key={idx}
-                  className="w-full space-y-2 rounded-xl border border-border bg-card p-3"
-                >
-                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    New information revealed
-                  </p>
-                  <ul className="space-y-2">
-                    {message.findings.map((finding) => (
-                      <li key={finding.label}>
-                        <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {finding.label}
-                        </p>
-                        <p className="font-nunito text-sm text-foreground">{finding.data}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div
-                  key={idx}
-                  className={`flex flex-col gap-1 ${
-                    message.role === "student" ? "items-end" : "items-start"
+            {messages.map((message, idx) => (
+              <div
+                key={idx}
+                className={`flex flex-col gap-1 ${
+                  message.role === "student" ? "items-end" : "items-start"
+                }`}
+              >
+                <p
+                  className={`max-w-[85%] rounded-2xl px-4 py-2 font-nunito text-base leading-relaxed ${
+                    message.role === "student"
+                      ? "bg-primary text-white"
+                      : "bg-muted text-foreground"
                   }`}
                 >
-                  <p
-                    className={`max-w-[85%] rounded-2xl px-4 py-2 font-nunito text-base leading-relaxed ${
-                      message.role === "student"
-                        ? "bg-primary text-white"
-                        : "bg-muted text-foreground"
-                    }`}
-                  >
-                    {message.text}
-                  </p>
-                </div>
-              ),
-            )}
+                  {message.text}
+                </p>
+              </div>
+            ))}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -934,66 +1029,70 @@ export default function SimulationSessionPage() {
               </div>
             )}
 
-            {gradingState === "done" && gradeResult && (
-              <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-4 text-left">
-                <div>
-                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Summary
-                  </p>
-                  <p className="font-nunito text-sm text-foreground">
-                    {gradeResult.competency.overallSummary || "No summary available."}
-                  </p>
-                </div>
+            {gradingState === "done" && gradeResult && (() => {
+              const mispronouncedWords = gradeResult.pronunciation?.mispronouncedWords ?? [];
+              const grammarErrors = gradeResult.grammar?.errors ?? [];
+              const overallSummary = gradeResult.competency?.overallSummary || "No summary available.";
 
-                <div>
-                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Mispronounced words
-                  </p>
-                  {gradeResult.pronunciation.mispronouncedWords.length === 0 ? (
-                    <p className="font-nunito text-sm text-muted-foreground">
-                      No mispronounced words detected.
+              return (
+                <div className="w-full space-y-4 rounded-2xl border border-border bg-card p-4 text-left">
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Summary
                     </p>
-                  ) : (
-                    <ul className="mt-1 flex flex-wrap gap-2">
-                      {gradeResult.pronunciation.mispronouncedWords.map((w, idx) => (
-                        <li
-                          key={idx}
-                          className="rounded-full bg-muted px-3 py-1 font-nunito text-sm text-foreground"
-                        >
-                          {w.word}{" "}
-                          <span className="text-xs text-muted-foreground">
-                            ({Math.round(w.score)})
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                    <p className="font-nunito text-sm text-foreground">{overallSummary}</p>
+                  </div>
 
-                <div>
-                  <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Misused words / grammar
-                  </p>
-                  {gradeResult.grammar.errors.length === 0 ? (
-                    <p className="font-nunito text-sm text-muted-foreground">
-                      No grammar issues detected.
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Mispronounced words
                     </p>
-                  ) : (
-                    <ul className="mt-1 space-y-2">
-                      {gradeResult.grammar.errors.map((err, idx) => (
-                        <li key={idx} className="font-nunito text-sm text-foreground">
-                          <span className="text-muted-foreground line-through">
-                            {err.quotedText}
-                          </span>{" "}
-                          → <span className="font-medium">{err.correctedVersion}</span>
-                          <p className="text-xs text-muted-foreground">{err.explanation}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                    {mispronouncedWords.length === 0 ? (
+                      <p className="font-nunito text-sm text-muted-foreground">
+                        No mispronounced words detected.
+                      </p>
+                    ) : (
+                      <ul className="mt-1 flex flex-wrap gap-2">
+                        {mispronouncedWords.map((w, idx) => (
+                          <li
+                            key={idx}
+                            className="rounded-full bg-muted px-3 py-1 font-nunito text-sm text-foreground"
+                          >
+                            {w.word}{" "}
+                            <span className="text-xs text-muted-foreground">
+                              ({Math.round(w.score)})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Misused words / grammar
+                    </p>
+                    {grammarErrors.length === 0 ? (
+                      <p className="font-nunito text-sm text-muted-foreground">
+                        No grammar issues detected.
+                      </p>
+                    ) : (
+                      <ul className="mt-1 space-y-2">
+                        {grammarErrors.map((err, idx) => (
+                          <li key={idx} className="font-nunito text-sm text-foreground">
+                            <span className="text-muted-foreground line-through">
+                              {err.quotedText}
+                            </span>{" "}
+                            → <span className="font-medium">{err.correctedVersion}</span>
+                            <p className="text-xs text-muted-foreground">{err.explanation}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <Button variant="outline" onClick={() => router.push("/account/practice/simulation")}>
               Back to Simulation Room
@@ -1006,7 +1105,10 @@ export default function SimulationSessionPage() {
       {(uiPhase === "active" || uiPhase === "recording" || uiPhase === "processing") && (
         <footer className="flex items-center justify-between border-t border-border px-6 py-4">
           <button
-            onClick={() => setShowHint(true)}
+            onClick={() => {
+              setHintCarouselIndex(0);
+              setShowHint(true);
+            }}
             aria-label="Show hint"
             className="rounded-full p-3 text-muted-foreground hover:bg-muted"
           >
@@ -1044,10 +1146,49 @@ export default function SimulationSessionPage() {
             className="w-full max-w-md rounded-t-2xl bg-card p-6 md:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="font-nunito text-sm font-semibold text-foreground">Hint</p>
-            <p className="mt-2 font-nunito text-sm text-muted-foreground">
-              {session?.scenario.studentHint || "No hint available for this scenario."}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="font-nunito text-sm font-semibold text-foreground">Hint</p>
+              {currentPhaseHints.length > 1 && (
+                <p className="font-nunito text-xs text-muted-foreground">
+                  {hintCarouselIndex + 1} / {currentPhaseHints.length}
+                </p>
+              )}
+            </div>
+
+            {currentPhaseHints.length === 0 ? (
+              <p className="mt-2 font-nunito text-sm text-muted-foreground">
+                No hint available for this phase.
+              </p>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                {currentPhaseHints.length > 1 && (
+                  <button
+                    onClick={() =>
+                      setHintCarouselIndex(
+                        (i) => (i - 1 + currentPhaseHints.length) % currentPhaseHints.length,
+                      )
+                    }
+                    aria-label="Previous hint"
+                    className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-muted"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                )}
+                <p className="flex-1 font-nunito text-sm text-muted-foreground">
+                  {currentPhaseHints[hintCarouselIndex]?.hintText}
+                </p>
+                {currentPhaseHints.length > 1 && (
+                  <button
+                    onClick={() => setHintCarouselIndex((i) => (i + 1) % currentPhaseHints.length)}
+                    aria-label="Next hint"
+                    className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-muted"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
             <Button className="mt-4" fullWidth onClick={() => setShowHint(false)}>
               Got it
             </Button>
