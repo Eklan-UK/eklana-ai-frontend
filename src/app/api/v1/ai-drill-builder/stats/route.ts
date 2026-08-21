@@ -1,4 +1,4 @@
-// GET /api/v1/precision-clinic/stats — dashboard card counts (admin only)
+// GET /api/v1/ai-drill-builder/stats — dashboard card counts (admin + tutor)
 import { NextRequest } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { withErrorHandler } from '@/lib/api/error-handler';
@@ -8,7 +8,7 @@ import { countDrillPracticeItems } from '@/lib/drills/count-practice-items';
 import Drill from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 
-const PC_SOURCE = { source: 'precision_clinic' as const };
+const BUILDER_SOURCE = { source: { $ne: 'precision_clinic' } };
 
 async function getHandler(
 	_req: NextRequest,
@@ -17,15 +17,15 @@ async function getHandler(
 	await connectToDatabase();
 
 	const [drills, assigned, publishedAgg] = await Promise.all([
-		Drill.find(PC_SOURCE)
+		Drill.find(BUILDER_SOURCE)
 			.select(
 				'target_sentences pronunciation_items matching_pairs definition_items grammar_items sentence_writing_items fill_blank_items key_phrase_items roleplay_scenes roleplay_dialogue listening_drill_content listening_drill_title article_content article_title sentence_drill_word'
 			)
 			.lean()
 			.exec(),
-		DrillAssignment.countDocuments(PC_SOURCE),
+		DrillAssignment.countDocuments(BUILDER_SOURCE),
 		DrillAssignment.aggregate([
-			{ $match: PC_SOURCE },
+			{ $match: BUILDER_SOURCE },
 			{ $group: { _id: '$drillId' } },
 			{ $count: 'count' },
 		]),
@@ -46,4 +46,4 @@ async function getHandler(
 	});
 }
 
-export const GET = withRole(['admin'], withErrorHandler(getHandler));
+export const GET = withRole(['admin', 'tutor'], withErrorHandler(getHandler));
