@@ -2363,6 +2363,23 @@ export const studentAPI = {
       data,
     });
   },
+
+  updateStudentWeekDates: (
+    studentId: string,
+    data: { weekNumber: number; weekStartDate: string; weekEndDate: string },
+  ) => {
+    return apiRequest<{
+      code: string;
+      data: {
+        weekNumber: number;
+        weekStartDate: string;
+        weekEndDate: string;
+      };
+    }>(`/students/${studentId}/weeks`, {
+      method: 'PATCH',
+      data,
+    });
+  },
 };
 
 // Learning Journey API

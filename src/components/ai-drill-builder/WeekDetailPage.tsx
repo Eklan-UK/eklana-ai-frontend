@@ -12,7 +12,10 @@ import { useStudentContext } from "@/hooks/useStudentContext";
 import { useStudentWeeks } from "@/hooks/useStudentWeeks";
 import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
-import { formatWeekDateRange } from "@/lib/ai-drill-builder/week-utils";
+import {
+  formatStoredWeekDateRange,
+  formatWeekDateRange,
+} from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
   getLearnerId,
@@ -112,7 +115,9 @@ export function WeekDetailPage({
     return (weeksData?.weeks ?? []).find((w) => w.weekNumber === weekNumber);
   }, [weeksData, weekNumber]);
 
-  const dateRange = formatWeekDateRange(weekNumber, weeksData?.anchorDate);
+  const dateRange =
+    formatStoredWeekDateRange(week?.weekStartDate, week?.weekEndDate) ??
+    formatWeekDateRange(weekNumber, weeksData?.anchorDate);
   const returnTo = `${basePath}/${studentId}/week/${weekNumber}`;
 
   const initialContext = useMemo(

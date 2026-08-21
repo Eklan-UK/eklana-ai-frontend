@@ -125,3 +125,24 @@ export function useDeleteStudentWeeks(studentId: string) {
     },
   });
 }
+
+export function useUpdateStudentWeekDates(studentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      weekNumber: number;
+      weekStartDate: string;
+      weekEndDate: string;
+    }) => studentAPI.updateStudentWeekDates(studentId, data),
+    onSuccess: async (_response, variables) => {
+      await invalidateStudentWeeks(queryClient, studentId);
+      toast.success(`Week ${variables.weekNumber} dates updated`);
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to update week dates";
+      toast.error(message);
+    },
+  });
+}
