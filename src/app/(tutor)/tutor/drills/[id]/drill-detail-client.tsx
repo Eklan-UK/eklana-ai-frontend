@@ -266,7 +266,7 @@ export function DrillDetailClient({ drill, drillId }: DrillDetailClientProps) {
           drill.key_phrase_items.length > 0 && (
             <Card className="mb-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Scenario/Pressure Test Questions ({drill.key_phrase_items.length})
+                Scenario Pressure Test Questions ({drill.key_phrase_items.length})
               </h2>
               <div className="space-y-4">
                 {drill.key_phrase_items.map((item: any, idx: number) => (

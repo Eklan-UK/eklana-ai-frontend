@@ -633,7 +633,7 @@ export default function KeyPhrasesDrill({
       : "/account/drills";
     return (
       <DrillCompletionScreen
-        drillType="Scenario/Pressure Test"
+        drillType="Scenario Pressure Test"
         returnPath={returnPath}
         returnLabel={weeklyChallengeMeta ? "Back to Challenge" : "Back to My Plan"}
         celebrate={false}
@@ -662,7 +662,7 @@ export default function KeyPhrasesDrill({
     return (
       <DrillLayout title={drill.title} headerRight={<DrillBookmarkToggle drillId={String(drill._id)} />}>
         <Card className="p-6 text-center text-muted-foreground">
-          No Scenario/Pressure Test items found for this drill.
+          No Scenario Pressure Test items found for this drill.
         </Card>
       </DrillLayout>
     );

@@ -60,7 +60,7 @@ export function KeyPhrasesAnalyticsComponent({
 
   const headerRow = (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-lg font-bold text-foreground">Scenario/Pressure Test Analytics</h2>
+      <h2 className="text-lg font-bold text-foreground">Scenario Pressure Test Analytics</h2>
       {!useAggregated && (
         <button
           type="button"
@@ -134,7 +134,7 @@ export function KeyPhrasesAnalyticsComponent({
       <div>
         {headerRow}
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-800">Failed to load Scenario/Pressure Test analytics</p>
+          <p className="text-sm text-red-800">Failed to load Scenario Pressure Test analytics</p>
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ export function KeyPhrasesAnalyticsComponent({
         {filterPanel}
         <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-muted/30 py-12 text-center">
           <MessageSquareQuote className="mb-2 h-8 w-8 text-muted-foreground opacity-60" aria-hidden />
-          <p className="text-sm text-muted-foreground">No Scenario/Pressure Test drill data for this learner yet.</p>
+          <p className="text-sm text-muted-foreground">No Scenario Pressure Test drill data for this learner yet.</p>
         </div>
       </div>
     );
