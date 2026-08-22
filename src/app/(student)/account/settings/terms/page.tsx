@@ -391,44 +391,44 @@ const sections: Section[] = [
     title: "15. Miscellaneous",
     content: (
       <>
-        <p className="font-semibold text-[#171717]">Governing Law & Jurisdiction.</p>
+        <p className="font-semibold text-foreground">Governing Law & Jurisdiction.</p>
         <p>
           These Terms and Conditions and their performance shall be governed by the laws
           of England and Wales. The parties submit to the exclusive jurisdiction of the
           courts of England and Wales.
         </p>
-        <p className="font-semibold text-[#171717]">Entire Agreement.</p>
+        <p className="font-semibold text-foreground">Entire Agreement.</p>
         <p>
           These Terms and Conditions together with the Privacy Policy constitute the
           entire agreement between you and Eklan concerning the App and Services and
           supersede prior agreements.
         </p>
-        <p className="font-semibold text-[#171717]">Severability.</p>
+        <p className="font-semibold text-foreground">Severability.</p>
         <p>
           If a court finds any provision of these Terms to be invalid or unenforceable,
           the remaining provisions remain in full force.
         </p>
-        <p className="font-semibold text-[#171717]">No Waiver.</p>
+        <p className="font-semibold text-foreground">No Waiver.</p>
         <p>
           Failure by Eklan to enforce any right or provision is not a waiver unless
           acknowledged in writing.
         </p>
-        <p className="font-semibold text-[#171717]">Data Usage & Bandwidth.</p>
+        <p className="font-semibold text-foreground">Data Usage & Bandwidth.</p>
         <p>
           You acknowledge the App may consume mobile or broadband data as permitted by
           these Terms and our Privacy Policy.
         </p>
-        <p className="font-semibold text-[#171717]">Changes to App.</p>
+        <p className="font-semibold text-foreground">Changes to App.</p>
         <p>
           Eklan may change, suspend or discontinue the App or Services (or any part) at
           any time without notice or liability.
         </p>
-        <p className="font-semibold text-[#171717]">Assignment.</p>
+        <p className="font-semibold text-foreground">Assignment.</p>
         <p>
           Eklan may assign its rights or obligations under these Terms at any time
           without your consent.
         </p>
-        <p className="font-semibold text-[#171717]">Contact.</p>
+        <p className="font-semibold text-foreground">Contact.</p>
         <p>
           If you have any questions about these Terms, the App or Services, contact us
           at:{" "}
@@ -437,7 +437,7 @@ const sections: Section[] = [
           </a>
           .
         </p>
-        <p className="font-semibold text-[#171717] uppercase tracking-wide text-center mt-2">
+        <p className="font-semibold text-foreground uppercase tracking-wide text-center mt-2">
           YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD AND AGREE TO BE BOUND BY THESE
           TERMS AND CONDITIONS.
         </p>
@@ -487,7 +487,7 @@ export default function SettingsTermsPage() {
             </a>
             . Any such modifications shall become effective immediately upon posting.
           </p>
-          <p className="font-semibold text-[#171717] uppercase text-xs tracking-wide">
+          <p className="font-semibold text-foreground uppercase text-xs tracking-wide">
             IF YOU DO NOT AGREE TO ALL OF THESE TERMS AND CONDITIONS, DO NOT ACCESS OR
             USE ANY PART OF THE APP OR SERVICES.
           </p>

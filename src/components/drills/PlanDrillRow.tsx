@@ -161,7 +161,7 @@ export function PlanDrillRow({
         <h3
           className={`text-foreground leading-snug line-clamp-2 ${
             isJourney
-              ? "font-bold text-[13.5px] text-[#1e2939]"
+              ? "font-bold text-[13.5px]"
               : "font-semibold text-sm"
           }`}
         >

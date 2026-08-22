@@ -166,7 +166,7 @@ function renderContentForType(
     case "key_phrases": {
       const items = (content.key_phrase_items as Record<string, unknown>[]) ?? [];
       return (
-        <PreviewSection title={`Scenario/Pressure Test — ${items.length} questions`}>
+        <PreviewSection title={`Scenario Pressure Test — ${items.length} questions`}>
           {items.map((item, i) => (
             <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
               {Boolean(String(item.context ?? "").trim()) && (

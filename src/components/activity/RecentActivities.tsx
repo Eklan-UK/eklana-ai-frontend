@@ -127,7 +127,7 @@ export function RecentActivities({ limit = 4 }: { limit?: number }) {
                   <Icon className={`w-6 h-6 ${iconColor}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-foreground">
                     {formatActivityTitle(activity)}
                   </p>
                   <p className="text-xs text-gray-500">
