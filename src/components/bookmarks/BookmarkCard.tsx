@@ -88,7 +88,7 @@ export function BookmarkCard({
         </div>
 
         <div className="mb-2">
-          <h3 className="text-lg font-bold text-gray-900 leading-tight mb-0.5 line-clamp-2 group-hover:text-green-600 transition-colors">
+          <h3 className="text-lg font-bold text-foreground leading-tight mb-0.5 line-clamp-2 group-hover:text-green-600 transition-colors">
             {bookmark.content}
           </h3>
 
