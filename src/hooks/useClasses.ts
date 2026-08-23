@@ -10,13 +10,10 @@ import {
 } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { classesAPI, tutorAPI } from '@/lib/api';
+import { patchClassListDataOnReschedule } from '@/lib/classes/patch-class-list-on-reschedule';
 import { queryKeys } from '@/lib/react-query';
 import { toast } from 'sonner';
-import type {
-  AdminClassListItemDTO,
-  ClassBucket,
-  CreateAdminClassBody,
-} from '@/domain/classes/class.api.types';
+import type { CreateAdminClassBody } from '@/domain/classes/class.api.types';
 
 type AdminSessionQueryData = {
   classTitle: string;
@@ -54,72 +51,6 @@ function applyAdminSessionRescheduleToCache(
   );
 }
 
-type ClassListQueryData = {
-  classes: AdminClassListItemDTO[];
-  pagination: {
-    total: number;
-    limit: number;
-    offset: number;
-    hasMore?: boolean;
-  };
-};
-
-function formatTimeLabel(d: Date) {
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
-
-function patchClassListDataOnReschedule(
-  old: ClassListQueryData | undefined,
-  classSeriesId: string,
-  newStartUtc: string,
-  newEndUtc: string,
-): ClassListQueryData | undefined {
-  if (!old) return old;
-  const start = new Date(newStartUtc);
-  const end = new Date(newEndUtc);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return old;
-
-  const nextSessionLabel = start.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const timeRange = `${formatTimeLabel(start)} – ${formatTimeLabel(end)}`;
-  const scheduleDays = start.toLocaleDateString('en-US', { weekday: 'long' });
-
-  const now = new Date();
-  const isToday =
-    start.getFullYear() === now.getFullYear() &&
-    start.getMonth() === now.getMonth() &&
-    start.getDate() === now.getDate();
-  const bucket: ClassBucket = isToday ? 'today' : 'upcoming';
-
-  return {
-    ...old,
-    classes: old.classes.map((row) => {
-      if (row.id !== classSeriesId) return row;
-      const drawer = row.drawer
-        ? {
-            ...row.drawer,
-            sessionTimeRange: timeRange.replace(' – ', ' - '),
-            nextSessionFull: nextSessionLabel,
-          }
-        : { nextSessionFull: nextSessionLabel, sessionTimeRange: timeRange.replace(' – ', ' - ') };
-      return {
-        ...row,
-        nextSessionStartUtc: newStartUtc,
-        nextSessionIsReschedule: true,
-        nextSessionLabel,
-        timeRange,
-        scheduleDays,
-        bucket,
-        drawer,
-      };
-    }),
-  };
-}
-
 function isClassListQueryKey(key: readonly unknown[] | undefined, role: 'admin' | 'tutor' | 'learner') {
   if (!key || key.length < 3) return false;
   if (role === 'admin') {
@@ -141,12 +72,19 @@ function patchClassListCachesAfterReschedule(
   newStartUtc: string,
   newEndUtc: string,
 ) {
-  (['admin', 'tutor', 'learner'] as const).forEach((role) => {
-    queryClient.setQueriesData(
-      { predicate: (q) => isClassListQueryKey(q.queryKey as readonly unknown[], role) },
-      (old) => patchClassListDataOnReschedule(old as ClassListQueryData, classSeriesId, newStartUtc, newEndUtc),
+  try {
+    (['admin', 'tutor', 'learner'] as const).forEach((role) => {
+      queryClient.setQueriesData(
+        { predicate: (q) => isClassListQueryKey(q.queryKey as readonly unknown[], role) },
+        (old) => patchClassListDataOnReschedule(old, classSeriesId, newStartUtc, newEndUtc),
+      );
+    });
+  } catch (error) {
+    console.error(
+      '[patchClassListCachesAfterReschedule] Failed to patch class list caches after reschedule',
+      error,
     );
-  });
+  }
 }
 
 function readClassSeriesIdFromSessionCache(

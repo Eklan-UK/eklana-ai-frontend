@@ -425,7 +425,13 @@ export function DrillFormBody({
     patchDraft({
       keyPhraseItems: [
         ...draft.keyPhraseItems,
-        { respondentName: "", prompt: "", options: ["", ""], correctAnswer: "" },
+        {
+          context: "",
+          respondentName: "",
+          prompt: "",
+          options: ["", ""],
+          correctAnswer: "",
+        },
       ],
     });
   };
@@ -1507,6 +1513,21 @@ export function DrillFormBody({
                   </div>
 
                   <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">
+                      Context (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={item.context ?? ""}
+                      onChange={(e) =>
+                        updateKeyPhraseField(itemIndex, "context", e.target.value)
+                      }
+                      placeholder='e.g., "You are at the front desk when a guest approaches:"'
+                      className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl resize-y"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1.5">Situation / Scenario<span className="text-red-500">*</span></label>
                     <textarea
                       rows={2}
@@ -1655,7 +1676,7 @@ export function DrillFormBody({
                       <option value="summary">Summary</option>
                       <option value="listening">Listening</option>
                       <option value="fill_blank">Fill in the Blank</option>
-                      <option value="key_phrases">Pressure Test</option>
+                      <option value="key_phrases">Scenario Pressure Test</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>

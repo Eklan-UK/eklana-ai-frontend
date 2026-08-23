@@ -55,6 +55,9 @@ async function postHandler(
 		}
 
 		session.briefingComplete = true;
+		// Timer starts when the student actually begins the conversation, not at
+		// session creation (which happens before the briefing has even played).
+		session.startedAt = new Date();
 		await session.save();
 
 		const scenario = await SimulationScenario.findById(session.scenarioId);
@@ -72,8 +75,9 @@ async function postHandler(
 			{
 				code: 'Success',
 				data: {
-					phaseName: phase?.phaseName ?? '',
+					phaseTitle: phase?.phaseTitle ?? '',
 					characters: phase?.characters ?? [],
+					startedAt: session.startedAt,
 				},
 			},
 			{ status: 200 },

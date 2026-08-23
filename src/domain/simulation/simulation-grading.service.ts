@@ -2,9 +2,10 @@
 // scoring for every student turn (in parallel), grammar/context analysis, and
 // competency scoring, then persists the aggregate result onto the session.
 //
-// Used by POST /api/v1/simulation/sessions/[sessionId]/grade — student-triggered,
-// on-demand grading only. Grading no longer fires automatically on session
-// completion (see turn/route.ts and end/route.ts).
+// Called automatically from POST .../end (right after a session is marked
+// completed) and on-demand from POST .../grade (the "See my grades" button,
+// which mostly just returns the already-persisted result from /end at this
+// point — see the overallGradeResult short-circuit below).
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
@@ -40,6 +41,28 @@ export interface SimulationGradeResult {
 // student as "mispronounced" in the review screen.
 const MISPRONOUNCED_SCORE_THRESHOLD = 70;
 
+// A stored overallGradeResult can predate a sub-grading field that was added
+// later (mispronouncedWords was flattened onto pronunciation after some
+// sessions were already graded), or predate a sub-grading pass's fallback
+// being wired up to store its documented empty shape. Normalize on read so
+// every caller — including the short-circuit below — gets the same complete
+// shape regardless of when the document was written.
+function normalizeGradeResult(raw: any): SimulationGradeResult {
+	return {
+		pronunciation: {
+			gradedTurnCount: raw?.pronunciation?.gradedTurnCount ?? 0,
+			failedTurnCount: raw?.pronunciation?.failedTurnCount ?? 0,
+			mispronouncedWords: raw?.pronunciation?.mispronouncedWords ?? [],
+		},
+		grammar: { errors: raw?.grammar?.errors ?? [] },
+		competency: {
+			competencyScores: raw?.competency?.competencyScores ?? [],
+			overallSummary: raw?.competency?.overallSummary ?? '',
+		},
+		gradedAt: raw?.gradedAt ?? new Date(0),
+	};
+}
+
 export async function gradeSimulationSession(sessionId: string): Promise<SimulationGradeResult> {
 	await connectToDatabase();
 
@@ -47,6 +70,13 @@ export async function gradeSimulationSession(sessionId: string): Promise<Simulat
 
 	if (!session) {
 		throw new Error('Session not found');
+	}
+
+	// Already graded (most commonly by the automatic call from /end) — return
+	// the stored result rather than re-running the LLM/SpeechAce calls a second
+	// time, which would be wasteful and could disagree with the first result.
+	if (session.overallGradeResult) {
+		return normalizeGradeResult(session.overallGradeResult);
 	}
 
 	if (session.status !== 'completed') {
@@ -57,6 +87,31 @@ export async function gradeSimulationSession(sessionId: string): Promise<Simulat
 
 	if (!scenario) {
 		throw new Error('Scenario not found');
+	}
+
+	const studentTurnCount = session.turns.filter(
+		(turn: ISimulationSession['turns'][number]) => turn.role === 'student',
+	).length;
+
+	// Nothing was ever said by the student (e.g. the timer ran out during the
+	// AI's opening line) — skip the LLM calls entirely rather than sending an
+	// empty/near-empty transcript and risking a fabricated-sounding assessment.
+	if (studentTurnCount === 0) {
+		const gradeResult: SimulationGradeResult = {
+			pronunciation: { gradedTurnCount: 0, failedTurnCount: 0, mispronouncedWords: [] },
+			grammar: { errors: [] },
+			competency: {
+				competencyScores: [],
+				overallSummary:
+					'No spoken responses were recorded for this session, so it could not be graded.',
+			},
+			gradedAt: new Date(),
+		};
+
+		session.overallGradeResult = gradeResult;
+		await session.save();
+
+		return gradeResult;
 	}
 
 	const transcript = session.turns.map((turn: ISimulationSession['turns'][number]) => ({

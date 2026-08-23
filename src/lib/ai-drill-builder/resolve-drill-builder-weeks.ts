@@ -7,7 +7,14 @@ import {
   WEEK_MS,
   getAssignedAtForWeek,
   getWeekDateRange,
+  parseLocalCalendarDate,
 } from "@/lib/ai-drill-builder/week-utils";
+
+export type DrillBuilderWeekDateRow = {
+  weekNumber: number;
+  weekStartDate: Date;
+  weekEndDate: Date;
+};
 
 export { WEEK_MS, getAssignedAtForWeek, getWeekDateRange };
 
@@ -51,6 +58,68 @@ function coercePositiveInt(value: unknown): number | null {
     if (Number.isFinite(n) && Number.isInteger(n) && n >= 1) return n;
   }
   return null;
+}
+
+export function remapDrillBuilderWeekDates(
+  dates: Array<{
+    weekNumber?: number;
+    weekStartDate?: Date | string;
+    weekEndDate?: Date | string;
+  }> | null | undefined,
+  remap: Map<number, number>,
+): DrillBuilderWeekDateRow[] {
+  if (!dates?.length) return [];
+  const remapped: DrillBuilderWeekDateRow[] = [];
+  for (const row of dates) {
+    const oldWeek = coercePositiveInt(row.weekNumber);
+    if (oldWeek == null) continue;
+    const newWeek = remap.get(oldWeek);
+    if (newWeek == null) continue;
+    const weekStartDate = row.weekStartDate
+      ? new Date(row.weekStartDate)
+      : null;
+    const weekEndDate = row.weekEndDate ? new Date(row.weekEndDate) : null;
+    if (
+      !weekStartDate ||
+      !weekEndDate ||
+      Number.isNaN(weekStartDate.getTime()) ||
+      Number.isNaN(weekEndDate.getTime())
+    ) {
+      continue;
+    }
+    remapped.push({
+      weekNumber: newWeek,
+      weekStartDate,
+      weekEndDate,
+    });
+  }
+  remapped.sort((a, b) => a.weekNumber - b.weekNumber);
+  return remapped;
+}
+
+export function resolveWeekDisplayDates(
+  weekNumber: number,
+  anchor: Date,
+  overrides?: Array<{
+    weekNumber?: number;
+    weekStartDate?: Date | string;
+    weekEndDate?: Date | string;
+  }> | null,
+): { weekStartDate: Date; weekEndDate: Date } {
+  const override = overrides?.find(
+    (row) => coercePositiveInt(row.weekNumber) === weekNumber,
+  );
+  if (override?.weekStartDate && override?.weekEndDate) {
+    const weekStartDate = new Date(override.weekStartDate);
+    const weekEndDate = new Date(override.weekEndDate);
+    if (
+      !Number.isNaN(weekStartDate.getTime()) &&
+      !Number.isNaN(weekEndDate.getTime())
+    ) {
+      return { weekStartDate, weekEndDate };
+    }
+  }
+  return getWeekDateRange(weekNumber, anchor);
 }
 
 export function weekNumberFromAssignment(
@@ -103,6 +172,11 @@ export async function resolveDrillBuilderWeekCount(params: {
   user?: {
     _id?: Types.ObjectId | string;
     drillBuilderWeekCount?: number | null;
+    drillBuilderWeekDates?: Array<{
+      weekNumber: number;
+      weekStartDate: Date;
+      weekEndDate: Date;
+    }> | null;
     subscriptionActivatedAt?: Date | string | null;
     createdAt?: Date | string | null;
   } | null;
@@ -114,7 +188,9 @@ export async function resolveDrillBuilderWeekCount(params: {
   const user =
     params.user ??
     (await User.findById(params.learnerId)
-      .select("subscriptionActivatedAt createdAt drillBuilderWeekCount")
+      .select(
+        "subscriptionActivatedAt createdAt drillBuilderWeekCount drillBuilderWeekDates",
+      )
       .lean()
       .exec());
 
@@ -223,7 +299,9 @@ export async function moveStudentWeekDrills(params: {
   }
 
   const user = await User.findById(learnerId)
-    .select("subscriptionActivatedAt createdAt drillBuilderWeekCount")
+    .select(
+      "subscriptionActivatedAt createdAt drillBuilderWeekCount drillBuilderWeekDates",
+    )
     .lean()
     .exec();
 
@@ -316,7 +394,9 @@ export async function deleteStudentWeeks(params: {
   ].sort((a, b) => a - b);
 
   const user = await User.findById(learnerId)
-    .select("subscriptionActivatedAt createdAt drillBuilderWeekCount")
+    .select(
+      "subscriptionActivatedAt createdAt drillBuilderWeekCount drillBuilderWeekDates",
+    )
     .lean()
     .exec();
 
@@ -407,14 +487,142 @@ export async function deleteStudentWeeks(params: {
   }
 
   const newWeekCount = remainingWeeks.length;
-  await User.updateOne(
-    { _id: learnerId },
-    { $set: { drillBuilderWeekCount: newWeekCount } },
-  ).exec();
+  const userUpdate: {
+    drillBuilderWeekCount: number;
+    drillBuilderWeekDates?: DrillBuilderWeekDateRow[];
+  } = { drillBuilderWeekCount: newWeekCount };
+
+  const existingDates = (
+    user as {
+      drillBuilderWeekDates?: Array<{
+        weekNumber?: number;
+        weekStartDate?: Date | string;
+        weekEndDate?: Date | string;
+      }>;
+    }
+  ).drillBuilderWeekDates;
+  if (Array.isArray(existingDates) && existingDates.length > 0) {
+    userUpdate.drillBuilderWeekDates = remapDrillBuilderWeekDates(
+      existingDates,
+      remap,
+    );
+  }
+
+  await User.updateOne({ _id: learnerId }, { $set: userUpdate }).exec();
 
   return {
     deletedWeekNumbers: uniqueWeeks,
     weekCount: newWeekCount,
     remappedAssignmentCount,
   };
+}
+
+export function upsertDrillBuilderWeekDateRow(
+  existing: Array<{
+    weekNumber?: number;
+    weekStartDate?: Date | string;
+    weekEndDate?: Date | string;
+  }> | null | undefined,
+  row: DrillBuilderWeekDateRow,
+): DrillBuilderWeekDateRow[] {
+  const next: DrillBuilderWeekDateRow[] = [];
+  for (const current of existing ?? []) {
+    const weekNumber = coercePositiveInt(current.weekNumber);
+    if (weekNumber == null || weekNumber === row.weekNumber) continue;
+    const weekStartDate = current.weekStartDate
+      ? new Date(current.weekStartDate)
+      : null;
+    const weekEndDate = current.weekEndDate
+      ? new Date(current.weekEndDate)
+      : null;
+    if (
+      !weekStartDate ||
+      !weekEndDate ||
+      Number.isNaN(weekStartDate.getTime()) ||
+      Number.isNaN(weekEndDate.getTime())
+    ) {
+      continue;
+    }
+    next.push({ weekNumber, weekStartDate, weekEndDate });
+  }
+  next.push(row);
+  next.sort((a, b) => a.weekNumber - b.weekNumber);
+  return next;
+}
+
+/**
+ * Store display-only start/end dates for one Drill Builder week.
+ * Does not write assignment dueDate / assignedAt / builderWeekNumber.
+ */
+export async function updateStudentWeekDates(params: {
+  learnerId: string;
+  weekNumber: number;
+  weekStartDate: string;
+  weekEndDate: string;
+}): Promise<DrillBuilderWeekDateRow> {
+  const { learnerId, weekNumber, weekStartDate: startRaw, weekEndDate: endRaw } =
+    params;
+
+  if (
+    typeof weekNumber !== "number" ||
+    !Number.isFinite(weekNumber) ||
+    !Number.isInteger(weekNumber) ||
+    weekNumber < 1
+  ) {
+    throw new ValidationError("weekNumber must be a positive integer");
+  }
+
+  const weekStartDate = parseLocalCalendarDate(startRaw, "start");
+  const weekEndDate = parseLocalCalendarDate(endRaw, "end");
+  if (!weekStartDate || !weekEndDate) {
+    throw new ValidationError(
+      "weekStartDate and weekEndDate must be valid YYYY-MM-DD dates",
+    );
+  }
+
+  if (weekEndDate.getTime() < weekStartDate.getTime()) {
+    throw new ValidationError("weekEndDate must be on or after weekStartDate");
+  }
+
+  const user = await User.findById(learnerId)
+    .select(
+      "subscriptionActivatedAt createdAt drillBuilderWeekCount drillBuilderWeekDates",
+    )
+    .lean()
+    .exec();
+
+  if (!user) {
+    throw new NotFoundError("Student");
+  }
+
+  const { weekCount } = await resolveDrillBuilderWeekCount({
+    learnerId,
+    user,
+  });
+
+  if (weekNumber > weekCount) {
+    throw new ValidationError(
+      `Week ${weekNumber} does not exist (student has ${weekCount} week${weekCount === 1 ? "" : "s"})`,
+    );
+  }
+
+  const nextDates = upsertDrillBuilderWeekDateRow(
+    (
+      user as {
+        drillBuilderWeekDates?: Array<{
+          weekNumber?: number;
+          weekStartDate?: Date | string;
+          weekEndDate?: Date | string;
+        }>;
+      }
+    ).drillBuilderWeekDates,
+    { weekNumber, weekStartDate, weekEndDate },
+  );
+
+  await User.updateOne(
+    { _id: learnerId },
+    { $set: { drillBuilderWeekDates: nextDates } },
+  ).exec();
+
+  return { weekNumber, weekStartDate, weekEndDate };
 }

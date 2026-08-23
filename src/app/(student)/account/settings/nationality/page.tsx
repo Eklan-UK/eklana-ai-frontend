@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/layout/Header";
-import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useQueryClient } from "@tanstack/react-query";
 import { userAPI } from "@/lib/api";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/nationality-language";
 import { NationalityOptionRow } from "@/components/account/NationalityOptionRow";
 import { NationalityLanguageConfirmSheet } from "@/components/account/NationalityLanguageConfirmSheet";
+import { ProfileRadioRow } from "@/components/account/ProfileRadioRow";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserDisplayName } from "@/utils/user";
@@ -81,9 +81,7 @@ export default function NationalityPage() {
     const previousUi = selected;
     setSelected(label);
 
-    if (
-      shouldOfferLanguageSwitchForNationality(label, currentAppLanguage)
-    ) {
+    if (shouldOfferLanguageSwitchForNationality(label, currentAppLanguage)) {
       setRevertSelected(previousUi);
       setModalOpen(true);
     }
@@ -162,57 +160,24 @@ export default function NationalityPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="h-6"></div>
+      <div className="h-6" />
 
       <Header showBack title={tSettings("nationality")} />
 
       <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
-        <p className="text-base text-gray-600 mb-6">
-          Select your nationality to help us personalize your learning experience.
+        <p className="text-base text-muted-foreground mb-6">
+          {tSettings("nationalityDescription")}
         </p>
 
         <div className="space-y-2 mb-6">
           {NATIONALITY_OPTIONS.map((nationality) => (
-            <button
+            <ProfileRadioRow
               key={nationality.id}
-              type="button"
-              onClick={() => handlePickNationality(nationality.label)}
-              className="w-full text-left"
+              selected={selected === nationality.label}
+              onSelect={() => handlePickNationality(nationality.label)}
             >
-              <Card
-                className={`transition-all ${
-                  selected === nationality.label
-                    ? "bg-green-50 ring-2 ring-green-600"
-                    : ""
-                }`}
-              >
-                <NationalityOptionRow
-                  option={nationality}
-                  trailing={
-                    selected === nationality.label ? (
-                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          aria-hidden
-                        >
-                          <path
-                            d="M13 4L6 11L3 8"
-                            stroke="white"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    ) : undefined
-                  }
-                />
-              </Card>
-            </button>
+              <NationalityOptionRow option={nationality} />
+            </ProfileRadioRow>
           ))}
         </div>
 

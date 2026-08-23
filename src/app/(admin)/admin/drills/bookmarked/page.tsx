@@ -52,7 +52,7 @@ const DRILL_TYPE_OPTIONS = [
   { value: "listening", label: "Listening" },
   { value: "pronunciation", label: "Pronunciation" },
   { value: "fill_blank", label: "Fill in the Blank" },
-  { value: "key_phrases", label: "Pressure Test" },
+  { value: "key_phrases", label: "Scenario Pressure Test" },
 ] as const;
 
 type BookmarkedFilters = {

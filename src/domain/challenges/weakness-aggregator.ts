@@ -199,7 +199,7 @@ function extractVocabularySignals(
 					: []),
 			],
 			label:
-				drillType === 'key_phrases' ? 'Pressure Test accuracy' : 'Vocabulary pronunciation',
+				drillType === 'key_phrases' ? 'Scenario Pressure Test accuracy' : 'Vocabulary pronunciation',
 		},
 	];
 }

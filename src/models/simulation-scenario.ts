@@ -9,35 +9,36 @@ interface IConversationBeat {
 	triggerCondition: string;
 }
 
-interface IGatedFinding {
-	label: string;
-	data: string;
-	revealCondition: string;
-}
-
 interface IScenarioPhase {
-	phaseName: string;
+	phaseTitle: string;
+	situation: string;
+	clinicalInformation: string;
 	triggerCondition: string;
 	characters: string[];
 	conversationBeats: IConversationBeat[];
-	gatedFindings: IGatedFinding[];
+}
+
+interface IScenarioHint {
+	phaseTitle: string;
+	hintText: string;
 }
 
 export interface ISimulationScenario extends Document {
 	_id: Types.ObjectId;
-	title: string;
 	workplaceSetting: string;
 	dramatisationPrompt: string;
 	studentCharacterName: string;
 	topicId: string;
 	weeklyFocus: string[];
-	displayData: string;
-	briefingAudioBase64: string;
+	background: string;
+	backgroundAudioBase64: string;
+	patientInformation: string;
+	patientInformationAudioBase64: string;
 	hiddenContext?: any;
 	rawSourceText?: string;
 	gradingRubric: string;
 	maxDurationMinutes: number;
-	studentHint: string;
+	hints: IScenarioHint[];
 	scenarioScript: IScenarioPhase[];
 	assignedLearnerIds: Types.ObjectId[];
 	isActive: boolean;
@@ -55,18 +56,19 @@ const ConversationBeatSchema = new Schema(
 	{ _id: false }
 );
 
-const GatedFindingSchema = new Schema(
+const HintSchema = new Schema(
 	{
-		label: { type: String, required: true },
-		data: { type: String, required: true },
-		revealCondition: { type: String, required: true },
+		phaseTitle: { type: String, required: true },
+		hintText: { type: String, required: true },
 	},
 	{ _id: false }
 );
 
 const PhaseSchema = new Schema(
 	{
-		phaseName: { type: String, required: true },
+		phaseTitle: { type: String, required: true },
+		situation: { type: String, required: true },
+		clinicalInformation: { type: String, required: true },
 		triggerCondition: { type: String, required: true },
 		characters: {
 			type: [String],
@@ -77,21 +79,12 @@ const PhaseSchema = new Schema(
 			type: [ConversationBeatSchema],
 			default: [],
 		},
-		gatedFindings: {
-			type: [GatedFindingSchema],
-			default: [],
-		},
 	},
 	{ _id: false }
 );
 
 const simulationScenarioSchema = new Schema<ISimulationScenario>(
 	{
-		title: {
-			type: String,
-			required: [true, 'Title is required'],
-			trim: true,
-		},
 		workplaceSetting: {
 			type: String,
 			required: [true, 'Workplace setting is required'],
@@ -107,6 +100,10 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 		// Stored raw (no Mongoose enum) so a change to COMPETENCY_FRAMEWORK's key
 		// set never requires a schema migration — validated against the framework
 		// at the API boundary instead (see simulation-scenario-api-schema.ts).
+		// Topic is also the sole scenario identifier shown to tutors/admins/
+		// students now that title has been removed — multiple scenarios may
+		// share the same topic with nothing else distinguishing them in the
+		// admin list. Known tradeoff, not addressed here.
 		topicId: {
 			type: String,
 			required: [true, 'Topic is required'],
@@ -116,13 +113,21 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 			required: true,
 			default: [],
 		},
-		displayData: {
+		background: {
 			type: String,
-			required: [true, 'Display data is required'],
+			required: [true, 'Background is required'],
 		},
-		briefingAudioBase64: {
+		backgroundAudioBase64: {
 			type: String,
-			required: [true, 'Briefing audio is required'],
+			required: [true, 'Background audio is required'],
+		},
+		patientInformation: {
+			type: String,
+			required: [true, 'Patient information is required'],
+		},
+		patientInformationAudioBase64: {
+			type: String,
+			required: [true, 'Patient information audio is required'],
 		},
 		hiddenContext: {
 			type: Schema.Types.Mixed,
@@ -139,9 +144,9 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 			required: true,
 			default: 15,
 		},
-		studentHint: {
-			type: String,
-			default: '',
+		hints: {
+			type: [HintSchema],
+			default: [],
 		},
 		scenarioScript: {
 			type: [PhaseSchema],

@@ -7,6 +7,11 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
+import { useDrillBuilderStats } from "@/hooks/useStudentWeeks";
+import {
+  DrillBuilderStatCards,
+  type DrillBuilderStatCardData,
+} from "@/components/ai-drill-builder/DrillBuilderStatCards";
 import { computeCurrentWeek } from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
@@ -56,9 +61,19 @@ export function StudentListPage({ variant }: StudentListPageProps) {
   } = useAiDrillBuilderLearners(variant === "admin");
 
   const { data: enrollmentMap } = useMissionEnrollmentsList();
+  const { data: statsData, isLoading: statsLoading } = useDrillBuilderStats();
 
   const isLoading = variant === "tutor" ? tutorLoading : adminLoading;
   const isTutor = variant === "tutor";
+
+  const stats: DrillBuilderStatCardData = useMemo(() => {
+    return {
+      totalDrills: statsData?.total ?? 0,
+      practiceItems: statsData?.practiceItems ?? 0,
+      publishedDrills: statsData?.published ?? 0,
+      assignedDrills: statsData?.assigned ?? statsData?.published ?? 0,
+    };
+  }, [statsData]);
 
   const students: StudentCard[] = useMemo(() => {
     if (isTutor) {
@@ -116,6 +131,13 @@ export function StudentListPage({ variant }: StudentListPageProps) {
 
   return (
     <div>
+      <div className="mb-6">
+        <DrillBuilderStatCards
+          stats={stats}
+          loading={statsLoading && !statsData}
+        />
+      </div>
+
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <EnrollmentButton onClick={() => setEnrollmentModalOpen(true)} />
       </div>

@@ -41,6 +41,16 @@ async function getHandler(
 			);
 		}
 
+		// Resuming from a "Leave & Continue Later" pause — push the deadline
+		// forward by exactly the time spent away so the timer doesn't keep
+		// counting down while the student wasn't in the session.
+		if (session.pausedAt) {
+			const pauseDurationMs = Date.now() - session.pausedAt.getTime();
+			session.startedAt = new Date(session.startedAt.getTime() + pauseDurationMs);
+			session.pausedAt = null;
+			await session.save();
+		}
+
 		const scenario = await SimulationScenario.findById(session.scenarioId);
 
 		if (!scenario) {
@@ -69,13 +79,21 @@ async function getHandler(
 					briefingComplete: session.briefingComplete,
 					turns,
 					scenario: {
-						title: scenario.title,
 						workplaceSetting: scenario.workplaceSetting,
 						maxDurationMinutes: scenario.maxDurationMinutes,
-						studentHint: scenario.studentHint,
+						background: scenario.background,
+						patientInformation: scenario.patientInformation,
+						hints: scenario.hints,
 						phases: scenario.scenarioScript.map(
-							(phase: { phaseName: string; characters: string[] }) => ({
-								phaseName: phase.phaseName,
+							(phase: {
+								phaseTitle: string;
+								situation: string;
+								clinicalInformation: string;
+								characters: string[];
+							}) => ({
+								phaseTitle: phase.phaseTitle,
+								situation: phase.situation,
+								clinicalInformation: phase.clinicalInformation,
 								characters: phase.characters,
 							}),
 						),

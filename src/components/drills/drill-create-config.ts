@@ -151,9 +151,19 @@ export function drillRecordToDraft(
         ? (drill.fill_blank_items as DrillDraft["fillBlankItems"])
         : base.fillBlankItems;
   } else if (type === "key_phrases" && Array.isArray(drill.key_phrase_items)) {
+    const kpItems = drill.key_phrase_items as Array<Record<string, unknown>>;
     base.keyPhraseItems =
-      drill.key_phrase_items.length > 0
-        ? (drill.key_phrase_items as DrillDraft["keyPhraseItems"])
+      kpItems.length > 0
+        ? kpItems.map((item) => ({
+            context: String(item.context || ""),
+            respondentName: String(item.respondentName || ""),
+            prompt: String(item.prompt || ""),
+            options:
+              Array.isArray(item.options) && item.options.length > 0
+                ? (item.options as string[])
+                : ["", ""],
+            correctAnswer: String(item.correctAnswer || ""),
+          }))
         : base.keyPhraseItems;
   }
 

@@ -7,6 +7,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
+import { getTopicName } from '@/config/competency-framework';
 
 async function handler(
 	req: NextRequest,
@@ -43,9 +44,9 @@ async function handler(
 			const latestSession = latestSessionByScenarioId.get(scenario._id.toString());
 			return {
 				scenarioId: scenario._id,
-				title: scenario.title,
 				workplaceSetting: scenario.workplaceSetting,
 				maxDurationMinutes: scenario.maxDurationMinutes,
+				topic: getTopicName(scenario.topicId),
 				latestSession: latestSession
 					? { sessionId: latestSession._id, status: latestSession.status }
 					: null,

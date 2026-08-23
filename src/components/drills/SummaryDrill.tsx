@@ -18,11 +18,16 @@ import {
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { completeLearnerDrill } from "@/lib/drill/complete-learner-drill";
+import {
+  clearCheckpoint,
+  markAssignedDrillInProgress,
+} from "@/lib/drill/drill-checkpoint";
 import { DrillCompletionScreen, DrillLayout } from "./shared";
 import { DrillBookmarkToggle } from "@/components/drills/DrillBookmarkToggle";
 import { trackActivity } from "@/utils/activity-cache";
 import { DRILL_ESTIMATED_DURATION_LABEL } from "@/utils/drill";
 import { useTTS } from "@/hooks/useTTS";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { useLocalDrillProgress } from "@/hooks/useLocalDrillProgress";
 
 interface SummaryDrillProps {
@@ -57,12 +62,25 @@ export default function SummaryDrill({
   const [isPlayingPreGen, setIsPlayingPreGen] = useState(false);
   const [hasStartedListening, setHasStartedListening] = useState(false); // Track if audio has been started
   const preGenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const markedInProgressRef = useRef(false);
+
+  const markInProgressOnce = () => {
+    if (!assignmentId || markedInProgressRef.current) return;
+    markedInProgressRef.current = true;
+    void markAssignedDrillInProgress(
+      String(drill._id),
+      assignmentId,
+      "summary",
+      new Date(startTime),
+    );
+  };
 
   const { playAudio: playTTSAudio, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS();
 
   const articleTitle = drill.article_title || "Passage";
   const articleContent = drill.article_content || "";
   const articleAudioUrl = drill.article_audio_url || "";
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   
   // Combined playing state
   const isPlaying = articleAudioUrl ? isPlayingPreGen : isTTSPlaying;
@@ -104,6 +122,7 @@ export default function SummaryDrill({
     } else {
       localProgress.persist(payload);
     }
+    markInProgressOnce();
   };
 
   useEffect(() => {
@@ -130,6 +149,7 @@ export default function SummaryDrill({
         setCurrentMode(partial.currentMode);
       }
       if (typeof partial.showPassage === "boolean") setShowPassage(partial.showPassage);
+      markInProgressOnce();
     }
     setIsHydrating(false);
   }, [localProgress.isReady]);
@@ -191,13 +211,13 @@ export default function SummaryDrill({
             setIsPlayingPreGen(false);
             // Fallback to TTS
             console.warn("Pre-generated audio failed, falling back to TTS");
-            playTTSAudio(articleContent);
+            playTTSAudio(articleContent, drillVoiceId);
           };
           
           await audio.play();
         } else {
           // Fall back to TTS generation
-          await playTTSAudio(articleContent);
+          await playTTSAudio(articleContent, drillVoiceId);
         }
         setHasListened(true);
         persistSummaryProgress({ hasListened: true });
@@ -252,6 +272,7 @@ export default function SummaryDrill({
       });
 
       localProgress.clear();
+      void clearCheckpoint(String(drill._id), assignmentId);
       setIsCompleted(true);
       toast.success("Summary submitted for review!");
 

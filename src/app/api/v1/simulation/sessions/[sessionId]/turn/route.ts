@@ -1,6 +1,5 @@
 // POST /api/v1/simulation/sessions/[sessionId]/turn — core Simulation Room turn:
-// transcribe the student's audio, run one live-conversation turn, and check for
-// newly-revealed findings, all in a single request.
+// transcribe the student's audio and run one live-conversation turn.
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
@@ -8,10 +7,10 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import SimulationScenario from '@/models/simulation-scenario';
 import SimulationSession, { ISimulationSession } from '@/models/simulation-session';
-import { transcribeAudio, generateWithLiveAPIStream, TranscriptionRejectedError } from '@/services/gemini.service';
+import { transcribeAudio, TranscriptionRejectedError } from '@/services/gemini.service';
 import { uploadToCloudinary } from '@/services/cloudinary.service';
-import { checkFindingReveals } from '@/domain/simulation/simulation-turn-reveal.service';
-import { buildSimulationSystemInstruction } from '@/domain/simulation/simulation-live-prompt.service';
+import { buildSimulationSystemInstruction, advancePhaseTool } from '@/domain/simulation/simulation-live-prompt.service';
+import config from '@/lib/api/config';
 
 async function postHandler(
 	req: NextRequest,
@@ -233,122 +232,107 @@ async function postHandler(
 			secondsRemaining,
 		);
 
-		const revealedLabelsForPhase = new Set(
-			session.revealedFindings
-				.filter(
-					(finding: ISimulationSession['revealedFindings'][number]) =>
-						finding.phaseIndex === session.currentPhaseIndex,
-				)
-				.map((finding: ISimulationSession['revealedFindings'][number]) => finding.label),
-		);
-		const unrevealedFindings = currentPhase.gatedFindings.filter(
-			(finding: { label: string; revealCondition: string }) =>
-				!revealedLabelsForPhase.has(finding.label),
-		);
-
 		let phaseAdvanced = false;
-		const controllerRef: { current: ReadableStreamDefaultController | null } = { current: null };
-		const bufferedPhaseAdvanceChunks: Uint8Array[] = [];
-		const onToolCall = (name: string) => {
-			if (name === 'advancePhase') {
-				phaseAdvanced = true;
-				const phaseAdvanceChunk = new TextEncoder().encode(
-					`data: ${JSON.stringify({
-						type: 'phaseAdvance',
-						newPhaseIndex: session.currentPhaseIndex + 1,
-					})}\n\n`,
-				);
-				if (controllerRef.current) {
-					controllerRef.current.enqueue(phaseAdvanceChunk);
-				} else {
-					bufferedPhaseAdvanceChunks.push(phaseAdvanceChunk);
-				}
-			}
-		};
+		const sessionKey = `sim_${sessionId}`;
 
-		// generateWithLiveAPIStream resolves with the ReadableStream almost
-		// immediately (its `start()` callback opens the WebSocket and runs in
-		// the background) — it does NOT wait for the Live API session to
-		// finish. `phaseAdvanced` is therefore read only after the stream is
-		// fully drained (see the wrappedStream `finally` block below), by
-		// which point any advancePhase tool call has had a chance to fire.
-		const [stream, revealResult] = await Promise.all([
-			generateWithLiveAPIStream(
+		const relayResponse = await fetch(`${config.RELAY_URL}/relay/turn`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Relay-Secret': config.RELAY_AUTH_SECRET || '',
+			},
+			body: JSON.stringify({
 				systemInstruction,
 				turns,
-				'Kore',
-				[
-					{
-						name: 'advancePhase',
-						description:
-							"Call this when the current phase's trigger condition has been clearly and fully satisfied by the conversation so far.",
-						parameters: { type: 'object', properties: {} },
-					},
-				],
-				onToolCall,
-			),
-			unrevealedFindings.length > 0
-				? checkFindingReveals(transcribedText, unrevealedFindings)
-				: Promise.resolve({ revealedLabels: [] as string[] }),
-		]);
+				voiceName: 'Kore',
+				tools: [advancePhaseTool],
+				sessionKey,
+			}),
+		});
 
-		const newlyRevealedLabels = revealResult.revealedLabels.filter(
-			(label) => !revealedLabelsForPhase.has(label),
-		);
+		if (!relayResponse.ok || !relayResponse.body) {
+			const errorText = await relayResponse.text().catch(() => '');
+			logger.error('[SimulationSessionTurn] Relay request failed', {
+				status: relayResponse.status,
+				error: errorText,
+				sessionId,
+			});
+			return NextResponse.json(
+				{ code: 'ServerError', message: 'Failed to reach the live conversation service' },
+				{ status: 502 },
+			);
+		}
 
-		const revealFindings = newlyRevealedLabels.map((label) => ({
-			label,
-			data:
-				currentPhase.gatedFindings.find(
-					(finding: { label: string; data: string }) => finding.label === label,
-				)?.data ?? '',
-		}));
+		const stream = relayResponse.body;
 
-		// Turn persistence (student turn, AI turn, revealedFindings,
-		// currentPhaseIndex) is deliberately deferred until AFTER the Live API
-		// stream is fully drained below — see the two KNOWN LIMITATION notes this
-		// replaced. Draining first lets us (a) accumulate the AI's actual spoken
-		// text from the streamed `outputTranscription` chunks instead of writing
-		// an empty string, and (b) observe whether `advancePhase` was actually
-		// called by the time the session closes, instead of checking a flag that
-		// hadn't had a chance to flip yet.
+		// Turn persistence (student turn, AI turn, currentPhaseIndex) is
+		// deliberately deferred until AFTER the Live API stream is fully drained
+		// below — see the two KNOWN LIMITATION notes this replaced. Draining
+		// first lets us (a) accumulate the AI's actual spoken text from the
+		// streamed `outputTranscription` chunks instead of writing an empty
+		// string, and (b) observe whether `advancePhase` was actually called by
+		// the time the session closes, instead of checking a flag that hadn't
+		// had a chance to flip yet.
 		const wrappedStream = new ReadableStream({
 			async start(controller) {
-				controllerRef.current = controller;
 				controller.enqueue(transcriptChunk);
-				while (bufferedPhaseAdvanceChunks.length > 0) {
-					controller.enqueue(bufferedPhaseAdvanceChunks.shift()!);
-				}
-
-				if (revealFindings.length > 0) {
-					const revealChunk = JSON.stringify({ type: 'reveal', findings: revealFindings });
-					controller.enqueue(new TextEncoder().encode(`data: ${revealChunk}\n\n`));
-				}
 
 				const decoder = new TextDecoder();
+				const encoder = new TextEncoder();
 				let aiResponseText = '';
 				const reader = stream.getReader();
+
+				// SSE frames can be split across multiple read() calls (e.g. large
+				// base64 `audio` payloads) — buffer across the whole loop and only
+				// process pieces that end in a complete '\n\n' frame separator.
+				let sseBuffer = '';
+
+				const processFrame = (line: string): string => {
+					const trimmed = line.trim();
+					if (!trimmed.startsWith('data: ')) {
+						return line;
+					}
+					try {
+						const parsed = JSON.parse(trimmed.slice('data: '.length));
+						if (parsed?.type === 'text' && typeof parsed.data === 'string') {
+							aiResponseText += parsed.data;
+							return line;
+						} else if (parsed?.type === 'phaseAdvance' && parsed?.name === 'advancePhase') {
+							phaseAdvanced = true;
+							const rewritten = JSON.stringify({
+								type: 'phaseAdvance',
+								newPhaseIndex: session.currentPhaseIndex + 1,
+							});
+							return `data: ${rewritten}`;
+						} else {
+							return line;
+						}
+					} catch {
+						/* partial/malformed SSE frame — ignore */
+						return line;
+					}
+				};
 
 				try {
 					while (true) {
 						const { done, value } = await reader.read();
 						if (done) break;
 
-						const decoded = decoder.decode(value, { stream: true });
-						for (const line of decoded.split('\n\n')) {
-							const trimmed = line.trim();
-							if (!trimmed.startsWith('data: ')) continue;
-							try {
-								const parsed = JSON.parse(trimmed.slice('data: '.length));
-								if (parsed?.type === 'text' && typeof parsed.data === 'string') {
-									aiResponseText += parsed.data;
-								}
-							} catch {
-								/* partial/malformed SSE frame split across chunks — ignore */
-							}
-						}
+						sseBuffer += decoder.decode(value, { stream: true });
 
-						controller.enqueue(value);
+						const pieces = sseBuffer.split('\n\n');
+						// The last piece may be an incomplete frame still waiting on
+						// more data from the next read() call — hold it back.
+						sseBuffer = pieces.pop() ?? '';
+
+						if (pieces.length > 0) {
+							const outputLines = pieces.map(processFrame);
+							controller.enqueue(encoder.encode(outputLines.join('\n\n') + '\n\n'));
+						}
+					}
+
+					if (sseBuffer.length > 0) {
+						controller.enqueue(encoder.encode(processFrame(sseBuffer)));
 					}
 				} finally {
 					try {
@@ -380,15 +364,6 @@ async function postHandler(
 											audioUrl: '',
 											createdAt: new Date(),
 									});
-
-									const now = new Date();
-									for (const label of newlyRevealedLabels) {
-											session.revealedFindings.push({
-													phaseIndex: session.currentPhaseIndex,
-													label,
-													revealedAt: now,
-											});
-									}
 
 									if (phaseAdvanced) {
 											session.currentPhaseIndex += 1;

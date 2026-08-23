@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
+import { Check, Crown, Zap, CreditCard, Receipt, Ban, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Card } from "@/components/ui/Card";
-import { Check, Crown, Zap, Calendar, Loader2 } from "lucide-react";
+import { ProfileMenuRow } from "@/components/account/ProfileMenuRow";
+import { ProfileMenuSection } from "@/components/account/ProfileMenuSection";
 import { useUserCurrent } from "@/hooks/useUserCurrent";
 import { planTitleFromUser, getPlanCardMessage } from "@/lib/learner-learning-goals";
 import { toast } from "sonner";
-
-// ── Plan data ─────────────────────────────────────────────────────────────────
 
 const FREE_FEATURES = [
   "Basic pronunciation practice",
@@ -25,8 +26,6 @@ const PRO_FEATURES = [
   "AI-driven feedback and scoring on every session",
   "Personalised difficulty that adapts as you improve",
 ];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function createCheckoutSession(): Promise<string> {
   const res = await fetch("/api/v1/stripe/checkout", {
@@ -54,9 +53,8 @@ async function openBillingPortal(): Promise<string> {
   return data.url;
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
-
 export default function SubscriptionsPage() {
+  const t = useTranslations("settings");
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -70,16 +68,13 @@ export default function SubscriptionsPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
-  // ── Handle ?checkout=success param ──────────────────────────────────────────
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (searchParams.get("checkout") !== "success") return;
 
-    // Strip the param from the URL immediately to avoid re-triggering on refresh.
     router.replace("/account/settings/subscriptions");
 
-    // Invalidate cache and start polling until subscribed = true (max 10 s).
     queryClient.invalidateQueries({ queryKey: ["user-current"] });
 
     let attempts = 0;
@@ -114,17 +109,17 @@ export default function SubscriptionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── CTA handlers ─────────────────────────────────────────────────────────────
-
   async function handleUpgrade() {
     setCheckoutLoading(true);
     try {
       const url = await createCheckoutSession();
       window.location.href = url;
-    } catch (err: any) {
-      toast.error(
-        err?.message || "Could not start checkout. Please try again or contact support."
-      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Could not start checkout. Please try again or contact support.";
+      toast.error(msg);
       setCheckoutLoading(false);
     }
   }
@@ -134,149 +129,166 @@ export default function SubscriptionsPage() {
     try {
       const url = await openBillingPortal();
       window.location.href = url;
-    } catch (err: any) {
-      toast.error(err?.message || "Could not open billing portal. Please try again.");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Could not open billing portal. Please try again.";
+      toast.error(msg);
       setPortalLoading(false);
     }
   }
-
-  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
       <Header
         showBack
-        title="Subscriptions"
+        title={t("subscriptions")}
         backHref="/account/profile"
       />
 
-      <div className="max-w-md mx-auto px-4 py-6 md:max-w-2xl md:px-8">
+      <div className="max-w-md mx-auto px-5 py-4 md:max-w-2xl md:px-8">
+        <p className="text-sm text-muted-foreground mb-5">
+          Manage your Eklan Pro plan
+        </p>
 
-        {/* Current plan summary card */}
-        <Card className="mb-6 bg-primary/10 border-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-foreground mb-1">Current plan</p>
-              <p className="text-2xl font-bold text-green-600">
-                {userLoading ? "—" : planTitle}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2 max-w-sm">{planMessage}</p>
+        {/* Current plan */}
+        <div
+          className={`rounded-2xl border px-4 py-4 mb-6 ${
+            isSubscribed
+              ? "bg-primary/10 border-primary/30"
+              : "bg-muted/50 border-border"
+          }`}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("currentPlan")}
+          </p>
+          <p
+            className={`text-2xl font-bold mt-1 ${
+              isSubscribed ? "text-primary" : "text-foreground"
+            }`}
+          >
+            {userLoading ? "—" : planTitle}
+          </p>
+          <p className="text-sm text-muted-foreground mt-2 leading-5">
+            {planMessage}
+          </p>
+        </div>
+
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
+          {t("planOverview")}
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div
+            className={`rounded-2xl border p-4 ${
+              !isSubscribed
+                ? "border-primary bg-primary/5"
+                : "border-border bg-muted/30"
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="size-10 rounded-[10px] flex items-center justify-center bg-muted">
+                <Zap className="size-5 text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-bold text-foreground">Free</h3>
             </div>
-            <Calendar className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <ul className="space-y-2">
+              {FREE_FEATURES.map((feature) => (
+                <li key={feature} className="flex items-start gap-2">
+                  <Check className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </Card>
 
-        {/* Plan overview */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-foreground mb-4">Plan overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* Free plan */}
-            <Card
-              className={`relative ${!isSubscribed ? "ring-2 ring-green-600 bg-green-500/10" : ""}`}
-            >
-              {!isSubscribed && (
-                <div className="absolute -top-3 right-3 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                  Current
-                </div>
-              )}
-              <div className="pt-4 pb-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-muted">
-                    <Zap className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-bold text-foreground">Free</h3>
-                </div>
-                <ul className="space-y-2">
-                  {FREE_FEATURES.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+          <div
+            className={`rounded-2xl border p-4 ${
+              isSubscribed
+                ? "border-primary bg-primary/5"
+                : "border-primary/60 bg-primary/5"
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <div className="size-10 rounded-[10px] flex items-center justify-center bg-primary/15">
+                <Crown className="size-5 text-primary" />
               </div>
-            </Card>
-
-            {/* Pro plan */}
-            <Card
-              className={`relative ${isSubscribed ? "ring-2 ring-green-600 bg-green-500/10" : "border-2 border-green-600"}`}
-            >
-              {!isSubscribed && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap">
-                  Unlock AI features
-                </div>
-              )}
-              {isSubscribed && (
-                <div className="absolute -top-3 right-3 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                  Current
-                </div>
-              )}
-              <div className="pt-6 pb-4">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-500/15">
-                    <Crown className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">Pro</h3>
-                    <p className="text-xs text-muted-foreground">
-                      US$1.99 / month — unlock the full AI experience
-                    </p>
-                  </div>
-                </div>
-                <ul className="space-y-2 mb-5 mt-4">
-                  {PRO_FEATURES.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 mt-0.5 flex-shrink-0 text-green-600" />
-                      <span className="text-sm text-muted-foreground">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA button */}
-                {isSubscribed ? (
-                  <button
-                    onClick={handleManage}
-                    disabled={portalLoading}
-                    className="w-full flex items-center justify-center gap-2 border border-green-600 text-green-600 font-semibold rounded-lg py-2.5 px-4 text-sm hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="Manage your Pro subscription"
-                  >
-                    {portalLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {portalLoading ? "Opening portal…" : "Manage subscription"}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleUpgrade}
-                    disabled={checkoutLoading || userLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-semibold rounded-lg py-2.5 px-4 text-sm hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="Upgrade to Pro"
-                  >
-                    {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {checkoutLoading ? "Preparing checkout…" : "Upgrade to Pro"}
-                  </button>
-                )}
+              <div>
+                <h3 className="text-base font-bold text-foreground">Pro</h3>
+                <p className="text-xs text-muted-foreground">
+                  US$1.99 / month
+                </p>
               </div>
-            </Card>
-
+            </div>
+            <ul className="space-y-2 mt-3">
+              {PRO_FEATURES.map((feature) => (
+                <li key={feature} className="flex items-start gap-2">
+                  <Check className="size-4 mt-0.5 shrink-0 text-primary" />
+                  <span className="text-sm text-muted-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
-        {/* Support link */}
-        <Card className="bg-muted/50 border-border">
-          <div className="text-center py-4">
-            <p className="text-sm font-semibold text-foreground mb-2">
-              Questions about subscriptions?
-            </p>
-            <a
-              href="/contact"
-              className="text-sm text-green-600 font-medium underline"
-            >
-              Contact our support team
-            </a>
-          </div>
-        </Card>
+        {isSubscribed ? (
+          <ProfileMenuSection>
+            <ProfileMenuRow
+              icon={CreditCard}
+              title={t("managePayment")}
+              onClick={() => {
+                if (!portalLoading) void handleManage();
+              }}
+              trailing={
+                portalLoading ? (
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                ) : undefined
+              }
+            />
+            <ProfileMenuRow
+              icon={Receipt}
+              title={t("billingHistory")}
+              onClick={() => {
+                if (!portalLoading) void handleManage();
+              }}
+            />
+            <ProfileMenuRow
+              icon={Ban}
+              title={t("cancelSubscription")}
+              onClick={() => {
+                if (!portalLoading) void handleManage();
+              }}
+              last
+            />
+          </ProfileMenuSection>
+        ) : (
+          <button
+            type="button"
+            onClick={handleUpgrade}
+            disabled={checkoutLoading || userLoading}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-white font-medium rounded-full py-4 text-base disabled:opacity-50 transition-opacity"
+            aria-label="Upgrade to Pro"
+          >
+            {checkoutLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
+            {checkoutLoading ? "Preparing checkout…" : "Upgrade to Pro"}
+          </button>
+        )}
 
+        <div className="mt-8 text-center">
+          <p className="text-sm text-muted-foreground mb-2">
+            Questions about subscriptions?
+          </p>
+          <Link
+            href="/account/settings/contact"
+            className="text-sm text-primary font-semibold"
+          >
+            {t("contact")}
+          </Link>
+        </div>
       </div>
 
       <BottomNav />

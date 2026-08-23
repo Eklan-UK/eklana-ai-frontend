@@ -61,21 +61,21 @@ export function LearningJourneyTopicAccordion({
             aria-controls={panelId}
           >
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-extrabold leading-[19px] text-[#111827]">
+              <span className="block text-sm font-extrabold leading-[19px] text-foreground">
                 {topic.title}
               </span>
-              <span className="mt-0.5 block text-[11px] font-semibold leading-[16.5px] text-[#99a1af]">
+              <span className="mt-0.5 block text-[11px] font-semibold leading-[16.5px] text-muted-foreground">
                 {progressLabel}
               </span>
             </span>
             {expanded ? (
               <ChevronDown
-                className="size-[15px] shrink-0 text-[#99a1af]"
+                className="size-[15px] shrink-0 text-muted-foreground"
                 aria-hidden
               />
             ) : (
               <ChevronRight
-                className="size-[15px] shrink-0 text-[#99a1af]"
+                className="size-[15px] shrink-0 text-muted-foreground"
                 aria-hidden
               />
             )}

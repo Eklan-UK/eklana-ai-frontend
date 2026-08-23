@@ -1,3 +1,17 @@
+/**
+ * Live API function-declaration for the phase-advance tool call. Shared by
+ * opening/route.ts and turn/route.ts so both relay requests for the same
+ * session send an identical tool definition — the relay's cached-session
+ * reuse only applies tools from whichever request establishes the
+ * connection, so the first request for a session must already include this.
+ */
+export const advancePhaseTool = {
+	name: 'advancePhase',
+	description:
+		"Call this when the current phase's trigger condition has been clearly and fully satisfied by the conversation so far.",
+	parameters: { type: 'object', properties: {} },
+};
+
 export interface SimulationPromptScenario {
 	dramatisationPrompt: string;
 }
@@ -9,7 +23,7 @@ export interface SimulationPromptConversationBeat {
 }
 
 export interface SimulationPromptPhase {
-	phaseName: string;
+	phaseTitle: string;
 	triggerCondition: string;
 	characters: string[];
 	conversationBeats: SimulationPromptConversationBeat[];
@@ -47,17 +61,13 @@ Everything above this line is silent background context. Your actual spoken dial
 
 You are voicing this workplace communication training simulation live, in real time, with a student.
 
-Current phase: "${phase.phaseName}"
+Current phase: "${phase.phaseTitle}"
 Active characters this phase: ${phase.characters.join(', ')}
 
 Conversation beats for this phase — these are intents to work toward, NOT scripted lines. Generate natural, in-character wording and respond live to whatever the student actually says:
 ${beatsList}
 
 Phase advancement: this phase ends when the following trigger condition is clearly and fully satisfied: "${phase.triggerCondition}". When you are confident this condition has been met by the conversation so far, call the advancePhase tool. Do not call it prematurely or on partial/ambiguous progress.
-
-CRITICAL — never state specific data values in spoken dialogue: you must NEVER say specific vitals, lab results, measurements, or other findings data out loud, no matter how naturally it would fit the scene. That information is only ever shown to the student through a separate on-screen mechanism that you do not control. When such information becomes available, react and respond in character to its availability (e.g. acknowledge it, react emotionally, prompt the student to look/check) WITHOUT yourself vocalizing the specific numbers or values.
-
-When in doubt, err on the side of underplaying clinical or informational specifics in your dialogue. Focus on natural, in-character conversation — let the on-screen mechanism carry the specific data.
 
 Reminder: you are never ${studentCharacterName}. Every line you generate must come from one of the other characters listed above, reacting to what the student just said.${windDownInstruction}`;
 }

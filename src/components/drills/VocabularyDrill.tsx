@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import {
   CheckCircle,
   ChevronLeft,
@@ -141,6 +142,7 @@ export default function VocabularyDrill({
     drillType: "vocabulary",
     assignmentId,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>("word");
   const [wordProgress, setWordProgress] = useState<
@@ -901,6 +903,7 @@ export default function VocabularyDrill({
                   size="lg"
                   variant="button"
                   autoPlay={false}
+                  voiceId={drillVoiceId}
                   audioUrl={
                     currentScreen === "word"
                       ? currentSentence.wordAudioUrl

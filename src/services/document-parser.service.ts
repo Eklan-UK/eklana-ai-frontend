@@ -731,36 +731,72 @@ class DocumentParserService {
     return items;
   }
 
-  private parseExcelKeyPhrases(data: any[][], startRow: number): { respondentName?: string; prompt: string; options: string[]; correctAnswer: string }[] {
+  private parseExcelKeyPhrases(data: any[][], startRow: number): {
+    context?: string;
+    respondentName?: string;
+    prompt: string;
+    options: string[];
+    correctAnswer: string;
+  }[] {
     const headerRow = data[0] ?? [];
+    const hasContextHeader = headerRow.some(
+      (cell) => String(cell || "").trim().toLowerCase() === "context",
+    );
     const hasRespondentHeader = headerRow.some((cell) =>
       String(cell || "").trim().toLowerCase().includes("respondent"),
     );
 
-    const items: { respondentName?: string; prompt: string; options: string[]; correctAnswer: string }[] = [];
+    const items: {
+      context?: string;
+      respondentName?: string;
+      prompt: string;
+      options: string[];
+      correctAnswer: string;
+    }[] = [];
     for (let i = startRow; i < data.length; i++) {
       const row = data[i];
       if (!row || row.every((cell: any) => !cell || String(cell).trim() === "")) continue;
       const stripPrefix = (s: string) => s.replace(/^[A-Da-d]\.\s*/, "").trim();
-      const prompt = String(row[0] || "").trim();
-      if (!prompt) continue;
 
+      let context: string | undefined;
+      let prompt: string;
       let respondentName: string | undefined;
       let correctAnswer: string;
       let option2: string;
       let option3: string;
 
-      if (hasRespondentHeader) {
-        // Legacy: Prompt | Respondent Name | Correct Answer | Option 2 | Option 3
-        respondentName = String(row[1] || "").trim() || undefined;
-        correctAnswer = stripPrefix(String(row[2] || "").trim());
-        option2 = stripPrefix(String(row[3] || "").trim());
-        option3 = stripPrefix(String(row[4] || "").trim());
+      if (hasContextHeader) {
+        // Current: Context | Prompt | Correct Answer | Option 2 | Option 3
+        // Or with respondent: Context | Prompt | Respondent Name | Correct Answer | Option 2 | Option 3
+        context = String(row[0] || "").trim() || undefined;
+        prompt = String(row[1] || "").trim();
+        if (!prompt) continue;
+        if (hasRespondentHeader) {
+          respondentName = String(row[2] || "").trim() || undefined;
+          correctAnswer = stripPrefix(String(row[3] || "").trim());
+          option2 = stripPrefix(String(row[4] || "").trim());
+          option3 = stripPrefix(String(row[5] || "").trim());
+        } else {
+          correctAnswer = stripPrefix(String(row[2] || "").trim());
+          option2 = stripPrefix(String(row[3] || "").trim());
+          option3 = stripPrefix(String(row[4] || "").trim());
+        }
       } else {
-        // Current: Prompt | Correct Answer | Option 2 | Option 3
-        correctAnswer = stripPrefix(String(row[1] || "").trim());
-        option2 = stripPrefix(String(row[2] || "").trim());
-        option3 = stripPrefix(String(row[3] || "").trim());
+        // Legacy Prompt-first sheets (backwards compatible)
+        prompt = String(row[0] || "").trim();
+        if (!prompt) continue;
+        if (hasRespondentHeader) {
+          // Legacy: Prompt | Respondent Name | Correct Answer | Option 2 | Option 3
+          respondentName = String(row[1] || "").trim() || undefined;
+          correctAnswer = stripPrefix(String(row[2] || "").trim());
+          option2 = stripPrefix(String(row[3] || "").trim());
+          option3 = stripPrefix(String(row[4] || "").trim());
+        } else {
+          // Legacy: Prompt | Correct Answer | Option 2 | Option 3
+          correctAnswer = stripPrefix(String(row[1] || "").trim());
+          option2 = stripPrefix(String(row[2] || "").trim());
+          option3 = stripPrefix(String(row[3] || "").trim());
+        }
       }
 
       const options = [correctAnswer, option2, option3].filter(Boolean);
@@ -769,6 +805,7 @@ class DocumentParserService {
         [options[j], options[k]] = [options[k], options[j]];
       }
       items.push({
+        ...(context ? { context } : {}),
         ...(respondentName ? { respondentName } : {}),
         prompt,
         options: options.length > 0 ? options : ["", ""],

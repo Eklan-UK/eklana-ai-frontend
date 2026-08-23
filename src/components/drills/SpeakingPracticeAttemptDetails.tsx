@@ -63,7 +63,7 @@ export function SpeakingPracticeAttemptDetails({
                     {wordScore.score}%
                   </p>
                   {wordScore.pronunciationScore !== undefined && (
-                    <p className="text-xs text-muted-foreground">Pronunciation: {wordScore.pronunciationScore}%</p>
+                    <p className="text-xs text-muted-foreground">Clarity score: {wordScore.pronunciationScore}%</p>
                   )}
                 </div>
               </div>
@@ -92,7 +92,7 @@ export function SpeakingPracticeAttemptDetails({
                     {wordScore.score}%
                   </p>
                   {wordScore.pronunciationScore !== undefined && (
-                    <p className="text-xs text-muted-foreground">Pronunciation: {wordScore.pronunciationScore}%</p>
+                    <p className="text-xs text-muted-foreground">Clarity score: {wordScore.pronunciationScore}%</p>
                   )}
                 </div>
               </div>
@@ -120,7 +120,7 @@ export function SpeakingPracticeAttemptDetails({
               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {scene.fluencyScore !== undefined && <span>Fluency: {scene.fluencyScore}%</span>}
                 {scene.pronunciationScore !== undefined && (
-                  <span>Pronunciation: {scene.pronunciationScore}%</span>
+                  <span>Clarity score: {scene.pronunciationScore}%</span>
                 )}
               </div>
             </Card>

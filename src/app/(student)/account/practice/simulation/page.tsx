@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Briefcase } from "lucide-react";
+import { Loader2, Briefcase, X, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
@@ -11,10 +11,46 @@ import { Button } from "@/components/ui/Button";
 
 interface ScenarioListItem {
   scenarioId: string;
-  title: string;
   workplaceSetting: string;
   maxDurationMinutes: number;
+  topic: string | null;
   latestSession: { sessionId: string; status: "in_progress" | "completed" | "abandoned" } | null;
+}
+
+// Shape matches GradeResult in [sessionId]/page.tsx — same
+// /grade response persisted as session.overallGradeResult and returned
+// in full (no trimming) by GET .../attempts.
+interface MispronouncedWord {
+  word: string;
+  score: number;
+  turnNumber: number;
+}
+
+interface GrammarError {
+  studentTurnNumber: number;
+  quotedText: string;
+  errorType: "context_error" | "phrasing_error";
+  correctedVersion: string;
+  explanation: string;
+}
+
+// Sub-fields are optional, not just their arrays defaulted — a session graded
+// before a given sub-grading pass existed (or whose pass failed in a way that
+// didn't hit the documented { errors: [] }-style fallback) can have the field
+// missing entirely rather than present-but-empty. Every read of these must
+// tolerate that, not just assume at least an empty array/object.
+interface AttemptGradeResult {
+  pronunciation?: { gradedTurnCount: number; failedTurnCount: number; mispronouncedWords?: MispronouncedWord[] };
+  grammar?: { errors?: GrammarError[] };
+  competency?: { competencyScores?: unknown[]; overallSummary?: string };
+  gradedAt: string;
+}
+
+interface AttemptListItem {
+  sessionId: string;
+  status: "in_progress" | "completed" | "abandoned";
+  attemptedAt: string;
+  overallGradeResult: AttemptGradeResult | null;
 }
 
 export default function SimulationRoomPage() {
@@ -23,6 +59,11 @@ export default function SimulationRoomPage() {
   const [loading, setLoading] = useState(true);
   const [scenarios, setScenarios] = useState<ScenarioListItem[]>([]);
   const [startingScenarioId, setStartingScenarioId] = useState<string | null>(null);
+
+  const [attemptsScenario, setAttemptsScenario] = useState<ScenarioListItem | null>(null);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
+  const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +110,38 @@ export default function SimulationRoomPage() {
     [router],
   );
 
+  const handleShowAttempts = useCallback(async (scenario: ScenarioListItem) => {
+    setAttemptsScenario(scenario);
+    setAttemptsLoading(true);
+    setAttempts([]);
+    try {
+      const res = await fetch(`/api/v1/simulation/scenarios/${scenario.scenarioId}/attempts`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load attempts");
+      const json = await res.json();
+      setAttempts(json.data?.attempts ?? []);
+    } catch {
+      toast.error("Failed to load past attempts.");
+      setAttemptsScenario(null);
+    } finally {
+      setAttemptsLoading(false);
+    }
+  }, []);
+
+  const closeAttempts = useCallback(() => {
+    setAttemptsScenario(null);
+    setAttempts([]);
+    setSelectedAttemptIndex(null);
+  }, []);
+
+  const selectedAttempt =
+    selectedAttemptIndex !== null ? attempts[selectedAttemptIndex] ?? null : null;
+  const selectedGrade = selectedAttempt?.overallGradeResult ?? null;
+  const selectedMispronouncedWords = selectedGrade?.pronunciation?.mispronouncedWords ?? [];
+  const selectedGrammarErrors = selectedGrade?.grammar?.errors ?? [];
+  const selectedOverallSummary = selectedGrade?.competency?.overallSummary || "No summary available.";
+
   return (
     <div className="min-h-screen bg-background pb-[max(5.5rem,env(safe-area-inset-bottom,0px))]">
       <div className="h-6" />
@@ -106,7 +179,7 @@ export default function SimulationRoomPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground text-sm leading-snug line-clamp-2">
-                        {s.title}
+                        {s.topic ?? "Untitled scenario"}
                       </h3>
                       <p className="text-xs mt-0.5 text-muted-foreground line-clamp-1">
                         {s.workplaceSetting}
@@ -114,6 +187,15 @@ export default function SimulationRoomPage() {
                       <p className="text-xs mt-0.5 font-medium text-emerald-700 dark:text-emerald-400">
                         {s.maxDurationMinutes} min
                       </p>
+                      {s.latestSession && (
+                        <button
+                          type="button"
+                          onClick={() => handleShowAttempts(s)}
+                          className="text-xs mt-1 font-medium text-primary hover:underline"
+                        >
+                          Show attempts
+                        </button>
+                      )}
                     </div>
                     {status === "completed" ? (
                       <Button
@@ -154,6 +236,179 @@ export default function SimulationRoomPage() {
       </div>
 
       <BottomNav />
+
+      {attemptsScenario && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center"
+          onClick={closeAttempts}
+        >
+          <div
+            className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-t-2xl bg-card p-6 md:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex items-start gap-2">
+                {selectedAttempt && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttemptIndex(null)}
+                    aria-label="Back to attempts list"
+                    className="rounded-full p-1.5 -ml-1.5 text-muted-foreground hover:bg-muted shrink-0"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {selectedAttempt ? `Attempt ${selectedAttemptIndex! + 1} Detail` : "Past Attempts"}
+                  </p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">
+                    {attemptsScenario.topic ?? "Untitled scenario"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeAttempts}
+                aria-label="Close"
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {selectedAttempt ? (
+              selectedGrade && (
+                <div className="mt-4 w-full space-y-4 rounded-2xl border border-border bg-muted/40 p-4 text-left">
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Summary
+                    </p>
+                    <p className="font-nunito text-sm text-foreground">{selectedOverallSummary}</p>
+                  </div>
+
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Mispronounced words
+                    </p>
+                    {selectedMispronouncedWords.length === 0 ? (
+                      <p className="font-nunito text-sm text-muted-foreground">
+                        No mispronounced words detected.
+                      </p>
+                    ) : (
+                      <ul className="mt-1 flex flex-wrap gap-2">
+                        {selectedMispronouncedWords.map((w, idx) => (
+                          <li
+                            key={idx}
+                            className="rounded-full bg-muted px-3 py-1 font-nunito text-sm text-foreground"
+                          >
+                            {w.word}{" "}
+                            <span className="text-xs text-muted-foreground">
+                              ({Math.round(w.score)})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="font-nunito text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Misused words / grammar
+                    </p>
+                    {selectedGrammarErrors.length === 0 ? (
+                      <p className="font-nunito text-sm text-muted-foreground">
+                        No grammar issues detected.
+                      </p>
+                    ) : (
+                      <ul className="mt-1 space-y-2">
+                        {selectedGrammarErrors.map((err, idx) => (
+                          <li key={idx} className="font-nunito text-sm text-foreground">
+                            <span className="text-muted-foreground line-through">{err.quotedText}</span>{" "}
+                            → <span className="font-medium">{err.correctedVersion}</span>
+                            <p className="text-xs text-muted-foreground">{err.explanation}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )
+            ) : attemptsLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-[#22c55e]" />
+              </div>
+            ) : attempts.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">No attempts recorded yet.</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {attempts.map((attempt, idx) => {
+                  const isGraded = Boolean(attempt.overallGradeResult);
+                  return (
+                    <div
+                      key={attempt.sessionId}
+                      role={isGraded ? "button" : undefined}
+                      tabIndex={isGraded ? 0 : undefined}
+                      onClick={isGraded ? () => setSelectedAttemptIndex(idx) : undefined}
+                      onKeyDown={
+                        isGraded
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedAttemptIndex(idx);
+                              }
+                            }
+                          : undefined
+                      }
+                      className={`rounded-xl border border-border bg-muted/40 p-3 ${
+                        isGraded ? "cursor-pointer transition-colors hover:bg-muted/70" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">Attempt {idx + 1}</p>
+                        <span
+                          className={`text-xs font-medium capitalize ${
+                            attempt.status === "completed"
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : attempt.status === "in_progress"
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {attempt.status.replace("_", " ")}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5 text-muted-foreground">
+                        {new Date(attempt.attemptedAt).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </p>
+                      {attempt.overallGradeResult ? (
+                        <div className="mt-2 space-y-1 border-t border-border pt-2">
+                          <p className="text-xs text-foreground line-clamp-2">
+                            {attempt.overallGradeResult.competency?.overallSummary || "No summary available."}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {(attempt.overallGradeResult.pronunciation?.mispronouncedWords ?? []).length} mispronounced
+                            words · {(attempt.overallGradeResult.grammar?.errors ?? []).length} grammar issues
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs mt-2 text-muted-foreground italic">Not graded</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <Button className="mt-5" fullWidth onClick={selectedAttempt ? () => setSelectedAttemptIndex(null) : closeAttempts}>
+              {selectedAttempt ? "Back to list" : "Close"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

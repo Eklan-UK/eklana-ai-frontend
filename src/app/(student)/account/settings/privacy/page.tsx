@@ -54,7 +54,7 @@ const sections: Section[] = [
       <>
         <p>The entity responsible for processing your personal data is:</p>
         <p>
-          <strong className="text-[#171717]">Eklan UK Limited</strong>
+          <strong className="text-foreground">Eklan UK Limited</strong>
           <br />
           (&quot;Eklan&quot;, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;)
         </p>
@@ -68,7 +68,7 @@ const sections: Section[] = [
         <p>
           Depending on your interaction with Eklan, we collect two categories of data:
         </p>
-        <p className="font-semibold text-[#171717]">A. Non-Personal Data</p>
+        <p className="font-semibold text-foreground">A. Non-Personal Data</p>
         <p>
           Non-Personal Data is information that does not identify you and cannot
           reasonably be used to identify you.
@@ -91,7 +91,7 @@ const sections: Section[] = [
         </ul>
         <p>This data is non-identifiable and may be used for any lawful purpose.</p>
 
-        <p className="font-semibold text-[#171717]">B. Personal Information</p>
+        <p className="font-semibold text-foreground">B. Personal Information</p>
         <p>Personal Information identifies you as an individual. This includes:</p>
         <ul className="list-disc ml-5 space-y-1">
           <li>Name</li>
@@ -111,7 +111,7 @@ const sections: Section[] = [
           We use your Personal Information for various purposes under the following legal bases:
         </p>
 
-        <p className="font-semibold text-[#171717]">
+        <p className="font-semibold text-foreground">
           i. Providing You with the Services (Contractual Necessity)
         </p>
         <p>To operate the App, we may collect:</p>
@@ -127,7 +127,7 @@ const sections: Section[] = [
           recommendations that make Eklan work.
         </p>
 
-        <p className="font-semibold text-[#171717]">
+        <p className="font-semibold text-foreground">
           ii. Customer Support & Communication (Contractual Necessity & Legitimate Interest)
         </p>
         <p>When you contact us, we may collect:</p>
@@ -139,7 +139,7 @@ const sections: Section[] = [
         </ul>
         <p>We use this information only to address your inquiry and improve user experience.</p>
 
-        <p className="font-semibold text-[#171717]">
+        <p className="font-semibold text-foreground">
           iii. App, Website & Service Improvement (Legitimate Interest)
         </p>
         <p>We may collect:</p>
@@ -160,7 +160,7 @@ const sections: Section[] = [
           <li>Optimize performance</li>
         </ul>
 
-        <p className="font-semibold text-[#171717]">
+        <p className="font-semibold text-foreground">
           iv. Marketing & Promotional Communications (Consent or Legitimate Interest)
         </p>
         <p>If you subscribe to updates or newsletters, we may collect:</p>
@@ -208,10 +208,10 @@ const sections: Section[] = [
         <p>We do not sell your personal information.</p>
         <p>We may share information only under these circumstances:</p>
 
-        <p className="font-semibold text-[#171717]">A. With Your Consent</p>
+        <p className="font-semibold text-foreground">A. With Your Consent</p>
         <p>When you explicitly agree to share certain data.</p>
 
-        <p className="font-semibold text-[#171717]">B. With Service Providers</p>
+        <p className="font-semibold text-foreground">B. With Service Providers</p>
         <p>
           We may share data with trusted third-party partners who help us provide:
         </p>
@@ -228,7 +228,7 @@ const sections: Section[] = [
           other purpose.
         </p>
 
-        <p className="font-semibold text-[#171717]">C. Business Transfers</p>
+        <p className="font-semibold text-foreground">C. Business Transfers</p>
         <p>If Eklan undergoes:</p>
         <ul className="list-disc ml-5 space-y-1">
           <li>Merger</li>
@@ -238,7 +238,7 @@ const sections: Section[] = [
         </ul>
         <p>your data may be transferred under strict confidentiality protections.</p>
 
-        <p className="font-semibold text-[#171717]">D. Legal Requirements & Safety</p>
+        <p className="font-semibold text-foreground">D. Legal Requirements & Safety</p>
         <p>We may disclose data where necessary to:</p>
         <ul className="list-disc ml-5 space-y-1">
           <li>Meet legal obligations</li>
@@ -247,7 +247,7 @@ const sections: Section[] = [
           <li>Respond to regulatory requests</li>
         </ul>
 
-        <p className="font-semibold text-[#171717]">E. International Data Transfers</p>
+        <p className="font-semibold text-foreground">E. International Data Transfers</p>
         <p>Your information may be processed in countries outside your jurisdiction.</p>
         <p>
           Where required, we rely on Standard Contractual Clauses (SCCs) or other

@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TTSButton } from "@/components/ui/TTSButton";
+import { resolveAccentVoiceId } from "@/services/tts-accent-voices";
 import { Loader2, BookOpen, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
     drillType: "definition",
     assignmentId,
   });
+  const drillVoiceId = resolveAccentVoiceId(drill.tts_voice_key);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState(false);
@@ -298,7 +300,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                         {item.word}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <TTSButton text={item.word} audioUrl={item.audioUrl} />
+                        <TTSButton text={item.word} audioUrl={item.audioUrl} voiceId={drillVoiceId} />
                       </div>
                     </div>
                     {item.hint && (
@@ -398,7 +400,7 @@ export default function DefinitionDrill({ drill, assignmentId }: DefinitionDrill
                       <p className="text-xs text-muted-foreground mt-1">Define this word</p>
                     </div>
                   </div>
-                  <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} />
+                  <TTSButton text={currentItem.word} audioUrl={currentItem.audioUrl} voiceId={drillVoiceId} />
                 </div>
 
                 {currentItem.hint && (

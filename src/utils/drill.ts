@@ -163,7 +163,7 @@ export const DRILL_TYPE_LABELS: Record<string, string> = {
   sentence: "Sentence",
   listening: "Listening",
   fill_blank: "Fill-in-the-Blank",
-  key_phrases: "Pressure Test",
+  key_phrases: "Scenario Pressure Test",
   eklan_free_talk: "Simulation Room",
 };
 

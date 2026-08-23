@@ -66,6 +66,55 @@ export function formatDateForInput(date: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+const LOCAL_CALENDAR_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parse a YYYY-MM-DD value as a local calendar date so it round-trips with
+ * `formatDateForInput`. Start is 00:00:00.000 local; end is 23:59:59.999 local.
+ */
+export function parseLocalCalendarDate(
+  value: string,
+  boundary: "start" | "end",
+): Date | null {
+  if (typeof value !== "string") return null;
+  const match = LOCAL_CALENDAR_DATE_RE.exec(value.trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date =
+    boundary === "end"
+      ? new Date(year, month, day, 23, 59, 59, 999)
+      : new Date(year, month, day, 0, 0, 0, 0);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+export function formatStoredWeekDateRange(
+  start?: string | Date | null,
+  end?: string | Date | null,
+): string | null {
+  if (start == null || end == null || start === "" || end === "") {
+    return null;
+  }
+  const startDate = start instanceof Date ? start : new Date(start);
+  const endDate = end instanceof Date ? end : new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  return `${fmt.format(startDate)} – ${fmt.format(endDate)}`;
+}
+
 export function getWeekCompletionDate(
   weekNumber: number,
   anchorDate?: string | Date | null,
