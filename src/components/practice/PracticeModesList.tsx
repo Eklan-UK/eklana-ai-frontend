@@ -9,6 +9,7 @@ import { ProLockHoverWrap } from "@/components/subscription/ProLockHoverWrap";
 import { ProLockedCtaSwap } from "@/components/subscription/ProLockedCtaSwap";
 
 type ModeId = "simulation" | "precisionClinic" | "weeklyChallenge";
+export type PracticeModeLockReason = "pro" | "enrollment";
 
 const MODES: Array<{
   id: ModeId;
@@ -42,7 +43,7 @@ function ModeRow({
   iconSrc,
   title,
   subtitle,
-  locked,
+  lockReason,
   isLast,
 }: {
   href: string;
@@ -50,9 +51,12 @@ function ModeRow({
   iconSrc: string;
   title: string;
   subtitle: string;
-  locked: boolean;
+  lockReason?: PracticeModeLockReason;
   isLast: boolean;
 }) {
+  const locked = Boolean(lockReason);
+  const enrollmentLocked = lockReason === "enrollment";
+
   const inner = (
     <div
       className={`flex items-center gap-3.5 px-4 py-3.5 ${
@@ -82,7 +86,7 @@ function ModeRow({
           <p className="text-sm font-extrabold font-nunito text-[#101828] dark:text-foreground leading-[17.5px]">
             {title}
           </p>
-          {locked && (
+          {lockReason === "pro" && (
             <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold leading-none text-orange-800">
               Pro
             </span>
@@ -92,7 +96,7 @@ function ModeRow({
           {subtitle}
         </p>
       </div>
-      {locked ? (
+      {lockReason === "pro" ? (
         <ProLockedCtaSwap density="compact">
           <span
             className="flex size-[34px] shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground pointer-events-none"
@@ -101,6 +105,13 @@ function ModeRow({
             <Lock className="size-4" />
           </span>
         </ProLockedCtaSwap>
+      ) : locked ? (
+        <span
+          className="flex size-[34px] shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground"
+          aria-hidden
+        >
+          <Lock className="size-4" />
+        </span>
       ) : (
         <span className="relative block size-[17px] shrink-0 overflow-hidden">
           <Image
@@ -116,7 +127,7 @@ function ModeRow({
     </div>
   );
 
-  if (locked) {
+  if (lockReason === "pro") {
     return (
       <ProLockHoverWrap className="block w-full">
         <div aria-disabled="true">{inner}</div>
@@ -124,16 +135,22 @@ function ModeRow({
     );
   }
 
+  if (enrollmentLocked) {
+    return <div aria-disabled="true">{inner}</div>;
+  }
+
   return <Link href={href}>{inner}</Link>;
 }
 
 export interface PracticeModesListProps {
   locked?: boolean;
+  clinicEnrollmentLocked?: boolean;
   heading?: ReactNode;
 }
 
 export function PracticeModesList({
   locked = false,
+  clinicEnrollmentLocked = false,
   heading,
 }: PracticeModesListProps) {
   const t = useTranslations("account.practiceHub");
@@ -146,18 +163,29 @@ export function PracticeModesList({
         </h2>
       )}
       <div className="overflow-hidden rounded-[18px] bg-card shadow-[0px_1px_6px_0px_rgba(0,0,0,0.06)] dark:border dark:border-border">
-        {MODES.map((mode, i) => (
-          <ModeRow
-            key={mode.id}
-            href={mode.href}
-            iconBg={mode.iconBg}
-            iconSrc={mode.iconSrc}
-            title={t(`${mode.id}Title`)}
-            subtitle={t(`${mode.id}Subtitle`)}
-            locked={locked}
-            isLast={i === MODES.length - 1}
-          />
-        ))}
+        {MODES.map((mode, i) => {
+          const lockReason: PracticeModeLockReason | undefined = locked
+            ? "pro"
+            : mode.id === "precisionClinic" && clinicEnrollmentLocked
+              ? "enrollment"
+              : undefined;
+          return (
+            <ModeRow
+              key={mode.id}
+              href={mode.href}
+              iconBg={mode.iconBg}
+              iconSrc={mode.iconSrc}
+              title={t(`${mode.id}Title`)}
+              subtitle={
+                lockReason === "enrollment"
+                  ? t("notEnrolledYet")
+                  : t(`${mode.id}Subtitle`)
+              }
+              lockReason={lockReason}
+              isLast={i === MODES.length - 1}
+            />
+          );
+        })}
       </div>
     </section>
   );

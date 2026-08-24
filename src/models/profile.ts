@@ -13,6 +13,8 @@ export interface IProfile extends Document {
 	learningGoal?: string;
 	nationality?: string;
 	language?: string;
+	/** Spoken native language (display name). Distinct from app interface `language`. */
+	nativeLanguage?: string;
 	
 	// Learning preferences
 	gradeLevel?: string;
@@ -101,6 +103,10 @@ const profileSchema = new Schema<IProfile>(
 		},
 		language: {
 			type: String,
+		},
+		nativeLanguage: {
+			type: String,
+			trim: true,
 		},
 		// Learning preferences
 		gradeLevel: {

@@ -13,6 +13,7 @@ import { toStudentLessonAccent } from '@/services/tts-accent-voices';
 const preferencesSchema = z.object({
 	nationality: z.string().optional(),
 	language: z.string().optional(),
+	nativeLanguage: z.string().optional(),
 	learningGoal: z.string().optional(),
 	learningGoals: z.array(z.string()).optional(),
 	theme: z.enum(['system', 'light', 'dark']).optional(),
@@ -34,6 +35,7 @@ const preferencesSchema = z.object({
 function profilePreferencesPayload(profile: {
 	nationality?: string;
 	language?: string;
+	nativeLanguage?: string;
 	learningGoal?: string;
 	learningGoals?: string[];
 	theme?: string;
@@ -54,6 +56,7 @@ function profilePreferencesPayload(profile: {
 	return {
 		nationality: profile.nationality,
 		language: profile.language,
+		nativeLanguage: profile.nativeLanguage,
 		learningGoal: profile.learningGoal,
 		learningGoals: profile.learningGoals,
 		theme: profile.theme,
@@ -72,7 +75,7 @@ async function getHandler(
 
 		const profile = await ProfileModel.findOne({ userId: context.userId })
 			.select(
-				'nationality language learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
+				'nationality language nativeLanguage learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
 			)
 			.lean()
 			.exec();
@@ -160,7 +163,7 @@ async function patchHandler(
 			{ new: true, upsert: false },
 		)
 			.select(
-				'nationality language learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
+				'nationality language nativeLanguage learningGoal learningGoals theme timezone notificationPreferences lessonPreferences',
 			)
 			.lean()
 			.exec();

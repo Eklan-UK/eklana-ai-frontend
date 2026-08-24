@@ -9,6 +9,7 @@ import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { apiResponse } from '@/lib/api/response';
+import { toUserIdCandidates } from '@/lib/api/user-id';
 
 const completeDailyFocusSchema = z.object({
   score: z.number().min(0).max(100),
@@ -38,7 +39,7 @@ async function calculateNewAverage(dailyFocusId: string): Promise<number> {
 
 async function postHandler(
   req: NextRequest,
-  context: { userId: Types.ObjectId; userRole: string },
+  context: { userId: string; userRole: string },
   params: { id: string }
 ): Promise<NextResponse> {
   try {
@@ -78,7 +79,7 @@ async function postHandler(
 
     // Record completion (only if first completion today)
     const { streakUpdated, badgesUnlocked } = await StreakService.recordCompletion(
-      context.userId.toString(),
+      context.userId,
       id,
       validated.score,
       validated.correctAnswers,
@@ -100,7 +101,7 @@ async function postHandler(
     const todayString = getTodayString();
     await DailyFocusProgress.findOneAndUpdate(
       {
-        userId: context.userId,
+        userId: { $in: toUserIdCandidates(context.userId) },
         dailyFocusId: new Types.ObjectId(id),
         dateString: todayString,
       },

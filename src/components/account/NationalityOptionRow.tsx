@@ -17,7 +17,7 @@ export function NationalityOptionRow({
     <div className="flex items-center gap-3 md:gap-4 justify-between min-w-0 w-full">
       <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
         <span className="text-2xl shrink-0 leading-none">{option.flag}</span>
-        <span className="text-base font-semibold text-gray-900 truncate">
+        <span className="text-base font-semibold text-foreground truncate">
           {option.label}
         </span>
       </div>

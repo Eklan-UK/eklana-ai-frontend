@@ -5,7 +5,10 @@ import '@/models/user';
 
 export interface IDailyFocusProgress extends Document {
   _id: Types.ObjectId;
-  userId: Types.ObjectId; // Reference to User
+  // Better Auth (web sign-up, incl. Google/Apple OAuth) assigns UUID string
+  // user ids; legacy/mobile accounts use ObjectId. Mixed so both formats
+  // can be stored/queried without a cast error.
+  userId: Types.ObjectId | string;
   dailyFocusId: Types.ObjectId; // Reference to DailyFocus
   dateString: string; // YYYY-MM-DD format (UTC)
   
@@ -33,9 +36,11 @@ export interface IDailyFocusProgress extends Document {
 
 const dailyFocusProgressSchema = new Schema<IDailyFocusProgress>(
   {
+    // Mixed (not ObjectId) so UUID user ids (Better Auth web sign-up, incl.
+    // Google/Apple OAuth) can be stored without a cast error. No `ref`
+    // since populate cannot reliably resolve a mixed-type field.
     userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
+      type: Schema.Types.Mixed,
       required: true,
       index: true,
     },

@@ -4,53 +4,11 @@ import { withRole } from '@/lib/api/middleware';
 import { withErrorHandler } from '@/lib/api/error-handler';
 import { connectToDatabase } from '@/lib/api/db';
 import { apiResponse } from '@/lib/api/response';
+import { countDrillPracticeItems } from '@/lib/drills/count-practice-items';
 import Drill from '@/models/drill';
 import DrillAssignment from '@/models/drill-assignment';
 
 const PC_SOURCE = { source: 'precision_clinic' as const };
-
-function len(arr: unknown): number {
-	return Array.isArray(arr) ? arr.length : 0;
-}
-
-/** Best-effort practice-item count from general Drill content fields. */
-function countDrillPracticeItems(drill: {
-	target_sentences?: unknown;
-	pronunciation_items?: unknown;
-	matching_pairs?: unknown;
-	definition_items?: unknown;
-	grammar_items?: unknown;
-	sentence_writing_items?: unknown;
-	fill_blank_items?: unknown;
-	key_phrase_items?: unknown;
-	roleplay_scenes?: unknown;
-	roleplay_dialogue?: unknown;
-	listening_drill_content?: string;
-	listening_drill_title?: string;
-	article_content?: string;
-	article_title?: string;
-	sentence_drill_word?: string;
-}): number {
-	const fromArrays =
-		len(drill.target_sentences) +
-		len(drill.pronunciation_items) +
-		len(drill.matching_pairs) +
-		len(drill.definition_items) +
-		len(drill.grammar_items) +
-		len(drill.sentence_writing_items) +
-		len(drill.fill_blank_items) +
-		len(drill.key_phrase_items) +
-		len(drill.roleplay_scenes);
-
-	if (fromArrays > 0) return fromArrays;
-
-	if (drill.listening_drill_content || drill.listening_drill_title) return 1;
-	if (drill.article_content || drill.article_title) return 1;
-	if (drill.sentence_drill_word) return 1;
-	if (len(drill.roleplay_dialogue) > 0) return 1;
-
-	return 0;
-}
 
 async function getHandler(
 	_req: NextRequest,
@@ -58,7 +16,7 @@ async function getHandler(
 ) {
 	await connectToDatabase();
 
-	const [drills, assigned, publishedDrillIds] = await Promise.all([
+	const [drills, assigned, publishedAgg] = await Promise.all([
 		Drill.find(PC_SOURCE)
 			.select(
 				'target_sentences pronunciation_items matching_pairs definition_items grammar_items sentence_writing_items fill_blank_items key_phrase_items roleplay_scenes roleplay_dialogue listening_drill_content listening_drill_title article_content article_title sentence_drill_word'
@@ -66,7 +24,11 @@ async function getHandler(
 			.lean()
 			.exec(),
 		DrillAssignment.countDocuments(PC_SOURCE),
-		DrillAssignment.distinct('drillId', PC_SOURCE),
+		DrillAssignment.aggregate([
+			{ $match: PC_SOURCE },
+			{ $group: { _id: '$drillId' } },
+			{ $count: 'count' },
+		]),
 	]);
 
 	let practiceItems = 0;
@@ -74,9 +36,7 @@ async function getHandler(
 		practiceItems += countDrillPracticeItems(drill);
 	}
 
-	const published = Array.isArray(publishedDrillIds)
-		? publishedDrillIds.length
-		: 0;
+	const published = publishedAgg[0]?.count ?? 0;
 
 	return apiResponse.success({
 		total: drills.length,

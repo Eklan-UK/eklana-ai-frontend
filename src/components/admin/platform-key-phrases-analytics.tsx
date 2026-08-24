@@ -31,7 +31,7 @@ export function PlatformKeyPhrasesAnalytics({
             <span className="p-2 bg-violet-50 rounded-lg">
               <MessageSquareQuote className="w-4 h-4 text-violet-600" />
             </span>
-            Pressure Test Analytics
+            Scenario Pressure Test Analytics
           </h2>
         </div>
       ) : null}
@@ -42,11 +42,11 @@ export function PlatformKeyPhrasesAnalytics({
         </div>
       ) : isError ? (
         <div className="text-center py-8 text-red-500">
-          Failed to load Pressure Test analytics.
+          Failed to load Scenario Pressure Test analytics.
         </div>
       ) : !stats || (stats.totalAssigned === 0 && stats.totalAttempts === 0) ? (
         <div className="text-center py-8 text-gray-500">
-          No Pressure Test data available.
+          No Scenario Pressure Test data available.
         </div>
       ) : (
         <div className="space-y-6">

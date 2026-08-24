@@ -33,7 +33,7 @@ export function LearningGoalsForm({
   return (
     <div className="w-full max-w-lg mx-auto px-4 md:max-w-xl md:px-8 py-6 md:py-12">
       <div className="mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-snug tracking-tight">
+        <h1 className="text-xl md:text-2xl font-bold text-foreground leading-snug tracking-tight">
           {t("heading")}
         </h1>
         {subheading ? (

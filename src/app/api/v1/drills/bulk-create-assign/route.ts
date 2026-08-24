@@ -15,6 +15,7 @@ import {
 } from "@/domain/learning-journey/learning-journey.validation";
 import { parseLearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { assertLearnersEnrolledForDrill } from "@/domain/learning-journey/mission-enrollment.service";
+import { assertLearnersEnrolledForClinic } from "@/domain/precision-clinic/clinic-enrollment.service";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 import { parseDrillCompletionDateInput } from "@/lib/drill-completion-date";
 import { getAssignedAtForWeek } from "@/lib/ai-drill-builder/week-utils";
@@ -233,7 +234,11 @@ async function handler(
             learning_journey_topic: validatedTopic,
           } = journeyValidation.data;
 
-          if (validatedPart != null) {
+          if (isPrecisionClinic) {
+            await assertLearnersEnrolledForClinic({
+              learnerIds: [studentId],
+            });
+          } else if (validatedPart != null) {
             await assertLearnersEnrolledForDrill({
               learnerIds: [studentId],
               part: validatedPart,

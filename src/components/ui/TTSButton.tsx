@@ -5,6 +5,23 @@ import { Volume2, VolumeX, Loader2 } from "lucide-react";
 import { useTTS } from "@/hooks/useTTS";
 import { Button } from "./Button";
 
+/** Module-level exclusive playback: starting one TTSButton stops the previous. */
+let activeTTSStop: (() => void) | null = null;
+
+export function stopAllTTSButtons() {
+  const stop = activeTTSStop;
+  activeTTSStop = null;
+  stop?.();
+}
+
+function stopPreviousTTSButton(except?: (() => void) | null) {
+  if (activeTTSStop && activeTTSStop !== except) {
+    const prev = activeTTSStop;
+    activeTTSStop = null;
+    prev();
+  }
+}
+
 interface TTSButtonProps {
   text: string;
   voiceId?: string;
@@ -33,10 +50,24 @@ export function TTSButton({
   onPlayStart,
   stopRef,
 }: TTSButtonProps) {
+  const onPlayStartRef = useRef(onPlayStart);
+  onPlayStartRef.current = onPlayStart;
+
+  const stopImplRef = useRef<() => void>(() => {});
+  const stableStopRef = useRef<() => void>(() => {
+    stopImplRef.current();
+  });
+
   // Use TTS hook for generating audio on-the-fly
   const { playAudio: playTTSAudio, preloadAudio, isGenerating, isPlaying: isTTSPlaying, stopAudio: stopTTSAudio } = useTTS({
     autoPlay: autoPlay && !audioUrl,
-    onPlayStart: audioUrl ? undefined : onPlayStart,
+    onPlayStart: audioUrl
+      ? undefined
+      : () => {
+          stopPreviousTTSButton(stableStopRef.current);
+          onPlayStartRef.current?.();
+          activeTTSStop = stableStopRef.current;
+        },
   });
   
   // State for playing pre-generated audio
@@ -46,6 +77,21 @@ export function TTSButton({
   
   // Combined playing state
   const isPlaying = audioUrl ? isPlayingUrl : isTTSPlaying;
+
+  stopImplRef.current = () => {
+    if (audioUrl) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlayingUrl(false);
+    } else {
+      stopTTSAudio();
+    }
+    if (activeTTSStop === stableStopRef.current) {
+      activeTTSStop = null;
+    }
+  };
 
   // Pre-warm TTS / pre-generated audio as soon as text or URL is known
   useEffect(() => {
@@ -78,10 +124,14 @@ export function TTSButton({
   
   // Cleanup audio on unmount
   useEffect(() => {
+    const stopThis = stableStopRef.current;
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
+      }
+      if (activeTTSStop === stopThis) {
+        activeTTSStop = null;
       }
     };
   }, []);
@@ -89,21 +139,13 @@ export function TTSButton({
   // Expose a stop function to the parent via stopRef
   useEffect(() => {
     if (!stopRef) return;
-    stopRef.current = () => {
-      if (audioUrl) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-          setIsPlayingUrl(false);
-        }
-      } else {
-        stopTTSAudio();
-      }
-    };
-  }, [audioUrl, stopRef, stopTTSAudio]);
+    stopRef.current = () => stopImplRef.current();
+  }, [stopRef]);
 
   const playFromUrl = () => {
     if (!audioUrl) return;
+
+    stopPreviousTTSButton(stableStopRef.current);
     
     // Stop any existing audio
     if (audioRef.current) {
@@ -118,11 +160,20 @@ export function TTSButton({
     
     audio.onplay = () => {
       setIsPlayingUrl(true);
-      onPlayStart?.();
+      onPlayStartRef.current?.();
+      activeTTSStop = stableStopRef.current;
     };
-    audio.onended = () => setIsPlayingUrl(false);
+    audio.onended = () => {
+      setIsPlayingUrl(false);
+      if (activeTTSStop === stableStopRef.current) {
+        activeTTSStop = null;
+      }
+    };
     audio.onerror = () => {
       setIsPlayingUrl(false);
+      if (activeTTSStop === stableStopRef.current) {
+        activeTTSStop = null;
+      }
       // Fallback to TTS if pre-generated audio fails
       console.warn("Pre-generated audio failed, falling back to TTS");
       playTTSAudio(text, voiceId);
@@ -132,6 +183,9 @@ export function TTSButton({
     audio.play().catch((err) => {
       console.error("Error playing audio:", err);
       setIsPlayingUrl(false);
+      if (activeTTSStop === stableStopRef.current) {
+        activeTTSStop = null;
+      }
       // Fallback to TTS
       playTTSAudio(text, voiceId);
     });
@@ -143,6 +197,9 @@ export function TTSButton({
       audioRef.current.currentTime = 0;
       setIsPlayingUrl(false);
     }
+    if (activeTTSStop === stableStopRef.current) {
+      activeTTSStop = null;
+    }
   };
 
   const handleClick = () => {
@@ -152,16 +209,22 @@ export function TTSButton({
         stopUrlAudio();
       } else {
         stopTTSAudio();
+        if (activeTTSStop === stableStopRef.current) {
+          activeTTSStop = null;
+        }
       }
     } else {
       // Play based on source
       if (audioUrl) {
         playFromUrl();
       } else {
+        stopPreviousTTSButton(stableStopRef.current);
         playTTSAudio(text, voiceId);
       }
     }
   };
+
+  const label = isPlaying ? "Stop audio" : "Play audio";
 
   if (variant === "button") {
     return (
@@ -171,6 +234,8 @@ export function TTSButton({
         onClick={handleClick}
         disabled={disabled || isGenerating}
         className={className}
+        title={label}
+        aria-label={label}
       >
         {isGenerating ? (
           <div className="flex items-center justify-center gap-2">
@@ -216,7 +281,8 @@ export function TTSButton({
           ? "bg-red-100 text-red-600 hover:bg-red-200"
           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
       } ${className}`}
-      title={isPlaying ? "Stop audio" : "Play audio"}
+      title={label}
+      aria-label={label}
     >
       {isGenerating ? (
         <Loader2 className={`${iconSizes[size]} animate-spin`} />

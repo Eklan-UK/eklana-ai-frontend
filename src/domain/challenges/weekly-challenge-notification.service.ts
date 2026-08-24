@@ -12,7 +12,7 @@ const DRILL_TYPE_LABELS: Record<string, string> = {
 	pronunciation: 'Pronunciation',
 	vocabulary: 'Vocabulary/Key Phrase',
 	roleplay: 'Roleplay',
-	key_phrases: 'Pressure Test',
+	key_phrases: 'Scenario Pressure Test',
 	fill_blank: 'Fill in the Blank',
 };
 

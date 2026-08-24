@@ -1,31 +1,83 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { User, Mail, Phone, Calendar, Globe2, Languages } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { useAuthStore } from "@/store/auth-store";
 import { getUserDisplayName } from "@/utils/user";
-import { useRouter } from "next/navigation";
 import { profileService } from "@/services/profile.service";
-import { toast } from "sonner";
-import Image from "next/image";
-import { User, Mail } from "lucide-react";
+import { userAPI } from "@/lib/api";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { LANGUAGE_OPTIONS } from "@/lib/languages";
+import { NATIONALITY_OPTIONS } from "@/lib/nationalities";
+import { ProfileRadioRow } from "@/components/account/ProfileRadioRow";
+
+function FieldShell({
+  label,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  icon: typeof User;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm text-muted-foreground">{label}</label>
+      <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
+        <Icon className="w-5 h-5 text-muted-foreground shrink-0" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function toDateInputValue(value: unknown): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
 
 export default function EditProfilePage() {
+  const t = useTranslations("profile");
+  const tCommon = useTranslations("common");
   const { user } = useAuthStore();
+  const { data: me } = useUserCurrent();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [nativeLanguage, setNativeLanguage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showNationalityPicker, setShowNationalityPicker] = useState(false);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setName(getUserDisplayName(user));
-      setEmail(user.email || "");
-    }
-  }, [user]);
+    const u = me?.user ?? user;
+    if (!u) return;
+    setName(getUserDisplayName(u));
+    setEmail(u.email || "");
+    setPhone(typeof u.phone === "string" ? u.phone : "");
+    setDateOfBirth(toDateInputValue(u.dateOfBirth));
+  }, [me?.user, user]);
+
+  useEffect(() => {
+    const profile = me?.profile;
+    if (!profile) return;
+    setNationality(profile.nationality?.trim() || "");
+    setNativeLanguage(profile.nativeLanguage?.trim() || "");
+  }, [me?.profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,187 +88,206 @@ export default function EditProfilePage() {
       const firstName =
         spaceIdx >= 0 ? trimmed.slice(0, spaceIdx) : trimmed;
       const lastName = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1) : "";
-      await profileService.updateProfile({ firstName, lastName, email });
-      toast.success("Profile updated");
+
+      await profileService.updateProfile({
+        firstName,
+        lastName,
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+      });
+
+      await userAPI.updatePreferences({
+        nationality: nationality || undefined,
+        nativeLanguage: nativeLanguage || undefined,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["user-current"] });
+      toast.success(t("profileUpdated"));
       router.back();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update profile");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : t("updateFailed");
+      toast.error(message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setIsDeletingAccount(true);
-    try {
-      await profileService.deleteAccount();
-      toast.success("Account deleted");
-      router.push("/auth/login");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete account");
-      setIsDeletingAccount(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="h-6" />
-      <Header showBack title="Edit profile" />
+      <Header showBack title={t("editTitle")} />
 
       <div className="max-w-md mx-auto px-5 pt-6 pb-10">
-        {/* Avatar row */}
         <div className="flex items-center gap-3 mb-6">
           <div className="relative w-[74px] h-[74px] shrink-0">
-            {user?.avatar ? (
+            {user?.avatar || me?.user?.avatar ? (
               <Image
-                src={user.avatar}
+                src={user?.avatar || me?.user?.avatar}
                 alt="Profile"
                 width={74}
                 height={74}
-                className="rounded-full object-cover w-full h-full border border-[#ecffed]"
+                className="rounded-full object-cover w-full h-full border border-border"
               />
             ) : (
-              <div className="w-full h-full rounded-full border border-[#ecffed] bg-muted flex items-center justify-center">
-                {/* empty-state image icon matching Figma frame 2 */}
-                <svg
-                  width="52"
-                  height="52"
-                  viewBox="0 0 52 52"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M6.5 40.625L17.333 29.792a3.25 3.25 0 014.594 0l3.64 3.64 6.166-6.165a3.25 3.25 0 014.594 0L45.5 40.625"
-                    stroke="#c8c8c8"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <rect
-                    x="6.5"
-                    y="9.75"
-                    width="39"
-                    height="32.5"
-                    rx="3.25"
-                    stroke="#c8c8c8"
-                    strokeWidth="2"
-                  />
-                  <circle
-                    cx="19.5"
-                    cy="22.75"
-                    r="3.25"
-                    stroke="#c8c8c8"
-                    strokeWidth="2"
-                  />
-                </svg>
+              <div className="w-full h-full rounded-full border border-border bg-muted flex items-center justify-center text-muted-foreground text-sm">
+                —
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => router.push("/account/profile/photo")}
-            className="border border-[rgba(231,234,237,0.5)] rounded-3xl px-[10px] py-[10px] text-xs text-[#606060] shrink-0"
+          <Link
+            href="/account/profile/photo"
+            className="border border-border rounded-3xl px-3 py-2.5 text-xs text-muted-foreground shrink-0"
           >
-            Change photo
-          </button>
+            {t("changePhotoAria")}
+          </Link>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {/* Name field */}
+          <FieldShell label={t("fullName")} icon={User}>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+              required
+              disabled={isLoading}
+            />
+          </FieldShell>
+
+          <FieldShell label={t("email")} icon={Mail}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+              required
+              disabled={isLoading}
+            />
+          </FieldShell>
+
+          <FieldShell label={t("phone")} icon={Phone}>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+              disabled={isLoading}
+            />
+          </FieldShell>
+
+          <FieldShell label={t("dateOfBirth")} icon={Calendar}>
+            <input
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              min="1900-01-01"
+              className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
+              disabled={isLoading}
+              aria-describedby="dob-hint"
+            />
+          </FieldShell>
+          <p id="dob-hint" className="text-xs text-muted-foreground -mt-1">
+            {t("dateOfBirthHint")}
+          </p>
+
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground">Name</label>
-            <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-1">
-              <User className="w-6 h-6 text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <label className="text-sm text-muted-foreground">
+              {t("nationality")}
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowNationalityPicker((v) => !v);
+                setShowLanguagePicker(false);
+              }}
+              className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2 text-left"
+            >
+              <Globe2 className="w-5 h-5 text-muted-foreground shrink-0" />
+              <span className="flex-1 text-base text-foreground truncate">
+                {nationality || t("selectNationality")}
+              </span>
+            </button>
+            {showNationalityPicker ? (
+              <div className="mt-2 max-h-56 overflow-y-auto space-y-2 rounded-xl border border-border p-2">
+                {NATIONALITY_OPTIONS.map((opt) => (
+                  <ProfileRadioRow
+                    key={opt.id}
+                    selected={nationality === opt.label}
+                    onSelect={() => {
+                      setNationality(opt.label);
+                      setShowNationalityPicker(false);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span aria-hidden>{opt.flag}</span>
+                      <span className="text-sm font-medium truncate">
+                        {opt.label}
+                      </span>
+                    </div>
+                  </ProfileRadioRow>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          {/* Email field */}
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-muted-foreground font-nunito">Email</label>
-            <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-1">
-              <Mail className="w-6 h-6 text-muted-foreground shrink-0" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="flex-1 bg-transparent text-base text-foreground outline-none min-w-0"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <label className="text-sm text-muted-foreground">
+              {t("nativeLanguage")}
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLanguagePicker((v) => !v);
+                setShowNationalityPicker(false);
+              }}
+              className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2 text-left"
+            >
+              <Languages className="w-5 h-5 text-muted-foreground shrink-0" />
+              <span className="flex-1 text-base text-foreground truncate">
+                {nativeLanguage || t("selectNativeLanguage")}
+              </span>
+            </button>
+            {showLanguagePicker ? (
+              <div className="mt-2 max-h-56 overflow-y-auto space-y-2 rounded-xl border border-border p-2">
+                {LANGUAGE_OPTIONS.map((opt) => (
+                  <ProfileRadioRow
+                    key={opt.locale}
+                    selected={nativeLanguage === opt.name}
+                    onSelect={() => {
+                      setNativeLanguage(opt.name);
+                      setShowLanguagePicker(false);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="text-sm font-medium truncate">
+                        {opt.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {opt.native}
+                      </span>
+                    </div>
+                  </ProfileRadioRow>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          {/* Save button */}
-          <div className="pt-10">
+          <div className="pt-6">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-primary text-white py-4 rounded-[50px] text-base font-medium disabled:opacity-50 transition-opacity"
+              className="w-full bg-primary text-white py-4 rounded-full text-base font-medium disabled:opacity-50 transition-opacity"
             >
-              {isLoading ? "Saving…" : "Save changes"}
+              {isLoading ? tCommon("saving") : t("saveChanges")}
             </button>
           </div>
         </form>
-
-        {/* Delete my account */}
-        <div className="mt-8">
-          <div className="flex items-start justify-between py-2 border-b border-[rgba(231,234,237,0.5)]">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-sm text-[#ff0e0e]"
-            >
-              Delete my account
-            </button>
-          </div>
-        </div>
       </div>
-
-      {/* Delete-account confirmation bottom sheet */}
-      {showDeleteConfirm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-end z-50"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          <div
-            className="bg-card rounded-t-[32px] w-full px-4 pt-5 pb-8 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold text-foreground mb-2">
-              Delete account?
-            </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              This action is permanent. All your data, progress and
-              subscription will be lost.
-            </p>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={isDeletingAccount}
-              className="w-full py-4 bg-[#ff0e0e] text-white rounded-[50px] font-medium mb-3 disabled:opacity-50 transition-opacity"
-            >
-              {isDeletingAccount ? "Deleting…" : "Yes, delete my account"}
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="w-full py-4 border border-border rounded-[50px] text-foreground font-medium"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

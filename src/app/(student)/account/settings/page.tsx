@@ -1,275 +1,43 @@
 "use client";
 
-import { Header } from "@/components/layout/Header";
-import Link from "next/link";
-import { useAuthStore } from "@/store/auth-store";
-import { getUserInitials, getUserDisplayName } from "@/utils/user";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useState } from "react";
 import Image from "next/image";
-import { authService } from "@/services/auth.service";
-import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useTheme } from "next-themes";
-import { useUserCurrent } from "@/hooks/useUserCurrent";
-import { formatProfileLearningGoalsShort } from "@/lib/learner-learning-goals";
+import { toast } from "sonner";
+import { ProfileMenuRow } from "@/components/account/ProfileMenuRow";
+import { ProfileMenuSection } from "@/components/account/ProfileMenuSection";
 import { ThemeSettingSheet } from "@/components/account/ThemeSettingSheet";
-
-interface SettingItemProps {
-  label: string;
-  value?: string;
-  href?: string;
-  onClick?: () => void;
-  isDanger?: boolean;
-}
-
-interface SettingSection {
-  title: string;
-  items: SettingItemProps[];
-}
+import { FeedbackSheet } from "@/components/account/FeedbackSheet";
+import { CloseAccountDialog } from "@/components/account/CloseAccountDialog";
+import { useAuthStore } from "@/store/auth-store";
+import { useUserCurrent } from "@/hooks/useUserCurrent";
+import { APP_VERSION } from "@/lib/app-version";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
 }
 
-function useSecuritySettings(): SettingItemProps[] {
+export default function SettingsPage() {
   const t = useTranslations("settings");
-  return useMemo(
-    (): SettingItemProps[] => [
-      {
-        label: t("changePassword"),
-        href: "/account/settings/password",
-      },
-    ],
-    [t]
-  );
-}
-
-function usePreferenceSettings(onOpenTheme: () => void): SettingItemProps[] {
-  const t = useTranslations("settings");
-  const tTheme = useTranslations("settingsTheme");
   const tCommon = useTranslations("common");
-  const { data: me, isLoading } = useUserCurrent();
-  const { theme } = useTheme();
-  const profile = me?.profile;
-
-  const themeLabel =
-    theme === "dark"
-      ? tTheme("dark")
-      : theme === "system"
-      ? tTheme("system")
-      : tTheme("light");
-
-  return useMemo((): SettingItemProps[] => {
-    const valueSuffix = isLoading && !me ? tCommon("loadingEllipsis") : undefined;
-    return [
-      {
-        label: t("nationality"),
-        value:
-          valueSuffix ??
-          (profile?.nationality?.trim() || tCommon("notSet")),
-        href: "/account/settings/nationality",
-      },
-      {
-        label: t("appLanguage"),
-        value:
-          valueSuffix ?? (profile?.language?.trim() || tCommon("notSet")),
-        href: "/account/settings/language",
-      },
-      {
-        label: t("learningGoals"),
-        value:
-          valueSuffix ?? formatProfileLearningGoalsShort(profile || {}),
-        href: "/account/settings/goals",
-      },
-      {
-        label: t("notifications"),
-        href: "/account/settings/notifications",
-      },
-      {
-        label: t("lesson"),
-        href: "/account/settings/lesson",
-      },
-      {
-        label: t("theme"),
-        value: themeLabel,
-        onClick: onOpenTheme,
-      },
-      {
-        label: t("help"),
-        href: "/account/settings/help",
-      },
-      {
-        label: t("subscriptions"),
-        href: "/account/settings/subscriptions",
-      },
-      {
-        label: t("privacyPolicy"),
-        href: "/account/settings/privacy",
-      },
-      {
-        label: t("termsOfUse"),
-        href: "/account/settings/terms",
-      },
-    ];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, me, profile, t, tCommon, tTheme, theme, onOpenTheme]);
-}
-
-function UserProfileSection() {
-  const t = useTranslations("settings");
-  const { user } = useAuthStore();
-  const initials = getUserInitials(user);
-  const displayName = getUserDisplayName(user);
-
-  return (
-    <div className="flex items-center gap-4 py-6 border-b border-border">
-      {user?.avatar ? (
-        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-green-500">
-          <Image
-            src={user.avatar}
-            alt={displayName}
-            width={80}
-            height={80}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-pink-400 via-primary-400 to-blue-400 flex items-center justify-center text-2xl md:text-3xl font-bold text-white">
-          {initials}
-        </div>
-      )}
-      <div className="flex-1">
-        <h3 className="text-lg md:text-xl font-bold text-foreground mb-1">
-          {displayName}
-        </h3>
-        <Link
-          href="/account/profile/edit"
-          className="text-sm text-primary font-medium no-underline hover:no-underline"
-        >
-          {t("editProfile")}
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-const SettingItem: React.FC<SettingItemProps> = ({
-  label,
-  value,
-  href,
-  onClick,
-  isDanger = false,
-}) => {
-  const content = (
-    <div
-      className={`flex items-center justify-between py-4 border-b border-border ${
-        isDanger ? "text-accent-red" : ""
-      }`}
-    >
-      <span className="text-base font-medium">{label}</span>
-      <div className="flex items-center gap-2 shrink-0">
-        {value && (
-          <span className="text-sm text-muted-foreground text-right max-w-[55%]">
-            {value}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className="block no-underline hover:no-underline">
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="block w-full text-left no-underline"
-    >
-      {content}
-    </button>
-  );
-};
-
-function EmailVerificationSection() {
-  const t = useTranslations("settings");
-  const { user } = useAuthStore();
-  const [isSending, setIsSending] = useState(false);
-  const isEmailVerified = user?.isEmailVerified || user?.emailVerified;
-
-  const handleSendVerification = async () => {
-    setIsSending(true);
-    try {
-      await authService.sendVerificationEmail();
-      toast.success(t("verificationEmailSent"));
-    } catch (error: unknown) {
-      toast.error(
-        getErrorMessage(error, t("verificationEmailFailed"))
-      );
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  return (
-    <div className="py-4 border-b border-border">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <span className="text-base font-medium text-foreground block">
-            {t("emailVerification")}
-          </span>
-          <span
-            className={`text-sm mt-1 block ${
-              isEmailVerified ? "text-primary" : "text-accent-red"
-            }`}
-          >
-            {isEmailVerified ? t("verified") : t("notVerified")}
-          </span>
-        </div>
-        {!isEmailVerified && (
-          <button
-            type="button"
-            onClick={handleSendVerification}
-            disabled={isSending}
-            className="text-sm text-primary font-medium shrink-0 disabled:opacity-50 no-underline hover:no-underline"
-          >
-            {isSending ? t("sendingEllipsis") : t("verify")}
-          </button>
-        )}
-      </div>
-      {!isEmailVerified && (
-        <p className="text-xs text-muted-foreground mt-2">
-          {t("verifyEmailHint")}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function SettingsSection({ title, items }: SettingSection) {
-  return (
-    <div className="py-4">
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
-        {title}
-      </h3>
-      {items.map((item, index) => (
-        <SettingItem key={`${item.label}-${index}`} {...item} />
-      ))}
-    </div>
-  );
-}
-
-function LogoutButton() {
-  const t = useTranslations("settings");
   const { logout, isLoading } = useAuthStore();
+  const { data: me, isLoading: meLoading } = useUserCurrent();
   const router = useRouter();
+  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+
+  const profile = me?.profile;
+  const languageLabel =
+    meLoading && !me
+      ? tCommon("loadingEllipsis")
+      : profile?.language?.trim() || t("appLanguageSubtitle");
+  const nationalityLabel =
+    meLoading && !me
+      ? tCommon("loadingEllipsis")
+      : profile?.nationality?.trim() || t("nationalitySubtitle");
 
   const handleLogout = async () => {
     try {
@@ -282,61 +50,178 @@ function LogoutButton() {
   };
 
   return (
-    <div className="pt-4">
-      <button
-        type="button"
-        onClick={handleLogout}
-        disabled={isLoading}
-        className="w-full text-center py-4 text-accent-red font-semibold disabled:opacity-50"
-      >
-        {isLoading ? t("loggingOutEllipsis") : t("logout")}
-      </button>
-    </div>
-  );
-}
+    <div className="min-h-screen bg-background pb-10">
+      <div className="h-6" />
 
-function VersionInfo() {
-  const t = useTranslations("settings");
-  return (
-    <div className="pt-8 pb-4 text-center">
-      <span className="text-sm text-muted-foreground">{t("version")}</span>
-    </div>
-  );
-}
-
-export default function SettingsPage() {
-  const t = useTranslations("settings");
-  const [themeSheetOpen, setThemeSheetOpen] = useState(false);
-  const preferenceItems = usePreferenceSettings(() => setThemeSheetOpen(true));
-  const securityItems = useSecuritySettings();
-
-  return (
-    <div className="min-h-screen bg-background pb-6">
-      <div className="h-6"></div>
-      <Header showBack title={t("pageTitle")} />
-
-      <div className="max-w-md mx-auto px-4 md:max-w-2xl md:px-8">
-        <UserProfileSection />
-
-        <div className="py-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 px-1">
-            {t("security")}
-          </h3>
-          <EmailVerificationSection />
-          {securityItems.map((item, index) => (
-            <SettingItem key={`security-${index}`} {...item} />
-          ))}
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-md items-center gap-3 px-4 py-3 md:max-w-2xl md:px-8">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-[0px_1px_2px_rgba(0,0,0,0.09)] dark:border dark:border-border"
+          >
+            <span className="relative block size-[18px] overflow-hidden">
+              <Image
+                src="/icons/profile/back.svg"
+                alt=""
+                width={18}
+                height={18}
+                className="size-full"
+                unoptimized
+              />
+            </span>
+          </button>
+          <h1 className="font-nunito text-xl font-extrabold leading-[30px] tracking-[-0.3px] text-[#101828] dark:text-foreground">
+            {t("pageTitle")}
+          </h1>
         </div>
+      </div>
 
-        <SettingsSection title={t("preferences")} items={preferenceItems} />
+      <div className="mx-auto max-w-md space-y-4 px-4 py-2 md:max-w-2xl md:px-8">
+        <ProfileMenuSection card title={t("accountSection")}>
+          <ProfileMenuRow
+            iconSrc="/icons/profile/my-profile.svg"
+            title={t("myProfile")}
+            subtitle={t("myProfileSubtitle")}
+            href="/account/profile/edit"
+            iconTone="primary"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/nationality.svg"
+            title={t("nationality")}
+            subtitle={nationalityLabel}
+            href="/account/settings/nationality"
+            iconTone="primary"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/subscriptions.svg"
+            title={t("subscriptions")}
+            subtitle={t("subscriptionsSubtitle")}
+            href="/account/settings/subscriptions"
+            iconTone="primary"
+            last
+          />
+        </ProfileMenuSection>
 
-        <LogoutButton />
-        <VersionInfo />
+        <ProfileMenuSection card title={t("preferences")}>
+          <ProfileMenuRow
+            iconSrc="/icons/profile/language.svg"
+            title={t("appLanguage")}
+            subtitle={languageLabel}
+            href="/account/settings/language"
+            iconTone="primary"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/goal.svg"
+            title={t("learningGoals")}
+            subtitle={t("learningGoalsSubtitle")}
+            href="/account/settings/goals"
+            iconTone="primary"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/notifications.svg"
+            title={t("notifications")}
+            subtitle={t("notificationsSubtitle")}
+            href="/account/settings/notifications"
+            iconTone="primary"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/appearance.svg"
+            title={t("appearance")}
+            subtitle={t("appearanceSubtitle")}
+            onClick={() => setThemeSheetOpen(true)}
+            iconTone="primary"
+            last
+          />
+        </ProfileMenuSection>
+
+        <ProfileMenuSection card title={t("securityPrivacy")}>
+          <ProfileMenuRow
+            iconSrc="/icons/profile/lock.svg"
+            title={t("changePassword")}
+            subtitle={t("passwordSubtitle")}
+            href="/account/settings/password"
+            iconTone="blue"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/shield.svg"
+            title={t("privacy")}
+            subtitle={t("privacySubtitle")}
+            href="/account/settings/privacy"
+            iconTone="blue"
+            last
+          />
+        </ProfileMenuSection>
+
+        <ProfileMenuSection card title={t("supportFeedback")}>
+          <ProfileMenuRow
+            iconSrc="/icons/profile/faq.svg"
+            title={t("faq")}
+            subtitle={t("faqSubtitle")}
+            href="/account/settings/faq"
+            iconTone="teal"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/contact.svg"
+            title={t("contact")}
+            subtitle={t("contactSubtitle")}
+            href="/account/settings/contact"
+            iconTone="blue"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/feedback.svg"
+            title={t("feedback")}
+            subtitle={t("feedbackSubtitle")}
+            onClick={() => setFeedbackOpen(true)}
+            iconTone="yellow"
+            last
+          />
+        </ProfileMenuSection>
+
+        <ProfileMenuSection card title={t("other")}>
+          <ProfileMenuRow
+            iconSrc="/icons/profile/about.svg"
+            title={t("about")}
+            subtitle={t("version", { version: APP_VERSION })}
+            iconTone="slate"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/terms.svg"
+            title={t("termsOfUse")}
+            subtitle={t("termsSubtitle")}
+            href="/account/settings/terms"
+            iconTone="slate"
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/close-account.svg"
+            title={t("closeAccount")}
+            subtitle={t("closeAccountSubtitle")}
+            onClick={() => setCloseOpen(true)}
+            danger
+          />
+          <ProfileMenuRow
+            iconSrc="/icons/profile/sign-out.svg"
+            title={isLoading ? t("loggingOutEllipsis") : t("logout")}
+            subtitle={t("signOutSubtitle")}
+            onClick={handleLogout}
+            danger
+            last
+          />
+        </ProfileMenuSection>
       </div>
 
       <ThemeSettingSheet
         isOpen={themeSheetOpen}
         onClose={() => setThemeSheetOpen(false)}
+      />
+      <FeedbackSheet
+        isOpen={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
+      <CloseAccountDialog
+        isOpen={closeOpen}
+        onClose={() => setCloseOpen(false)}
       />
     </div>
   );

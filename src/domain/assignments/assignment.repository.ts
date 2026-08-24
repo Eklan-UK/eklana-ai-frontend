@@ -7,6 +7,22 @@ import { ValidationError } from '@/lib/api/response';
 import { toUserIdQuery, toUserIdQueryMulti } from '@/lib/api/user-id';
 import type { DrillAssignment as AssignmentType, CreateAssignmentData, AssignmentFilters } from './assignment.types';
 
+type AssignmentStatus = AssignmentType['status'];
+
+/**
+ * Query for status writes. Never match a completed assignment when flipping
+ * to in-progress so a later checkpoint cannot downgrade a finished drill.
+ */
+export function buildAssignmentStatusUpdateFilter(
+  assignmentId: string,
+  status: AssignmentStatus,
+): Record<string, unknown> {
+  if (status === 'in-progress') {
+    return { _id: assignmentId, status: { $ne: 'completed' } };
+  }
+  return { _id: assignmentId };
+}
+
 /**
  * Repository for drill assignment data access
  */
@@ -154,16 +170,20 @@ export class AssignmentRepository {
    */
   async updateStatus(
     assignmentId: string,
-    status: 'pending' | 'in-progress' | 'completed' | 'overdue' | 'skipped',
+    status: AssignmentStatus,
     completedAt?: Date
   ): Promise<AssignmentType | null> {
     try {
-      const update: any = { status };
+      const update: Record<string, unknown> = { status };
       if (completedAt) {
         update.completedAt = completedAt;
       }
 
-      return await DrillAssignment.findByIdAndUpdate(assignmentId, update, { new: true })
+      return await DrillAssignment.findOneAndUpdate(
+        buildAssignmentStatusUpdateFilter(assignmentId, status),
+        update,
+        { new: true },
+      )
         .lean()
         .exec();
     } catch (error: any) {

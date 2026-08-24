@@ -10,9 +10,10 @@ import {
   resolveDrillBuilderWeekCount,
   incrementDrillBuilderWeekCount,
   deleteStudentWeeks,
+  updateStudentWeekDates,
   weekNumberFromAssignment,
+  resolveWeekDisplayDates,
 } from "@/lib/ai-drill-builder/resolve-drill-builder-weeks";
-import { WEEK_MS } from "@/lib/ai-drill-builder/week-utils";
 
 async function getHandler(
   _req: NextRequest,
@@ -109,12 +110,20 @@ async function getHandler(
     }
 
     const weeks = [];
+    const dateOverrides = (
+      user as {
+        drillBuilderWeekDates?: Array<{
+          weekNumber?: number;
+          weekStartDate?: Date | string;
+          weekEndDate?: Date | string;
+        }>;
+      }
+    ).drillBuilderWeekDates;
     for (let weekNumber = 1; weekNumber <= currentWeek; weekNumber++) {
-      const weekStartDate = new Date(
-        anchor.getTime() + (weekNumber - 1) * WEEK_MS,
-      );
-      const weekEndDate = new Date(
-        anchor.getTime() + weekNumber * WEEK_MS - 1,
+      const { weekStartDate, weekEndDate } = resolveWeekDisplayDates(
+        weekNumber,
+        anchor,
+        dateOverrides,
       );
       const items = weekMap.get(weekNumber) ?? [];
       weeks.push({
@@ -287,6 +296,93 @@ async function deleteHandler(
   }
 }
 
+async function patchHandler(
+  req: NextRequest,
+  _context: { userId: string; userRole: string },
+  params: { studentId: string },
+): Promise<NextResponse> {
+  try {
+    const { studentId } = params;
+
+    if (!isValidUserId(studentId)) {
+      return NextResponse.json(
+        { code: "ValidationError", message: "Invalid student ID" },
+        { status: 400 },
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const weekNumber = body?.weekNumber;
+    const weekStartDate = body?.weekStartDate;
+    const weekEndDate = body?.weekEndDate;
+
+    if (
+      typeof weekNumber !== "number" ||
+      typeof weekStartDate !== "string" ||
+      typeof weekEndDate !== "string"
+    ) {
+      return NextResponse.json(
+        {
+          code: "ValidationError",
+          message:
+            "weekNumber, weekStartDate, and weekEndDate are required",
+        },
+        { status: 400 },
+      );
+    }
+
+    await connectToDatabase();
+
+    const data = await updateStudentWeekDates({
+      learnerId: studentId,
+      weekNumber,
+      weekStartDate,
+      weekEndDate,
+    });
+
+    logger.info("Updated student drill-builder week dates", {
+      studentId,
+      weekNumber: data.weekNumber,
+    });
+
+    return NextResponse.json(
+      {
+        code: "Success",
+        data: {
+          weekNumber: data.weekNumber,
+          weekStartDate: data.weekStartDate.toISOString(),
+          weekEndDate: data.weekEndDate.toISOString(),
+        },
+      },
+      { status: 200 },
+    );
+  } catch (error: unknown) {
+    if (isValidationError(error)) {
+      return NextResponse.json(
+        { code: "ValidationError", message: error.message },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.name === "NotFoundError") {
+      return NextResponse.json(
+        { code: "NotFoundError", message: error.message },
+        { status: 404 },
+      );
+    }
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Error updating student week dates", { error: message });
+    return NextResponse.json(
+      {
+        code: "ServerError",
+        message: "Failed to update week dates",
+        error: message,
+      },
+      { status: 500 },
+    );
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ studentId: string }> },
@@ -304,6 +400,16 @@ export async function POST(
   const resolvedParams = await params;
   return withRole(["admin", "tutor"], (req, context) =>
     postHandler(req, context, resolvedParams),
+  )(req);
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const resolvedParams = await params;
+  return withRole(["admin", "tutor"], (req, context) =>
+    patchHandler(req, context, resolvedParams),
   )(req);
 }
 

@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import { usePrecisionClinicStats } from "@/hooks/usePrecisionClinic";
+import { useClinicEnrollmentsList } from "@/hooks/usePrecisionClinicEnrollments";
 import { computeCurrentWeek } from "@/lib/ai-drill-builder/week-utils";
 import {
   getLearnerDisplayName,
@@ -21,6 +22,10 @@ import {
 } from "@/lib/ai-drill-builder/learner-utils";
 import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 import { ClinicStatCards, type ClinicStatCardData } from "./ClinicStatCards";
+import {
+  ClinicEnrollmentButton,
+  ClinicEnrollmentModal,
+} from "./ClinicEnrollmentModal";
 
 interface StudentCard {
   id: string;
@@ -35,9 +40,11 @@ interface StudentCard {
 
 export function ClinicStudentListView() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
 
   const { data: statsData, isLoading: statsLoading } =
     usePrecisionClinicStats();
+  const { data: enrolledIds } = useClinicEnrollmentsList();
   const {
     data: adminData,
     isLoading: learnersLoading,
@@ -103,6 +110,12 @@ export function ClinicStudentListView() {
       </div>
 
       <ClinicStatCards stats={stats} loading={statsLoading && !statsData} />
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <ClinicEnrollmentButton
+          onClick={() => setEnrollmentModalOpen(true)}
+        />
+      </div>
 
       <div className="mb-2">
         <div className="relative">
@@ -171,6 +184,15 @@ export function ClinicStudentListView() {
                           <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                             Week {currentWeek}
                           </span>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+                              enrolledIds?.has(student.id)
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-gray-200 bg-gray-50 text-gray-600"
+                            }`}
+                          >
+                            {enrolledIds?.has(student.id) ? "Enrolled" : "Locked"}
+                          </span>
                         </div>
                         {student.email ? (
                           <div className="mt-1 flex items-center gap-2 text-sm text-gray-600 dark:text-muted-foreground">
@@ -187,6 +209,12 @@ export function ClinicStudentListView() {
             );
           })}
         </div>
+      )}
+
+      {enrollmentModalOpen && (
+        <ClinicEnrollmentModal
+          onClose={() => setEnrollmentModalOpen(false)}
+        />
       )}
     </div>
   );

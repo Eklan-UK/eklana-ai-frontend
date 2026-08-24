@@ -11,6 +11,10 @@ import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
 import { SavedDrillsList } from "@/components/drills/SavedDrillsList";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useTTS } from "@/hooks/useTTS";
+import {
+  assignmentIdFromGetDrillPayload,
+  buildDrillWebPath,
+} from "@/lib/drill-open-url";
 import { queryKeys } from "@/lib/react-query";
 
 export type BookmarksTab = "words" | "expressions" | "drills";
@@ -25,6 +29,7 @@ export function BookmarksTabPanel({
   defaultTab = "words",
 }: BookmarksTabPanelProps) {
   const [tab, setTab] = useState<BookmarksTab>(defaultTab);
+  const [openingDrillId, setOpeningDrillId] = useState<string | null>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
   const { playAudio } = useTTS();
@@ -64,10 +69,29 @@ export function BookmarksTabPanel({
     }
   };
 
-  const handleGoToDrill = (drillId: string, e: React.MouseEvent) => {
+  const handleGoToDrill = async (drillId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!drillId) return;
-    router.push(`/account/drills/${drillId}`);
+    if (!drillId || openingDrillId) return;
+    setOpeningDrillId(drillId);
+    try {
+      const response = await fetch(`/api/v1/drills/${drillId}`);
+      if (!response.ok) {
+        toast.error("Could not open this drill");
+        setOpeningDrillId(null);
+        return;
+      }
+      const payload: unknown = await response.json();
+      const assignmentId = assignmentIdFromGetDrillPayload(payload);
+      if (!assignmentId) {
+        toast.error("Could not open this drill");
+        setOpeningDrillId(null);
+        return;
+      }
+      router.push(buildDrillWebPath(drillId, assignmentId));
+    } catch {
+      toast.error("Could not open this drill");
+      setOpeningDrillId(null);
+    }
   };
 
   return (
@@ -118,6 +142,7 @@ export function BookmarksTabPanel({
             onDelete={handleDelete}
             onPlay={handlePlay}
             onGoToDrill={handleGoToDrill}
+            openingDrillId={openingDrillId}
           />
         ) : (
           <ContentBookmarksList
@@ -130,6 +155,7 @@ export function BookmarksTabPanel({
             onDelete={handleDelete}
             onPlay={handlePlay}
             onGoToDrill={handleGoToDrill}
+            openingDrillId={openingDrillId}
           />
         )}
       </div>
@@ -145,6 +171,7 @@ function ContentBookmarksList({
   onDelete,
   onPlay,
   onGoToDrill,
+  openingDrillId,
 }: {
   bookmarks: {
     _id: string;
@@ -160,7 +187,8 @@ function ContentBookmarksList({
   emptyMessage: string;
   onDelete: (id: string, e: React.MouseEvent) => void;
   onPlay: (content: string, e: React.MouseEvent) => void;
-  onGoToDrill: (drillId: string, e: React.MouseEvent) => void;
+  onGoToDrill: (drillId: string, e: React.MouseEvent) => void | Promise<void>;
+  openingDrillId: string | null;
 }) {
   if (isLoading) {
     return (
@@ -191,6 +219,7 @@ function ContentBookmarksList({
           onDelete={onDelete}
           onPlay={onPlay}
           onGoToDrill={onGoToDrill}
+          opening={openingDrillId === bookmark.drillId}
         />
       ))}
     </div>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useTheme } from "next-themes";
-import { X, Sun, Moon } from "lucide-react";
 import { userAPI } from "@/lib/api";
 import { useTranslations } from "next-intl";
 
@@ -13,21 +13,11 @@ interface ThemeSettingSheetProps {
   onClose: () => void;
 }
 
-function SystemIcon({ selected }: { selected: boolean }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden
-      className={selected ? "text-foreground" : "text-muted-foreground"}
-    >
-      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 1 A7 7 0 0 1 8 15 Z" fill="currentColor" />
-    </svg>
-  );
-}
+const OPTION_EMOJI: Record<ThemeValue, string> = {
+  system: "⚙️",
+  light: "☀️",
+  dark: "🌙",
+};
 
 export function ThemeSettingSheet({ isOpen, onClose }: ThemeSettingSheetProps) {
   const { theme, setTheme } = useTheme();
@@ -56,112 +46,94 @@ export function ThemeSettingSheet({ isOpen, onClose }: ThemeSettingSheetProps) {
     }
   };
 
-  const options: { value: ThemeValue; labelKey: "system" | "light" | "dark"; icon: React.ReactNode }[] = [
-    {
-      value: "system",
-      labelKey: "system",
-      icon: <SystemIcon selected={staged === "system"} />,
-    },
-    {
-      value: "light",
-      labelKey: "light",
-      icon: (
-        <Sun
-          size={16}
-          className={staged === "light" ? "text-foreground" : "text-muted-foreground"}
-        />
-      ),
-    },
-    {
-      value: "dark",
-      labelKey: "dark",
-      icon: (
-        <Moon
-          size={16}
-          className={staged === "dark" ? "text-foreground" : "text-muted-foreground"}
-        />
-      ),
-    },
-  ];
+  const options: { value: ThemeValue; labelKey: "system" | "light" | "dark" }[] =
+    [
+      { value: "system", labelKey: "system" },
+      { value: "light", labelKey: "light" },
+      { value: "dark", labelKey: "dark" },
+    ];
 
   if (!isOpen) return null;
 
   return (
-    <>
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[60]">
       <div
-        className="fixed inset-0 z-40 bg-black/40"
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-hidden
       />
+      <div className="absolute inset-x-0 bottom-0 flex justify-center pb-[max(5.5rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))]">
+        <div
+          role="dialog"
+          aria-modal
+          aria-label={t("pageTitle")}
+          className="relative mx-4 mb-2 flex w-full max-w-md flex-col overflow-hidden rounded-[28px] bg-card px-5 pb-10 pt-6 shadow-[0px_-4px_16px_rgba(0,0,0,0.15)]"
+        >
+          <div className="flex h-8 items-center justify-between">
+            <h2 className="font-nunito text-lg font-extrabold leading-[27px] text-[#101828] dark:text-foreground">
+              {t("pageTitle")}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex size-8 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6a7282] hover:text-[#101828] dark:bg-muted dark:text-muted-foreground"
+              aria-label="Close"
+            >
+              <span className="relative block size-3 overflow-hidden">
+                <Image
+                  src="/icons/profile/sheet-close.svg"
+                  alt=""
+                  width={12}
+                  height={12}
+                  className="size-full"
+                  unoptimized
+                />
+              </span>
+            </button>
+          </div>
 
-      {/* Sheet */}
-      <div
-        role="dialog"
-        aria-modal
-        aria-label={t("pageTitle")}
-        className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto bg-card rounded-t-[32px] shadow-lg px-4 pt-5 pb-6 flex flex-col gap-6"
-      >
-        {/* Header row */}
-        <div className="flex items-center justify-between h-7">
-          <span className="text-base font-bold text-foreground">
-            {t("pageTitle")}
-          </span>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground"
-            aria-label="Close"
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        {/* Subtitle */}
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-foreground">
-            {t("themeColour")}
-          </span>
-          <span className="text-xs text-muted-foreground">
+          <p className="mt-1 font-nunito text-[12.5px] font-semibold leading-[18.75px] text-[#99a1af]">
             {t("description")}
-          </span>
-        </div>
+          </p>
 
-        {/* Option tiles */}
-        <div className="flex gap-2.5">
-          {options.map(({ value, labelKey, icon }) => {
-            const selected = staged === value;
-            return (
-              <button
-                key={value}
-                onClick={() => setStaged(value)}
-                className={`flex-1 h-[66px] rounded-2xl flex flex-col justify-between p-2.5 border transition-colors ${
-                  selected
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-muted/40"
-                }`}
-              >
-                {icon}
-                <span
-                  className={`text-xs leading-4 font-medium ${
-                    selected ? "text-foreground" : "text-muted-foreground"
+          <div className="flex gap-3 pb-6 pt-5">
+            {options.map(({ value, labelKey }) => {
+              const selected = staged === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStaged(value)}
+                  className={`flex h-[51.5px] flex-1 items-center justify-center rounded-[14px] border-2 transition-colors ${
+                    selected
+                      ? "border-[#3b883e] bg-[#ecffed] dark:border-primary dark:bg-primary/15"
+                      : "border-[#f3f4f6] bg-[#f9fafb] dark:border-border dark:bg-muted/40"
                   }`}
                 >
-                  {t(labelKey)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span
+                    className={`font-nunito text-[13px] font-extrabold leading-[19.5px] ${
+                      selected
+                        ? "text-[#3b883e] dark:text-primary"
+                        : "text-[#6a7282] dark:text-muted-foreground"
+                    }`}
+                  >
+                    {OPTION_EMOJI[value]} {t(labelKey)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm disabled:opacity-60"
-        >
-          {saving ? "Saving…" : t("saveSettings")}
-        </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex h-[49px] w-full items-center justify-center rounded-[14px] bg-[#2a602c] font-nunito text-sm font-extrabold text-white disabled:opacity-60 dark:bg-primary"
+          >
+            {saving ? t("saving") : t("saveSettings")}
+          </button>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

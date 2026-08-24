@@ -5,7 +5,33 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { studentAPI } from "@/lib/api";
+import { drillBuilderAPI, studentAPI } from "@/lib/api";
+import { queryKeys } from "@/lib/react-query";
+
+export type DrillBuilderStats = {
+  total: number;
+  practiceItems: number;
+  published: number;
+  assigned: number;
+};
+
+export function useDrillBuilderStats(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.drillBuilder.stats(),
+    queryFn: async (): Promise<DrillBuilderStats> => {
+      const response = await drillBuilderAPI.getStats();
+      const stats = response?.data;
+      return {
+        total: stats?.total ?? 0,
+        practiceItems: stats?.practiceItems ?? 0,
+        published: stats?.published ?? 0,
+        assigned: stats?.assigned ?? 0,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
+    enabled: options?.enabled !== false,
+  });
+}
 
 export const studentWeeksQueryKey = (studentId: string) =>
   ["student-weeks", studentId] as const;
@@ -121,6 +147,27 @@ export function useDeleteStudentWeeks(studentId: string) {
     onError: (error: unknown) => {
       const message =
         error instanceof Error ? error.message : "Failed to delete weeks";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateStudentWeekDates(studentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      weekNumber: number;
+      weekStartDate: string;
+      weekEndDate: string;
+    }) => studentAPI.updateStudentWeekDates(studentId, data),
+    onSuccess: async (_response, variables) => {
+      await invalidateStudentWeeks(queryClient, studentId);
+      toast.success(`Week ${variables.weekNumber} dates updated`);
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to update week dates";
       toast.error(message);
     },
   });

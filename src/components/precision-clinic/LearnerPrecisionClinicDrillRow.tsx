@@ -36,16 +36,23 @@ const THUMB_GRADIENT: Record<string, string> = {
 export function LearnerPrecisionClinicDrillRow({
 	item,
 	completedLabel,
+	inProgressLabel,
+	overdueLabel,
 }: {
 	item: PrecisionClinicLearnerWeekDrillListItem;
 	completedLabel: string;
+	inProgressLabel: string;
+	overdueLabel?: string;
 }) {
 	const typeInfo = getDrillTypeInfo(item.type);
 	const catClass = CATEGORY_TEXT[typeInfo.color] ?? CATEGORY_TEXT.gray!;
 	const thumbGrad = THUMB_GRADIENT[typeInfo.color] ?? THUMB_GRADIENT.gray!;
+	const isCompleted = item.completed || item.status === "completed";
+	const isInProgress = !isCompleted && item.status === "in-progress";
+	const isOverdue = !isCompleted && item.status === "overdue";
 
 	const href =
-		item.completed && item.assignmentId
+		isCompleted && item.assignmentId
 			? `/account/drills/${item.drillId}/completed?assignmentId=${item.assignmentId}`
 			: item.assignmentId
 				? `/account/drills/${item.drillId}?assignmentId=${item.assignmentId}`
@@ -67,9 +74,15 @@ export function LearnerPrecisionClinicDrillRow({
 				</h3>
 				<p className={`text-xs mt-0.5 font-medium ${catClass}`}>
 					• {getDrillTypeLabel(item.type)}
+					{isInProgress ? (
+						<span className="ml-1.5 text-sky-600">· {inProgressLabel}</span>
+					) : null}
+					{isOverdue && overdueLabel ? (
+						<span className="ml-1.5 text-amber-700">· {overdueLabel}</span>
+					) : null}
 				</p>
 			</div>
-			{item.completed ? (
+			{isCompleted ? (
 				<div className="flex items-center gap-1 text-emerald-600 shrink-0">
 					<CheckCircle2 className="w-5 h-5" aria-hidden />
 					<span className="text-xs font-medium sr-only sm:not-sr-only">

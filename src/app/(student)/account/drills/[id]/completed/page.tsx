@@ -1173,7 +1173,7 @@ export default function DrillCompletedPage() {
                           )}
                           {item.pronunciationScore != null && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Pronunciation: {formatPercent(item.pronunciationScore)}%
+                              Clarity score: {formatPercent(item.pronunciationScore)}%
                             </p>
                           )}
                         </div>
