@@ -3,19 +3,13 @@ import { Schema, model, models, Document, Types } from 'mongoose';
 // Import User model to ensure it's registered before this schema references it
 import '@/models/user';
 
-interface IConversationBeat {
-	character: string;
-	intent: string;
-	triggerCondition: string;
-}
-
 interface IScenarioPhase {
 	phaseTitle: string;
 	situation: string;
 	clinicalInformation: string;
 	triggerCondition: string;
 	characters: string[];
-	conversationBeats: IConversationBeat[];
+	dramatisationPrompt: string;
 }
 
 interface IScenarioHint {
@@ -26,8 +20,8 @@ interface IScenarioHint {
 export interface ISimulationScenario extends Document {
 	_id: Types.ObjectId;
 	workplaceSetting: string;
-	dramatisationPrompt: string;
 	studentCharacterName: string;
+	dramatisationPrompt: string;
 	topicId: string;
 	weeklyFocus: string[];
 	background: string;
@@ -46,15 +40,6 @@ export interface ISimulationScenario extends Document {
 	createdAt: Date;
 	updatedAt: Date;
 }
-
-const ConversationBeatSchema = new Schema(
-	{
-		character: { type: String, required: true },
-		intent: { type: String, required: true },
-		triggerCondition: { type: String, required: true },
-	},
-	{ _id: false }
-);
 
 const HintSchema = new Schema(
 	{
@@ -75,10 +60,7 @@ const PhaseSchema = new Schema(
 			required: true,
 			default: [],
 		},
-		conversationBeats: {
-			type: [ConversationBeatSchema],
-			default: [],
-		},
+		dramatisationPrompt: { type: String, required: true },
 	},
 	{ _id: false }
 );
@@ -89,13 +71,13 @@ const simulationScenarioSchema = new Schema<ISimulationScenario>(
 			type: String,
 			required: [true, 'Workplace setting is required'],
 		},
-		dramatisationPrompt: {
-			type: String,
-			required: [true, 'Dramatisation prompt is required'],
-		},
 		studentCharacterName: {
 			type: String,
 			required: [true, 'Student character name is required'],
+		},
+		dramatisationPrompt: {
+			type: String,
+			required: [true, 'Dramatisation prompt is required'],
 		},
 		// Stored raw (no Mongoose enum) so a change to COMPETENCY_FRAMEWORK's key
 		// set never requires a schema migration — validated against the framework

@@ -1,9 +1,3 @@
-export interface ConversationBeatFormState {
-  character: string;
-  intent: string;
-  triggerCondition: string;
-}
-
 export interface PhaseFormState {
   phaseTitle: string;
   situation: string;
@@ -11,7 +5,7 @@ export interface PhaseFormState {
   triggerCondition: string;
   characters: string[];
   characterInput: string;
-  conversationBeats: ConversationBeatFormState[];
+  dramatisationPrompt: string;
 }
 
 export interface HintFormState {
@@ -35,7 +29,7 @@ export const emptyPhase = (): PhaseFormState => ({
   triggerCondition: "",
   characters: [],
   characterInput: "",
-  conversationBeats: [],
+  dramatisationPrompt: "",
 });
 
 export const emptyHint = (): HintFormState => ({
@@ -83,10 +77,11 @@ export function validateScenarioForm(
       p.phaseTitle.trim() &&
       p.situation.trim() &&
       p.clinicalInformation.trim() &&
-      p.characters.length > 0,
+      p.characters.length > 0 &&
+      p.dramatisationPrompt.trim(),
   );
   if (!hasValidPhase) {
-    return "Add at least one phase with a title, situation, clinical information, and at least one AI-voiced character";
+    return "Add at least one phase with a title, situation, clinical information, at least one AI-voiced character, and a dramatisation prompt";
   }
   const hasIncompleteHint = hints.some((h) => !h.phaseTitle.trim() || !h.hintText.trim());
   if (hasIncompleteHint) return "Each hint needs a phase and hint text";
