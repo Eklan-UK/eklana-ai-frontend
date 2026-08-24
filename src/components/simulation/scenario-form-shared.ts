@@ -16,6 +16,7 @@ export interface HintFormState {
 export interface ScenarioFormValues {
   workplaceSetting: string;
   studentCharacterName: string;
+  dramatisationPrompt: string;
   gradingRubric: string;
   maxDurationMinutes: string;
   topicId: string;
@@ -39,6 +40,7 @@ export const emptyHint = (): HintFormState => ({
 export const emptyForm = (): ScenarioFormValues => ({
   workplaceSetting: "",
   studentCharacterName: "",
+  dramatisationPrompt: "",
   gradingRubric: "",
   maxDurationMinutes: "15",
   topicId: "",
@@ -64,6 +66,7 @@ export function validateScenarioForm(
 ): string | null {
   if (!form.workplaceSetting.trim()) return "Workplace setting is required";
   if (!form.studentCharacterName.trim()) return "Student character name is required";
+  if (!form.dramatisationPrompt.trim()) return "Dramatisation prompt is required";
   if (!form.topicId) return "Select a topic";
   if (!background.trim()) return "Background is required";
   if (!patientInformation.trim()) return "Patient information is required";
@@ -97,6 +100,7 @@ export function buildScenarioFormData(
   const formData = new FormData();
   formData.append("workplaceSetting", form.workplaceSetting.trim());
   formData.append("studentCharacterName", form.studentCharacterName.trim());
+  formData.append("dramatisationPrompt", form.dramatisationPrompt.trim());
   formData.append("topicId", form.topicId);
   formData.append("gradingRubric", form.gradingRubric.trim());
   formData.append("maxDurationMinutes", form.maxDurationMinutes);

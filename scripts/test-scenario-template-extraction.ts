@@ -122,6 +122,10 @@ async function main() {
   console.log(result.patientInformation);
   console.log("");
 
+  console.log("=== dramatisationPrompt (full) ===");
+  console.log(result.dramatisationPrompt);
+  console.log("");
+
   console.log("=== hints (full) ===");
   if (result.hints.length === 0) {
     console.log("(empty array — deck had no student-facing reference material)");

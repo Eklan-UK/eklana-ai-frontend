@@ -116,7 +116,7 @@ async function postHandler(
 		}
 
 		const systemInstruction =
-			buildSimulationSystemInstruction(currentPhase, scenario.studentCharacterName) +
+			buildSimulationSystemInstruction(scenario, currentPhase, scenario.studentCharacterName) +
 			'\n\nBegin the scene now with your opening line based on the dramatisation prompt above — do not wait for the student to speak first.';
 
 		// Synthetic kickoff turn needed to elicit a response from the Live API —

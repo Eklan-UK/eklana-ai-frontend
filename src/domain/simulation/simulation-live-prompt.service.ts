@@ -19,11 +19,16 @@ export interface SimulationPromptPhase {
 	dramatisationPrompt: string;
 }
 
+export interface SimulationPromptScenario {
+	dramatisationPrompt: string;
+}
+
 /**
  * Builds the system instruction for a Simulation Room live turn session,
  * scoped to a single phase of a scenario's scenarioScript.
  */
 export function buildSimulationSystemInstruction(
+	scenario: SimulationPromptScenario,
 	phase: SimulationPromptPhase,
 	studentCharacterName: string,
 	secondsRemaining?: number
@@ -36,6 +41,11 @@ export function buildSimulationSystemInstruction(
 	return `The student is playing the role of ${studentCharacterName}. You must NEVER voice, narrate, or address the student as ${studentCharacterName} or as any other character. The student speaks for themselves — you only ever play the OTHER characters listed above, reacting to what the student says. Do not describe what ${studentCharacterName} is doing or feeling.
 
 You are voicing this workplace communication training simulation live, in real time, with a student.
+
+DRAMATISATION PROMPT for the overall scenario (for your understanding only — never speak, read aloud, or paraphrase this block as dialogue; it may be written in second person addressing the student, but you are not the student and must never voice these lines). This is tutor-authored background context on how to play the OTHER characters across the whole encounter — treat it as silent background, never voice it aloud:
+"""
+${scenario.dramatisationPrompt}
+"""
 
 Current phase: "${phase.phaseTitle}"
 Active characters this phase: ${phase.characters.join(', ')}
