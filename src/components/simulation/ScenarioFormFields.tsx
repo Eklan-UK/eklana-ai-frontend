@@ -69,6 +69,22 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
         />
       </div>
 
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium text-gray-700">
+          Dramatisation Prompt <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-gray-500">
+          Overall direction for how the AI-voiced character(s) should play this scenario across the whole encounter — layered underneath each phase's own dramatisation prompt.
+        </p>
+        <textarea
+          value={form.dramatisationPrompt}
+          onChange={(e) => set("dramatisationPrompt", e.target.value)}
+          rows={4}
+          placeholder="Describe how the AI character(s) should play this scenario overall"
+          className={`resize-y ${fieldClass}`}
+        />
+      </div>
+
       {slideDeckSection}
 
       <div className="space-y-1.5">

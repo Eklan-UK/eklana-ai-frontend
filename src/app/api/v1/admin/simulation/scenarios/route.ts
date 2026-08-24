@@ -78,6 +78,7 @@ async function handler(
 		const fields: Record<string, unknown> = {
 			workplaceSetting: formData.get('workplaceSetting'),
 			studentCharacterName: formData.get('studentCharacterName'),
+			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			topicId: formData.get('topicId'),
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
@@ -143,6 +144,7 @@ async function handler(
 		const scenario = await SimulationScenario.create({
 			workplaceSetting: validated.workplaceSetting,
 			studentCharacterName: validated.studentCharacterName,
+			dramatisationPrompt: validated.dramatisationPrompt,
 			topicId: validated.topicId,
 			weeklyFocus,
 			assignedLearnerIds: validated.assignedLearnerIds,

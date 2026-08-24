@@ -134,6 +134,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
       const result = json.data as {
         background: string;
         patientInformation: string;
+        dramatisationPrompt: string;
         hints: Array<{ phaseTitle: string; hintText: string }>;
         scenarioScript: Array<{
           phaseTitle: string;
@@ -147,6 +148,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
 
       formState.setBackground(result.background ?? "");
       formState.setPatientInformation(result.patientInformation ?? "");
+      formState.set("dramatisationPrompt", result.dramatisationPrompt ?? "");
       formState.setPhases(
         (result.scenarioScript ?? []).map((phase) => ({
           phaseTitle: phase.phaseTitle,
