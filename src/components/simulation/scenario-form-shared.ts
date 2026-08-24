@@ -1,9 +1,3 @@
-export interface ConversationBeatFormState {
-  character: string;
-  intent: string;
-  triggerCondition: string;
-}
-
 export interface PhaseFormState {
   phaseTitle: string;
   situation: string;
@@ -11,7 +5,7 @@ export interface PhaseFormState {
   triggerCondition: string;
   characters: string[];
   characterInput: string;
-  conversationBeats: ConversationBeatFormState[];
+  dramatisationPrompt: string;
 }
 
 export interface HintFormState {
@@ -22,7 +16,6 @@ export interface HintFormState {
 export interface ScenarioFormValues {
   workplaceSetting: string;
   studentCharacterName: string;
-  dramatisationPrompt: string;
   gradingRubric: string;
   maxDurationMinutes: string;
   topicId: string;
@@ -35,7 +28,7 @@ export const emptyPhase = (): PhaseFormState => ({
   triggerCondition: "",
   characters: [],
   characterInput: "",
-  conversationBeats: [],
+  dramatisationPrompt: "",
 });
 
 export const emptyHint = (): HintFormState => ({
@@ -46,7 +39,6 @@ export const emptyHint = (): HintFormState => ({
 export const emptyForm = (): ScenarioFormValues => ({
   workplaceSetting: "",
   studentCharacterName: "",
-  dramatisationPrompt: "",
   gradingRubric: "",
   maxDurationMinutes: "15",
   topicId: "",
@@ -72,7 +64,6 @@ export function validateScenarioForm(
 ): string | null {
   if (!form.workplaceSetting.trim()) return "Workplace setting is required";
   if (!form.studentCharacterName.trim()) return "Student character name is required";
-  if (!form.dramatisationPrompt.trim()) return "Dramatisation prompt is required";
   if (!form.topicId) return "Select a topic";
   if (!background.trim()) return "Background is required";
   if (!patientInformation.trim()) return "Patient information is required";
@@ -83,10 +74,11 @@ export function validateScenarioForm(
       p.phaseTitle.trim() &&
       p.situation.trim() &&
       p.clinicalInformation.trim() &&
-      p.characters.length > 0,
+      p.characters.length > 0 &&
+      p.dramatisationPrompt.trim(),
   );
   if (!hasValidPhase) {
-    return "Add at least one phase with a title, situation, clinical information, and at least one AI-voiced character";
+    return "Add at least one phase with a title, situation, clinical information, at least one AI-voiced character, and a dramatisation prompt";
   }
   const hasIncompleteHint = hints.some((h) => !h.phaseTitle.trim() || !h.hintText.trim());
   if (hasIncompleteHint) return "Each hint needs a phase and hint text";
@@ -105,7 +97,6 @@ export function buildScenarioFormData(
   const formData = new FormData();
   formData.append("workplaceSetting", form.workplaceSetting.trim());
   formData.append("studentCharacterName", form.studentCharacterName.trim());
-  formData.append("dramatisationPrompt", form.dramatisationPrompt.trim());
   formData.append("topicId", form.topicId);
   formData.append("gradingRubric", form.gradingRubric.trim());
   formData.append("maxDurationMinutes", form.maxDurationMinutes);
