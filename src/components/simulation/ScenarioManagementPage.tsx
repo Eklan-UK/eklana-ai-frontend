@@ -12,7 +12,6 @@ import { useScenarioFormState } from "@/hooks/useScenarioFormState";
 import {
   buildScenarioFormData,
   validateScenarioForm,
-  type ConversationBeatFormState,
 } from "@/components/simulation/scenario-form-shared";
 import { ScenarioFormFields } from "@/components/simulation/ScenarioFormFields";
 import { LearnerAssignmentPicker } from "@/components/simulation/LearnerAssignmentPicker";
@@ -135,6 +134,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
       const result = json.data as {
         background: string;
         patientInformation: string;
+        dramatisationPrompt: string;
         hints: Array<{ phaseTitle: string; hintText: string }>;
         scenarioScript: Array<{
           phaseTitle: string;
@@ -142,12 +142,13 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
           clinicalInformation: string;
           triggerCondition: string;
           characters: string[];
-          conversationBeats: ConversationBeatFormState[];
+          dramatisationPrompt: string;
         }>;
       };
 
       formState.setBackground(result.background ?? "");
       formState.setPatientInformation(result.patientInformation ?? "");
+      formState.set("dramatisationPrompt", result.dramatisationPrompt ?? "");
       formState.setPhases(
         (result.scenarioScript ?? []).map((phase) => ({
           phaseTitle: phase.phaseTitle,
@@ -156,7 +157,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
           triggerCondition: phase.triggerCondition,
           characters: phase.characters,
           characterInput: "",
-          conversationBeats: phase.conversationBeats,
+          dramatisationPrompt: phase.dramatisationPrompt,
         })),
       );
       formState.setHints(result.hints ?? []);

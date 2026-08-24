@@ -114,8 +114,8 @@ async function patchHandler(
 		const rawAssignedLearnerIds = formData.getAll('assignedLearnerIds').map(String);
 		const fields: Record<string, unknown> = {
 			workplaceSetting: formData.get('workplaceSetting'),
-			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			studentCharacterName: formData.get('studentCharacterName'),
+			dramatisationPrompt: formData.get('dramatisationPrompt'),
 			topicId: formData.get('topicId'),
 			gradingRubric: formData.get('gradingRubric'),
 			maxDurationMinutes: formData.get('maxDurationMinutes'),
@@ -145,8 +145,8 @@ async function patchHandler(
 			{
 				$set: {
 					workplaceSetting: validated.workplaceSetting,
-					dramatisationPrompt: validated.dramatisationPrompt,
 					studentCharacterName: validated.studentCharacterName,
+					dramatisationPrompt: validated.dramatisationPrompt,
 					topicId: validated.topicId,
 					weeklyFocus,
 					assignedLearnerIds: validated.assignedLearnerIds,

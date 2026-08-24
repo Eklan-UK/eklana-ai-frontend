@@ -4,7 +4,6 @@ import {
   emptyHint,
   emptyPhase,
   learnerDisplayName,
-  type ConversationBeatFormState,
   type HintFormState,
   type PhaseFormState,
   type ScenarioFormValues,
@@ -82,7 +81,7 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
 
   const updatePhaseField = (
     phaseIndex: number,
-    field: "phaseTitle" | "situation" | "clinicalInformation" | "triggerCondition",
+    field: "phaseTitle" | "situation" | "clinicalInformation" | "triggerCondition" | "dramatisationPrompt",
     value: string,
   ) => setPhases((prev) => prev.map((p, i) => (i === phaseIndex ? { ...p, [field]: value } : p)));
 
@@ -115,49 +114,6 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
       addPhaseCharacter(phaseIndex);
     }
   };
-
-  const addBeat = (phaseIndex: number) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? {
-              ...p,
-              conversationBeats: [
-                ...p.conversationBeats,
-                { character: "", intent: "", triggerCondition: "" },
-              ],
-            }
-          : p,
-      ),
-    );
-
-  const removeBeat = (phaseIndex: number, beatIndex: number) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? { ...p, conversationBeats: p.conversationBeats.filter((_, bi) => bi !== beatIndex) }
-          : p,
-      ),
-    );
-
-  const updateBeatField = (
-    phaseIndex: number,
-    beatIndex: number,
-    field: keyof ConversationBeatFormState,
-    value: string,
-  ) =>
-    setPhases((prev) =>
-      prev.map((p, i) =>
-        i === phaseIndex
-          ? {
-              ...p,
-              conversationBeats: p.conversationBeats.map((b, bi) =>
-                bi === beatIndex ? { ...b, [field]: value } : b,
-              ),
-            }
-          : p,
-      ),
-    );
 
   // ─── Hints editor ────────────────────────────────────────────────────────
   // A carousel of { phaseTitle, hintText } entries — multiple hints per phase
@@ -197,9 +153,6 @@ export function useScenarioFormState(initial?: ScenarioFormInitialValues) {
     addPhaseCharacter,
     removePhaseCharacter,
     handlePhaseCharacterKeyDown,
-    addBeat,
-    removeBeat,
-    updateBeatField,
     addHint,
     removeHint,
     updateHintField,
