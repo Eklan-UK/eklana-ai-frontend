@@ -82,7 +82,6 @@ const hintsField = z
 export const simulationScenarioBodySchema = z
 	.object({
 		workplaceSetting: z.string().min(1, 'Workplace setting is required'),
-		dramatisationPrompt: z.string().min(1, 'Dramatisation prompt is required'),
 		studentCharacterName: z.string().min(1, 'Student character name is required'),
 		topicId: z.string().refine((id) => id in COMPETENCY_FRAMEWORK, 'Invalid topic'),
 		gradingRubric: z.string().min(1, 'Grading rubric is required'),
