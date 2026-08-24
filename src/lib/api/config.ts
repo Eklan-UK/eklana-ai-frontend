@@ -79,6 +79,7 @@ const DEFAULT_FOREVER_PREMIUM_EMAILS = [
 	'bri8kingsley@gmail.com',
 	'dv@eklan.ai',
 	'afolabi.aanu@gmail.com',
+	'michael.jarod.turner@gmail.com',
 ] as const;
 
 /** Hardcoded staff QA accounts + optional FOREVER_PREMIUM_EMAILS env (comma-separated). */
