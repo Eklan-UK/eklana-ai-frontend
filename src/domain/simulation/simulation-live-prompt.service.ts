@@ -12,21 +12,11 @@ export const advancePhaseTool = {
 	parameters: { type: 'object', properties: {} },
 };
 
-export interface SimulationPromptScenario {
-	dramatisationPrompt: string;
-}
-
-export interface SimulationPromptConversationBeat {
-	character: string;
-	intent: string;
-	triggerCondition: string;
-}
-
 export interface SimulationPromptPhase {
 	phaseTitle: string;
 	triggerCondition: string;
 	characters: string[];
-	conversationBeats: SimulationPromptConversationBeat[];
+	dramatisationPrompt: string;
 }
 
 /**
@@ -34,18 +24,10 @@ export interface SimulationPromptPhase {
  * scoped to a single phase of a scenario's scenarioScript.
  */
 export function buildSimulationSystemInstruction(
-	scenario: SimulationPromptScenario,
 	phase: SimulationPromptPhase,
 	studentCharacterName: string,
 	secondsRemaining?: number
 ): string {
-	const beatsList = phase.conversationBeats
-		.map(
-			(beat) =>
-				`- ${beat.character}: work toward "${beat.intent}" (trigger: ${beat.triggerCondition})`
-		)
-		.join('\n');
-
 	const windDownInstruction =
 		secondsRemaining !== undefined && secondsRemaining < 30
 			? `\n\nTime is almost up (${secondsRemaining} seconds remaining) — begin naturally concluding this interaction in character (e.g. wrapping up, handing off, or reaching a natural pause) rather than starting new threads.`
@@ -53,19 +35,15 @@ export function buildSimulationSystemInstruction(
 
 	return `The student is playing the role of ${studentCharacterName}. You must NEVER voice, narrate, or address the student as ${studentCharacterName} or as any other character. The student speaks for themselves — you only ever play the OTHER characters listed above, reacting to what the student says. Do not describe what ${studentCharacterName} is doing or feeling.
 
-BACKGROUND CONTEXT (for your understanding only — never speak, read aloud, or paraphrase this block as dialogue; it may be written in second person addressing the student, but you are not the student and must never voice these lines):
-"""
-${scenario.dramatisationPrompt}
-"""
-Everything above this line is silent background context. Your actual spoken dialogue must come only from your own in-character reactions to the conversation, guided by the conversation beats below — never recite scenario framing or instructions aloud.
-
 You are voicing this workplace communication training simulation live, in real time, with a student.
 
 Current phase: "${phase.phaseTitle}"
 Active characters this phase: ${phase.characters.join(', ')}
 
-Conversation beats for this phase — these are intents to work toward, NOT scripted lines. Generate natural, in-character wording and respond live to whatever the student actually says:
-${beatsList}
+DRAMATISATION PROMPT for this phase (for your understanding only — never speak, read aloud, or paraphrase this block as dialogue; it may be written in second person addressing the student, but you are not the student and must never voice these lines). This is tutor-authored scene direction on how to play the OTHER characters this phase — generate natural, in-character wording and respond live to whatever the student actually says, never reciting this direction aloud:
+"""
+${phase.dramatisationPrompt}
+"""
 
 Phase advancement: this phase ends when the following trigger condition is clearly and fully satisfied: "${phase.triggerCondition}". When you are confident this condition has been met by the conversation so far, call the advancePhase tool. Do not call it prematurely or on partial/ambiguous progress.
 

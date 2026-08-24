@@ -226,7 +226,6 @@ async function postHandler(
 		];
 
 		const systemInstruction = buildSimulationSystemInstruction(
-			scenario,
 			currentPhase,
 			scenario.studentCharacterName,
 			secondsRemaining,

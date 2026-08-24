@@ -24,7 +24,6 @@ interface ScenarioEditModalProps {
 interface ScenarioDetail {
   workplaceSetting: string;
   studentCharacterName: string;
-  dramatisationPrompt: string;
   gradingRubric: string;
   maxDurationMinutes: number;
   topicId: string;
@@ -72,7 +71,6 @@ export function ScenarioEditModal({ scenarioId, variant, onClose, onSaved }: Sce
           form: {
             workplaceSetting: scenario.workplaceSetting,
             studentCharacterName: scenario.studentCharacterName,
-            dramatisationPrompt: scenario.dramatisationPrompt,
             gradingRubric: scenario.gradingRubric,
             maxDurationMinutes: String(scenario.maxDurationMinutes),
             topicId: scenario.topicId,

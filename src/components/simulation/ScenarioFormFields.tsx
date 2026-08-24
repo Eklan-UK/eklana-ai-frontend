@@ -8,7 +8,7 @@ import type { ScenarioFormState } from "@/hooks/useScenarioFormState";
 
 interface ScenarioFormFieldsProps {
   formState: ScenarioFormState;
-  /** Injected between "Student Character Name" and "Dramatisation Prompt" — the create form's slide-deck upload/extract UI. Omit for the edit form, which doesn't touch the upload flow. */
+  /** Injected between "Student Character Name" and "Background" — the create form's slide-deck upload/extract UI. Omit for the edit form, which doesn't touch the upload flow. */
   slideDeckSection?: ReactNode;
 }
 
@@ -31,9 +31,6 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
     addPhaseCharacter,
     removePhaseCharacter,
     handlePhaseCharacterKeyDown,
-    addBeat,
-    removeBeat,
-    updateBeatField,
     hints,
     addHint,
     removeHint,
@@ -73,19 +70,6 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
       </div>
 
       {slideDeckSection}
-
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-700">
-          Dramatisation Prompt <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          value={form.dramatisationPrompt}
-          onChange={(e) => set("dramatisationPrompt", e.target.value)}
-          rows={4}
-          placeholder="Describe how the AI character(s) should play out this scenario"
-          className={`resize-y ${fieldClass}`}
-        />
-      </div>
 
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-gray-700">
@@ -243,60 +227,17 @@ export function ScenarioFormFields({ formState, slideDeckSection }: ScenarioForm
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-gray-700">Conversation Beats</label>
-                  <button
-                    type="button"
-                    onClick={() => addBeat(phaseIndex)}
-                    className="flex items-center gap-1 text-xs font-medium text-[#3B883E] hover:underline"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add beat
-                  </button>
-                </div>
-                {phase.conversationBeats.length === 0 && (
-                  <p className="text-xs text-gray-500">No conversation beats yet</p>
-                )}
-                <div className="space-y-2">
-                  {phase.conversationBeats.map((beat, beatIndex) => (
-                    <div
-                      key={beatIndex}
-                      className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
-                    >
-                      <input
-                        type="text"
-                        value={beat.character}
-                        onChange={(e) => updateBeatField(phaseIndex, beatIndex, "character", e.target.value)}
-                        placeholder="Character"
-                        className={smallFieldClass}
-                      />
-                      <input
-                        type="text"
-                        value={beat.intent}
-                        onChange={(e) => updateBeatField(phaseIndex, beatIndex, "intent", e.target.value)}
-                        placeholder="Intent"
-                        className={smallFieldClass}
-                      />
-                      <input
-                        type="text"
-                        value={beat.triggerCondition}
-                        onChange={(e) =>
-                          updateBeatField(phaseIndex, beatIndex, "triggerCondition", e.target.value)
-                        }
-                        placeholder="Trigger condition"
-                        className={smallFieldClass}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeBeat(phaseIndex, beatIndex)}
-                        aria-label="Remove conversation beat"
-                        className="shrink-0 rounded-lg p-2 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <label className="text-xs font-medium text-gray-700">Dramatisation Prompt</label>
+                <p className="text-xs text-gray-500">
+                  Direction for how the AI-voiced character(s) should play this phase — sent directly into the live scene instruction.
+                </p>
+                <textarea
+                  value={phase.dramatisationPrompt}
+                  onChange={(e) => updatePhaseField(phaseIndex, "dramatisationPrompt", e.target.value)}
+                  rows={4}
+                  placeholder="Describe how the AI character(s) should play out this phase"
+                  className={`resize-y ${smallFieldClass}`}
+                />
               </div>
             </div>
           ))}

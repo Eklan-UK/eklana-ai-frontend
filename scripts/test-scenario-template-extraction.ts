@@ -94,7 +94,7 @@ function printCharacterBreakdown(scenarioScript: Array<{
   situation: string;
   clinicalInformation: string;
   characters: string[];
-  conversationBeats: Array<{ character: string; intent: string; triggerCondition: string }>;
+  dramatisationPrompt: string;
 }>) {
   console.log("\n=== scenarioScript — character breakdown per phase ===");
   scenarioScript.forEach((phase, idx) => {
@@ -102,16 +102,7 @@ function printCharacterBreakdown(scenarioScript: Array<{
     console.log(`  situation: ${phase.situation}`);
     console.log(`  clinicalInformation: ${phase.clinicalInformation}`);
     console.log(`  characters (${phase.characters.length}): ${phase.characters.join(", ") || "(none)"}`);
-
-    const beatCharacters = Array.from(new Set(phase.conversationBeats.map((b) => b.character)));
-    console.log(
-      `  characters with conversation beats (${beatCharacters.length}): ${beatCharacters.join(", ") || "(none)"}`,
-    );
-
-    console.log(`  conversationBeats (${phase.conversationBeats.length}):`);
-    for (const beat of phase.conversationBeats) {
-      console.log(`    - [${beat.character}] intent: "${beat.intent}" | trigger: "${beat.triggerCondition}"`);
-    }
+    console.log(`  dramatisationPrompt: ${phase.dramatisationPrompt}`);
   });
   console.log("");
 }

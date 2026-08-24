@@ -1,19 +1,13 @@
 import { logger } from '@/lib/api/logger';
 import { genAI, DEFAULT_MODEL } from '@/services/gemini.service';
 
-export interface ScenarioConversationBeat {
-	character: string;
-	intent: string;
-	triggerCondition: string;
-}
-
 export interface ScenarioPhase {
 	phaseTitle: string;
 	situation: string;
 	clinicalInformation: string;
 	triggerCondition: string;
 	characters: string[];
-	conversationBeats: ScenarioConversationBeat[];
+	dramatisationPrompt: string;
 }
 
 export interface ScenarioHint {
@@ -32,7 +26,7 @@ export interface ScenarioExtractionResult {
 function buildExtractionPrompt(rawSlideText: string, studentCharacterName: string): string {
 	return `You are extracting structured content from a tutor's uploaded slide deck to build a workplace communication training simulation. The simulation could be set in any workplace context — medical, hospitality, customer service, or otherwise — so do not assume a fixed domain or a fixed number of phases. Derive everything from what is actually present in the deck.
 
-The learner/student plays the role of ${studentCharacterName}. Do NOT include ${studentCharacterName} in any phase's characters array or conversationBeats — the AI never voices or narrates this character, since the student speaks for themselves.
+The learner/student plays the role of ${studentCharacterName}. Do NOT include ${studentCharacterName} in any phase's characters array, and do not have the dramatisation prompt direct ${studentCharacterName}'s lines — the AI never voices or narrates this character, since the student speaks for themselves.
 
 Extract exactly five things:
 
@@ -46,7 +40,7 @@ Extract exactly five things:
    - clinicalInformation: string — a single plain-text block of information relevant to this phase, shown to the student on screen upfront, before that phase's conversation begins. This is NOT gated or reveal-conditioned — the student sees it immediately when the phase starts. Include here whatever information would newly become relevant or available during this phase (e.g. a repeat reading taken during the encounter, an updated status).
    - triggerCondition: string — what ends this phase / advances to the next
    - characters: string[] — which roles/characters are active in this phase (e.g. "patient", "supervisor", "colleague")
-   - conversationBeats: array of { character, intent, triggerCondition } — intent describes WHAT the character should communicate or accomplish in natural language (e.g. "reports sudden distress, sounds anxious"), NOT a verbatim scripted line, since a separate live AI will generate the actual wording and respond to the learner in real time
+   - dramatisationPrompt: string — tutor-facing direction for how the AI should play the OTHER character(s) during this phase: their situation, attitude, and what they should communicate or work toward (e.g. "Mr. Kim reports sudden shortness of breath and sounds anxious; the Charge Nurse checks in and offers help if asked"). This is scene direction, NOT a verbatim script — a separate live AI will generate the actual wording and respond to the learner in real time, guided by this prompt
 
 4. hints — optional on-demand reference material the learner could look up during a specific phase if they choose to; not shown automatically. Return an array of { phaseTitle, hintText }, where phaseTitle matches one of the scenarioScript phase titles above exactly. Return an empty array if the deck has no such content. A phase may have zero, one, or multiple hints.
 
@@ -66,9 +60,7 @@ Return ONLY valid JSON with this exact shape:
       "clinicalInformation": <string>,
       "triggerCondition": <string>,
       "characters": [<string>, ...],
-      "conversationBeats": [
-        { "character": <string>, "intent": <string>, "triggerCondition": <string> }
-      ]
+      "dramatisationPrompt": <string>
     }
   ],
   "hints": [
@@ -86,16 +78,6 @@ function isStringArray(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
-function isValidConversationBeat(value: unknown): value is ScenarioConversationBeat {
-	if (typeof value !== 'object' || value === null) return false;
-	const beat = value as Record<string, unknown>;
-	return (
-		isNonEmptyString(beat.character) &&
-		isNonEmptyString(beat.intent) &&
-		isNonEmptyString(beat.triggerCondition)
-	);
-}
-
 function isValidHint(value: unknown): value is ScenarioHint {
 	if (typeof value !== 'object' || value === null) return false;
 	const hint = value as Record<string, unknown>;
@@ -111,8 +93,7 @@ export function isValidPhase(value: unknown): value is ScenarioPhase {
 		isNonEmptyString(phase.clinicalInformation) &&
 		isNonEmptyString(phase.triggerCondition) &&
 		isStringArray(phase.characters) &&
-		Array.isArray(phase.conversationBeats) &&
-		phase.conversationBeats.every(isValidConversationBeat)
+		isNonEmptyString(phase.dramatisationPrompt)
 	);
 }
 
@@ -150,9 +131,6 @@ function stripStudentCharacter(
 	return scenarioScript.map((phase) => ({
 		...phase,
 		characters: phase.characters.filter((character) => !matchesStudent(character)),
-		conversationBeats: phase.conversationBeats.filter(
-			(beat) => !matchesStudent(beat.character)
-		),
 	}));
 }
 

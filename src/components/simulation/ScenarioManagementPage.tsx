@@ -12,7 +12,6 @@ import { useScenarioFormState } from "@/hooks/useScenarioFormState";
 import {
   buildScenarioFormData,
   validateScenarioForm,
-  type ConversationBeatFormState,
 } from "@/components/simulation/scenario-form-shared";
 import { ScenarioFormFields } from "@/components/simulation/ScenarioFormFields";
 import { LearnerAssignmentPicker } from "@/components/simulation/LearnerAssignmentPicker";
@@ -142,7 +141,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
           clinicalInformation: string;
           triggerCondition: string;
           characters: string[];
-          conversationBeats: ConversationBeatFormState[];
+          dramatisationPrompt: string;
         }>;
       };
 
@@ -156,7 +155,7 @@ export function ScenarioManagementPage({ variant }: ScenarioManagementPageProps)
           triggerCondition: phase.triggerCondition,
           characters: phase.characters,
           characterInput: "",
-          conversationBeats: phase.conversationBeats,
+          dramatisationPrompt: phase.dramatisationPrompt,
         })),
       );
       formState.setHints(result.hints ?? []);
