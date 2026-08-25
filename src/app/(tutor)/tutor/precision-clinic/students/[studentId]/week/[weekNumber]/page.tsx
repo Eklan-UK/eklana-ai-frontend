@@ -1,9 +1,10 @@
 "use client";
 
 import { use } from "react";
+import { Header } from "@/components/layout/Header";
 import { ClinicStudentWeekDetailView } from "@/components/precision-clinic/ClinicStudentWeekDetailView";
 
-export default function PrecisionClinicStudentWeekPage({
+export default function TutorPrecisionClinicStudentWeekPage({
   params,
 }: {
   params: Promise<{ studentId: string; weekNumber: string }>;
@@ -12,10 +13,12 @@ export default function PrecisionClinicStudentWeekPage({
   const week = parseInt(weekNumber, 10);
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="max-w-5xl">
+    <div className="min-h-screen bg-gray-50">
+      <div className="h-6" />
+      <Header title="Precision Clinic" />
+      <div className="max-w-5xl mx-auto px-4 py-6 md:px-8">
         <ClinicStudentWeekDetailView
-          variant="admin"
+          variant="tutor"
           studentId={studentId}
           weekNumber={Number.isFinite(week) ? week : 1}
         />

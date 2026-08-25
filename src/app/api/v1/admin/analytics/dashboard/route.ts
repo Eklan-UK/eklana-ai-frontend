@@ -5,10 +5,11 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { getAnalyticsDashboard } from '@/domain/admin/platform-analytics.service';
 import { Types } from 'mongoose';
+import { resolveTutorScopedLearnerIds } from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
-	_context: { userId: Types.ObjectId; userRole: string }
+	context: { userId: Types.ObjectId; userRole: string }
 ): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
@@ -17,16 +18,27 @@ async function handler(
 		const learnerIdsParam = searchParams.get('learnerIds');
 		const daysParam = searchParams.get('days');
 
-		const learnerIds = learnerIdsParam
+		const requestedIds = learnerIdsParam
 			? learnerIdsParam
 					.split(',')
 					.map((id) => id.trim())
 					.filter(Boolean)
 			: undefined;
 
+		const scoped = await resolveTutorScopedLearnerIds(context, requestedIds);
+		if (!scoped.ok) {
+			return NextResponse.json(
+				{ code: 'NotFoundError', message: 'Not found' },
+				{ status: 404 }
+			);
+		}
+
 		const days = daysParam ? parseInt(daysParam, 10) : 30;
 
-		const dashboard = await getAnalyticsDashboard(learnerIds, Number.isNaN(days) ? 30 : days);
+		const dashboard = await getAnalyticsDashboard(
+			scoped.learnerIds,
+			Number.isNaN(days) ? 30 : days
+		);
 
 		return NextResponse.json(
 			{
@@ -54,4 +66,4 @@ async function handler(
 	}
 }
 
-export const GET = withRole(['admin'], handler);
+export const GET = withRole(['admin', 'tutor'], handler);

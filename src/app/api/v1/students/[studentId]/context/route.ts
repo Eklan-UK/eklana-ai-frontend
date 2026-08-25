@@ -4,6 +4,10 @@ import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { Types } from 'mongoose';
 import StudentContext from '@/models/studentContext';
+import {
+	assertStaffCanReadLearner,
+	resolveLearnerIdToUserIdString,
+} from '@/lib/api/staff-learner-access';
 
 async function getHandler(
 	req: NextRequest,
@@ -22,7 +26,16 @@ async function getHandler(
 			);
 		}
 
-		const doc = await StudentContext.findOne({ studentId });
+		const canonicalLearnerId = await resolveLearnerIdToUserIdString(studentId);
+		const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+		if (access === 'forbidden') {
+			return NextResponse.json(
+				{ code: 'NotFoundError', message: 'Student not found' },
+				{ status: 404 },
+			);
+		}
+
+		const doc = await StudentContext.findOne({ studentId: canonicalLearnerId });
 
 		if (!doc) {
 			return NextResponse.json(
@@ -53,6 +66,15 @@ async function postHandler(
 			return NextResponse.json(
 				{ code: 'ValidationError', message: 'Invalid student ID' },
 				{ status: 400 },
+			);
+		}
+
+		const canonicalLearnerId = await resolveLearnerIdToUserIdString(studentId);
+		const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+		if (access === 'forbidden') {
+			return NextResponse.json(
+				{ code: 'NotFoundError', message: 'Student not found' },
+				{ status: 404 },
 			);
 		}
 
@@ -115,14 +137,14 @@ async function postHandler(
 		}
 
 		const doc = await StudentContext.findOneAndUpdate(
-			{ studentId },
+			{ studentId: canonicalLearnerId },
 			{ $set: update },
 			{ upsert: true, new: true, runValidators: true },
 		);
 
 		logger.info('Student context upserted', {
 			byUserId: context.userId.toString(),
-			studentId,
+			studentId: canonicalLearnerId,
 		});
 
 		return NextResponse.json({ code: 'Success', data: doc }, { status: 200 });

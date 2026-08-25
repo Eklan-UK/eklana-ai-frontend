@@ -490,8 +490,13 @@ export async function getAnalyticsLearners(searchParams: URLSearchParams) {
 }
 
 function buildLearnerIdMatch(learnerIds?: string[]): Record<string, unknown> {
-	if (!learnerIds?.length) {
+	// undefined = no filter (platform-wide). Empty array = match nothing
+	// (e.g. tutor with zero assigned students).
+	if (learnerIds == null) {
 		return {};
+	}
+	if (learnerIds.length === 0) {
+		return { learnerId: { $in: [] } };
 	}
 	const validIds = toUserIdQueryMulti(learnerIds.filter((id) => id));
 	if (validIds.length === 0) {

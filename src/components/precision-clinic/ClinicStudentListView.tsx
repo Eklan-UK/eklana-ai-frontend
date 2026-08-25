@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import { usePrecisionClinicStats } from "@/hooks/usePrecisionClinic";
 import { useClinicEnrollmentsList } from "@/hooks/usePrecisionClinicEnrollments";
@@ -38,20 +39,36 @@ interface StudentCard {
   precisionClinicWeekCount?: number | null;
 }
 
-export function ClinicStudentListView() {
+interface ClinicStudentListViewProps {
+  variant?: "admin" | "tutor";
+}
+
+export function ClinicStudentListView({
+  variant = "admin",
+}: ClinicStudentListViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [enrollmentModalOpen, setEnrollmentModalOpen] = useState(false);
+  const basePath =
+    variant === "tutor" ? "/tutor/precision-clinic" : "/admin/precision-clinic";
+  const isTutor = variant === "tutor";
 
   const { data: statsData, isLoading: statsLoading } =
     usePrecisionClinicStats();
   const { data: enrolledIds } = useClinicEnrollmentsList();
+
+  const { data: tutorData, isLoading: tutorLoading } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: isTutor },
+  );
   const {
     data: adminData,
-    isLoading: learnersLoading,
+    isLoading: adminLoading,
     isError: adminError,
     error: adminErrorDetail,
     refetch: refetchAdminLearners,
-  } = useAiDrillBuilderLearners(true);
+  } = useAiDrillBuilderLearners(variant === "admin");
+
+  const isLoading = isTutor ? tutorLoading : adminLoading;
 
   const stats: ClinicStatCardData = useMemo(() => {
     return {
@@ -63,6 +80,29 @@ export function ClinicStudentListView() {
   }, [statsData]);
 
   const students: StudentCard[] = useMemo(() => {
+    if (isTutor) {
+      return (tutorData?.students ?? [])
+        .map((s: Record<string, unknown>) => {
+          const id = getLearnerId(s as Parameters<typeof getLearnerId>[0]);
+          if (!id) return null;
+          return {
+            id,
+            name: getLearnerDisplayName(
+              s as Parameters<typeof getLearnerDisplayName>[0],
+            ),
+            email: s.email as string | undefined,
+            avatar: s.avatar as string | null | undefined,
+            image: s.image as string | null | undefined,
+            subscriptionActivatedAt: s.subscriptionActivatedAt as string | null,
+            createdAt: s.createdAt as string | null,
+            precisionClinicWeekCount:
+              typeof s.precisionClinicWeekCount === "number"
+                ? s.precisionClinicWeekCount
+                : null,
+          };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+    }
     return (adminData?.learners ?? [])
       .map((s) => {
         const id = getLearnerId(s);
@@ -82,7 +122,7 @@ export function ClinicStudentListView() {
         };
       })
       .filter((s): s is NonNullable<typeof s> => s !== null);
-  }, [adminData]);
+  }, [isTutor, tutorData, adminData]);
 
   const filteredStudents = students.filter((student) => {
     if (!searchQuery) return true;
@@ -130,7 +170,7 @@ export function ClinicStudentListView() {
         </div>
       </div>
 
-      {adminError ? (
+      {!isTutor && adminError ? (
         <Card className="p-8 text-center">
           <AlertCircle className="mx-auto mb-3 h-10 w-10 text-red-500" />
           <p className="mb-1 font-medium text-gray-700 dark:text-foreground">
@@ -144,7 +184,7 @@ export function ClinicStudentListView() {
             Try again
           </Button>
         </Card>
-      ) : learnersLoading ? (
+      ) : isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
         </div>
@@ -153,7 +193,9 @@ export function ClinicStudentListView() {
           <p className="text-gray-500 dark:text-muted-foreground">
             {searchQuery
               ? "No students match your search"
-              : "No learners found"}
+              : isTutor
+                ? "No assigned students found"
+                : "No learners found"}
           </p>
         </Card>
       ) : (
@@ -170,7 +212,7 @@ export function ClinicStudentListView() {
             return (
               <Link
                 key={student.id}
-                href={`/admin/precision-clinic/students/${student.id}`}
+                href={`${basePath}/students/${student.id}`}
               >
                 <Card className="cursor-pointer transition-shadow hover:shadow-md">
                   <div className="flex items-center justify-between">
@@ -213,6 +255,7 @@ export function ClinicStudentListView() {
 
       {enrollmentModalOpen && (
         <ClinicEnrollmentModal
+          variant={variant}
           onClose={() => setEnrollmentModalOpen(false)}
         />
       )}

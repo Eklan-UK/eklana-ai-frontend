@@ -20,6 +20,7 @@ import { getCompetencyNamesForTopic } from '@/config/competency-framework';
 import { loadOfficeParser } from '@/services/document-parser.service';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
 import { Types } from 'mongoose';
+import { assertStaffCanActOnLearners } from '@/lib/api/staff-learner-access';
 
 async function handler(
 	req: NextRequest,
@@ -92,6 +93,16 @@ async function handler(
 		const validated = simulationScenarioBodySchema.parse(fields);
 		const weeklyFocus = getCompetencyNamesForTopic(validated.topicId);
 
+		await connectToDatabase();
+
+		const access = await assertStaffCanActOnLearners(ctx, validated.assignedLearnerIds);
+		if (access === 'forbidden') {
+			return NextResponse.json(
+				{ code: 'NotFound', message: 'Learner not found or access denied' },
+				{ status: 404 },
+			);
+		}
+
 		let rawText: string | undefined;
 		let hiddenContext: string | undefined;
 
@@ -138,8 +149,6 @@ async function handler(
 		]);
 		const backgroundAudioBase64 = backgroundAudioBuffer.toString('base64');
 		const patientInformationAudioBase64 = patientInformationAudioBuffer.toString('base64');
-
-		await connectToDatabase();
 
 		const scenario = await SimulationScenario.create({
 			workplaceSetting: validated.workplaceSetting,

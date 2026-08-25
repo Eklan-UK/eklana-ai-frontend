@@ -4,8 +4,13 @@ import { withRole } from '@/lib/api/middleware';
 import { connectToDatabase } from '@/lib/api/db';
 import { logger } from '@/lib/api/logger';
 import { getPlatformKeyPhrasesAnalytics } from '@/domain/admin/platform-analytics.service';
+import { Types } from 'mongoose';
+import { resolveTutorScopedLearnerIds } from '@/lib/api/staff-learner-access';
 
-async function handler(req: NextRequest): Promise<NextResponse> {
+async function handler(
+	req: NextRequest,
+	context: { userId: Types.ObjectId; userRole: string }
+): Promise<NextResponse> {
 	try {
 		await connectToDatabase();
 
@@ -13,16 +18,24 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 		const daysParam = searchParams.get('days');
 		const learnerIdsParam = searchParams.get('learnerIds');
 		const days = daysParam ? parseInt(daysParam, 10) : 30;
-		const learnerIds = learnerIdsParam
+		const requestedIds = learnerIdsParam
 			? learnerIdsParam
 					.split(',')
 					.map((id) => id.trim())
 					.filter(Boolean)
 			: undefined;
 
+		const scoped = await resolveTutorScopedLearnerIds(context, requestedIds);
+		if (!scoped.ok) {
+			return NextResponse.json(
+				{ code: 'NotFoundError', message: 'Not found' },
+				{ status: 404 }
+			);
+		}
+
 		const analytics = await getPlatformKeyPhrasesAnalytics(
 			Number.isNaN(days) ? 30 : days,
-			learnerIds
+			scoped.learnerIds
 		);
 
 		return NextResponse.json(
@@ -43,4 +56,4 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 	}
 }
 
-export const GET = withRole(['admin'], (_req, _context) => handler(_req));
+export const GET = withRole(['admin', 'tutor'], handler);

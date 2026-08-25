@@ -8,6 +8,7 @@ import {
   useMovePrecisionClinicStudentWeekDrills,
   usePrecisionClinicStudentWeeks,
 } from "@/hooks/usePrecisionClinic";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import {
   formatWeekDateRange,
@@ -23,6 +24,7 @@ import { WeekDrillList } from "@/components/ai-drill-builder/WeekDrillList";
 interface ClinicStudentWeekDetailViewProps {
   studentId: string;
   weekNumber: number;
+  variant?: "admin" | "tutor";
 }
 
 function toWeekDrillItem(raw: Record<string, unknown>): WeekDrillItem {
@@ -62,13 +64,32 @@ function toWeekDrillItem(raw: Record<string, unknown>): WeekDrillItem {
 export function ClinicStudentWeekDetailView({
   studentId,
   weekNumber,
+  variant = "admin",
 }: ClinicStudentWeekDetailViewProps) {
   const { data: weeksData, isLoading: weeksLoading } =
     usePrecisionClinicStudentWeeks(studentId);
   const moveDrills = useMovePrecisionClinicStudentWeekDrills(studentId);
-  const { data: adminData } = useAiDrillBuilderLearners(true);
+  const { data: tutorData } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: variant === "tutor" },
+  );
+  const { data: adminData } = useAiDrillBuilderLearners(variant === "admin");
 
   const studentInfo = useMemo(() => {
+    if (variant === "tutor") {
+      const match = (tutorData?.students ?? []).find(
+        (s: Record<string, unknown>) =>
+          getLearnerId(s as Parameters<typeof getLearnerId>[0]) === studentId,
+      );
+      if (!match) return { name: "Student", avatar: null, image: null };
+      return {
+        name: getLearnerDisplayName(
+          match as Parameters<typeof getLearnerDisplayName>[0],
+        ),
+        avatar: match.avatar as string | null | undefined,
+        image: match.image as string | null | undefined,
+      };
+    }
     const match = (adminData?.learners ?? []).find(
       (s) => getLearnerId(s) === studentId,
     );
@@ -78,7 +99,7 @@ export function ClinicStudentWeekDetailView({
       avatar: match.avatar,
       image: match.image,
     };
-  }, [adminData, studentId]);
+  }, [variant, tutorData, adminData, studentId]);
 
   const week = useMemo(() => {
     return (weeksData?.weeks ?? []).find((w) => w.weekNumber === weekNumber);
@@ -90,9 +111,12 @@ export function ClinicStudentWeekDetailView({
   }, [week]);
 
   const dateRange = formatWeekDateRange(weekNumber, weeksData?.anchorDate);
-  const returnTo = `/admin/precision-clinic/students/${studentId}/week/${weekNumber}`;
-  const createHref = `/admin/drills/create?student=${encodeURIComponent(studentId)}&week=${weekNumber}&source=precision_clinic&returnTo=${encodeURIComponent(returnTo)}`;
-  const backHref = `/admin/precision-clinic/students/${studentId}`;
+  const clinicBase =
+    variant === "tutor" ? "/tutor/precision-clinic" : "/admin/precision-clinic";
+  const drillBase = variant === "tutor" ? "/tutor/drills" : "/admin/drills";
+  const returnTo = `${clinicBase}/students/${studentId}/week/${weekNumber}`;
+  const createHref = `${drillBase}/create?student=${encodeURIComponent(studentId)}&week=${weekNumber}&source=precision_clinic&returnTo=${encodeURIComponent(returnTo)}`;
+  const backHref = `${clinicBase}/students/${studentId}`;
 
   if (weeksLoading) {
     return (
@@ -140,7 +164,7 @@ export function ClinicStudentWeekDetailView({
         </h2>
         <WeekDrillList
           drills={drills}
-          drillDetailBasePath="/admin/drills"
+          drillDetailBasePath={drillBase}
           returnTo={returnTo}
           studentId={studentId}
           currentWeekNumber={weekNumber}

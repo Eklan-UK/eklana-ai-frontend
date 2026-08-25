@@ -77,7 +77,7 @@ export async function GET(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ['admin'],
+    ['admin', 'tutor'],
     withErrorHandler((r, ctx) => getHandler(r, ctx, resolvedParams)),
   )(req);
 }
@@ -88,7 +88,7 @@ export async function PUT(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ['admin'],
+    ['admin', 'tutor'],
     withErrorHandler((r, ctx) => putHandler(r, ctx, resolvedParams)),
   )(req);
 }

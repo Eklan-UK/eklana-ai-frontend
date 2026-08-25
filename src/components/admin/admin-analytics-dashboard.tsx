@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import { BarChart3, BookOpen, Mic, User } from "lucide-react";
 import { useAllLearners } from "@/hooks/useAdmin";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { AnalyticsProgressSummary } from "@/components/admin/analytics-progress-summary";
 import { AnalyticsDrillProgressStats } from "@/components/admin/analytics-drill-progress-stats";
 import { AnalyticsPronunciationSection } from "@/components/admin/analytics-pronunciation-section";
@@ -12,9 +13,11 @@ import { MatchingAnalyticsComponent } from "@/components/admin/matching-analytic
 import { PlatformFillBlankAnalytics } from "@/components/admin/platform-fill-blank-analytics";
 import { PlatformKeyPhrasesAnalytics } from "@/components/admin/platform-key-phrases-analytics";
 import { LearnerProfileAnalytics } from "@/components/shared/learner-profile-analytics";
+import type { AnalyticsLearnerSource } from "@/components/admin/analytics-learner-filter";
 
 interface AdminAnalyticsDashboardProps {
   learnerIds: string[];
+  learnerSource?: AnalyticsLearnerSource;
 }
 
 function learnerDisplayName(learner: {
@@ -27,9 +30,33 @@ function learnerDisplayName(learner: {
   return fromParts || learner.name || learner.email || "Unknown";
 }
 
-export function AdminAnalyticsDashboard({ learnerIds }: AdminAnalyticsDashboardProps) {
-  const { data: learnersData } = useAllLearners({ limit: 1000 });
-  const learners = learnersData?.learners ?? [];
+export function AdminAnalyticsDashboard({
+  learnerIds,
+  learnerSource = "all",
+}: AdminAnalyticsDashboardProps) {
+  const { data: allLearnersData } = useAllLearners(
+    { limit: 1000 },
+    { enabled: learnerSource === "all" }
+  );
+  const { data: tutorData } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: learnerSource === "tutor" }
+  );
+
+  const learners = useMemo(() => {
+    if (learnerSource === "tutor") {
+      return (tutorData?.students ?? []).map(
+        (s: { _id?: string; id?: string; firstName?: string; lastName?: string; name?: string; email?: string }) => ({
+          _id: String(s._id ?? s.id ?? ""),
+          firstName: s.firstName,
+          lastName: s.lastName,
+          name: s.name,
+          email: s.email,
+        })
+      );
+    }
+    return allLearnersData?.learners ?? [];
+  }, [allLearnersData?.learners, learnerSource, tutorData?.students]);
 
   const selectedLearners = useMemo(() => {
     return learnerIds.map((id) => {
@@ -41,11 +68,14 @@ export function AdminAnalyticsDashboard({ learnerIds }: AdminAnalyticsDashboardP
     });
   }, [learnerIds, learners]);
 
+  const allLabel =
+    learnerSource === "tutor" ? "All assigned students" : "All learners";
+
   if (learnerIds.length === 0) {
     return (
       <div className="space-y-6">
         <p className="text-sm text-gray-500">
-          Viewing analytics for: <span className="font-medium text-gray-700">All learners</span>
+          Viewing analytics for: <span className="font-medium text-gray-700">{allLabel}</span>
         </p>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">

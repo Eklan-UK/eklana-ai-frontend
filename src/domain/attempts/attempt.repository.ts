@@ -3,7 +3,7 @@ import User from '@/models/user';
 import Drill from '@/models/drill';
 import { Types } from 'mongoose';
 import { logger } from '@/lib/api/logger';
-import { toUserIdQuery } from '@/lib/api/user-id';
+import { toUserIdQuery, toUserIdQueryMulti } from '@/lib/api/user-id';
 
 export interface CreateAttemptData {
   drillAssignmentId: Types.ObjectId;
@@ -243,6 +243,7 @@ export class AttemptRepository {
     status?: 'pending' | 'reviewed' | 'all';
     limit?: number;
     offset?: number;
+    learnerIds?: string[];
   }): Promise<{ attempts: any[]; total: number }> {
     try {
       const query: Record<string, any> = {
@@ -253,6 +254,10 @@ export class AttemptRepository {
         query['sentenceResults.reviewStatus'] = 'pending';
       } else if (filters.status === 'reviewed') {
         query['sentenceResults.reviewStatus'] = 'reviewed';
+      }
+
+      if (filters.learnerIds != null) {
+        query.learnerId = { $in: toUserIdQueryMulti(filters.learnerIds) };
       }
 
       const attempts = await DrillAttempt.find(query)
@@ -287,6 +292,7 @@ export class AttemptRepository {
     status?: 'pending' | 'reviewed' | 'all';
     limit?: number;
     offset?: number;
+    learnerIds?: string[];
   }): Promise<{ attempts: any[]; total: number }> {
     try {
       const query: Record<string, any> = {
@@ -297,6 +303,10 @@ export class AttemptRepository {
         query['grammarResults.reviewStatus'] = 'pending';
       } else if (filters.status === 'reviewed') {
         query['grammarResults.reviewStatus'] = 'reviewed';
+      }
+
+      if (filters.learnerIds != null) {
+        query.learnerId = { $in: toUserIdQueryMulti(filters.learnerIds) };
       }
 
       const attempts = await DrillAttempt.find(query)

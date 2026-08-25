@@ -8,6 +8,10 @@ import { connectToDatabase } from "@/lib/api/db";
 import { apiResponse, NotFoundError, ValidationError } from "@/lib/api/response";
 import { isValidUserId, toUserIdQuery } from "@/lib/api/user-id";
 import { logger } from "@/lib/api/logger";
+import {
+  assertStaffCanReadLearner,
+  resolveLearnerIdToUserIdString,
+} from "@/lib/api/staff-learner-access";
 import User from "@/models/user";
 import DrillAssignment from "@/models/drill-assignment";
 import {
@@ -18,9 +22,21 @@ import {
   getWeekDateRange,
 } from "@/lib/precision-clinic/resolve-precision-clinic-weeks";
 
+async function assertStudentAccess(
+  context: { userId: string; userRole: string },
+  studentId: string,
+): Promise<string> {
+  const canonicalLearnerId = await resolveLearnerIdToUserIdString(studentId);
+  const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+  if (access === "forbidden") {
+    throw new NotFoundError("Student");
+  }
+  return canonicalLearnerId;
+}
+
 async function getHandler(
   _req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ) {
   const { studentId } = params;
@@ -31,16 +47,17 @@ async function getHandler(
 
   await connectToDatabase();
 
-  const learnerIdQuery = toUserIdQuery(studentId);
+  const learnerId = await assertStudentAccess(context, studentId);
+  const learnerIdQuery = toUserIdQuery(learnerId);
 
-  const user = await User.findById(studentId).lean();
+  const user = await User.findById(learnerId).lean();
   if (!user) {
     throw new NotFoundError("Student");
   }
 
   const { anchor, weekCount: currentWeek } =
     await resolvePrecisionClinicWeekCount({
-      learnerId: studentId,
+      learnerId,
       user,
     });
 
@@ -119,7 +136,7 @@ async function getHandler(
   }
 
   logger.info("Fetched precision clinic student weekly breakdown", {
-    studentId,
+    studentId: learnerId,
     weekCount: weeks.length,
     currentWeek,
   });
@@ -133,7 +150,7 @@ async function getHandler(
 
 async function postHandler(
   _req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ) {
   const { studentId } = params;
@@ -144,15 +161,17 @@ async function postHandler(
 
   await connectToDatabase();
 
-  const user = await User.findById(studentId).select("_id").lean();
+  const learnerId = await assertStudentAccess(context, studentId);
+
+  const user = await User.findById(learnerId).select("_id").lean();
   if (!user) {
     throw new NotFoundError("Student");
   }
 
-  const created = await incrementPrecisionClinicWeekCount(studentId);
+  const created = await incrementPrecisionClinicWeekCount(learnerId);
 
   logger.info("Created next precision clinic week for student", {
-    studentId,
+    studentId: learnerId,
     weekNumber: created.weekNumber,
     currentWeek: created.weekCount,
   });
@@ -171,7 +190,7 @@ async function postHandler(
 
 async function deleteHandler(
   req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ) {
   const { studentId } = params;
@@ -189,13 +208,15 @@ async function deleteHandler(
 
   await connectToDatabase();
 
+  const learnerId = await assertStudentAccess(context, studentId);
+
   const data = await deletePrecisionClinicStudentWeeks({
-    learnerId: studentId,
+    learnerId,
     weekNumbers,
   });
 
   logger.info("Deleted precision clinic student weeks", {
-    studentId,
+    studentId: learnerId,
     deletedWeekNumbers: data.deletedWeekNumbers,
     weekCount: data.weekCount,
     remappedAssignmentCount: data.remappedAssignmentCount,
@@ -210,7 +231,7 @@ export async function GET(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ["admin"],
+    ["admin", "tutor"],
     withErrorHandler((r, c) => getHandler(r, c, resolvedParams)),
   )(req);
 }
@@ -221,7 +242,7 @@ export async function POST(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ["admin"],
+    ["admin", "tutor"],
     withErrorHandler((r, c) => postHandler(r, c, resolvedParams)),
   )(req);
 }
@@ -232,7 +253,7 @@ export async function DELETE(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ["admin"],
+    ["admin", "tutor"],
     withErrorHandler((r, c) => deleteHandler(r, c, resolvedParams)),
   )(req);
 }

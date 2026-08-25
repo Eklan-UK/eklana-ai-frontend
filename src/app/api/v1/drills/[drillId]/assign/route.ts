@@ -14,6 +14,7 @@ import { assertLearnersEnrolledForClinic } from "@/domain/precision-clinic/clini
 import type { LearningJourneyPartId } from "@/domain/learning-journey/learning-journey.catalog";
 import { notifyLearnersOfAssignment } from "@/domain/drills/drill.service";
 import { getAssignedAtForWeek } from "@/lib/ai-drill-builder/week-utils";
+import { assertStaffCanActOnLearners } from "@/lib/api/staff-learner-access";
 
 async function handler(
   req: NextRequest,
@@ -97,6 +98,14 @@ async function handler(
     throw new ValidationError(
       `The following userIds are not valid learners (role: user): ${invalidIds.join(", ")}`
     );
+  }
+
+  const access = await assertStaffCanActOnLearners(
+    context,
+    userIds as string[],
+  );
+  if (access === "forbidden") {
+    return apiResponse.notFound("Learner");
   }
 
   if (drill.source === "precision_clinic") {

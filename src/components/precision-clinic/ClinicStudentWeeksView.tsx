@@ -22,6 +22,7 @@ import {
 } from "@/lib/ai-drill-builder/learner-utils";
 import { LearnerAvatar } from "@/components/ai-drill-builder/LearnerAvatar";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import {
   useCreatePrecisionClinicStudentWeek,
@@ -32,8 +33,6 @@ import { getDrillTypeLabel } from "@/utils/drill";
 import { assignmentStatusLabel } from "@/lib/drills/assignment-status";
 import { useLearnerClinicEnrollment } from "@/hooks/usePrecisionClinicEnrollments";
 import { ClinicEnrollmentModal } from "./ClinicEnrollmentModal";
-
-const BASE_PATH = "/admin/precision-clinic/students";
 
 type ClinicWeekDrill = {
   _id?: string;
@@ -47,13 +46,28 @@ type ClinicWeekDrill = {
 
 interface ClinicStudentWeeksViewProps {
   studentId: string;
+  variant?: "admin" | "tutor";
 }
 
-export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProps) {
+export function ClinicStudentWeeksView({
+  studentId,
+  variant = "admin",
+}: ClinicStudentWeeksViewProps) {
+  const basePath =
+    variant === "tutor"
+      ? "/tutor/precision-clinic/students"
+      : "/admin/precision-clinic/students";
+  const listHref =
+    variant === "tutor" ? "/tutor/precision-clinic" : "/admin/precision-clinic";
+
   const { data, isLoading } = usePrecisionClinicStudentWeeks(studentId);
   const createWeek = useCreatePrecisionClinicStudentWeek(studentId);
   const deleteWeeks = useDeletePrecisionClinicStudentWeeks(studentId);
-  const { data: adminData } = useAiDrillBuilderLearners(true);
+  const { data: tutorData } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: variant === "tutor" },
+  );
+  const { data: adminData } = useAiDrillBuilderLearners(variant === "admin");
   const [expandedPast, setExpandedPast] = useState<Set<number>>(new Set());
   const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<Set<number>>(
     new Set(),
@@ -62,6 +76,23 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
   const { data: enrolled = false } = useLearnerClinicEnrollment(studentId);
 
   const studentInfo = useMemo(() => {
+    if (variant === "tutor") {
+      const match = (tutorData?.students ?? []).find(
+        (s: Record<string, unknown>) =>
+          getLearnerId(s as Parameters<typeof getLearnerId>[0]) === studentId,
+      );
+      if (!match) {
+        return { name: "Student", email: undefined, avatar: null, image: null };
+      }
+      return {
+        name: getLearnerDisplayName(
+          match as Parameters<typeof getLearnerDisplayName>[0],
+        ),
+        email: match.email as string | undefined,
+        avatar: match.avatar as string | null | undefined,
+        image: match.image as string | null | undefined,
+      };
+    }
     const match = (adminData?.learners ?? []).find(
       (s) => getLearnerId(s) === studentId,
     );
@@ -74,7 +105,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
       avatar: match.avatar,
       image: match.image,
     };
-  }, [adminData, studentId]);
+  }, [variant, tutorData, adminData, studentId]);
 
   const currentWeek = data?.currentWeek ?? 0;
 
@@ -167,7 +198,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
           <LearnerAvatar learner={studentInfo} size="lg" />
           <div>
             <Link
-              href="/admin/precision-clinic"
+              href={listHref}
               className="mb-2 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -321,7 +352,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
                       </button>
                     ) : null}
                     <Link
-                      href={`${BASE_PATH}/${studentId}/week/${week.weekNumber}`}
+                      href={`${basePath}/${studentId}/week/${week.weekNumber}`}
                       className={`flex flex-1 items-center justify-between px-4 py-4 transition-colors hover:bg-gray-50/50 dark:hover:bg-muted/30 ${
                         isPast ? "pl-0" : ""
                       }`}
@@ -423,6 +454,7 @@ export function ClinicStudentWeeksView({ studentId }: ClinicStudentWeeksViewProp
 
       {enrollmentModalOpen && (
         <ClinicEnrollmentModal
+          variant={variant}
           initialStudentId={studentId}
           onClose={() => setEnrollmentModalOpen(false)}
         />

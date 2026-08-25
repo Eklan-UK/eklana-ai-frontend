@@ -13,6 +13,8 @@ import { AttemptReviewService } from '@/domain/attempts/attempt-review.service';
 import { AttemptRepository } from '@/domain/attempts/attempt.repository';
 import { DrillRepository } from '@/domain/drills/drill.repository';
 import { AssignmentRepository } from '@/domain/assignments/assignment.repository';
+import DrillAttempt from '@/models/drill-attempt';
+import { assertStaffCanReadLearner } from '@/lib/api/staff-learner-access';
 
 const reviewSchema = z.object({
 	grammarReviews: z.array(z.object({
@@ -34,6 +36,17 @@ async function handler(
 
 	if (!Types.ObjectId.isValid(attemptId)) {
 		throw new ValidationError('Invalid or missing attempt ID');
+	}
+
+	const attempt = await DrillAttempt.findById(attemptId).select('learnerId').lean().exec();
+	if (!attempt?.learnerId) {
+		return apiResponse.notFound('Attempt');
+	}
+
+	const learnerId = String(attempt.learnerId);
+	const access = await assertStaffCanReadLearner(context, learnerId);
+	if (access === 'forbidden') {
+		return apiResponse.notFound('Attempt');
 	}
 
 	const body = await parseRequestBody(req);

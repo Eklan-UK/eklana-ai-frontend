@@ -14,10 +14,29 @@ import {
   weekNumberFromAssignment,
   resolveWeekDisplayDates,
 } from "@/lib/ai-drill-builder/resolve-drill-builder-weeks";
+import {
+  assertStaffCanReadLearner,
+  resolveLearnerIdToUserIdString,
+} from "@/lib/api/staff-learner-access";
+
+async function studentAccessOrNotFound(
+  context: { userId: string; userRole: string },
+  studentId: string,
+): Promise<string | NextResponse> {
+  const canonicalLearnerId = await resolveLearnerIdToUserIdString(studentId);
+  const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+  if (access === "forbidden") {
+    return NextResponse.json(
+      { code: "NotFoundError", message: "Student not found" },
+      { status: 404 },
+    );
+  }
+  return canonicalLearnerId;
+}
 
 async function getHandler(
   _req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
@@ -32,9 +51,13 @@ async function getHandler(
 
     await connectToDatabase();
 
-    const learnerIdQuery = toUserIdQuery(studentId);
+    const learnerOrDenied = await studentAccessOrNotFound(context, studentId);
+    if (learnerOrDenied instanceof NextResponse) return learnerOrDenied;
+    const learnerId = learnerOrDenied;
 
-    const user = await User.findById(studentId).lean();
+    const learnerIdQuery = toUserIdQuery(learnerId);
+
+    const user = await User.findById(learnerId).lean();
     if (!user) {
       return NextResponse.json(
         { code: "NotFoundError", message: "Student not found" },
@@ -44,7 +67,7 @@ async function getHandler(
 
     const { anchor, weekCount: currentWeek } =
       await resolveDrillBuilderWeekCount({
-        learnerId: studentId,
+        learnerId,
         user,
       });
 
@@ -168,7 +191,7 @@ async function getHandler(
 
 async function postHandler(
   _req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
@@ -183,7 +206,11 @@ async function postHandler(
 
     await connectToDatabase();
 
-    const user = await User.findById(studentId).select("_id").lean();
+    const learnerOrDenied = await studentAccessOrNotFound(context, studentId);
+    if (learnerOrDenied instanceof NextResponse) return learnerOrDenied;
+    const learnerId = learnerOrDenied;
+
+    const user = await User.findById(learnerId).select("_id").lean();
     if (!user) {
       return NextResponse.json(
         { code: "NotFoundError", message: "Student not found" },
@@ -191,7 +218,7 @@ async function postHandler(
       );
     }
 
-    const created = await incrementDrillBuilderWeekCount(studentId);
+    const created = await incrementDrillBuilderWeekCount(learnerId);
 
     logger.info("Created next drill-builder week for student", {
       studentId,
@@ -228,7 +255,7 @@ async function postHandler(
 
 async function deleteHandler(
   req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
@@ -256,8 +283,11 @@ async function deleteHandler(
 
     await connectToDatabase();
 
+    const learnerOrDenied = await studentAccessOrNotFound(context, studentId);
+    if (learnerOrDenied instanceof NextResponse) return learnerOrDenied;
+
     const data = await deleteStudentWeeks({
-      learnerId: studentId,
+      learnerId: learnerOrDenied,
       weekNumbers,
     });
 
@@ -298,7 +328,7 @@ async function deleteHandler(
 
 async function patchHandler(
   req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ): Promise<NextResponse> {
   try {
@@ -333,8 +363,11 @@ async function patchHandler(
 
     await connectToDatabase();
 
+    const learnerOrDenied = await studentAccessOrNotFound(context, studentId);
+    if (learnerOrDenied instanceof NextResponse) return learnerOrDenied;
+
     const data = await updateStudentWeekDates({
-      learnerId: studentId,
+      learnerId: learnerOrDenied,
       weekNumber,
       weekStartDate,
       weekEndDate,

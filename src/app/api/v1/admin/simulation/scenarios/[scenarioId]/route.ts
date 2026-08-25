@@ -20,6 +20,7 @@ import SimulationSession from '@/models/simulation-session';
 import { simulationScenarioBodySchema } from '@/lib/simulation-scenario-api-schema';
 import { getCompetencyNamesForTopic } from '@/config/competency-framework';
 import { generateGeminiTTSAudio } from '@/services/gemini.service';
+import { resolveTutorScopedLearnerIds } from '@/lib/api/staff-learner-access';
 
 async function getHandler(
 	req: NextRequest,
@@ -129,6 +130,32 @@ async function patchHandler(
 		const validated = simulationScenarioBodySchema.parse(fields);
 		const weeklyFocus = getCompetencyNamesForTopic(validated.topicId);
 
+		let assignedLearnerIds = validated.assignedLearnerIds;
+		if (ctx.userRole === 'tutor') {
+			const scoped = await resolveTutorScopedLearnerIds(ctx);
+			if (!scoped.ok) {
+				return NextResponse.json(
+					{ code: 'NotFound', message: 'Learner not found or access denied' },
+					{ status: 404 },
+				);
+			}
+			const roster = new Set(scoped.learnerIds ?? []);
+			const incoming = validated.assignedLearnerIds.map(String);
+			const existing: string[] = (scenario.assignedLearnerIds ?? []).map(
+				(id: Types.ObjectId | string) => String(id),
+			);
+			const existingSet = new Set(existing);
+			if (incoming.some((id) => !roster.has(id) && !existingSet.has(id))) {
+				return NextResponse.json(
+					{ code: 'NotFound', message: 'Learner not found or access denied' },
+					{ status: 404 },
+				);
+			}
+			const preserved = existing.filter((id) => !roster.has(id));
+			const incomingOnRoster = incoming.filter((id) => roster.has(id));
+			assignedLearnerIds = [...new Set([...preserved, ...incomingOnRoster])];
+		}
+
 		// Only re-synthesize each audio track when its spoken text actually
 		// changed — TTS generation is the expensive part of this update.
 		const [backgroundAudioBase64, patientInformationAudioBase64] = await Promise.all([
@@ -149,7 +176,7 @@ async function patchHandler(
 					studentCharacterName: validated.studentCharacterName,
 					topicId: validated.topicId,
 					weeklyFocus,
-					assignedLearnerIds: validated.assignedLearnerIds,
+					assignedLearnerIds,
 					background: validated.background,
 					backgroundAudioBase64,
 					patientInformation: validated.patientInformation,

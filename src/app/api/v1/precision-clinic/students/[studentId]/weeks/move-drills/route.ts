@@ -3,14 +3,18 @@ import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api/middleware";
 import { withErrorHandler } from "@/lib/api/error-handler";
 import { connectToDatabase } from "@/lib/api/db";
-import { apiResponse, ValidationError } from "@/lib/api/response";
+import { apiResponse, NotFoundError, ValidationError } from "@/lib/api/response";
 import { isValidUserId } from "@/lib/api/user-id";
 import { logger } from "@/lib/api/logger";
+import {
+  assertStaffCanReadLearner,
+  resolveLearnerIdToUserIdString,
+} from "@/lib/api/staff-learner-access";
 import { movePrecisionClinicStudentWeekDrills } from "@/lib/precision-clinic/resolve-precision-clinic-weeks";
 
 async function postHandler(
   req: NextRequest,
-  _context: { userId: string; userRole: string },
+  context: { userId: string; userRole: string },
   params: { studentId: string },
 ) {
   const { studentId } = params;
@@ -43,14 +47,20 @@ async function postHandler(
 
   await connectToDatabase();
 
+  const canonicalLearnerId = await resolveLearnerIdToUserIdString(studentId);
+  const access = await assertStaffCanReadLearner(context, canonicalLearnerId);
+  if (access === "forbidden") {
+    throw new NotFoundError("Student");
+  }
+
   const data = await movePrecisionClinicStudentWeekDrills({
-    learnerId: studentId,
+    learnerId: canonicalLearnerId,
     assignmentIds,
     targetWeekNumber,
   });
 
   logger.info("Moved precision clinic student week drills", {
-    studentId,
+    studentId: canonicalLearnerId,
     movedCount: data.movedCount,
     targetWeekNumber: data.targetWeekNumber,
   });
@@ -64,7 +74,7 @@ export async function POST(
 ) {
   const resolvedParams = await params;
   return withRole(
-    ["admin"],
+    ["admin", "tutor"],
     withErrorHandler((r, c) => postHandler(r, c, resolvedParams)),
   )(req);
 }

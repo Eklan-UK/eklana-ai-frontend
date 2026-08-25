@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { AnalyticsLearnerFilter } from "@/components/admin/analytics-learner-filter";
 import { AdminAnalyticsDashboard } from "@/components/admin/admin-analytics-dashboard";
 
-function AdminAnalyticsPageContent() {
+function TutorAnalyticsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -28,7 +28,7 @@ function AdminAnalyticsPageContent() {
         params.set("learners", learnerIds.join(","));
       }
       const qs = params.toString();
-      router.replace(qs ? `/admin/analytics?${qs}` : "/admin/analytics", { scroll: false });
+      router.replace(qs ? `/tutor/analytics?${qs}` : "/tutor/analytics", { scroll: false });
     },
     [router, searchParams]
   );
@@ -46,25 +46,25 @@ function AdminAnalyticsPageContent() {
   }, [searchParams, setSelectedLearnerIds]);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="max-w-7xl mx-auto px-4 py-6 md:px-8 space-y-8 pb-12">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
         <p className="text-gray-500 text-sm">
-          Platform-wide or filtered learner performance across drills, pronunciation, and more
+          Performance across your assigned students — drills, pronunciation, and more
         </p>
       </div>
 
       <AnalyticsLearnerFilter
         value={selectedLearnerIds}
         onChange={setSelectedLearnerIds}
-        learnerSource="all"
+        learnerSource="tutor"
       />
-      <AdminAnalyticsDashboard learnerIds={selectedLearnerIds} learnerSource="all" />
+      <AdminAnalyticsDashboard learnerIds={selectedLearnerIds} learnerSource="tutor" />
     </div>
   );
 }
 
-export default function AdminAnalyticsPage() {
+export default function TutorAnalyticsPage() {
   return (
     <Suspense
       fallback={
@@ -73,7 +73,7 @@ export default function AdminAnalyticsPage() {
         </div>
       }
     >
-      <AdminAnalyticsPageContent />
+      <TutorAnalyticsPageContent />
     </Suspense>
   );
 }

@@ -35,11 +35,11 @@ export class ClinicEnrollmentService {
   }
 
   async listEnrollmentsForAdmin(
-    learnerIdFilter?: string,
+    learnerIds?: string[],
   ): Promise<ClinicEnrollmentListItem[]> {
     const rows =
-      learnerIdFilter != null
-        ? await this.repo.findActiveEnrollmentsForLearners([learnerIdFilter])
+      learnerIds != null
+        ? await this.repo.findActiveEnrollmentsForLearners(learnerIds)
         : await this.repo.findAllActiveEnrollments();
 
     return rows.map((row) => ({
@@ -114,9 +114,9 @@ export async function isLearnerEnrolled(learnerId: string): Promise<boolean> {
 }
 
 export async function listEnrollmentsForAdmin(
-  learnerIdFilter?: string,
+  learnerIds?: string[],
 ): Promise<ClinicEnrollmentListItem[]> {
-  return defaultService.listEnrollmentsForAdmin(learnerIdFilter);
+  return defaultService.listEnrollmentsForAdmin(learnerIds);
 }
 
 export async function getLearnerEnrollment(learnerId: string) {

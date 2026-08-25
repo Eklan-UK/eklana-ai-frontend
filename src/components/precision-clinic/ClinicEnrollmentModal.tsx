@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { useAiDrillBuilderLearners } from "@/hooks/useAiDrillBuilderLearners";
 import {
   useClinicEnrollmentsList,
@@ -208,21 +209,47 @@ function StudentClinicEnrollmentDetail({
 export interface ClinicEnrollmentModalProps {
   onClose: () => void;
   initialStudentId?: string;
+  variant?: "admin" | "tutor";
 }
 
 export function ClinicEnrollmentModal({
   onClose,
   initialStudentId,
+  variant = "admin",
 }: ClinicEnrollmentModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     initialStudentId ?? null,
   );
 
-  const { data: adminData, isLoading } = useAiDrillBuilderLearners(true);
+  const { data: tutorData, isLoading: tutorLoading } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: variant === "tutor" },
+  );
+  const { data: adminData, isLoading: adminLoading } =
+    useAiDrillBuilderLearners(variant === "admin");
   const { data: enrolledIds } = useClinicEnrollmentsList();
 
+  const isLoading = variant === "tutor" ? tutorLoading : adminLoading;
+
   const students: StudentRow[] = useMemo(() => {
+    if (variant === "tutor") {
+      return (tutorData?.students ?? [])
+        .map((s: Record<string, unknown>) => {
+          const id = getLearnerId(s as Parameters<typeof getLearnerId>[0]);
+          if (!id) return null;
+          return {
+            id,
+            name: getLearnerDisplayName(
+              s as Parameters<typeof getLearnerDisplayName>[0],
+            ),
+            email: s.email as string | undefined,
+            avatar: s.avatar as string | null | undefined,
+            image: s.image as string | null | undefined,
+          };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+    }
     return (adminData?.learners ?? [])
       .map((s) => {
         const id = getLearnerId(s);
@@ -236,7 +263,7 @@ export function ClinicEnrollmentModal({
         };
       })
       .filter((s): s is NonNullable<typeof s> => s !== null);
-  }, [adminData]);
+  }, [variant, tutorData, adminData]);
 
   const filteredStudents = useMemo(() => {
     if (!searchQuery) return students;
@@ -314,7 +341,9 @@ export function ClinicEnrollmentModal({
                 <p className="text-center text-sm text-gray-500 py-10">
                   {searchQuery
                     ? "No students match your search"
-                    : "No students found"}
+                    : variant === "tutor"
+                      ? "No assigned students found"
+                      : "No students found"}
                 </p>
               ) : (
                 <div className="space-y-2">

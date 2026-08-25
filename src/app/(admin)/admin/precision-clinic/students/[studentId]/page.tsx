@@ -13,7 +13,7 @@ export default function PrecisionClinicStudentPage({
   return (
     <div className="p-6 md:p-8">
       <div className="max-w-4xl">
-        <ClinicStudentWeeksView studentId={studentId} />
+        <ClinicStudentWeeksView variant="admin" studentId={studentId} />
       </div>
     </div>
   );

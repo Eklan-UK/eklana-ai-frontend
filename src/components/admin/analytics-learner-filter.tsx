@@ -3,11 +3,15 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { Check, Filter, Loader2, X } from "lucide-react";
 import { useAllLearners } from "@/hooks/useAdmin";
+import { useTutorStudents } from "@/hooks/useTutor";
 import { Checkbox } from "@/components/ui/Checkbox";
+
+export type AnalyticsLearnerSource = "all" | "tutor";
 
 interface AnalyticsLearnerFilterProps {
   value: string[];
   onChange: (learnerIds: string[]) => void;
+  learnerSource?: AnalyticsLearnerSource;
 }
 
 function learnerDisplayName(learner: {
@@ -20,30 +24,62 @@ function learnerDisplayName(learner: {
   return fromParts || learner.name || learner.email || "Unknown";
 }
 
-export function AnalyticsLearnerFilter({ value, onChange }: AnalyticsLearnerFilterProps) {
+type FilterLearner = {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email?: string;
+};
+
+export function AnalyticsLearnerFilter({
+  value,
+  onChange,
+  learnerSource = "all",
+}: AnalyticsLearnerFilterProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { data: learnersData, isLoading } = useAllLearners({ limit: 1000 });
-  const learners = learnersData?.learners ?? [];
+  const { data: allLearnersData, isLoading: allLoading } = useAllLearners(
+    { limit: 1000 },
+    { enabled: learnerSource === "all" }
+  );
+  const { data: tutorData, isLoading: tutorLoading } = useTutorStudents(
+    { limit: 1000 },
+    { enabled: learnerSource === "tutor" }
+  );
+
+  const learners: FilterLearner[] = useMemo(() => {
+    if (learnerSource === "tutor") {
+      return (tutorData?.students ?? []).map((s: FilterLearner & { _id?: string; id?: string }) => ({
+        _id: String(s._id ?? s.id ?? ""),
+        firstName: s.firstName,
+        lastName: s.lastName,
+        name: s.name,
+        email: s.email,
+      })).filter((s) => s._id);
+    }
+    return (allLearnersData?.learners ?? []) as FilterLearner[];
+  }, [allLearnersData?.learners, learnerSource, tutorData?.students]);
+
+  const isLoading = learnerSource === "tutor" ? tutorLoading : allLoading;
+  const emptyLabel =
+    learnerSource === "tutor" ? "Showing all assigned students" : "Showing all learners";
 
   const selectedSet = useMemo(() => new Set(value), [value]);
 
   const filteredLearners = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return learners;
-    return learners.filter(
-      (learner: { firstName?: string; lastName?: string; name?: string; email?: string }) => {
-        const name = learnerDisplayName(learner).toLowerCase();
-        const email = (learner.email ?? "").toLowerCase();
-        return name.includes(q) || email.includes(q);
-      }
-    );
+    return learners.filter((learner) => {
+      const name = learnerDisplayName(learner).toLowerCase();
+      const email = (learner.email ?? "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
   }, [learners, search]);
 
   const selectedLearners = useMemo(
-    () =>
-      learners.filter((l: { _id: string }) => selectedSet.has(l._id)),
+    () => learners.filter((l) => selectedSet.has(l._id)),
     [learners, selectedSet]
   );
 
@@ -59,8 +95,8 @@ export function AnalyticsLearnerFilter({ value, onChange }: AnalyticsLearnerFilt
   );
 
   const handleSelectAllFiltered = useCallback(() => {
-    const ids = filteredLearners.map((l: { _id: string }) => l._id);
-    const allSelected = ids.length > 0 && ids.every((id: string) => selectedSet.has(id));
+    const ids = filteredLearners.map((l) => l._id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedSet.has(id));
     if (allSelected) {
       onChange(value.filter((id) => !ids.includes(id)));
     } else {
@@ -91,13 +127,13 @@ export function AnalyticsLearnerFilter({ value, onChange }: AnalyticsLearnerFilt
         </button>
 
         {value.length === 0 && (
-          <span className="text-sm text-gray-500">Showing all learners</span>
+          <span className="text-sm text-gray-500">{emptyLabel}</span>
         )}
       </div>
 
       {value.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          {selectedLearners.map((learner: { _id: string; firstName?: string; lastName?: string; email?: string }) => (
+          {selectedLearners.map((learner) => (
             <span
               key={learner._id}
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm text-gray-800"
@@ -151,7 +187,7 @@ export function AnalyticsLearnerFilter({ value, onChange }: AnalyticsLearnerFilt
                 onClick={handleSelectAllFiltered}
                 className="text-xs font-medium text-emerald-600 hover:underline"
               >
-                {filteredLearners.every((l: { _id: string }) => selectedSet.has(l._id))
+                {filteredLearners.every((l) => selectedSet.has(l._id))
                   ? "Deselect filtered"
                   : "Select all filtered"}
               </button>
@@ -168,42 +204,35 @@ export function AnalyticsLearnerFilter({ value, onChange }: AnalyticsLearnerFilt
               <p className="py-8 text-center text-sm text-gray-500">No learners found</p>
             ) : (
               <ul className="space-y-1">
-                {filteredLearners.map(
-                  (learner: {
-                    _id: string;
-                    firstName?: string;
-                    lastName?: string;
-                    email?: string;
-                  }) => {
-                    const isSelected = selectedSet.has(learner._id);
-                    const name = learnerDisplayName(learner);
-                    return (
-                      <li key={learner._id}>
-                        <label
-                          className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 transition-colors ${
-                            isSelected
-                              ? "border-emerald-200 bg-emerald-50"
-                              : "border-transparent hover:bg-gray-50"
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => handleToggle(learner._id)}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-gray-900">{name}</p>
-                            {learner.email && (
-                              <p className="truncate text-xs text-gray-500">{learner.email}</p>
-                            )}
-                          </div>
-                          {isSelected && (
-                            <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                {filteredLearners.map((learner) => {
+                  const isSelected = selectedSet.has(learner._id);
+                  const name = learnerDisplayName(learner);
+                  return (
+                    <li key={learner._id}>
+                      <label
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 transition-colors ${
+                          isSelected
+                            ? "border-emerald-200 bg-emerald-50"
+                            : "border-transparent hover:bg-gray-50"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => handleToggle(learner._id)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-gray-900">{name}</p>
+                          {learner.email && (
+                            <p className="truncate text-xs text-gray-500">{learner.email}</p>
                           )}
-                        </label>
-                      </li>
-                    );
-                  }
-                )}
+                        </div>
+                        {isSelected && (
+                          <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                        )}
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
